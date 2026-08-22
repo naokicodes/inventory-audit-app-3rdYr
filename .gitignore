@@ -1,0 +1,12 @@
+# Local data — never goes to GitHub
+*.db
+*.sqlite
+*.sqlite3
+/uploads/
+
+# Secrets
+.env
+
+# Standard clutter
+node_modules/
+.DS_Store
