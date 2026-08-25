@@ -1,0 +1,22 @@
+// Database connection helper.
+// Opens (or creates, if missing) the local SQLite file.
+// No tables are defined here yet - that's the next step, once
+// docs/data-model.md is turned into an actual schema.
+//
+// Uses Node's BUILT-IN SQLite support (node:sqlite) instead of the
+// better-sqlite3 package. As of Node 22.13+ this ships with the runtime
+// itself - no native compilation, no Visual Studio Build Tools needed on
+// Windows. Requires Node 22.13.0 or newer.
+
+const path = require('path');
+const { DatabaseSync } = require('node:sqlite');
+
+const DB_PATH = path.join(__dirname, 'inventory.db');
+
+const db = new DatabaseSync(DB_PATH);
+
+// A couple of sane defaults for a single-user local SQLite file:
+db.exec('PRAGMA journal_mode = WAL');   // better crash-safety, minimal downside here
+db.exec('PRAGMA foreign_keys = ON');    // enforce FK constraints once tables exist
+
+module.exports = db;
