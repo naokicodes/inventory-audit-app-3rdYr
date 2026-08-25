@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS ending_actual (
   meat_id INTEGER NOT NULL,
   business_date TEXT NOT NULL,
   quantity REAL NOT NULL,
+  notes TEXT,
   photo_path TEXT,
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -189,4 +190,5 @@ INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations) VALUE
   ('Staff Meal / In-House', 0),
   ('Allocation / Transfer', 1),
   ('Spoilage', 0),
-  ('Damaged', 0);
+  ('Damaged', 0),
+  ('Other / Uncategorized', 0);
