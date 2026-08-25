@@ -1,0 +1,81 @@
+/* Minimal structural CSS - layout, spacing, and clear buttons only.
+   No fonts/colors/animations beyond what's needed to navigate easily.
+   This is intentionally basic - see docs/scope.md, visual polish is a
+   later phase, not now. */
+
+body {
+  font-family: sans-serif;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.controls label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 0.25rem;
+}
+
+.meat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.meat-row .name {
+  flex: 1;
+}
+
+.meat-row .unit {
+  color: #666;
+  font-size: 0.85rem;
+  width: 3rem;
+}
+
+.meat-row input[type="number"] {
+  width: 6rem;
+  padding: 0.4rem;
+  font-size: 1rem;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.save-bar {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.status-message {
+  font-size: 0.9rem;
+}
+
+.status-message.success {
+  color: green;
+}
+
+.status-message.error {
+  color: crimson;
+}
+
+nav {
+  margin-bottom: 1.5rem;
+  display: flex;
+  gap: 1rem;
+}
