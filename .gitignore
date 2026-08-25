@@ -1,5 +1,7 @@
 # Local data — never goes to GitHub
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 /uploads/
