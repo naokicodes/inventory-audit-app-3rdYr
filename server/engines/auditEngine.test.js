@@ -152,9 +152,19 @@ test('missing actual count is flagged, not silently treated as zero variance', (
 
 console.log(`\n${passed} passed, ${failed} failed`);
 
+// Close the connection BEFORE deleting the file - Windows keeps a lock on
+// the db file until the handle is explicitly closed (Linux releases it
+// automatically at process exit, which is why this didn't show up during
+// initial testing). Wrapped in try/catch as an extra safety net in case
+// antivirus/indexing briefly holds the file on some machines.
+db.close();
 for (const ext of ['', '-shm', '-wal']) {
   const p = TEST_DB_PATH + ext;
-  if (fs.existsSync(p)) fs.unlinkSync(p);
+  try {
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  } catch (err) {
+    console.log(`  (note: couldn't clean up ${p} - ${err.code}. Harmless, delete manually if it bothers you.)`);
+  }
 }
 
 process.exit(failed > 0 ? 1 : 0);
