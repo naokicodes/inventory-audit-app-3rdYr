@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Daily Audit - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem; text-align: right; }
+    th { background: #f0f0f0; text-align: center; }
+    td:first-child, th:first-child { text-align: left; }
+    td.calculated { background: #f7f7f7; color: #555; }
+    input[type="number"] { width: 4.5rem; padding: 0.3rem; }
+    input[type="text"] { width: 8rem; padding: 0.3rem; }
+    .status-OK { color: green; font-weight: bold; }
+    .status-SHORTAGE { color: crimson; font-weight: bold; }
+    .status-SURPLUS { color: darkorange; font-weight: bold; }
+    .status-MISSING_ACTUAL_COUNT, .status-MISSING_BEGINNING_STOCK { color: #999; font-style: italic; }
+  </style>
+</head>
+<body style="max-width: 1100px;">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Daily Audit</a>
+  </nav>
+
+  <h1>Daily Audit</h1>
+
+  <div class="controls">
+    <label>
+      Restaurant
+      <select id="restaurant"></select>
+    </label>
+    <label>
+      Date
+      <input type="date" id="business-date">
+    </label>
+  </div>
+
+  <div id="grid-container">Loading...</div>
+
+  <div class="save-bar">
+    <button id="save-btn">Save Day</button>
+    <span id="status" class="status-message"></span>
+  </div>
+
+  <script>
+    const restaurantSelect = document.getElementById('restaurant');
+    const dateInput = document.getElementById('business-date');
+    const gridContainer = document.getElementById('grid-container');
+    const saveBtn = document.getElementById('save-btn');
+    const statusEl = document.getElementById('status');
+
+    dateInput.value = new Date().toISOString().slice(0, 10);
+
+    function fmt(n) {
+      return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
+    }
+
+    async function loadRestaurants() {
+      const res = await fetch('/api/restaurants');
+      const restaurants = await res.json();
+      restaurantSelect.innerHTML = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+    }
+
+    async function loadGrid() {
+      const restaurantId = restaurantSelect.value;
+      const date = dateInput.value;
+      if (!restaurantId || !date) return;
+
+      gridContainer.innerHTML = 'Loading...';
+      const res = await fetch(`/api/daily-audit?restaurant_id=${restaurantId}&date=${date}`);
+      const rows = await res.json();
+
+      const tableRows = rows.map(r => `
+        <tr data-meat-id="${r.meat_id}">
+          <td>${r.name} <span style="color:#999;font-size:0.8em;">(${r.unit})</span></td>
+          <td class="calculated">${fmt(r.beginning)}</td>
+          <td><input type="number" step="0.01" class="new_stock" value="${r.new_stock ?? ''}" placeholder="0"></td>
+          <td class="calculated">${fmt(r.usage)}</td>
+          <td><input type="number" step="0.01" class="in_house" value="${r.in_house ?? ''}" placeholder="0"></td>
+          <td><input type="number" step="0.01" class="wastage" value="${r.wastage ?? ''}" placeholder="0"></td>
+          <td><input type="number" step="0.01" class="other" value="${r.other ?? ''}" placeholder="0"></td>
+          <td class="calculated">${fmt(r.ending_calculated)}</td>
+          <td><input type="number" step="0.01" class="ending_actual" value="${r.ending_actual ?? ''}" placeholder="0"></td>
+          <td class="calculated">${fmt(r.unexplained_variance)}</td>
+          <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""></td>
+          <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
+        </tr>
+      `).join('');
+
+      gridContainer.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Meat</th><th>Beginning</th><th>New Stock</th><th>Usage</th>
+              <th>In-House</th><th>Wastage</th><th>Other (+/-)</th>
+              <th>Ending (calc)</th><th>Ending (actual)</th><th>Variance</th>
+              <th>Remarks</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      `;
+    }
+
+    async function save() {
+      const restaurantId = Number(restaurantSelect.value);
+      const date = dateInput.value;
+      const trs = gridContainer.querySelectorAll('tr[data-meat-id]');
+
+      const rows = Array.from(trs).map(tr => ({
+        meat_id: Number(tr.dataset.meatId),
+        new_stock: tr.querySelector('.new_stock').value,
+        in_house: tr.querySelector('.in_house').value,
+        wastage: tr.querySelector('.wastage').value,
+        other: tr.querySelector('.other').value,
+        ending_actual: tr.querySelector('.ending_actual').value,
+        remarks: tr.querySelector('.remarks').value
+      }));
+
+      statusEl.textContent = 'Saving...';
+      statusEl.className = 'status-message';
+
+      try {
+        const res = await fetch('/api/daily-audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurant_id: restaurantId, business_date: date, rows })
+        });
+        const result = await res.json();
+        if (result.ok) {
+          statusEl.textContent = `Saved. Reloading...`;
+          statusEl.className = 'status-message success';
+          await loadGrid();
+          statusEl.textContent = `Saved ${result.saved} row(s).`;
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+      } catch (err) {
+        statusEl.textContent = 'Error saving: ' + err.message;
+        statusEl.className = 'status-message error';
+      }
+    }
+
+    restaurantSelect.addEventListener('change', loadGrid);
+    dateInput.addEventListener('change', loadGrid);
+    saveBtn.addEventListener('click', save);
+
+    loadRestaurants().then(loadGrid);
+  </script>
+</body>
+</html>

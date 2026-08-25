@@ -9,14 +9,14 @@ const express = require('express');
 // Touching the db connection here just to confirm it opens without error.
 require('./db/connection');
 
-const newStockRoutes = require('./routes/newStock.js');
+const dailyAuditRoutes = require('./routes/dailyAudit.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/api', newStockRoutes);
+app.use('/api', dailyAuditRoutes);
 
 app.listen(PORT, () => {
   console.log(`Inventory Audit App running at http://localhost:${PORT}`);
