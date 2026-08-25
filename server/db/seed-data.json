@@ -1,0 +1,427 @@
+{
+  "restaurant": {
+    "name": "Restaurant A",
+    "code": "RA"
+  },
+  "meats": [
+    {
+      "meat_code": "M01",
+      "name": "Whole Chicken Raw",
+      "unit": "unit",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M02",
+      "name": "Belly Slab",
+      "unit": "kg",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M03",
+      "name": "JOWL",
+      "unit": "kg",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M04",
+      "name": "PATA",
+      "unit": "unit",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M05",
+      "name": "Shortplate",
+      "unit": "kg",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M06",
+      "name": "Pork Steak",
+      "unit": "unit",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M07",
+      "name": "French Cut",
+      "unit": "unit",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M08",
+      "name": "Pompano",
+      "unit": "unit",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M09",
+      "name": "Salmon Belly",
+      "unit": "unit",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M10",
+      "name": "Ground Beef",
+      "unit": "kg",
+      "cost_per_unit": null
+    },
+    {
+      "meat_code": "M11",
+      "name": "Miscuts",
+      "unit": "kg",
+      "cost_per_unit": null
+    }
+  ],
+  "dishes": [
+    {
+      "dish_code": "D001",
+      "name": "Mozarella Sticks",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D002",
+      "name": "Kalabasa Hummus",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D003",
+      "name": "Bagnet Sisig",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D004",
+      "name": "Golabki",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D005",
+      "name": "Mini Buratta",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D006",
+      "name": "Chef's Salad",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D007",
+      "name": "Pako Salad",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D008",
+      "name": "Pasta Negra",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D009",
+      "name": "Meatball Pasta",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D010",
+      "name": "Bolognese Pasta",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D011",
+      "name": "Caccio e Pepe",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D012",
+      "name": "Croquettes",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D013",
+      "name": "Pan Fry Pork Steak",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D014",
+      "name": "French Pork Chop",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D015",
+      "name": "Braised Beef Short Plate",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D016",
+      "name": "Pork Bagnet",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D017",
+      "name": "Chopsuey - Chicken",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D018",
+      "name": "Chopsuey - Jowl",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D019",
+      "name": "Pork Pinakbet",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D020",
+      "name": "Cabbage Sinutey",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D021",
+      "name": "Chicken Dereta",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D022",
+      "name": "Whole Chicken",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D023",
+      "name": "Bagnet sa Ginamos - BSG",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D024",
+      "name": "Pata Ka",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D025",
+      "name": "Pompano",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D026",
+      "name": "Bah Mi - Chicken",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D027",
+      "name": "Bah Mi - Pork",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D028",
+      "name": "Stir Fry - Chicken",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D029",
+      "name": "Stir Fry - Pork",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D030",
+      "name": "Lomi Daw - Chicken",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D031",
+      "name": "Lomi Daw - Pork",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D032",
+      "name": "Homemade Burger",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D033",
+      "name": "Fillet Burger",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D034",
+      "name": "Chicken Sandwich",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D035",
+      "name": "Above Pounder",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D036",
+      "name": "Salmon Tinola",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D037",
+      "name": "Beef Short Plate Nilaga",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D038",
+      "name": "Sinigang na Inihaw",
+      "prep_type": "BATCH_PREPPED",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D039",
+      "name": "Adobo Rice Platter",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    }
+  ],
+  "recipe_bom": [
+    {
+      "dish_code": "D003",
+      "meat_code": "M03",
+      "quantity": 0.18
+    },
+    {
+      "dish_code": "D013",
+      "meat_code": "M06",
+      "quantity": 1.0
+    },
+    {
+      "dish_code": "D014",
+      "meat_code": "M07",
+      "quantity": 1.0
+    },
+    {
+      "dish_code": "D015",
+      "meat_code": "M05",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D016",
+      "meat_code": "M03",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D017",
+      "meat_code": "M01",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D018",
+      "meat_code": "M03",
+      "quantity": 0.1
+    },
+    {
+      "dish_code": "D019",
+      "meat_code": "M03",
+      "quantity": 0.1
+    },
+    {
+      "dish_code": "D021",
+      "meat_code": "M01",
+      "quantity": 0.25
+    },
+    {
+      "dish_code": "D022",
+      "meat_code": "M01",
+      "quantity": 1.0
+    },
+    {
+      "dish_code": "D023",
+      "meat_code": "M03",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D024",
+      "meat_code": "M04",
+      "quantity": 1.0
+    },
+    {
+      "dish_code": "D025",
+      "meat_code": "M08",
+      "quantity": 1.0
+    },
+    {
+      "dish_code": "D026",
+      "meat_code": "M01",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D027",
+      "meat_code": "M03",
+      "quantity": 0.1
+    },
+    {
+      "dish_code": "D028",
+      "meat_code": "M01",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D029",
+      "meat_code": "M03",
+      "quantity": 0.1
+    },
+    {
+      "dish_code": "D030",
+      "meat_code": "M01",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D031",
+      "meat_code": "M03",
+      "quantity": 0.1
+    },
+    {
+      "dish_code": "D036",
+      "meat_code": "M09",
+      "quantity": 0.5
+    },
+    {
+      "dish_code": "D037",
+      "meat_code": "M05",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D038",
+      "meat_code": "M02",
+      "quantity": 0.2
+    },
+    {
+      "dish_code": "D039",
+      "meat_code": "M03",
+      "quantity": 0.1
+    }
+  ]
+}
