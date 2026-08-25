@@ -9,14 +9,23 @@
 // Windows. Requires Node 22.13.0 or newer.
 
 const path = require('path');
+const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 
 const DB_PATH = path.join(__dirname, 'inventory.db');
+const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 const db = new DatabaseSync(DB_PATH);
 
 // A couple of sane defaults for a single-user local SQLite file:
 db.exec('PRAGMA journal_mode = WAL');   // better crash-safety, minimal downside here
 db.exec('PRAGMA foreign_keys = ON');    // enforce FK constraints once tables exist
+
+// Run schema.sql on every startup. All statements use "CREATE TABLE IF
+// NOT EXISTS" and "INSERT OR IGNORE", so this is safe to re-run every
+// time the app starts - it only creates what's missing, never destroys
+// or duplicates existing data.
+const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
+db.exec(schema);
 
 module.exports = db;
