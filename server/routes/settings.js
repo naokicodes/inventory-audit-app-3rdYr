@@ -1,0 +1,141 @@
+// Settings API - admin management of meats, dishes, and recipes.
+// This is where restaurant setup happens (occasional use, not daily) -
+// see docs/daily-workflow.md, this is deliberately separate from the
+// auditor's daily screens.
+
+const express = require('express');
+const db = require('../db/connection.js');
+
+const router = express.Router();
+
+// ---------- MEATS ----------
+
+router.get('/settings/meats', (req, res) => {
+  const restaurantId = Number(req.query.restaurant_id);
+  if (!restaurantId) return res.status(400).json({ error: 'restaurant_id required' });
+  const meats = db.prepare(
+    `SELECT id, meat_code, name, unit, cost_per_unit, active FROM meats WHERE restaurant_id = ? ORDER BY meat_code`
+  ).all(restaurantId);
+  res.json(meats);
+});
+
+router.post('/settings/meats', (req, res) => {
+  const { restaurant_id, meat_code, name, unit, cost_per_unit } = req.body;
+  if (!restaurant_id || !meat_code || !name || !unit) {
+    return res.status(400).json({ error: 'restaurant_id, meat_code, name, and unit are required' });
+  }
+  if (!['kg', 'unit'].includes(unit)) {
+    return res.status(400).json({ error: 'unit must be "kg" or "unit"' });
+  }
+  try {
+    const result = db.prepare(
+      `INSERT INTO meats (restaurant_id, meat_code, name, unit, cost_per_unit) VALUES (?, ?, ?, ?, ?)`
+    ).run(restaurant_id, meat_code.toUpperCase(), name, unit, cost_per_unit || null);
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That meat code already exists.' : err.message });
+  }
+});
+
+router.put('/settings/meats/:id', (req, res) => {
+  const { name, unit, cost_per_unit, active } = req.body;
+  db.prepare(
+    `UPDATE meats SET name = ?, unit = ?, cost_per_unit = ?, active = ? WHERE id = ?`
+  ).run(name, unit, cost_per_unit || null, active ? 1 : 0, req.params.id);
+  res.json({ ok: true });
+});
+
+// ---------- DISHES ----------
+
+router.get('/settings/dishes', (req, res) => {
+  const restaurantId = Number(req.query.restaurant_id);
+  if (!restaurantId) return res.status(400).json({ error: 'restaurant_id required' });
+  const dishes = db.prepare(
+    `SELECT id, dish_code, name, prep_type, cost_per_portion, active FROM dishes WHERE restaurant_id = ? ORDER BY dish_code`
+  ).all(restaurantId);
+  res.json(dishes);
+});
+
+router.post('/settings/dishes', (req, res) => {
+  const { restaurant_id, dish_code, name, prep_type, cost_per_portion } = req.body;
+  if (!restaurant_id || !dish_code || !name || !prep_type) {
+    return res.status(400).json({ error: 'restaurant_id, dish_code, name, and prep_type are required' });
+  }
+  if (!['DIRECT', 'BATCH_PREPPED'].includes(prep_type)) {
+    return res.status(400).json({ error: 'prep_type must be DIRECT or BATCH_PREPPED' });
+  }
+  try {
+    const result = db.prepare(
+      `INSERT INTO dishes (restaurant_id, dish_code, name, prep_type, cost_per_portion) VALUES (?, ?, ?, ?, ?)`
+    ).run(restaurant_id, dish_code.toUpperCase(), name, prep_type, cost_per_portion || null);
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That dish code already exists.' : err.message });
+  }
+});
+
+router.put('/settings/dishes/:id', (req, res) => {
+  const { name, prep_type, cost_per_portion, active } = req.body;
+  db.prepare(
+    `UPDATE dishes SET name = ?, prep_type = ?, cost_per_portion = ?, active = ? WHERE id = ?`
+  ).run(name, prep_type, cost_per_portion || null, active ? 1 : 0, req.params.id);
+  res.json({ ok: true });
+});
+
+// ---------- RECIPE_BOM ----------
+// Returns recipe rows joined with dish/meat names for readability, plus
+// the full meat/dish lists separately so the frontend can build "add a
+// new ingredient line" dropdowns.
+
+router.get('/settings/recipes', (req, res) => {
+  const restaurantId = Number(req.query.restaurant_id);
+  if (!restaurantId) return res.status(400).json({ error: 'restaurant_id required' });
+
+  const rows = db.prepare(`
+    SELECT r.id, r.dish_id, d.name as dish_name, r.meat_id, m.name as meat_name,
+           m.unit, r.quantity, r.effective_from, r.effective_until
+    FROM recipe_bom r
+    JOIN dishes d ON d.id = r.dish_id
+    JOIN meats m ON m.id = r.meat_id
+    WHERE d.restaurant_id = ?
+      AND (r.effective_until IS NULL OR r.effective_until >= date('now'))
+    ORDER BY d.name, m.name
+  `).all(restaurantId);
+
+  res.json(rows);
+});
+
+router.post('/settings/recipes', (req, res) => {
+  const { dish_id, meat_id, quantity } = req.body;
+  if (!dish_id || !meat_id || quantity === undefined || quantity === null) {
+    return res.status(400).json({ error: 'dish_id, meat_id, and quantity are required' });
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const result = db.prepare(
+    `INSERT INTO recipe_bom (dish_id, meat_id, quantity, effective_from) VALUES (?, ?, ?, ?)`
+  ).run(dish_id, meat_id, Number(quantity), today);
+  res.json({ ok: true, id: result.lastInsertRowid });
+});
+
+// Recipe versioning: don't destroy history, close out the old row and
+// open a new one - matches data-model.md's recipe versioning rule.
+router.put('/settings/recipes/:id', (req, res) => {
+  const { quantity } = req.body;
+  const old = db.prepare(`SELECT * FROM recipe_bom WHERE id = ?`).get(req.params.id);
+  if (!old) return res.status(404).json({ error: 'Recipe row not found' });
+
+  const today = new Date().toISOString().slice(0, 10);
+  db.prepare(`UPDATE recipe_bom SET effective_until = ? WHERE id = ?`).run(today, req.params.id);
+  const result = db.prepare(
+    `INSERT INTO recipe_bom (dish_id, meat_id, quantity, effective_from) VALUES (?, ?, ?, ?)`
+  ).run(old.dish_id, old.meat_id, Number(quantity), today);
+  res.json({ ok: true, id: result.lastInsertRowid });
+});
+
+router.delete('/settings/recipes/:id', (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  db.prepare(`UPDATE recipe_bom SET effective_until = ? WHERE id = ?`).run(today, req.params.id);
+  res.json({ ok: true });
+});
+
+module.exports = router;

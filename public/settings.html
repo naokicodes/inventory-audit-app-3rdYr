@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Settings - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem; text-align: left; }
+    th { background: #f0f0f0; }
+    section { margin-bottom: 2.5rem; }
+    .add-form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin-bottom: 1rem; }
+    .add-form label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .add-form input, .add-form select { padding: 0.3rem; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tabs button { background: #eee; border: 1px solid #ccc; }
+    .tabs button.active { background: #333; color: white; }
+    .section-panel { display: none; }
+    .section-panel.active { display: block; }
+    small.hint { color: #888; }
+  </style>
+</head>
+<body style="max-width: 900px;">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+
+  <h1>Restaurant Settings</h1>
+  <label>Restaurant <select id="restaurant"></select></label>
+
+  <div class="tabs">
+    <button data-section="meats" class="active">Meats</button>
+    <button data-section="dishes">Dishes</button>
+    <button data-section="recipes">Recipes</button>
+  </div>
+
+  <section id="section-meats" class="section-panel active">
+    <h2>Meats</h2>
+    <div class="add-form">
+      <label>Code <input id="meat-code" placeholder="M12"></label>
+      <label>Name <input id="meat-name" placeholder="Beef Shank"></label>
+      <label>Unit <select id="meat-unit"><option value="kg">kg</option><option value="unit">unit</option></select></label>
+      <label>Cost/unit <input id="meat-cost" type="number" step="0.01"></label>
+      <button id="add-meat">Add Meat</button>
+    </div>
+    <div id="meats-table">Loading...</div>
+  </section>
+
+  <section id="section-dishes" class="section-panel">
+    <h2>Dishes</h2>
+    <div class="add-form">
+      <label>Code <input id="dish-code" placeholder="D40"></label>
+      <label>Name <input id="dish-name" placeholder="New Dish"></label>
+      <label>Prep Type
+        <select id="dish-prep-type">
+          <option value="DIRECT">Direct</option>
+          <option value="BATCH_PREPPED">Batch-Prepped</option>
+        </select>
+      </label>
+      <label>Cost/portion <input id="dish-cost" type="number" step="0.01"></label>
+      <button id="add-dish">Add Dish</button>
+    </div>
+    <div id="dishes-table">Loading...</div>
+  </section>
+
+  <section id="section-recipes" class="section-panel">
+    <h2>Recipes (which meats each dish uses)</h2>
+    <small class="hint">Editing a quantity keeps the old value in history (versioned), doesn't erase it.</small>
+    <div class="add-form">
+      <label>Dish <select id="recipe-dish"></select></label>
+      <label>Meat <select id="recipe-meat"></select></label>
+      <label>Quantity <input id="recipe-qty" type="number" step="0.001"></label>
+      <button id="add-recipe">Add Ingredient Line</button>
+    </div>
+    <div id="recipes-table">Loading...</div>
+  </section>
+
+  <script>
+    const restaurantSelect = document.getElementById('restaurant');
+    let currentRestaurantId = null;
+
+    document.querySelectorAll('.tabs button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.section-panel').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('section-' + btn.dataset.section).classList.add('active');
+      });
+    });
+
+    async function loadRestaurants() {
+      const res = await fetch('/api/restaurants');
+      const restaurants = await res.json();
+      restaurantSelect.innerHTML = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+      currentRestaurantId = restaurantSelect.value;
+    }
+
+    // ---------- MEATS ----------
+    async function loadMeats() {
+      const res = await fetch(`/api/settings/meats?restaurant_id=${currentRestaurantId}`);
+      const meats = await res.json();
+      document.getElementById('meats-table').innerHTML = `
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Cost/unit</th><th>Active</th></tr></thead>
+          <tbody>${meats.map(m => `
+            <tr>
+              <td>${m.meat_code}</td>
+              <td><input value="${m.name}" data-field="name" data-id="${m.id}" class="meat-edit"></td>
+              <td>
+                <select data-field="unit" data-id="${m.id}" class="meat-edit">
+                  <option value="kg" ${m.unit==='kg'?'selected':''}>kg</option>
+                  <option value="unit" ${m.unit==='unit'?'selected':''}>unit</option>
+                </select>
+              </td>
+              <td><input type="number" step="0.01" value="${m.cost_per_unit ?? ''}" data-field="cost_per_unit" data-id="${m.id}" class="meat-edit"></td>
+              <td><input type="checkbox" ${m.active ? 'checked' : ''} data-field="active" data-id="${m.id}" class="meat-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.meat-edit').forEach(el => el.addEventListener('change', saveMeatRow));
+    }
+
+    async function saveMeatRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      await fetch(`/api/settings/meats/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          unit: get('unit').value,
+          cost_per_unit: get('cost_per_unit').value || null,
+          active: get('active').checked
+        })
+      });
+    }
+
+    document.getElementById('add-meat').addEventListener('click', async () => {
+      const code = document.getElementById('meat-code').value.trim();
+      const name = document.getElementById('meat-name').value.trim();
+      const unit = document.getElementById('meat-unit').value;
+      const cost = document.getElementById('meat-cost').value;
+      if (!code || !name) return alert('Code and name are required.');
+      const res = await fetch('/api/settings/meats', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_id: currentRestaurantId, meat_code: code, name, unit, cost_per_unit: cost || null })
+      });
+      const result = await res.json();
+      if (!result.ok) return alert(result.error);
+      document.getElementById('meat-code').value = '';
+      document.getElementById('meat-name').value = '';
+      document.getElementById('meat-cost').value = '';
+      loadMeats(); loadRecipeDropdowns();
+    });
+
+    // ---------- DISHES ----------
+    async function loadDishes() {
+      const res = await fetch(`/api/settings/dishes?restaurant_id=${currentRestaurantId}`);
+      const dishes = await res.json();
+      document.getElementById('dishes-table').innerHTML = `
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Prep Type</th><th>Cost/portion</th><th>Active</th></tr></thead>
+          <tbody>${dishes.map(d => `
+            <tr>
+              <td>${d.dish_code}</td>
+              <td><input value="${d.name}" data-field="name" data-id="${d.id}" class="dish-edit"></td>
+              <td>
+                <select data-field="prep_type" data-id="${d.id}" class="dish-edit">
+                  <option value="DIRECT" ${d.prep_type==='DIRECT'?'selected':''}>Direct</option>
+                  <option value="BATCH_PREPPED" ${d.prep_type==='BATCH_PREPPED'?'selected':''}>Batch-Prepped</option>
+                </select>
+              </td>
+              <td><input type="number" step="0.01" value="${d.cost_per_portion ?? ''}" data-field="cost_per_portion" data-id="${d.id}" class="dish-edit"></td>
+              <td><input type="checkbox" ${d.active ? 'checked' : ''} data-field="active" data-id="${d.id}" class="dish-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.dish-edit').forEach(el => el.addEventListener('change', saveDishRow));
+    }
+
+    async function saveDishRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      await fetch(`/api/settings/dishes/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          prep_type: get('prep_type').value,
+          cost_per_portion: get('cost_per_portion').value || null,
+          active: get('active').checked
+        })
+      });
+    }
+
+    document.getElementById('add-dish').addEventListener('click', async () => {
+      const code = document.getElementById('dish-code').value.trim();
+      const name = document.getElementById('dish-name').value.trim();
+      const prep_type = document.getElementById('dish-prep-type').value;
+      const cost = document.getElementById('dish-cost').value;
+      if (!code || !name) return alert('Code and name are required.');
+      const res = await fetch('/api/settings/dishes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_id: currentRestaurantId, dish_code: code, name, prep_type, cost_per_portion: cost || null })
+      });
+      const result = await res.json();
+      if (!result.ok) return alert(result.error);
+      document.getElementById('dish-code').value = '';
+      document.getElementById('dish-name').value = '';
+      document.getElementById('dish-cost').value = '';
+      loadDishes(); loadRecipeDropdowns();
+    });
+
+    // ---------- RECIPES ----------
+    async function loadRecipeDropdowns() {
+      const [meatsRes, dishesRes] = await Promise.all([
+        fetch(`/api/settings/meats?restaurant_id=${currentRestaurantId}`),
+        fetch(`/api/settings/dishes?restaurant_id=${currentRestaurantId}`)
+      ]);
+      const meats = await meatsRes.json();
+      const dishes = await dishesRes.json();
+      document.getElementById('recipe-meat').innerHTML = meats.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      document.getElementById('recipe-dish').innerHTML = dishes.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    }
+
+    async function loadRecipes() {
+      const res = await fetch(`/api/settings/recipes?restaurant_id=${currentRestaurantId}`);
+      const rows = await res.json();
+      document.getElementById('recipes-table').innerHTML = `
+        <table>
+          <thead><tr><th>Dish</th><th>Meat</th><th>Quantity</th><th>Unit</th><th></th></tr></thead>
+          <tbody>${rows.map(r => `
+            <tr>
+              <td>${r.dish_name}</td>
+              <td>${r.meat_name}</td>
+              <td><input type="number" step="0.001" value="${r.quantity}" data-id="${r.id}" class="recipe-qty-edit" style="width:5rem"></td>
+              <td>${r.unit}</td>
+              <td><button data-id="${r.id}" class="recipe-delete">Remove</button></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.recipe-qty-edit').forEach(el => el.addEventListener('change', async (e) => {
+        await fetch(`/api/settings/recipes/${e.target.dataset.id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantity: e.target.value })
+        });
+        loadRecipes();
+      }));
+      document.querySelectorAll('.recipe-delete').forEach(el => el.addEventListener('click', async (e) => {
+        if (!confirm('Remove this ingredient line from the recipe?')) return;
+        await fetch(`/api/settings/recipes/${e.target.dataset.id}`, { method: 'DELETE' });
+        loadRecipes();
+      }));
+    }
+
+    document.getElementById('add-recipe').addEventListener('click', async () => {
+      const dish_id = document.getElementById('recipe-dish').value;
+      const meat_id = document.getElementById('recipe-meat').value;
+      const quantity = document.getElementById('recipe-qty').value;
+      if (!quantity) return alert('Quantity is required.');
+      await fetch('/api/settings/recipes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dish_id, meat_id, quantity })
+      });
+      document.getElementById('recipe-qty').value = '';
+      loadRecipes();
+    });
+
+    restaurantSelect.addEventListener('change', () => {
+      currentRestaurantId = restaurantSelect.value;
+      loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
+    });
+
+    loadRestaurants().then(() => {
+      loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
+    });
+  </script>
+</body>
+</html>
