@@ -95,8 +95,37 @@ BATCH_PREPPED over-sold warning above would surface.
   after a full save+reload round trip. Should recalculate live in the
   browser as the auditor types, matching spreadsheet-like expectations.
 
+## Confirmed tab layout (final, for now)
+**Home, Landing, Sales** — three tabs total. No separate Direct/Batch tabs
+(Landing already mixes both as rows, per the correction above).
+
+## Command panel — confirmed dual purpose (log/notes AND quick actions)
+The command panel isn't just an audit trail feed — it's also where **typed
+bulk actions/shortcuts** live, rather than scattering buttons across the
+UI. First concrete command to build:
+
+**"Sync batch stock" (exact command text/phrasing still TBD)** — addresses
+a real gap between ideal workflow and actual kitchen practice: batch-prepped
+dishes are SUPPOSED to be prepped ahead in tracked batches, but right now
+the kitchen mostly cooks to order, so Prepped effectively equals Sold most
+days. Rather than making the auditor retype the same number twice, this
+command:
+1. Finds every BATCH_PREPPED dish for the restaurant/date in view
+2. For each: if a `prepped` entry ALREADY exists for that day, skip it
+   (never overwrite a manually-entered value)
+3. If no `prepped` entry exists yet, copy that dish's `sales` quantity into
+   `prepped` for that day automatically
+4. Logs the action to `activity_log` (system-generated entry) so it's
+   visible in the audit trail that this happened automatically, not
+   manually entered
+
+This should run as an explicit, deliberate action (typed command or a
+clearly-labeled button), never automatically/silently — the auditor
+should always know when data was auto-filled vs. manually entered.
+
 ## Order for next session
-1. `activity_log` table + reusable command panel component
+1. `activity_log` table + reusable command panel component, including the
+   "sync batch stock" command described above
 2. Generalize the audit engine (or add a parallel version) to handle
    portion-tracking the same way it handles meats, since Landing needs both
 3. Rebuild Landing tab as ONE mixed grid (meats + prepared dishes), with
