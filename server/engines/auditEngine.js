@@ -37,11 +37,18 @@ function getBeginningStock(db, restaurantId, meatId, businessDate) {
   return null;
 }
 
+/**
+ * New stock = SUM of all non-deleted stock_receipts rows for this
+ * meat/restaurant/date, regardless of source (DIRECT or COMMISSARY).
+ * Deliveries are irregular and can repeat within a day, so this is a
+ * SUM over the log, not a single-row lookup - see data-model.md section
+ * 5/6 and docs/commissary-and-stock-receipts.md.
+ */
 function getNewStock(db, restaurantId, meatId, businessDate) {
   const row = db.prepare(
-    `SELECT quantity FROM new_stock WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
+    `SELECT SUM(quantity) as qty FROM stock_receipts WHERE restaurant_id = ? AND meat_id = ? AND business_date = ? AND deleted_at IS NULL`
   ).get(restaurantId, meatId, businessDate);
-  return row ? row.quantity : 0;
+  return row.qty || 0;
 }
 
 /**

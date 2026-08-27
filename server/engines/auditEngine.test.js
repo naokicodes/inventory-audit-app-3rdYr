@@ -17,6 +17,7 @@ const { DatabaseSync } = require('node:sqlite');
 const {
   computeMeatAudit,
   getUsage,
+  getNewStock,
   addDays
 } = require('./auditEngine.js');
 
@@ -79,8 +80,8 @@ test('usage calculation: 5 portions prepped x 0.18kg = 0.9kg exactly', () => {
 test('day 1: beginning stock comes from opening_stock, not a prior ending_actual', () => {
   db.prepare('INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
     .run(restaurantId, meatId, '2026-08-01', 10.0);
-  db.prepare('INSERT INTO new_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
-    .run(restaurantId, meatId, '2026-08-01', 5.0);
+  db.prepare('INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source) VALUES (?, ?, ?, ?, ?)')
+    .run(restaurantId, meatId, '2026-08-01', 5.0, 'DIRECT');
   db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
     .run(restaurantId, meatId, '2026-08-01', 14.0);
 
@@ -99,8 +100,6 @@ test('day 1: beginning stock comes from opening_stock, not a prior ending_actual
 test('day 2: beginning stock carries forward from day 1 actual ending automatically', () => {
   db.prepare('INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced) VALUES (?, ?, ?, ?)')
     .run(restaurantId, dishId, '2026-08-02', 3); // 3 x 0.18 = 0.54kg usage
-  db.prepare('INSERT INTO new_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
-    .run(restaurantId, meatId, '2026-08-02', 0);
   db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
     .run(restaurantId, meatId, '2026-08-02', 13.46);
 
@@ -112,8 +111,6 @@ test('day 2: beginning stock carries forward from day 1 actual ending automatica
 });
 
 test('surplus case: actual higher than expected gives negative variance', () => {
-  db.prepare('INSERT INTO new_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
-    .run(restaurantId, meatId, '2026-08-03', 0);
   db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
     .run(restaurantId, meatId, '2026-08-03', 20.0);
 
@@ -126,8 +123,6 @@ test('surplus case: actual higher than expected gives negative variance', () => 
 
 test('known adjustment (waste) reduces unexplained variance without changing raw variance', () => {
   const typeId = db.prepare('SELECT id FROM adjustment_types WHERE name = ?').get('Wastage').id;
-  db.prepare('INSERT INTO new_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
-    .run(restaurantId, meatId, '2026-08-04', 0);
   db.prepare('INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id) VALUES (?, ?, ?, ?, ?)')
     .run(restaurantId, meatId, '2026-08-04', 1.0, typeId);
   db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
@@ -142,12 +137,30 @@ test('known adjustment (waste) reduces unexplained variance without changing raw
 });
 
 test('missing actual count is flagged, not silently treated as zero variance', () => {
-  db.prepare('INSERT INTO new_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
-    .run(restaurantId, meatId, '2026-08-05', 2.0);
+  db.prepare('INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source) VALUES (?, ?, ?, ?, ?)')
+    .run(restaurantId, meatId, '2026-08-05', 2.0, 'DIRECT');
   const result = computeMeatAudit(db, restaurantId, meatId, '2026-08-05');
   assert.strictEqual(result.actual, null);
   assert.strictEqual(result.status, 'MISSING_ACTUAL_COUNT');
   assert.strictEqual(result.variance, null);
+});
+
+test('getNewStock sums two receipts on the same meat/day (DIRECT + COMMISSARY)', () => {
+  db.prepare('INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source) VALUES (?, ?, ?, ?, ?)')
+    .run(restaurantId, meatId, '2026-08-06', 4.0, 'DIRECT');
+  db.prepare('INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source) VALUES (?, ?, ?, ?, ?)')
+    .run(restaurantId, meatId, '2026-08-06', 2.5, 'COMMISSARY');
+
+  const newStock = getNewStock(db, restaurantId, meatId, '2026-08-06');
+  assert.ok(Math.abs(newStock - 6.5) < 0.0001, `expected 4.0 + 2.5 = 6.5, got ${newStock}`);
+});
+
+test('getNewStock excludes soft-deleted receipts from the SUM', () => {
+  db.prepare('INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, deleted_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(restaurantId, meatId, '2026-08-06', 100.0, 'DIRECT', '2026-08-06T12:00:00Z');
+
+  const newStock = getNewStock(db, restaurantId, meatId, '2026-08-06');
+  assert.ok(Math.abs(newStock - 6.5) < 0.0001, `deleted receipt should not count, expected still 6.5, got ${newStock}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
