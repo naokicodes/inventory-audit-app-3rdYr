@@ -56,6 +56,32 @@ CREATE TABLE IF NOT EXISTS recipe_bom (
 
 -- 5. Daily input tables
 
+-- stock_receipts: unified log of everything received at a restaurant,
+-- whether shipped from the commissary or delivered direct. Replaces
+-- new_stock (see docs/commissary-and-stock-receipts.md) - that migration
+-- is a later phase, new_stock stays as-is for now.
+-- No unique constraint on (restaurant_id, meat_id, business_date):
+-- deliveries are irregular and can repeat within a day. new_stock(meat,
+-- date) becomes SUM(quantity) over matching non-deleted rows for that
+-- date - see data-model.md section 5/6.
+CREATE TABLE IF NOT EXISTS stock_receipts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  restaurant_id INTEGER NOT NULL,
+  meat_id INTEGER NOT NULL,
+  business_date TEXT NOT NULL,    -- ISO format YYYY-MM-DD
+  quantity REAL NOT NULL,
+  source TEXT NOT NULL CHECK (source IN ('DIRECT', 'COMMISSARY')),
+  commissary_meat_id INTEGER,     -- set only when source = COMMISSARY
+  notes TEXT,
+  photo_path TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT,                -- soft delete only, no hard DELETE
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
+  FOREIGN KEY (meat_id) REFERENCES meats(id),
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id)
+);
+
 CREATE TABLE IF NOT EXISTS new_stock (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   restaurant_id INTEGER NOT NULL,
@@ -171,6 +197,51 @@ CREATE TABLE IF NOT EXISTS adjustments (
   FOREIGN KEY (to_location_id) REFERENCES locations(id)
 );
 
+-- 10. Commissary tables (see docs/commissary-and-stock-receipts.md)
+
+-- commissary_meats: global list, independent of any restaurant's own
+-- meats table.
+CREATE TABLE IF NOT EXISTS commissary_meats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  unit TEXT NOT NULL CHECK (unit IN ('kg', 'unit')),
+  allowed_leeway_pct REAL NOT NULL,
+  cost_per_unit REAL,
+  active INTEGER NOT NULL DEFAULT 1
+);
+
+-- commissary_meat_map: explicit mapping between commissary meats and a
+-- restaurant's own meats. Never inferred from matching code strings -
+-- commissary and restaurant codes are confirmed NOT aligned.
+CREATE TABLE IF NOT EXISTS commissary_meat_map (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,
+  restaurant_id INTEGER NOT NULL,
+  meat_id INTEGER NOT NULL,
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
+  FOREIGN KEY (meat_id) REFERENCES meats(id),
+  UNIQUE (commissary_meat_id, restaurant_id)
+);
+
+-- commissary_yield_log: one row per raw delivery/processing event at the
+-- commissary, not tied to any restaurant. actual_loss_pct, status, and
+-- excess loss are calculated on read, not stored - see data-model.md
+-- section 10.
+CREATE TABLE IF NOT EXISTS commissary_yield_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,
+  business_date TEXT NOT NULL,    -- ISO format YYYY-MM-DD
+  raw_weight_in REAL NOT NULL,
+  backed_weight_out REAL NOT NULL,
+  notes TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT,                -- soft delete only, no hard DELETE
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id)
+);
+
 -- Loyverse name resolution (see docs/loyverse-sync.md) - created now since
 -- it's simple and referenced by the sync doc, even though sync itself is
 -- a later phase. Empty until that phase, no harm in having it exist.
@@ -181,6 +252,23 @@ CREATE TABLE IF NOT EXISTS loyverse_name_map (
   dish_id INTEGER NOT NULL,
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (dish_id) REFERENCES dishes(id)
+);
+
+-- 11. activity_log (audit trail)
+-- Every write to stock_receipts or commissary_yield_log writes a matching
+-- row here in the same transaction (see data-model.md section 11). Scoped
+-- to those two tables for now - extending to other input tables is
+-- follow-up work, not bundled into this change.
+CREATE TABLE IF NOT EXISTS activity_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+  actor TEXT,                     -- plain text, no auth system yet
+  entity_type TEXT NOT NULL,      -- e.g. "stock_receipts"
+  entity_id INTEGER NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('CREATE', 'UPDATE', 'DELETE')),
+  before TEXT,                    -- JSON snapshot, nullable
+  after TEXT,                     -- JSON snapshot, nullable
+  source TEXT NOT NULL CHECK (source IN ('SYSTEM', 'MANUAL'))
 );
 
 -- Seed a reasonable starting set of adjustment types (admin can add more
