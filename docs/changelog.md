@@ -11,6 +11,46 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-27 — Design decision: unified stock receipts log + commissary yield tracking + activity log
+
+**Context**: reviewed `Commi_Audit_Master.xlsx` (the commissary's existing
+spreadsheet) alongside the app's docs. That workbook already tracks raw
+meat → processed ("backed") yield with a pass/fail leeway check, and ships
+processed meat out to restaurants — with its own instructions literally
+saying the only manual handoff is retyping the resulting balance into each
+restaurant's New Stock cell. That's exactly the gap being closed here.
+
+**Decisions made**:
+1. `new_stock` (one row per restaurant/meat/day) is replaced by
+   `stock_receipts`, a flat, restaurant-labeled log covering both direct
+   deliveries and commissary shipments. One page instead of duplicate
+   per-restaurant New Stock screens. `new_stock(meat, date)` becomes a
+   `SUM(...)` query, same treatment as the other calculated fields.
+2. Commissary yield (raw-in vs. backed-out, checked against an allowed
+   leeway %) is tracked separately in `commissary_yield_log`, since it
+   happens before any meat is assigned to a restaurant. A shipment out of
+   the commissary is just a `stock_receipts` row with `source =
+   COMMISSARY` — no separate outbound table needed.
+3. **Found a real data mismatch** while checking this: commissary MeatIDs
+   (`Commi_Audit_Master.xlsx`) do NOT line up with restaurant MeatIDs
+   (`seed-data.json`) — e.g. commissary M01 = processed Whole Chicken,
+   Restaurant A's own M01 = Whole Chicken *Raw*. An explicit
+   `commissary_meat_map` table is required; matching by code string would
+   have silently misfiled stock.
+4. Requirement clarified as "detect manipulation, don't block corrections."
+   Landed on soft deletes (`deleted_at`) + an `activity_log` table
+   (before/after JSON snapshot per change) instead of a hard lock on any
+   field. Scoped to `stock_receipts` and `commissary_yield_log` only for
+   now — extending this pattern to older input tables is flagged as
+   deliberate follow-up work in `scope.md`, not bundled in.
+
+**Docs touched**: `data-model.md` (sections 5, 10, 11), `scope.md`,
+`daily-workflow.md`, and a new `commissary-and-stock-receipts.md` with the
+full reasoning. No code changed yet — docs land first per
+`rules-for-claude-code.md`.
+
+---
+
 ## 2026-08-25 — Windows: SQLite test file wouldn't delete (EBUSY)
 **Symptom**: `auditEngine.test.js` passed all 7 tests, then crashed during
 its own cleanup step with `EBUSY: resource busy or locked, unlink ...test.db`.
