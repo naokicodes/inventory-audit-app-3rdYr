@@ -36,16 +36,12 @@ router.get('/daily-audit', (req, res) => {
   const getExistingAdjustment = db.prepare(
     `SELECT quantity FROM adjustments WHERE restaurant_id = ? AND meat_id = ? AND business_date = ? AND adjustment_type_id = ?`
   );
-  const getNewStock = db.prepare(
-    `SELECT quantity FROM new_stock WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
-  );
   const getRemarks = db.prepare(
     `SELECT notes FROM ending_actual WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
   );
 
   const rows = meats.map(meat => {
     const audit = computeMeatAudit(db, restaurantId, meat.id, date);
-    const newStockRow = getNewStock.get(restaurantId, meat.id, date);
     const inHouse = inHouseTypeId ? getExistingAdjustment.get(restaurantId, meat.id, date, inHouseTypeId) : null;
     const wastage = wastageTypeId ? getExistingAdjustment.get(restaurantId, meat.id, date, wastageTypeId) : null;
     const other = otherTypeId ? getExistingAdjustment.get(restaurantId, meat.id, date, otherTypeId) : null;
@@ -57,7 +53,10 @@ router.get('/daily-audit', (req, res) => {
       name: meat.name,
       unit: meat.unit,
       beginning: audit.beginning,
-      new_stock: newStockRow ? newStockRow.quantity : null,
+      // new_stock is now read-only here - calculated by the audit engine
+      // as SUM(stock_receipts), entered on the Stock Receipts page, not
+      // this screen. See docs/commissary-and-stock-receipts.md Part 2.
+      new_stock: audit.newStock,
       usage: audit.usage,
       in_house: inHouse ? inHouse.quantity : null,
       wastage: wastage ? wastage.quantity : null,
@@ -75,9 +74,11 @@ router.get('/daily-audit', (req, res) => {
 });
 
 // POST /api/daily-audit
-// Body: { restaurant_id, business_date, rows: [{ meat_id, new_stock, in_house, wastage, other, ending_actual, remarks }] }
+// Body: { restaurant_id, business_date, rows: [{ meat_id, in_house, wastage, other, ending_actual, remarks }] }
 // Routes each field to its correct table. Only writes fields that were
 // actually provided (not null/empty) - leaves everything else untouched.
+// Note: new_stock is no longer accepted here - it's entered on the Stock
+// Receipts page now (see docs/commissary-and-stock-receipts.md Part 2).
 router.post('/daily-audit', (req, res) => {
   const { restaurant_id, business_date, rows } = req.body;
   if (!restaurant_id || !business_date || !Array.isArray(rows)) {
@@ -89,11 +90,6 @@ router.post('/daily-audit', (req, res) => {
   const wastageTypeId = adjTypes.find(t => t.name === 'Wastage')?.id;
   const otherTypeId = adjTypes.find(t => t.name === 'Other / Uncategorized')?.id;
 
-  const upsertNewStock = db.prepare(`
-    INSERT INTO new_stock (restaurant_id, meat_id, business_date, quantity)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(restaurant_id, meat_id, business_date) DO UPDATE SET quantity = excluded.quantity
-  `);
   const upsertEndingActual = db.prepare(`
     INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity, notes)
     VALUES (?, ?, ?, ?, ?)
@@ -116,9 +112,6 @@ router.post('/daily-audit', (req, res) => {
 
   let saved = 0;
   for (const row of rows) {
-    if (row.new_stock !== null && row.new_stock !== undefined && row.new_stock !== '') {
-      upsertNewStock.run(restaurant_id, row.meat_id, business_date, Number(row.new_stock));
-    }
     if (row.ending_actual !== null && row.ending_actual !== undefined && row.ending_actual !== '') {
       upsertEndingActual.run(restaurant_id, row.meat_id, business_date, Number(row.ending_actual), row.remarks || null);
     }
