@@ -57,9 +57,9 @@ CREATE TABLE IF NOT EXISTS recipe_bom (
 -- 5. Daily input tables
 
 -- stock_receipts: unified log of everything received at a restaurant,
--- whether shipped from the commissary or delivered direct. Replaces
--- new_stock (see docs/commissary-and-stock-receipts.md) - that migration
--- is a later phase, new_stock stays as-is for now.
+-- whether shipped from the commissary or delivered direct. Replaces the
+-- old new_stock table (see docs/commissary-and-stock-receipts.md) -
+-- new_stock has been retired as of the Stock Receipts page (step 4).
 -- No unique constraint on (restaurant_id, meat_id, business_date):
 -- deliveries are irregular and can repeat within a day. new_stock(meat,
 -- date) becomes SUM(quantity) over matching non-deleted rows for that
@@ -80,20 +80,6 @@ CREATE TABLE IF NOT EXISTS stock_receipts (
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (meat_id) REFERENCES meats(id),
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id)
-);
-
-CREATE TABLE IF NOT EXISTS new_stock (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  restaurant_id INTEGER NOT NULL,
-  meat_id INTEGER NOT NULL,
-  business_date TEXT NOT NULL,    -- ISO format YYYY-MM-DD
-  quantity REAL NOT NULL,
-  photo_path TEXT,
-  created_by TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
-  FOREIGN KEY (meat_id) REFERENCES meats(id),
-  UNIQUE (restaurant_id, meat_id, business_date)
 );
 
 CREATE TABLE IF NOT EXISTS ending_actual (
