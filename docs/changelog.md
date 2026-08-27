@@ -11,6 +11,54 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-28 — Stock Receipts page + route (step 4); `new_stock` retired
+
+**What shipped**: `server/routes/stockReceipts.js` (`GET /api/stock-receipts/meats`,
+`GET /api/stock-receipts` filterable list, `POST /api/stock-receipts` create)
+and `public/stock-receipts.html` — one page, per `commissary-and-stock-
+receipts.md` Part 2: date, restaurant, meat (filtered to that restaurant),
+quantity, source, notes, plus a filterable running list.
+
+**`commissary_meat_id` is resolved server-side, never client-supplied.**
+When `source = COMMISSARY`, the route looks up `commissary_meat_map` by
+`(restaurant_id, meat_id)`; a missing mapping is rejected with the
+"not mapped yet - set this up in Settings" message the docs specify,
+not a silent failure. The frontend also checks this proactively per-meat
+so the warning shows before submit, not just after.
+
+**`new_stock` is now fully retired**, not just superseded: `dailyAudit.js`'s
+GET/POST no longer touch the `new_stock` table at all — the New Stock
+column on Landing reads `computeMeatAudit(...).newStock` (already a
+`SUM(stock_receipts)` since step 2) and is display-only, matching Beginning/
+Usage. Dropped the `new_stock` table from `schema.sql` entirely, since
+`data-model.md` already didn't list it and nothing references it anymore.
+
+**Deliberately not built yet** (flagged, not forgotten):
+- No edit/soft-delete on `stock_receipts` from this page — every write to
+  this table must log to `activity_log` per `rules-for-claude-code.md`
+  rule 9, and that wiring is step 6. Building delete now would mean either
+  violating that rule or hand-rolling a one-off log just for this table.
+  Create + read only until step 6 lands, then edit/delete get added
+  alongside the logging.
+- No `commissary_meats` seed data added. The page works correctly with
+  zero commissary meats/mappings — COMMISSARY source just shows "not
+  mapped yet" for every meat until Settings has real mappings — but the
+  dropdowns will look empty in practice until that seeding happens
+  (HANDOFF.md flagged this as still-undecided: step-4 prerequisite vs.
+  separate task; left as the latter for now).
+
+**Environment note**: this sandbox has no network access, so `express`
+couldn't be installed to run the server end-to-end here. Verified instead
+by: `node --check` on every changed/new server file, the full existing
+`auditEngine.test.js` + `commissaryYieldEngine.test.js` suites re-run
+against the updated schema (24/24 still green), and a standalone script
+exercising the new route handlers' exact SQL directly against `node:sqlite`
+(mapping enforcement, multi-receipt-per-day summing, soft-delete exclusion,
+and `getNewStock` reflecting it all correctly). Run `npm run dev` on a
+machine with npm access to confirm the live server/UI before moving on.
+
+---
+
 ## 2026-08-27 — Design decision: unified stock receipts log + commissary yield tracking + activity log
 
 **Context**: reviewed `Commi_Audit_Master.xlsx` (the commissary's existing
