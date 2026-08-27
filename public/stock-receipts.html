@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Stock Receipts - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem; text-align: left; }
+    th { background: #f0f0f0; }
+    .add-form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin-bottom: 0.5rem; }
+    .add-form label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .add-form input, .add-form select { padding: 0.3rem; }
+    .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin: 1.5rem 0 1rem; }
+    .filters label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .filters select, .filters input { padding: 0.3rem; }
+    .hint { color: #888; font-size: 0.8rem; }
+    .warn { color: crimson; font-size: 0.8rem; }
+    .source-DIRECT { color: #333; }
+    .source-COMMISSARY { color: #06c; font-weight: bold; }
+  </style>
+</head>
+<body style="max-width: 1000px;">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+
+  <h1>Stock Receipts</h1>
+  <p class="hint">One log for everything a restaurant receives - direct deliveries and commissary shipments alike. Landing's New Stock cell is a read-only sum of this log.</p>
+
+  <div class="add-form">
+    <label>Date <input type="date" id="new-date"></label>
+    <label>Restaurant <select id="new-restaurant"></select></label>
+    <label>Meat <select id="new-meat"></select></label>
+    <label>Quantity <input type="number" step="0.01" id="new-qty" placeholder="0"></label>
+    <label>Source
+      <select id="new-source">
+        <option value="DIRECT">Direct</option>
+        <option value="COMMISSARY">Commissary</option>
+      </select>
+    </label>
+    <label>Notes <input type="text" id="new-notes" placeholder="optional"></label>
+    <button id="add-receipt">Add Receipt</button>
+  </div>
+  <div id="mapping-warning" class="warn"></div>
+  <div id="add-status" class="status-message"></div>
+
+  <div class="filters">
+    <label>Restaurant <select id="filter-restaurant"><option value="">All</option></select></label>
+    <label>Date <input type="date" id="filter-date"></label>
+    <label>Source
+      <select id="filter-source">
+        <option value="">All</option>
+        <option value="DIRECT">Direct</option>
+        <option value="COMMISSARY">Commissary</option>
+      </select>
+    </label>
+    <button id="clear-filters">Clear filters</button>
+  </div>
+
+  <div id="receipts-table">Loading...</div>
+
+  <script>
+    const newDate = document.getElementById('new-date');
+    const newRestaurant = document.getElementById('new-restaurant');
+    const newMeat = document.getElementById('new-meat');
+    const newQty = document.getElementById('new-qty');
+    const newSource = document.getElementById('new-source');
+    const newNotes = document.getElementById('new-notes');
+    const mappingWarning = document.getElementById('mapping-warning');
+    const addStatus = document.getElementById('add-status');
+
+    const filterRestaurant = document.getElementById('filter-restaurant');
+    const filterDate = document.getElementById('filter-date');
+    const filterSource = document.getElementById('filter-source');
+
+    let restaurants = [];
+    let currentMeats = []; // meats for whichever restaurant is selected in the add form
+
+    newDate.value = new Date().toISOString().slice(0, 10);
+
+    function fmt(n) {
+      return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
+    }
+
+    async function loadRestaurants() {
+      const res = await fetch('/api/restaurants');
+      restaurants = await res.json();
+      const opts = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+      newRestaurant.innerHTML = opts;
+      filterRestaurant.innerHTML = '<option value="">All</option>' + opts;
+    }
+
+    async function loadMeatsForNewForm() {
+      const restaurantId = newRestaurant.value;
+      if (!restaurantId) { newMeat.innerHTML = ''; currentMeats = []; return; }
+      const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${restaurantId}`);
+      currentMeats = await res.json();
+      newMeat.innerHTML = currentMeats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
+      updateMappingWarning();
+    }
+
+    function updateMappingWarning() {
+      if (newSource.value !== 'COMMISSARY') { mappingWarning.textContent = ''; return; }
+      const meat = currentMeats.find(m => String(m.id) === String(newMeat.value));
+      if (meat && !meat.commissary_meat_id) {
+        mappingWarning.textContent = `${meat.name} isn't mapped to a commissary meat yet - set this up in Settings before receiving it from the commissary.`;
+      } else {
+        mappingWarning.textContent = '';
+      }
+    }
+
+    async function loadReceipts() {
+      const params = new URLSearchParams();
+      if (filterRestaurant.value) params.set('restaurant_id', filterRestaurant.value);
+      if (filterDate.value) params.set('business_date', filterDate.value);
+      if (filterSource.value) params.set('source', filterSource.value);
+
+      document.getElementById('receipts-table').innerHTML = 'Loading...';
+      const res = await fetch(`/api/stock-receipts?${params.toString()}`);
+      const rows = await res.json();
+
+      if (rows.length === 0) {
+        document.getElementById('receipts-table').innerHTML = '<p class="hint">No receipts match these filters yet.</p>';
+        return;
+      }
+
+      document.getElementById('receipts-table').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Restaurant</th><th>Meat</th><th>Qty</th>
+              <th>Source</th><th>Commissary Meat</th><th>Notes</th><th>Entered</th>
+            </tr>
+          </thead>
+          <tbody>${rows.map(r => `
+            <tr>
+              <td>${r.business_date}</td>
+              <td>${r.restaurant_name}</td>
+              <td>${r.meat_code} - ${r.meat_name} <span class="hint">(${r.unit})</span></td>
+              <td>${fmt(r.quantity)}</td>
+              <td class="source-${r.source}">${r.source}</td>
+              <td>${r.commissary_meat_code ? `${r.commissary_meat_code} - ${r.commissary_meat_name}` : '-'}</td>
+              <td>${r.notes || ''}</td>
+              <td class="hint">${r.created_at}</td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+    }
+
+    document.getElementById('add-receipt').addEventListener('click', async () => {
+      const restaurant_id = Number(newRestaurant.value);
+      const meat_id = Number(newMeat.value);
+      const business_date = newDate.value;
+      const quantity = newQty.value;
+      const source = newSource.value;
+      const notes = newNotes.value.trim();
+
+      if (!restaurant_id || !meat_id || !business_date || quantity === '') {
+        addStatus.textContent = 'Date, restaurant, meat, and quantity are required.';
+        addStatus.className = 'status-message error';
+        return;
+      }
+
+      addStatus.textContent = 'Saving...';
+      addStatus.className = 'status-message';
+
+      try {
+        const res = await fetch('/api/stock-receipts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurant_id, meat_id, business_date, quantity, source, notes: notes || null })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+
+        addStatus.textContent = 'Receipt added.';
+        addStatus.className = 'status-message success';
+        newQty.value = '';
+        newNotes.value = '';
+        await loadReceipts();
+      } catch (err) {
+        addStatus.textContent = 'Error: ' + err.message;
+        addStatus.className = 'status-message error';
+      }
+    });
+
+    newRestaurant.addEventListener('change', loadMeatsForNewForm);
+    newMeat.addEventListener('change', updateMappingWarning);
+    newSource.addEventListener('change', updateMappingWarning);
+
+    [filterRestaurant, filterDate, filterSource].forEach(el => el.addEventListener('change', loadReceipts));
+    document.getElementById('clear-filters').addEventListener('click', () => {
+      filterRestaurant.value = ''; filterDate.value = ''; filterSource.value = '';
+      loadReceipts();
+    });
+
+    loadRestaurants().then(() => {
+      loadMeatsForNewForm();
+      loadReceipts();
+    });
+  </script>
+</body>
+</html>
