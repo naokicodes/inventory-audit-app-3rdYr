@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Commissary - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem; text-align: left; }
+    th { background: #f0f0f0; }
+    .add-form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin-bottom: 0.5rem; }
+    .add-form label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .add-form input, .add-form select { padding: 0.3rem; }
+    .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin: 1.5rem 0 1rem; }
+    .filters select, .filters input { padding: 0.3rem; }
+    .hint { color: #888; font-size: 0.8rem; }
+    .status-Pass { color: #0a7d0a; font-weight: bold; }
+    .status-Review { color: crimson; font-weight: bold; }
+    .balance-cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .balance-card { border: 1px solid #ddd; border-radius: 6px; padding: 0.75rem 1rem; min-width: 9rem; }
+    .balance-card .code { color: #888; font-size: 0.8rem; }
+    .balance-card .qty { font-size: 1.4rem; font-weight: bold; }
+    .balance-card .qty.negative { color: crimson; }
+  </style>
+</head>
+<body style="max-width: 1000px;">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+
+  <h1>Commissary</h1>
+  <p class="hint">Raw-in / backed-out yield tracking at the commissary, before any meat is assigned to a restaurant. Shipping to a restaurant is logged on the Stock Receipts page, not here.</p>
+
+  <h2>On-hand balance</h2>
+  <p class="hint">Backed-in (from yield log) minus shipped-out (Stock Receipts rows with source = Commissary).</p>
+  <div id="balances">Loading...</div>
+
+  <h2>Log a yield event</h2>
+  <div class="add-form">
+    <label>Date <input type="date" id="new-date"></label>
+    <label>Commissary meat <select id="new-meat"></select></label>
+    <label>Raw weight in <input type="number" step="0.01" id="new-raw" placeholder="0"></label>
+    <label>Backed weight out <input type="number" step="0.01" id="new-backed" placeholder="0"></label>
+    <label>Notes <input type="text" id="new-notes" placeholder="optional"></label>
+    <button id="add-yield">Log Event</button>
+  </div>
+  <div id="add-status" class="status-message"></div>
+
+  <h2>Yield log</h2>
+  <div class="filters">
+    <label>Commissary meat <select id="filter-meat"><option value="">All</option></select></label>
+    <label>Date <input type="date" id="filter-date"></label>
+    <button id="clear-filters">Clear filters</button>
+  </div>
+
+  <div id="yield-table">Loading...</div>
+
+  <script>
+    const newDate = document.getElementById('new-date');
+    const newMeat = document.getElementById('new-meat');
+    const newRaw = document.getElementById('new-raw');
+    const newBacked = document.getElementById('new-backed');
+    const newNotes = document.getElementById('new-notes');
+    const addStatus = document.getElementById('add-status');
+
+    const filterMeat = document.getElementById('filter-meat');
+    const filterDate = document.getElementById('filter-date');
+
+    newDate.value = new Date().toISOString().slice(0, 10);
+
+    function fmt(n) {
+      return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
+    }
+    function fmtPct(n) {
+      return (n === null || n === undefined) ? '-' : (Number(n) * 100).toFixed(1) + '%';
+    }
+
+    async function loadMeats() {
+      const res = await fetch('/api/commissary/meats');
+      const meats = await res.json();
+      const opts = meats.map(m => `<option value="${m.id}">${m.code} - ${m.name} (${m.unit})</option>`).join('');
+      newMeat.innerHTML = opts || '<option value="">No commissary meats seeded yet</option>';
+      filterMeat.innerHTML = '<option value="">All</option>' + opts;
+    }
+
+    async function loadBalances() {
+      const res = await fetch('/api/commissary/balances');
+      const balances = await res.json();
+      const el = document.getElementById('balances');
+      if (balances.length === 0) {
+        el.innerHTML = '<p class="hint">No commissary meats seeded yet - add some in the seed data or Settings.</p>';
+        return;
+      }
+      el.innerHTML = `<div class="balance-cards">${balances.map(b => `
+        <div class="balance-card">
+          <div class="code">${b.code} - ${b.name}</div>
+          <div class="qty${b.balance < 0 ? ' negative' : ''}">${fmt(b.balance)} <span class="hint">${b.unit}</span></div>
+        </div>
+      `).join('')}</div>`;
+    }
+
+    async function loadYieldLog() {
+      const params = new URLSearchParams();
+      if (filterMeat.value) params.set('commissary_meat_id', filterMeat.value);
+      if (filterDate.value) params.set('business_date', filterDate.value);
+
+      document.getElementById('yield-table').innerHTML = 'Loading...';
+      const res = await fetch(`/api/commissary/yield-log?${params.toString()}`);
+      const rows = await res.json();
+
+      if (rows.length === 0) {
+        document.getElementById('yield-table').innerHTML = '<p class="hint">No yield events match these filters yet.</p>';
+        return;
+      }
+
+      document.getElementById('yield-table').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Meat</th><th>Raw In</th><th>Backed Out</th>
+              <th>Actual Loss %</th><th>Status</th><th>Excess Loss</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>${rows.map(r => `
+            <tr>
+              <td>${r.business_date}</td>
+              <td>${r.commissary_meat_code} - ${r.commissary_meat_name} <span class="hint">(${r.unit})</span></td>
+              <td>${fmt(r.raw_weight_in)}</td>
+              <td>${fmt(r.backed_weight_out)}</td>
+              <td>${fmtPct(r.actualLossPct)}</td>
+              <td class="${r.status ? 'status-' + r.status : ''}">${r.status || '-'}</td>
+              <td>${fmt(r.excessLoss)}</td>
+              <td>${r.notes || ''}</td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+    }
+
+    document.getElementById('add-yield').addEventListener('click', async () => {
+      const commissary_meat_id = Number(newMeat.value);
+      const business_date = newDate.value;
+      const raw_weight_in = newRaw.value;
+      const backed_weight_out = newBacked.value;
+      const notes = newNotes.value.trim();
+
+      if (!commissary_meat_id || !business_date || raw_weight_in === '' || backed_weight_out === '') {
+        addStatus.textContent = 'Date, commissary meat, raw weight in, and backed weight out are required.';
+        addStatus.className = 'status-message error';
+        return;
+      }
+
+      addStatus.textContent = 'Saving...';
+      addStatus.className = 'status-message';
+
+      try {
+        const res = await fetch('/api/commissary/yield-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes: notes || null })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+
+        addStatus.textContent = 'Yield event logged.';
+        addStatus.className = 'status-message success';
+        newRaw.value = '';
+        newBacked.value = '';
+        newNotes.value = '';
+        await Promise.all([loadBalances(), loadYieldLog()]);
+      } catch (err) {
+        addStatus.textContent = 'Error: ' + err.message;
+        addStatus.className = 'status-message error';
+      }
+    });
+
+    [filterMeat, filterDate].forEach(el => el.addEventListener('change', loadYieldLog));
+    document.getElementById('clear-filters').addEventListener('click', () => {
+      filterMeat.value = ''; filterDate.value = '';
+      loadYieldLog();
+    });
+
+    loadMeats().then(() => {
+      loadBalances();
+      loadYieldLog();
+    });
+  </script>
+</body>
+</html>
