@@ -11,6 +11,50 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 14: Command panel scaffold
+New file `public/command-panel.js` + a one-line `<script>` include added
+before `</body>` on all six existing pages (`index.html`,
+`daily-audit.html`, `stock-receipts.html`, `commissary.html`,
+`settings.html`, `history.html`). Pure client-side plumbing - no backend,
+schema, or engine change.
+
+**What it is**: an IIFE exposing `window.CommandPanel.register(id,
+label, run)` / `.list()`, plus a floating "Commands" toggle button that
+opens a small panel listing whatever's registered, each with a Run
+button. `register()` throws on a duplicate `id` rather than silently
+overwriting. Running a command awaits `run()` and shows whatever it
+resolves to as an ephemeral result line in the panel - nothing is
+written to the server or any table. One no-op command
+(`register('noop', 'No-op (test)', () => 'Ran no-op - no real action
+taken, nothing logged.')`) is registered on script load, proving
+register -> appear -> run works end to end with no real functionality
+behind it yet, per the roadmap's own description of this step.
+
+**Scope note flagged, not decided**: `rules-for-claude-code.md` rule 10
+says worker-facing daily screens (`daily-audit.html`/Landing) must stay
+minimal - no math, no recipe/admin concepts leaking in. A generic, inert
+command panel isn't math or recipe/admin content, so it's included on
+Landing same as every other page, matching the roadmap's "can appear on
+any tab" - but flagging the rule-10 angle explicitly in case Landing
+should actually be excluded once step 15+ add real commands.
+
+**Not done**: no real commands - that's step 15 ("Sync batch stock"),
+which the scaffold's own comments point to as the next `register()`
+call. No activity_log wiring here either - deliberately out of scope,
+rule 9 scopes that logging to `stock_receipts`/`commissary_yield_log`
+only, and step 15 is where a real command's SYSTEM log entry gets added.
+
+**Verified**: no engine/schema/backend change, so no new automated tests
+per rule 6. `node --check` on the new file. Registry logic (register/
+list/duplicate-id-rejection/run() resolution) smoke-tested standalone
+via a `node -e` script reproducing the same closure logic, outside the
+DOM - all four checks passed. Full existing test suite re-run - still
+84 passing / 0 failing across all 7 files, no regression. Same sandbox
+constraint as step 13: no `.git`, no network this session either, so no
+live browser click-through of the actual injected UI (toggle button
+placement, panel open/close, Run button click) - flagging as the same
+open item as step 13's.
+
 ## 2026-08-29 — Step 13: Live recalculation on Landing
 Frontend-only, `public/daily-audit.html`. Ending(calc)/Over-Short/Status
 now update live in the browser as a meat row's editable inputs change,

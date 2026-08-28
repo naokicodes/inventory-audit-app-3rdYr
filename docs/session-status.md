@@ -1,12 +1,12 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-13 completion).
+Last updated: 2026-08-29 (post step-14 completion).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
 so always start here.
 
-## Where things stand: steps 1–13 done (12–13 pending commit — see below).
+## Where things stand: steps 1–14 done (12–14 pending commit — see below).
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -164,12 +164,34 @@ so always start here.
     still owed — same open item as Stock Receipts' Unallocated/Assign
     flow and Commissary's Edit/Delete flows below.
 
-**Next up is step 14** (Command panel scaffold) — see the roadmap
-below. Steps 10–11 are already committed and pushed (verified above).
-Steps 12–13 are done in code but not yet committed (no `.git` in the
-working environment for either of those two sessions) — whoever next
-has git access should commit steps 12 then 13, in order, before starting
-step 14.
+- **Step 14** (Command panel scaffold): done. New `public/command-panel.js`
+  + one-line `<script>` include on all six pages. `window.CommandPanel`
+  exposes `register(id, label, run)`/`list()`; a floating "Commands"
+  button opens a panel listing registered commands with a Run button per
+  row. One no-op command registered on load — proves register → appear →
+  run end to end with no real functionality yet, per the roadmap. Running
+  never touches the server; the result is an ephemeral on-screen line
+  only. See `changelog.md`'s step-14 entry for the rule-10 scope note
+  (Landing gets the panel too, same as every page — flagged, not
+  resolved, since it's currently inert).
+  - **Verified**: no backend/schema/engine change, so no new automated
+    tests (rule 6 scope). `node --check` on the new file; registry logic
+    (register/list/duplicate-id-rejection/run() resolution) smoke-tested
+    standalone outside the DOM — all passed. Full existing suite re-run —
+    still 84/0, no regression.
+  - **Not yet committed**: same as steps 12–13 — no `.git`, no network
+    this session either.
+  - **Known gap carried forward**: no live browser click-through of the
+    actual injected UI (button placement, panel open/close, Run click) —
+    same bucket as step 13's open item.
+
+**Next up is step 15** ("First real command: Sync batch stock") — see
+the roadmap below. Steps 10–11 are committed and pushed. Steps 12–14 are
+done in code but their commit status depends on whether steps 12–13 were
+actually pushed as the user reported at the end of the prior session —
+this session couldn't independently verify that (no git/network access
+here either), so whoever has git access should confirm 12–13 landed
+before committing 14 on top, in order.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -255,13 +277,8 @@ of sizing them correctly, not a separate concern.
     detail.
 13. **[Done] Live recalculation on Landing.** See "Where things stand"
     above for detail, including the New-Stock/Usage scope note.
-14. **[Not started] Command panel scaffold.** A UI element that can
-    appear on any tab, with a small pluggable command registry — no real
-    commands yet beyond a no-op proving the plumbing works end to end
-    (registers, appears, runs, logs nothing meaningful). This exists on
-    its own so step 18 (the over-sold warning) has something to plug
-    into without needing to build panel infrastructure and a Sales
-    feature in the same sitting.
+14. **[Done] Command panel scaffold.** See "Where things stand" above
+    for detail, including the rule-10 scope note.
 15. **[Not started] First real command: "Sync batch stock."** Copies
     sales into `prepped` for BATCH_PREPPED dishes with no manual entry
     yet, logged as a SYSTEM `activity_log` entry. Exercises the step-14
