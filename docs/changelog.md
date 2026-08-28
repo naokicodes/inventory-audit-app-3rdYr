@@ -11,7 +11,87 @@ worth remembering if they happen again.
 
 ---
 
-## 2026-08-28 — Step 9 session lost to usage limit before commit; repo made public
+## 2026-08-28 (later) — Step 9 rebuilt from spec and shipped
+
+Rebuilt the Unallocated-receipts work described in the entry directly
+below, from `docs/data-model.md` section 5 and
+`docs/commissary-and-stock-receipts.md` Part 2 - not from any memory of
+the lost attempt, per `session-status.md`'s instruction.
+
+**Shipped:**
+- `server/db/schema.sql` - `stock_receipts.restaurant_id`/`meat_id` now
+  nullable, with a CHECK constraint requiring both null together and only
+  when `source = 'COMMISSARY'`.
+- `server/db/migrate.js` (new) - idempotent rebuild-and-rename for any
+  pre-existing local `inventory.db` still on the old NOT NULL definition.
+  Wired into `connection.js` to run before `schema.sql` loads.
+- `server/routes/stockReceipts.js`:
+  - `POST` accepts an Unallocated COMMISSARY receipt (restaurant/meat
+    both left unset) - since there's no restaurant+meat pair yet to
+    resolve a mapping through, `commissary_meat_id` is required directly
+    from the client in that one case, validated against `commissary_meats`
+    server-side.
+  - `GET` list query switched from `JOIN` to `LEFT JOIN` on
+    restaurants/meats, so an Unallocated row (NULL on both) isn't
+    silently dropped from every list. Added `?unallocated=true` filter.
+  - `PATCH` gains a genuinely new capability: assigning a previously
+    Unallocated row's `restaurant_id`+`meat_id` together, one time. Enforces
+    the **continuity requirement** flagged by the lost session and
+    written into `data-model.md` section 5: the `commissary_meat_map`
+    lookup for the chosen restaurant+meat must resolve to the *same*
+    `commissary_meat_id` already stored on the row, or the assignment is
+    rejected. An already-assigned row still can't have restaurant/meat
+    changed (delete + re-create, unchanged from before step 9).
+- `server/routes/stockReceipts.test.js` (new, 17/17) - covers both the
+  in-app validation and an independent check that the DB-level CHECK
+  constraint rejects a bad NULL/NOT-NULL combination even if application
+  validation were bypassed.
+- `server/engines/commissaryYieldEngine.test.js` - Belly Slab fixture
+  updated to include the real 5.0kg Unallocated row from `Outbound_Log`;
+  the balance assertion now matches the sheet's actual cached 14.8
+  exactly, closing the previously-documented 19.8-vs-14.8 gap. No engine
+  code changes were needed - `getCommissaryBalance` was already
+  destination-agnostic.
+- `public/stock-receipts.html` - "Leave Unassigned" toggle on the add
+  form (shown only when Source = Commissary), swapping the restaurant/meat
+  pickers for a commissary-meat dropdown; an "Unallocated" badge + Assign
+  action per row with inline restaurant→meat pickers; an "Unallocated
+  only" list filter.
+
+**Verification - stronger than any prior session on this route file**:
+this sandbox had working npm registry access, so `npm install` succeeded
+and the real Express server was run live (`npm run dev` equivalent) for
+the first time ever on this route. In addition to the full existing
+suite (55/55) plus the new 17/17 (72/72 total, 0 failures):
+- 12/12 live HTTP requests against the actual running server exercising
+  the full Unallocated → list → reject-on-mismatched-mapping →
+  assign → re-assign-rejected flow end to end.
+- 9/9 requests replaying the *exact* payload shapes the new
+  `stock-receipts.html` JS constructs (including the string-vs-number
+  quirks of reading straight from DOM inputs), against the live server,
+  confirming the frontend and backend actually agree with each other -
+  not just that each was individually plausible.
+- Every `getElementById` call in the updated page cross-checked
+  programmatically against the HTML's actual `id` attributes - no
+  browser available in this sandbox to click through visually (no
+  puppeteer/playwright, and the Chromium download host isn't in the
+  network allowlist), so this plus the live payload replay is the
+  strongest verification available here. A real click-through in an
+  actual browser is still worth doing before/soon after this ships.
+
+**Not built** (out of scope for step 9 specifically, tracked separately):
+the Landing rebuild and Sales tab (steps 10-11) don't yet reflect
+Unallocated stock in any UI beyond Stock Receipts itself - that's fine,
+per the spec's design ("invisible to restaurant-facing screens until
+assigned").
+
+`HANDOFF.md` was deleted this session - see its own commit message. It
+had drifted two steps stale (still describing itself as the step-6
+handoff) and was actively misleading relative to `session-status.md`,
+which is now the sole "where we left off" doc, so keeping both around
+was a real risk rather than a harmless redundancy.
+
+
 
 **What happened**: a session fully planned and implemented step 9
 (Unallocated-receipts support) — schema change, migration helper,

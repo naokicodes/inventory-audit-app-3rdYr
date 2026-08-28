@@ -1,12 +1,12 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-28 (post step-8, step-9 recovery note). This is the
-authoritative "where we left off" doc. **Read this before `HANDOFF.md`** —
-`HANDOFF.md` is a snapshot from the end of the step-6 session and doesn't
-know steps 7 or 8 shipped; leave it alone per rule 7 unless explicitly
-asked to refresh it.
+Last updated: 2026-08-28 (post step-9 completion + roadmap re-split).
+This is the authoritative "where we left off" doc. `HANDOFF.md` was
+deleted this session (see `changelog.md`) — it had drifted stale and was
+actively misleading; this file is now the only "where we left off" doc,
+so always start here.
 
-## Where things stand: steps 1–8 done and committed. Step 9 was attempted and lost — redo from spec.
+## Where things stand: steps 1–9 done and committed.
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -18,63 +18,52 @@ asked to refresh it.
   `settings.html` has a "Commissary Mapping" tab; `settings.js` has
   `GET`/`POST`/`DELETE /api/settings/commissary-mappings`; covered by
   `server/routes/settings.test.js`.
+- **Step 9** (Unallocated-receipts support): done, committed. Rebuilt
+  from `docs/data-model.md` section 5 and
+  `docs/commissary-and-stock-receipts.md` Part 2 after an earlier attempt
+  was lost to a usage cutoff before it could commit (see `changelog.md`'s
+  two 2026-08-28 entries — one documents the loss, the other the
+  successful rebuild). This incident is also why the roadmap below was
+  re-split into smaller steps — see rule 16 in `rules-for-claude-code.md`.
+  - `schema.sql`/`migrate.js`: `stock_receipts.restaurant_id`/`meat_id`
+    nullable, CHECK constraint, idempotent migration for pre-existing
+    local databases.
+  - `stockReceipts.js`: `POST` accepts an Unallocated COMMISSARY receipt
+    (client supplies `commissary_meat_id` directly since there's no
+    restaurant+meat pair yet to map through); `GET` uses `LEFT JOIN` so
+    Unallocated rows aren't hidden, plus `?unallocated=true`; `PATCH`
+    gains one-time assignment of `restaurant_id`+`meat_id`, enforcing the
+    `commissary_meat_id` continuity check.
+  - `stock-receipts.html`: "Leave Unassigned" toggle on the add form, an
+    "Unallocated" badge + Assign action per row, an "Unallocated only"
+    filter.
+  - Tests: 72/72 total (55 pre-existing + 17 new), plus live HTTP
+    verification against the actual running server (the first time this
+    route file has ever been exercised that way) and a payload-shape
+    replay confirming the new frontend and backend actually agree.
+  - `commissaryYieldEngine.test.js`'s Belly Slab test now asserts the
+    real 14.8 balance (was 19.8, a documented gap) — closed automatically
+    once the Unallocated row became representable, no engine code change
+    needed.
 
-### Step 9 — attempted, not committed, work is gone. Start over from the doc spec, not from memory of a prior attempt.
-
-A session worked through step 9 (Unallocated-receipts support) in full —
-planned it, edited `schema.sql`, wrote a migration helper, updated
-`stockReceipts.js`'s POST/GET/PATCH, added `stockReceipts.test.js`
-(18/18 green), updated `commissaryYieldEngine.test.js`'s Belly Slab test
-to assert the real 14.8 instead of the documented 19.8 gap, and was
-partway through `stock-receipts.html`'s UI — then hit its usage limit
-before committing or writing an end-of-session doc update. **None of that
-code exists in the repo**, confirmed directly against the live GitHub repo
-on 2026-08-28: `schema.sql`'s `stock_receipts.restaurant_id` is still
-`NOT NULL`, and neither `server/routes/stockReceipts.test.js` nor a
-migration file exist. Latest commit at time of writing:
-`398be2d — docs: session-status — step 8 done, step 9 next`.
-
-This is a real loss, not a formality — don't assume any part of step 9 is
-already in place. The next session should treat step 9 as **not started**
-and rebuild it from `docs/data-model.md` section 5 and
-`docs/commissary-and-stock-receipts.md` Part 2's Unallocated-receipts note,
-which fully specify what to build. Two things worth carrying forward from
-the lost attempt, since they were sound design calls even though the code
-is gone:
-
-1. **A migration helper is genuinely needed**, not optional — `schema.sql`
-   uses `CREATE TABLE IF NOT EXISTS`, which cannot retroactively loosen a
-   `NOT NULL` constraint on a table that already exists in someone's local
-   `inventory.db`. Any session with a pre-existing local database needs an
-   idempotent one-time rebuild step (detect the old constraint via
-   `PRAGMA table_info`, rebuild the table preserving existing rows) run
-   once before `schema.sql`, not just a schema.sql edit alone.
-2. **Assignment must validate `commissary_meat_id` continuity**: when
-   `PATCH`-assigning an unallocated row to a restaurant, the
-   `commissary_meat_map` lookup for the chosen restaurant+meat must resolve
-   to the *same* `commissary_meat_id` already stored on that row — reject
-   the assignment otherwise. This was flagged by the prior session as an
-   ambiguity the docs didn't spell out; confirmed correct: without this
-   check, assignment could silently misattribute which physical commissary
-   pool a shipment was drawn from, undermining the balance/traceability
-   the table exists for. This rule should be written into
-   `docs/data-model.md` section 5 as part of implementing step 9, not
-   re-litigated.
-
-**Next up is step 9**, rebuilt from scratch per the above.
+**Next up is step 10** — see the roadmap below. It's the first of several
+small steps that used to be one big "step 10" before the 2026-08-28
+re-split.
 
 ## Known open items (not the next step's problem, just not forgotten)
 
-- **`npm run dev` has still never been fully click-tested** across Stock
-  Receipts' and Commissary's own Edit/Delete UI flows — only History's
-  routes and the two write routes needed to generate its test data have
-  been verified live. Worth doing if a session gets a natural opening.
+- **A real click-through in an actual browser is still owed** for Stock
+  Receipts' Unallocated/Assign flow specifically — the 2026-08-28 session
+  had no browser available (no puppeteer/playwright, and the download
+  host for one isn't in the sandbox's network allowlist), so it verified
+  via live HTTP payload replay instead (see `changelog.md`). Strong
+  verification, but not the same as clicking it. Commissary's own
+  Edit/Delete UI flows are in the same boat — never fully click-tested.
 - **Opening stock bug** (older, still unfixed): a meat/dish with no prior
-  tracking has `beginning` null forever. Fix: make the Beginning cell
-  editable only on a row's first-ever appearance, write once to
-  `opening_stock`.
+  tracking has `beginning` null forever. This is step 12 below.
 - **Live recalculation** (older, still unfixed): Ending(calc)/Over-Short
-  only update after a full save+reload, not live in the browser.
+  only update after a full save+reload, not live in the browser. This is
+  step 13 below.
 - Restaurant B/C still aren't seeded — Restaurant A only. Step 8's admin
   screen removes the main blocker to onboarding them (mapping is now
   reachable in the UI); they'll still need their own
@@ -83,22 +72,72 @@ is gone:
   workbook) is expected to be prepared separately, outside a coding
   session — check with the project owner before assuming it's ready.
 
-## Remaining scope after step 9 (steps 10-12)
+## Remaining scope (steps 10–19)
 
-10. Rebuild Landing as ONE mixed grid (meats + prepared dishes together,
-    per the real "Silingan Landing Inventory" paper workflow — NOT
-    meats-only), with the opening-stock fix and live recalc built in from
-    the start. Vocabulary: the real term is "Over/Short", not "variance"
-    (keep "variance" as the internal/technical term in code and docs).
-11. Sales tab: monthly grid (rows = dishes, columns = Day 1..last day),
-    editable with a confirm prompt on manual override, plus the
-    BATCH_PREPPED over-sold validation warning (sold qty should never
-    exceed available prepped portions — WARNING via the command panel,
-    not a hard block).
-12. Command panel (cross-cutting, appears on any tab) — first planned
-    command: "Sync batch stock" (copy sales into prepped for
-    BATCH_PREPPED dishes with no manual entry yet, logged as a SYSTEM
-    `activity_log` entry).
+Re-split on 2026-08-28 from the old 3-item "steps 10–12" list, per rule
+16 in `rules-for-claude-code.md` — each item below is meant to be
+comfortably doable, tested, documented, and **committed** within one
+focused session, including a session that gets cut off by a usage limit
+partway through the *next* step rather than this one. A step that turns
+out bigger than it looked should still stop and commit at its own clean
+boundary rather than pushing into the next item's scope.
+
+Notice the command panel (old step 12) moved earlier, to before Sales —
+Sales' over-sold warning (step 18 below) needs somewhere to surface
+through, so building the command panel after it would've meant either
+building Sales twice or quietly growing step 11 back into a multi-part
+step. Sequencing steps so each one's dependencies already exist is part
+of sizing them correctly, not a separate concern.
+
+10. **Landing backend: unify the read endpoint into one mixed grid.**
+    Rework/extend the audit engine's Landing-read endpoint to return one
+    array of rows — meats and prepared dishes together, each tagged with
+    its type — instead of separate meats-only data. No UI changes yet.
+    Backend + tests only. Per the real "Silingan Landing Inventory" paper
+    workflow (not meats-only) — see `daily-workflow.md`.
+11. **Landing frontend: render the mixed grid.** Build the actual
+    Landing page UI on top of step 10's endpoint — meats and dishes as
+    rows in one grid, matching the paper layout. Still using the
+    existing full save-and-reload flow (no live recalc yet — that's step
+    13). Vocabulary: the real term is "Over/Short," not "variance" (keep
+    "variance" as the internal/technical term in code and docs).
+12. **Opening-stock fix.** A meat/dish with no prior tracking currently
+    has `beginning` null forever. Make the Beginning cell editable only
+    on a row's first-ever appearance, writing once to `opening_stock`.
+    Backend + the minimal frontend change to make that cell editable —
+    doesn't touch the rest of Landing.
+13. **Live recalculation on Landing.** Ending(calc)/Over-Short update
+    live in the browser as New Stock/Usage/Actual change, instead of
+    only after a full save+reload. Frontend-only, built on top of steps
+    10–12 once they're stable.
+14. **Command panel scaffold.** A UI element that can appear on any tab,
+    with a small pluggable command registry — no real commands yet
+    beyond a no-op proving the plumbing works end to end (registers,
+    appears, runs, logs nothing meaningful). This exists on its own so
+    step 18 (the over-sold warning) has something to plug into without
+    needing to build panel infrastructure and a Sales feature in the
+    same sitting.
+15. **First real command: "Sync batch stock."** Copies sales into
+    `prepped` for BATCH_PREPPED dishes with no manual entry yet, logged
+    as a SYSTEM `activity_log` entry. Exercises the step-14 scaffold
+    with a real, useful command before Sales needs it.
+16. **Sales backend.** CRUD for manual sales entry shaped for a monthly
+    grid — `GET` a month's matrix for a restaurant/dish set, `PATCH` a
+    single day's cell. Backend + tests only.
+17. **Sales frontend.** The monthly grid UI (rows = dishes, columns =
+    Day 1..last day) on top of step 16, editable with a confirm prompt
+    on manual override.
+18. **BATCH_PREPPED over-sold warning.** Sold quantity should never
+    exceed available prepped portions for a BATCH_PREPPED dish — surface
+    this as a WARNING through the step 14/15 command panel, not a hard
+    block. Small and self-contained now that steps 14–17 exist under it.
+19. **Restaurant B onboarding** (once `seed-data-B.json` is confirmed
+    ready by the project owner — see "Known open items" above): seed
+    `meats`/`dishes`/`recipe_bom` for Restaurant B via the Settings
+    screens step 8 already built. No new code expected — this is a data
+    / verification step, not a feature step; worth keeping as its own
+    numbered item anyway so it isn't silently skipped or bundled into
+    something else.
 
 ## Things NOT to re-litigate (already decided, stable)
 
@@ -113,10 +152,14 @@ is gone:
   docs don't resolve, it should flag it and stop, per rule 3.
 - Testing approach: build and test in the sandbox environment first (real
   code paths, real database, hand-verified numbers) before handing files
-  over.
+  over. As of the step-9 session, this sandbox has had working npm
+  registry access, so "build and test" can mean a real `npm install` +
+  live Express server + live HTTP requests, not just hand-mirrored SQL —
+  worth doing whenever the sandbox allows it, not just schema-level
+  tests.
 - Stock receipts are unified across restaurants (one log, restaurant
   column) rather than per-restaurant New Stock screens; `restaurant_id`
-  will become nullable as part of step 9, per `data-model.md` section 5.
+  is nullable as of step 9, per `data-model.md` section 5.
 - Activity logging via before/after snapshots + soft deletes, not hard
   locks. Scoped to `stock_receipts` and `commissary_yield_log` only —
   `commissary_meat_map` is deliberately excluded, being config data
@@ -124,7 +167,7 @@ is gone:
 - "Landing" mixes meats + prepared dishes as rows; Prep is not a separate
   tab (confirmed via the real paper workflow, "Silingan Landing
   Inventory").
-- The repo is now **public** (no secrets committed — `.env`, `*.db`, and
+- The repo is public (no secrets committed — `.env`, `*.db`, and
   `/uploads/` are gitignored and always have been). This was a deliberate
   choice to simplify tooling access; it doesn't change any of the above.
 
@@ -136,10 +179,18 @@ the step it was working on is fully finished — should, before ending:
 
 1. Update `docs/changelog.md` with a dated entry (what shipped, what's
    deliberately not built yet, how it was verified).
-2. Update **this file** (`session-status.md`) — even a one-line "step 9 is
-   half done, X works, Y doesn't yet" beats leaving it saying the prior
-   step is current. **This step was skipped once already** (the lost
-   step-9 attempt) — do this even if you're cut off mid-task; commit
+2. Update **this file** (`session-status.md`) — even a one-line "step 10
+   is half done, X works, Y doesn't yet" beats leaving it saying the
+   prior step is current. **This step was skipped once already** (the
+   step-9 loss) — do this even if you're cut off mid-task; commit
    whatever code exists plus an honest status note, rather than losing
    the whole session's work silently.
-3. Leave `HANDOFF.md` alone unless explicitly asked to refresh it.
+3. Per rule 16, prefer not needing step 2 to say "half done" at all —
+   if a step is running long, stop and commit at the nearest clean
+   boundary instead of pushing to finish the original scope in one
+   sitting.
+4. There is no `HANDOFF.md` to leave alone anymore — it was deleted
+   2026-08-28. If a future session is tempted to create a new
+   parallel "handoff" doc, don't — extend this file instead, so there's
+   never again a second doc that can silently drift out of sync with the
+   real one.

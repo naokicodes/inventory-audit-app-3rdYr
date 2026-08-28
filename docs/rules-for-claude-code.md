@@ -62,6 +62,33 @@ standing constraints, not suggestions — they exist to keep a solo,
     Commissary and restaurant meat numbering are confirmed NOT aligned
     (see `data-model.md` section 10) — mapping is explicit, admin-set data
     only.
+16. **Size each numbered step to fit one focused session, with margin —
+    not "as much as fits before usage runs out."** This rule exists
+    because of a real incident: step 9 (Unallocated receipts) was sized
+    as "schema + migration + all three routes + tests + the UI," a
+    session did the first four parts correctly, then lost all of it by
+    hitting its usage limit before committing (see `changelog.md`,
+    2026-08-28 entries). A step sized so a full session comfortably
+    covers implementation, tests, docs, AND a commit — with room to
+    spare — turns a usage cutoff into "next session picks up the next
+    small step" instead of "the last hour of work vanished." Concretely:
+    - A backend change and its matching frontend change are two steps,
+      not one, unless both are genuinely trivial.
+    - A step description that reads as "X, Y, and Z" (three-plus
+      distinct deliverables) should usually be three steps.
+    - **Commit as soon as a step's own tests pass** — don't bundle
+      "finish the step" and "commit it" as separate later actions within
+      the same session if the step is already done; per rule 8, testing
+      and committing are separate steps, but on a *usage-limited* session
+      the gap between them should be minutes, not "whenever I get
+      around to it."
+    - If a step turns out bigger than expected once inside it, stop at
+      the next clean, tested, committable boundary and hand off via
+      `session-status.md` rather than pushing to finish the whole
+      original step in one sitting.
+    - See `session-status.md`'s roadmap for what this looks like applied
+      to the actual remaining work (steps 10 onward were re-split for
+      exactly this reason on 2026-08-28).
 
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.
