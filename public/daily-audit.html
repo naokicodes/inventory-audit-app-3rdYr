@@ -71,12 +71,22 @@
       restaurantSelect.innerHTML = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
     }
 
-    // Meat row: same editable fields/save flow as before this step.
+    // Meat row: same editable fields/save flow as before this step, plus
+    // step 12's Beginning cell. Beginning is only ever editable when it's
+    // null (r.beginning === null / status MISSING_BEGINNING_STOCK) - once
+    // an opening_stock row exists for this meat, getBeginningStock never
+    // returns null for it again, so the cell naturally reverts to
+    // calculated/read-only on every later day. No separate "is this the
+    // first day" check needed on the frontend - null-ness already is that
+    // check.
     function meatRowHtml(r) {
+      const beginningCell = r.beginning === null
+        ? `<td><input type="number" step="0.01" class="opening_stock" placeholder="opening count"></td>`
+        : `<td class="calculated">${fmt(r.beginning)}</td>`;
       return `
         <tr data-meat-id="${r.meat_id}">
           <td>${r.name} <span class="type-badge">(${r.unit})</span></td>
-          <td class="calculated">${fmt(r.beginning)}</td>
+          ${beginningCell}
           <td class="calculated">${fmt(r.newStock)}</td>
           <td class="calculated">${fmt(r.usage)}</td>
           <td><input type="number" step="0.01" class="in_house" value="${r.in_house ?? ''}" placeholder="0"></td>
@@ -150,14 +160,23 @@
       const date = dateInput.value;
       const trs = gridContainer.querySelectorAll('tr[data-meat-id]');
 
-      const rows = Array.from(trs).map(tr => ({
-        meat_id: Number(tr.dataset.meatId),
-        in_house: tr.querySelector('.in_house').value,
-        wastage: tr.querySelector('.wastage').value,
-        other: tr.querySelector('.other').value,
-        ending_actual: tr.querySelector('.ending_actual').value,
-        remarks: tr.querySelector('.remarks').value
-      }));
+      const rows = Array.from(trs).map(tr => {
+        const openingStockInput = tr.querySelector('.opening_stock');
+        return {
+          meat_id: Number(tr.dataset.meatId),
+          // Only present on rows whose Beginning cell was editable this
+          // load (see meatRowHtml) - the backend also enforces write-once
+          // via opening_stock's UNIQUE constraint, but there's no reason
+          // to send the field at all for rows that already have a
+          // calculated Beginning.
+          opening_stock: openingStockInput ? openingStockInput.value : undefined,
+          in_house: tr.querySelector('.in_house').value,
+          wastage: tr.querySelector('.wastage').value,
+          other: tr.querySelector('.other').value,
+          ending_actual: tr.querySelector('.ending_actual').value,
+          remarks: tr.querySelector('.remarks').value
+        };
+      });
 
       statusEl.textContent = 'Saving...';
       statusEl.className = 'status-message';
