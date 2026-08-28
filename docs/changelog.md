@@ -11,6 +11,72 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Steps 10-11: Landing mixed grid (meats + BATCH_PREPPED dishes), backend and frontend
+**Step 10 (backend, prior session's work, verified and handed off this
+session)**: `computeDishAudit`/`computeMixedDailyAudit` in
+`auditEngine.js`, mirroring `computeMeatAudit`'s null-when-missing-data
+shape but following `data-model.md` section 6's simpler portion formulas
+(no adjustments layer for portions). `GET /api/daily-audit/mixed` added
+to `dailyAudit.js`, additive alongside the untouched `GET /api/daily-audit`.
+6 new tests (5 dish-audit + 1 mixed-grid) appended to `auditEngine.test.js`.
+Verified this session: all 15 tests in that file pass (`node
+server/engines/auditEngine.test.js`, exit 0), and `schema.sql`'s
+`portion_ending_actual` table already had the exact columns the tests
+assumed - no schema gap, no migration needed.
+
+**Step 11 (frontend, this session)**: `daily-audit.html` now reads
+`/api/daily-audit/mixed` and renders meats + BATCH_PREPPED dishes as rows
+in one table, per the real "Silingan Landing Inventory" paper workflow.
+
+Before writing any frontend code, this session hit a real ambiguity the
+docs didn't resolve and stopped to ask (per rule 3) rather than assume:
+`daily-workflow.md` describes Prepped/Portion Ending Actual as their own
+separate daily screens, but `session-status.md`'s "not to re-litigate"
+list says Prep is *not* a separate tab - it's part of Landing. Meanwhile
+no write endpoint for `prepped`/`portion_ending_actual` exists anywhere
+in the app yet. Asked the project owner: dish rows read-only this step,
+or extend scope to add the write path too? **Answer: read-only** - so
+dish rows in the new grid show Prepped/Sold/Portion Beginning/Ending
+calc/Portion Actual/status, with no inputs. Meat rows are unchanged:
+same editable fields, same `POST /api/daily-audit` save flow as before.
+User-facing label changed to "Over/Short" (vocabulary note in the
+roadmap); `variance` stays the internal/code term everywhere.
+
+One small backend addition came with this, not a separate step: MEAT
+rows returned by `/api/daily-audit/mixed` are now decorated with the
+same `in_house`/`wastage`/`other`/`remarks` lookups the older
+`/api/daily-audit` endpoint already had, via a new shared
+`getMeatInputDecoration` helper in `dailyAudit.js`. This wasn't scope
+creep - the step-10 session's own comment on that route explicitly
+flagged it as "left for step 11 to add if the Landing UI needs it," and
+without it the Landing UI couldn't show previously-typed values in the
+now-editable meat-row inputs.
+
+**Verification**: `node --check` on both changed files (syntax only -
+no live server this session, see below). Re-ran the full
+`auditEngine.test.js` suite (still 15/15, unchanged by this step). Hand-
+ran an uncommitted `node -e '...'` script that seeded a real test DB via
+`node:sqlite`, called `computeMixedDailyAudit` plus the new decoration
+helper exactly as the route composes them, and confirmed the JSON shape
+(field names and nesting) matches exactly what `daily-audit.html`'s JS
+reads for both row types.
+
+**Known gap, same shape as prior sessions' "Known open items"**: this
+session worked from an uploaded zip snapshot of the repo, not a live
+clone - no `.git` directory, no network access for `npm install`. That
+meant no live Express server, so no real HTTP request/response round
+trip and no browser click-through - same limitation already logged for
+Stock Receipts' Unallocated/Assign flow and Commissary's Edit/Delete UI.
+The three step-10 files and two step-11 files were packaged as
+downloads for the project owner to drop into their real local clone and
+commit/push themselves. **A future session should confirm via `git log`
+that steps 10-11 actually landed** before trusting this changelog entry
+and `session-status.md` at face value - that hand-off is a new kind of
+gap this project hasn't hit before (steps 1-9 were all committed live,
+in-session).
+
+---
+
 ## 2026-08-28 (later) — Step 9 rebuilt from spec and shipped
 
 Rebuilt the Unallocated-receipts work described in the entry directly
@@ -650,3 +716,4 @@ mistaken for new problems:
   command has any quotes inside it.
 - **`git status` showing "upstream is gone"`** right after cloning a fresh
   empty repo — resolves itself after the first `git push`, not an error.
+
