@@ -10,6 +10,80 @@ this is for things that took real debugging, changed a decision, or are
 worth remembering if they happen again.
 
 ---
+## 2026-08-28 (architecture review, between step 6 and step 7) — Resolved two open gaps: commissary mapping UI and the Unallocated-destination schema limit
+
+**Context**: before starting step 7, took a step back to review the whole
+repo against `HANDOFF.md`/`session-status.md`'s own account of where things
+stand (confirmed accurate — steps 1-6 really are done as described, step 7
+really is next). Two items that had been *flagged* in earlier sessions but
+never turned into an actual planned step were surfaced during that review:
+`commissary_meat_map` has no admin UI (only a dev writing SQL can create a
+mapping), and the "Unallocated destination" gap noted back on 2026-08-27/28
+(a commissary shipment that hasn't been assigned to a restaurant yet isn't
+representable, since `stock_receipts.restaurant_id` was `NOT NULL`). Both
+are now resolved as concrete decisions, written into the docs, before any
+more code gets built on top of the current schema.
+
+**No code changed in this entry** — per `rules-for-claude-code.md` rule 7
+and the project's established docs-first workflow, architecture decisions
+land in the docs first, get implemented as their own step next.
+
+**Decisions made:**
+
+1. **`commissary_meat_map` gets an admin screen** — new "Commissary
+   Mapping" tab on `settings.html` (same pattern as the existing
+   Meats/Dishes/Recipes tabs) + a route in `settings.js`. `commissary_meats`
+   itself stays seed-only (still just the one commissary). No
+   `activity_log` wiring needed — this is config/reference data, not one of
+   the two tables `rules-for-claude-code.md` rule 9 scopes activity logging
+   to. Scheduled as **step 8**.
+
+2. **`stock_receipts.restaurant_id` and `meat_id` become nullable**, to
+   represent a commissary shipment that's left the commissary but hasn't
+   been assigned to a restaurant yet (the real xlsx's `Outbound_Log`
+   "Unallocated" destination). A NULL-restaurant row is created via the
+   existing `POST` flow with the restaurant left unset (only valid for
+   `source = COMMISSARY`), stays correctly excluded from every restaurant's
+   `new_stock` sum while unassigned, still correctly counts against the
+   commissary's on-hand balance (that formula is already destination-
+   agnostic), and gets assigned later via a `PATCH` that sets both fields
+   together — logged as a normal `UPDATE`, reusing step 6's existing
+   `activity_log` machinery rather than adding a new logging path.
+   Scheduled as **step 9**, after step 8 (assignment needs mappings to be
+   manageable in the UI first, or there's nothing to test it against
+   beyond hand-written SQL).
+
+3. **Corrected a docs staleness bug while reviewing**: `data-model.md`'s
+   "Still open" section still listed the `excess_loss` formula as
+   unresolved ("to be pinned down from real xlsx rows"), but it was
+   actually pinned down and verified back on 2026-08-28 per
+   `commissaryYieldEngine.js`/`.test.js` (7 real Review rows, 38 Pass, 1
+   zero-weight edge case, all matched). The doc was just never updated to
+   reflect that at the time. Fixed — not a new decision, just closing a gap
+   between what the code already proves and what the doc claimed.
+
+**Docs touched**: `data-model.md` (sections 5, 10, 10a new, "Still open"
+list corrected), `commissary-and-stock-receipts.md` (Part 1's mapping note,
+Part 2's Unallocated note, "Open items" list resolved), `session-status.md`
+(steps renumbered 7 → 7, new 8-9 inserted, old 8-10 renumbered to 10-12;
+`session-status.md` formally established as the doc future sessions should
+read first, ahead of `HANDOFF.md`, since `HANDOFF.md` is a point-in-time
+snapshot that goes stale the moment a new step starts).
+
+**Also formalized**: an explicit end-of-session checklist in
+`session-status.md` (update `changelog.md` + `session-status.md` before
+ending, every session, even on partial progress) — this project runs across
+multiple independent Claude Code sessions with no shared memory between
+them, so `docs/` is the only continuity mechanism; worth stating the
+discipline explicitly rather than relying on each session to reinvent it.
+
+**Not done in this entry, on purpose**: no schema.sql change, no route
+code, no UI code. Step 8 and step 9 are real implementation work for a
+future session — this entry only records the decision and the reasoning,
+per the docs-first rule.
+
+---
+
 
 ## 2026-08-28 (latest) — Activity log wired in (step 6): edit/delete for both tables, full audit trail
 

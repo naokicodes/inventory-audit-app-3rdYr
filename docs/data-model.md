@@ -12,6 +12,16 @@ been added — commissary yield tracking and the activity log. See
 `docs/commissary-and-stock-receipts.md` for the full reasoning; this file has
 the resulting schema only.
 
+**2026-08-28 update (architecture review)**: two items previously listed under
+"Still open" are now resolved decisions — see section 5 (`stock_receipts.
+restaurant_id` is now nullable, to represent commissary shipments not yet
+assigned to a restaurant) and section 10a (commissary meat mapping gets an
+admin CRUD screen). The excess-loss formula (previously "still open" item 2)
+was actually pinned down and verified back on 2026-08-28 per
+`commissaryYieldEngine.js`/`.test.js` — this doc was just never updated to
+reflect that; corrected below. See `docs/changelog.md` for the full reasoning
+behind this round of decisions.
+
 ## Design principle
 The Excel workbooks stored some things as raw input and calculated others with
 formulas. We preserve that split:
@@ -87,12 +97,12 @@ per-restaurant tabs.
 | column | type | notes |
 |---|---|---|
 | id | integer, PK | |
-| restaurant_id | integer, FK | |
-| meat_id | integer, FK | |
+| restaurant_id | integer, FK, **nullable (2026-08-28)** | **NULL means "shipped from the commissary, not yet assigned to a restaurant"** — the "Unallocated" case from the real xlsx's `Outbound_Log`. Only valid when `source = COMMISSARY`; a `DIRECT` receipt must always have a restaurant, since a direct delivery is by definition addressed to one. See "Unallocated receipts" note below. |
+| meat_id | integer, FK, **nullable (2026-08-28)** | **NULL only when `restaurant_id` is also NULL** (an unallocated row hasn't been assigned to a restaurant yet, so it can't reference that restaurant's own meat item — only `commissary_meat_id` is known at that point). Non-null in every other case. |
 | business_date | date | |
 | quantity | decimal | |
 | source | text | `DIRECT` or `COMMISSARY` |
-| commissary_meat_id | integer, FK → commissary_meats, nullable | set only when source = COMMISSARY |
+| commissary_meat_id | integer, FK → commissary_meats, nullable | set only when source = COMMISSARY. For an unallocated row this is the ONLY meat reference present. |
 | notes | text, nullable | |
 | photo_path | text, nullable | |
 | created_by | text | |
@@ -103,7 +113,35 @@ per-restaurant tabs.
 deliveries are irregular and can repeat within a day. `new_stock(meat, date)`
 is now `SUM(quantity)` over matching, non-deleted rows for that date —
 calculated, same treatment as beginning/usage/variance below, not a
-single-row lookup.
+single-row lookup. **A row with `restaurant_id IS NULL` is never counted
+toward any restaurant's `new_stock`** — it isn't attributable to one yet by
+definition.
+
+#### Unallocated receipts (resolved 2026-08-28)
+Previously flagged as an open gap: the real xlsx's `Outbound_Log` allows a
+commissary shipment with no restaurant destination yet ("Unallocated"), but
+the original schema had `restaurant_id NOT NULL`, so this case wasn't
+representable.
+
+**Decision**: `restaurant_id` and `meat_id` are now nullable, with the
+constraint above (both null together, only for `source = COMMISSARY`). An
+unallocated row is created via the normal `POST /api/stock-receipts` flow but
+with restaurant left unset. It is later assigned via
+`PATCH /api/stock-receipts/:id` — a genuinely new capability, not just an
+edit to existing editable fields — setting `restaurant_id` and `meat_id`
+together (`meat_id` must be resolvable via `commissary_meat_map` for the
+chosen restaurant, same validation `POST` already applies). Both the create
+and the later assignment go through the existing `activity_log` machinery —
+assignment is logged as an `UPDATE`, same as any other edit.
+
+**Why this approach over a placeholder "Unallocated" row in `restaurants`**:
+a placeholder restaurant would pollute restaurant-scoped reporting (it would
+show up in "restaurants" dropdowns, weekly summaries, etc. as if it were a
+real location) for no benefit over a nullable column. Nullable + explicit
+assignment-later keeps unallocated stock cleanly invisible to
+restaurant-facing screens until it's actually assigned.
+
+Tracked as **step 9** in `docs/session-status.md`.
 
 ### ending_actual
 Unchanged.
@@ -162,7 +200,10 @@ beginning_stock(meat, date) =
 ### new_stock (calculated, not stored — see section 5)
 ```
 new_stock(meat, date) =
-  SUM(stock_receipts.quantity WHERE meat = ? AND date = ? AND deleted_at IS NULL)
+  SUM(stock_receipts.quantity WHERE meat = ? AND date = ? AND deleted_at IS NULL
+      AND restaurant_id IS NOT NULL)
+  -- the restaurant_id IS NOT NULL clause excludes unallocated commissary
+     shipments that haven't been assigned to a restaurant yet (2026-08-28)
 ```
 
 ### usage (calculated, not stored)
@@ -288,6 +329,32 @@ strings.
 
 `UNIQUE (commissary_meat_id, restaurant_id)`.
 
+### 10a. commissary_meat_map admin screen (resolved 2026-08-28)
+Previously "still open" (item 3, old list): whether `commissary_meats`/
+`commissary_meat_map` need their own admin CRUD screen, or a one-time seed is
+enough.
+
+**Decision**: yes, build an admin screen now. `commissary_meats` itself can
+stay seed-only for the current single-commissary setup (still just the 14
+real rows from `commissary-seed-data.json` — no CRUD needed there yet), but
+`commissary_meat_map` **needs a real admin screen**, because right now the
+only way to create a mapping row is a developer hand-writing SQL (this is
+literally how the test fixtures in `commissaryYieldEngine.test.js` do it).
+That's a hard blocker the moment Restaurant B/C come online, and it already
+means `stock_receipts`' "not mapped yet — set this up in Settings" error
+message points at a Settings screen that doesn't exist.
+
+Add a "Commissary Mapping" tab to `settings.html` (same tab pattern as
+Meats/Dishes/Recipes) plus a route in `settings.js`: list existing mappings
+for the selected restaurant, and a simple add-form (commissary meat dropdown
+× that restaurant's meat dropdown → creates one `commissary_meat_map` row).
+No edit needed for v1 (a wrong mapping is delete + re-add); no activity-log
+wiring needed (this table isn't in the step-6 scope per
+`rules-for-claude-code.md` rule 9 — it's reference/config data, not a daily
+transactional log).
+
+Tracked as **step 8** in `docs/session-status.md`.
+
 ### commissary_yield_log
 One row per raw delivery/processing event at the commissary. Not tied to any
 restaurant — this happens before allocation.
@@ -308,8 +375,18 @@ restaurant — this happens before allocation.
 actual_loss_pct(row) = (raw_weight_in - backed_weight_out) / raw_weight_in
 status(row) = 'Review' if actual_loss_pct(row) > commissary_meats.allowed_leeway_pct else 'Pass'
 ```
-(Excess-loss formula to be pinned exactly against real xlsx rows during
-implementation.) All calculated, not stored.
+(Both calculated, not stored.)
+
+**Excess-loss formula (resolved, was previously listed as "still open"):**
+```
+excess_loss(row) = max(0, (raw_weight_in - backed_weight_out)
+                          - raw_weight_in * allowed_leeway_pct)
+```
+Pinned down and verified against all real rows in `Commi_Audit_Master.xlsx`'s
+`Yield_Log` sheet (7 Review + 38 Pass + 1 zero-weight edge case) back on
+2026-08-28 — see `server/engines/commissaryYieldEngine.js` and its test file.
+This doc previously still listed the formula as open; that was a docs lag,
+not an unresolved formula. Corrected here.
 
 ### commissary_balance (calculated, not stored)
 ```
@@ -317,6 +394,12 @@ commissary_balance(commissary_meat) =
   SUM(commissary_yield_log.backed_weight_out WHERE deleted_at IS NULL)
   - SUM(stock_receipts.quantity WHERE commissary_meat_id = ? AND source = 'COMMISSARY' AND deleted_at IS NULL)
 ```
+Note: this SUM is destination-agnostic — it subtracts a `COMMISSARY`-source
+`stock_receipts` row whether or not `restaurant_id` is set, so an unallocated
+shipment (section 5) still correctly leaves the commissary's on-hand balance
+once shipped, even before it's assigned to a restaurant. Matches the real
+xlsx's own `Commissary_Stock` formula, which the 2026-08-28 changelog entry
+confirmed sums `Outbound_Log` "regardless of destination."
 
 ---
 
@@ -340,6 +423,10 @@ row here in the same transaction. Deletes on those two tables are soft
 for now — extending it to `ending_actual`/`adjustments`/`prepped`/
 `portion_ending_actual` is real follow-up work, not bundled into this change.
 
+An unallocated-receipt assignment (section 5) is logged as a normal `UPDATE`
+row here — no special-casing needed, since it goes through the same
+`PATCH /api/stock-receipts/:id` path as any other edit.
+
 ---
 
 ## Confirmed scope (resolved)
@@ -355,11 +442,15 @@ for now — extending it to `ending_actual`/`adjustments`/`prepped`/
 - Stock receipts (new stock, from any source) are a single unified log
   across all restaurants, not per-restaurant tables — see section 5.
 - Commissary yield tracking is in scope as of 2026-08-27 — see section 10.
+- `stock_receipts.restaurant_id`/`meat_id` are nullable, to represent an
+  unallocated commissary shipment — resolved 2026-08-28, see section 5.
+- `commissary_meat_map` gets its own admin screen — resolved 2026-08-28,
+  see section 10a.
 
 ## Still open
 1. Recipe_BOM quantities are NOT filled in for most dishes in the real
    workbook — finished via the admin UI over time, not from the xlsx import.
-2. Exact excess-loss formula for `commissary_yield_log` (section 10) — pin
-   down from real xlsx rows during implementation.
-3. Whether `commissary_meats` needs its own admin CRUD screen now or a
-   one-time seed is enough given there's currently one commissary.
+2. ~~Exact excess-loss formula~~ — resolved, see section 10.
+3. ~~Whether `commissary_meats` needs its own admin CRUD screen~~ — resolved,
+   see section 10a (`commissary_meats` itself stays seed-only;
+   `commissary_meat_map` gets a real screen).
