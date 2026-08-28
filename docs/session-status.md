@@ -1,12 +1,12 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-28 (post step-9 completion + roadmap re-split).
+Last updated: 2026-08-29 (post step-11 completion).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
 so always start here.
 
-## Where things stand: steps 1–9 done and committed.
+## Where things stand: steps 1–11 done (10–11 pending push — see below).
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -46,9 +46,59 @@ so always start here.
     once the Unallocated row became representable, no engine code change
     needed.
 
-**Next up is step 10** — see the roadmap below. It's the first of several
-small steps that used to be one big "step 10" before the 2026-08-28
-re-split.
+- **Step 10** (Landing backend: unify the read endpoint into one mixed
+  grid): done. `computeDishAudit`/`computeMixedDailyAudit` added to
+  `auditEngine.js`, `GET /api/daily-audit/mixed` added to
+  `dailyAudit.js` (additive, `GET /api/daily-audit` untouched), 6 new
+  tests in `auditEngine.test.js` (5 dish-audit + 1 mixed-grid; 9
+  pre-existing + 6 new = 15/15 in that file). Verified `portion_ending_
+  actual`'s columns (`restaurant_id`, `dish_id`, `business_date`,
+  `portions_counted`) already matched what the tests assumed — no schema
+  gap.
+- **Step 11** (Landing frontend: render the mixed grid): done, with one
+  scope decision made explicitly this session (see below) rather than
+  assumed. `daily-audit.html` now reads from `/api/daily-audit/mixed`
+  instead of `/api/daily-audit` and renders meats + BATCH_PREPPED dishes
+  as rows in one table. Meat rows: unchanged editable fields/save flow
+  (still posts to the untouched `POST /api/daily-audit`). Dish rows:
+  **display-only** (Prepped, Sold, Portion Beginning/Ending calc,
+  Portion Actual, status) — there is still no write path for
+  `prepped`/`portion_ending_actual` anywhere in the app, so editing dish
+  rows is explicitly deferred to its own future step, not silently
+  assumed in-scope here. User-facing label is "Over/Short"; `variance`
+  stays the internal/code term, per the roadmap's vocabulary note.
+  `GET /api/daily-audit/mixed` gained a small, doc-anticipated addition
+  (`dailyAudit.js`'s own step-10 comment flagged this as step 11's job):
+  MEAT rows are now decorated with the same `in_house`/`wastage`/
+  `other`/`remarks` lookups the old endpoint already had, via a shared
+  `getMeatInputDecoration` helper — needed so the Landing UI shows
+  previously-entered values, not just calculated columns.
+  - **Verification caveat**: this session worked from an uploaded zip of
+    the repo (no `.git` present, no network for `npm install`), so there
+    was no live Express server to click-test against — same gap already
+    logged under "Known open items" for stock receipts/commissary. What
+    *was* done: `node --check` on both changed files (syntax), the full
+    `auditEngine.test.js` suite re-run (still 15/15 green — this session
+    didn't touch the engine), and a hand-run script (`node -e '...'`,
+    not committed) that seeded a real test DB, called
+    `computeMixedDailyAudit` + the new decoration helper exactly as the
+    route does, and confirmed the JSON shape matches what
+    `daily-audit.html`'s JS reads (`newStock`/`endingCalculated`/
+    `unexplainedVariance`/`actual` for meat rows; `portionBeginning`/
+    `prepped`/`sold`/`portionEndingCalculated`/`portionActual`/
+    `portionVariance` for dish rows). A real click-through is still owed,
+    same as the existing open item below.
+  - **Not yet pushed**: the three step-10 files
+    (`auditEngine.js`/`auditEngine.test.js`/`dailyAudit.js`) and the two
+    step-11 files (`dailyAudit.js` again/`daily-audit.html`) were handed
+    to the project owner as downloads to drop into the real local clone
+    and commit/push themselves, since this session had no `.git` to
+    commit into. **If you're a session picking this up, check with the
+    project owner whether steps 10–11 have actually landed in the repo
+    before assuming this status doc reflects `git log`** — that's a
+    process gap worth watching for, not a normal state.
+
+**Next up is step 12** (Opening-stock fix) — see the roadmap below.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -129,20 +179,11 @@ building Sales twice or quietly growing step 11 back into a multi-part
 step. Sequencing steps so each one's dependencies already exist is part
 of sizing them correctly, not a separate concern.
 
-10. **[Not started] Landing backend: unify the read endpoint into one
-    mixed grid.**
-    Rework/extend the audit engine's Landing-read endpoint to return one
-    array of rows — meats and prepared dishes together, each tagged with
-    its type — instead of separate meats-only data. No UI changes yet.
-    Backend + tests only. Per the real "Silingan Landing Inventory" paper
-    workflow (not meats-only) — see `daily-workflow.md` for background,
-    not as extra scope to also implement.
-11. **[Not started] Landing frontend: render the mixed grid.** Build the
-    actual Landing page UI on top of step 10's endpoint — meats and
-    dishes as rows in one grid, matching the paper layout. Still using
-    the existing full save-and-reload flow (no live recalc yet — that's
-    step 13). Vocabulary: the real term is "Over/Short," not "variance"
-    (keep "variance" as the internal/technical term in code and docs).
+10. **[Done] Landing backend: unify the read endpoint into one
+    mixed grid.** See "Where things stand" above for detail.
+11. **[Done] Landing frontend: render the mixed grid.** See "Where things
+    stand" above for detail, including the dish-rows-are-read-only
+    decision and the not-yet-pushed caveat.
 12. **[Not started] Opening-stock fix.** A meat/dish with no prior
     tracking currently has `beginning` null forever. Make the Beginning
     cell editable only on a row's first-ever appearance, writing once to
