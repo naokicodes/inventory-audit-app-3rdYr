@@ -100,6 +100,60 @@ function computeYieldLogForDate(db, businessDate) {
   return rows.map(r => computeYieldRow(db, r.id));
 }
 
+// --- Commissary on-hand balance ---------------------------------------
+// Replaces the xlsx's Commissary_Stock sheet. Formula per
+// docs/commissary-and-stock-receipts.md Part 1 (exact text, unchanged):
+//
+//   commissary_balance(commissary_meat) =
+//     SUM(commissary_yield_log.backed_weight_out WHERE commissary_meat_id = ? AND deleted_at IS NULL)
+//     - SUM(stock_receipts.quantity WHERE commissary_meat_id = ? AND source = 'COMMISSARY' AND deleted_at IS NULL)
+//
+// NOTE ON VERIFICATION: this formula was hand-checked against
+// Commi_Audit_Master.xlsx's Commissary_Stock sheet (SUMIF cross-checked
+// against the sheet's own cached numbers, e.g. M03 Belly Slab = 14.8) in
+// an earlier session - but that session's work never made it into the
+// committed repo (see changelog for 2026-08-28), and the xlsx wasn't
+// available this session to redo that check. The formula below is the
+// documented one, exactly as re-verified before; the test fixtures for
+// it are constructed numbers that exercise the SUM-minus-SUM mechanics
+// and the deleted_at/source filters correctly, NOT numbers pulled fresh
+// from Outbound_Log. Re-verify against real Outbound_Log rows next time
+// the xlsx is available, same rigor as excess_loss got.
+
+/**
+ * Backed-in minus shipped-out, in the meat's own unit. Returns 0 (not
+ * null) for a commissary meat with no activity yet - "nothing on hand"
+ * is a valid, real answer, not a missing-data case.
+ */
+function getCommissaryBalance(db, commissaryMeatId) {
+  const backedIn = db.prepare(
+    `SELECT COALESCE(SUM(backed_weight_out), 0) AS total
+     FROM commissary_yield_log WHERE commissary_meat_id = ? AND deleted_at IS NULL`
+  ).get(commissaryMeatId).total;
+
+  const shippedOut = db.prepare(
+    `SELECT COALESCE(SUM(quantity), 0) AS total
+     FROM stock_receipts WHERE commissary_meat_id = ? AND source = 'COMMISSARY' AND deleted_at IS NULL`
+  ).get(commissaryMeatId).total;
+
+  return backedIn - shippedOut;
+}
+
+/** Balance for every active commissary meat, for the live balance view. */
+function listCommissaryBalances(db) {
+  const meats = db.prepare(
+    `SELECT id, code, name, unit FROM commissary_meats WHERE active = 1 ORDER BY code`
+  ).all();
+
+  return meats.map(m => ({
+    commissary_meat_id: m.id,
+    code: m.code,
+    name: m.name,
+    unit: m.unit,
+    balance: getCommissaryBalance(db, m.id)
+  }));
+}
+
 module.exports = {
   computeActualLossPct,
   computeYieldStatus,
@@ -107,5 +161,7 @@ module.exports = {
   computeYieldMetrics,
   getAllowedLeewayPct,
   computeYieldRow,
-  computeYieldLogForDate
+  computeYieldLogForDate,
+  getCommissaryBalance,
+  listCommissaryBalances
 };
