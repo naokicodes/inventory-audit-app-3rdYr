@@ -163,14 +163,17 @@ test('soft-deleted yield log rows are excluded from computeYieldLogForDate', () 
 // (D3=29.7 backed in, E3=14.9 shipped out, F3=14.8 balance), the same way
 // excess_loss was verified in step 3.
 //
-// One real, deliberate gap: Outbound_Log has a 5.0kg "Unallocated" row for
-// M03 on 2026-07-02 (shipped but not yet assigned to a restaurant) that
-// the app's schema cannot represent - stock_receipts.restaurant_id is
-// NOT NULL (flagged in docs/commissary-and-stock-receipts.md, not decided
-// unilaterally). So our own balance legitimately comes out to 19.8, not
-// the sheet's 14.8 - a real, documented difference, not a bug. The other
-// 3 real Outbound_Log rows for M03 (all restaurant-assigned) sum to 9.9,
-// which IS fully representable and IS what's tested below.
+// Outbound_Log also has a 5.0kg "Unallocated" row for M03 on 2026-07-02
+// (shipped but not yet assigned to a restaurant). Before step 9,
+// stock_receipts.restaurant_id was NOT NULL, so this row was
+// unrepresentable and the balance below came out to 19.8 instead of the
+// sheet's real 14.8 - a documented, known gap (see
+// docs/commissary-and-stock-receipts.md Part 2). As of step 9,
+// restaurant_id/meat_id are nullable and getCommissaryBalance is already
+// destination-agnostic (it only filters on commissary_meat_id/source,
+// never restaurant_id - see commissaryYieldEngine.js), so simply adding
+// the real Unallocated row below makes the balance match the sheet
+// exactly, with no engine code changes needed.
 
 // Complete the real Yield_Log dataset for Belly Slab (bellySlabId already
 // has the 2026-07-02 0.0/0.0 row from Part 2 above) - adding the other 2
@@ -196,11 +199,11 @@ const restaurantMeatId = db.prepare('SELECT id FROM meats WHERE restaurant_id = 
 db.prepare('INSERT INTO commissary_meat_map (commissary_meat_id, restaurant_id, meat_id) VALUES (?, ?, ?)')
   .run(bellySlabId, restaurantId, restaurantMeatId);
 
-test('getCommissaryBalance: real Belly Slab restaurant-bound shipments (2.2 + 5.7 + 2.0 = 9.9) match the representable slice of Outbound_Log', () => {
-  // Real Outbound_Log rows for m03 that HAVE a restaurant destination:
-  // 07-01 Restaurant B 2.2, 07-02 Restaurant A 5.7, 07-05 Restaurant A 2.0.
-  // The 4th real row (07-02, 5.0kg, destination "Unallocated") is
-  // deliberately NOT reproduced here - see the Part 3 header comment.
+test('getCommissaryBalance: all 4 real Belly Slab shipments (2.2 + 5.7 + 2.0 + 5.0 Unallocated = 14.9) now match Outbound_Log exactly', () => {
+  // Real Outbound_Log rows for M03, all 4 of them:
+  // 07-01 Restaurant B 2.2, 07-02 Restaurant A 5.7, 07-05 Restaurant A 2.0,
+  // and 07-02 destination "Unallocated" 5.0 - representable as of step 9
+  // via restaurant_id = NULL, meat_id = NULL.
   db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id)
               VALUES (?, ?, ?, ?, 'COMMISSARY', ?)`)
     .run(restaurantId, restaurantMeatId, '2026-07-01', 2.2, bellySlabId);
@@ -210,11 +213,14 @@ test('getCommissaryBalance: real Belly Slab restaurant-bound shipments (2.2 + 5.
   db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id)
               VALUES (?, ?, ?, ?, 'COMMISSARY', ?)`)
     .run(restaurantId, restaurantMeatId, '2026-07-05', 2.0, bellySlabId);
+  db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id)
+              VALUES (NULL, NULL, ?, ?, 'COMMISSARY', ?)`)
+    .run('2026-07-02', 5.0, bellySlabId);
 
   const balance = getCommissaryBalance(db, bellySlabId);
-  // 29.7 - 9.9 = 19.8, NOT the sheet's 14.8 - the 5.0kg Unallocated
-  // shipment isn't representable in this schema yet (flagged gap).
-  assert.ok(Math.abs(balance - 19.8) < EPS, `expected 19.8 (29.7 - 9.9, excluding the unrepresentable Unallocated row), got ${balance}`);
+  // 29.7 - 14.9 = 14.8, matching Commissary_Stock's own cached F3 exactly -
+  // the previously-flagged 19.8-vs-14.8 gap is now closed.
+  assert.ok(Math.abs(balance - 14.8) < EPS, `expected 14.8 (29.7 - 14.9, all 4 Outbound_Log rows now representable), got ${balance}`);
 });
 
 test('getCommissaryBalance: a DIRECT-source receipt on the same meat is not subtracted', () => {
