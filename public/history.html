@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin History - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin: 1rem 0 1.5rem; }
+    .filters label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .filters select, .filters input { padding: 0.3rem; }
+    .hint { color: #888; font-size: 0.85rem; }
+    .entry { border: 1px solid #ddd; border-radius: 4px; padding: 0.75rem 1rem; margin-bottom: 0.75rem; }
+    .entry-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem; }
+    .entry-meta { font-size: 0.85rem; color: #555; }
+    .action-badge { font-size: 0.75rem; font-weight: bold; padding: 0.1rem 0.5rem; border-radius: 3px; text-transform: uppercase; }
+    .action-CREATE { background: #e2f5e2; color: #1a7a1a; }
+    .action-UPDATE { background: #fff2cc; color: #8a6d00; }
+    .action-DELETE { background: #fbe2e2; color: #a32020; }
+    .source-tag { font-size: 0.7rem; color: #999; border: 1px solid #ddd; border-radius: 3px; padding: 0 0.3rem; }
+    table.diff { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+    table.diff th, table.diff td { border: 1px solid #eee; padding: 0.25rem 0.5rem; text-align: left; }
+    table.diff th { background: #fafafa; width: 10rem; }
+    .diff-old { color: #a32020; text-decoration: line-through; }
+    .diff-new { color: #1a7a1a; }
+    .no-change-note { color: #999; font-size: 0.8rem; font-style: italic; }
+  </style>
+</head>
+<body style="max-width: 1000px;">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="settings.html">Settings</a>
+    <a href="history.html">History</a>
+  </nav>
+
+  <h1>Admin History</h1>
+  <p class="hint">
+    A reverse-chronological feed of every change to Stock Receipts and Commissary Yield Log
+    entries - creates, edits, and deletes (deletes are soft: the row stays, only
+    <code>deleted_at</code> changes). Read-only - this page never writes anything.
+  </p>
+
+  <div class="filters">
+    <label>Entity type <select id="filter-entity-type"><option value="">All</option></select></label>
+    <label>Actor <select id="filter-actor"><option value="">All</option></select></label>
+    <label>From <input type="date" id="filter-date-from"></label>
+    <label>To <input type="date" id="filter-date-to"></label>
+    <button id="clear-filters">Clear filters</button>
+  </div>
+
+  <div id="feed">Loading...</div>
+
+  <script>
+    const filterEntityType = document.getElementById('filter-entity-type');
+    const filterActor = document.getElementById('filter-actor');
+    const filterDateFrom = document.getElementById('filter-date-from');
+    const filterDateTo = document.getElementById('filter-date-to');
+    const feed = document.getElementById('feed');
+
+    // Columns that are the same on every row of a table and not
+    // interesting in a diff (identity/audit columns already shown in the
+    // entry header, or timestamps that always differ between snapshots
+    // for uninteresting reasons). Kept as a UI-only concern here - the
+    // API returns the full row either way.
+    const SKIP_FIELDS = new Set(['id', 'created_at', 'created_by']);
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str === null || str === undefined ? '' : String(str);
+      return div.innerHTML;
+    }
+
+    function fmtValue(v) {
+      if (v === null || v === undefined || v === '') return '<span class="hint">-</span>';
+      return escapeHtml(v);
+    }
+
+    // Renders the before/after snapshot as a small table. For CREATE,
+    // `before` is null - show every `after` field as new. For DELETE,
+    // `after` is null - show every `before` field as removed. For
+    // UPDATE, show only the fields that actually changed.
+    function renderDiff(entry) {
+      const before = entry.before || {};
+      const after = entry.after || {};
+      const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+      SKIP_FIELDS.forEach(k => keys.delete(k));
+
+      const rows = [];
+      for (const key of keys) {
+        const beforeVal = before[key];
+        const afterVal = after[key];
+
+        if (entry.action === 'CREATE') {
+          rows.push({ key, html: fmtValue(afterVal) });
+        } else if (entry.action === 'DELETE') {
+          rows.push({ key, html: fmtValue(beforeVal) });
+        } else {
+          // UPDATE: only show rows where the value actually changed.
+          if (JSON.stringify(beforeVal) === JSON.stringify(afterVal)) continue;
+          rows.push({
+            key,
+            html: `<span class="diff-old">${fmtValue(beforeVal)}</span> &rarr; <span class="diff-new">${fmtValue(afterVal)}</span>`
+          });
+        }
+      }
+
+      if (rows.length === 0) {
+        return '<p class="no-change-note">No field-level changes to show for this entry.</p>';
+      }
+
+      return `
+        <table class="diff">
+          <tbody>
+            ${rows.map(r => `<tr><th>${escapeHtml(r.key)}</th><td>${r.html}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderEntry(entry) {
+      return `
+        <div class="entry">
+          <div class="entry-head">
+            <div>
+              <span class="action-badge action-${entry.action}">${entry.action}</span>
+              <strong>${escapeHtml(entry.entity_type)}</strong>
+              <span class="hint">#${entry.entity_id}</span>
+            </div>
+            <div class="entry-meta">
+              ${escapeHtml(entry.actor || 'unknown')} &middot; ${escapeHtml(entry.timestamp)}
+              <span class="source-tag">${escapeHtml(entry.source)}</span>
+            </div>
+          </div>
+          ${renderDiff(entry)}
+        </div>
+      `;
+    }
+
+    async function loadFilters() {
+      const res = await fetch('/api/history/filters');
+      const { entityTypes, actors } = await res.json();
+      filterEntityType.innerHTML = '<option value="">All</option>' +
+        entityTypes.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+      filterActor.innerHTML = '<option value="">All</option>' +
+        actors.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+    }
+
+    async function loadFeed() {
+      const params = new URLSearchParams();
+      if (filterEntityType.value) params.set('entity_type', filterEntityType.value);
+      if (filterActor.value) params.set('actor', filterActor.value);
+      if (filterDateFrom.value) params.set('date_from', filterDateFrom.value);
+      if (filterDateTo.value) params.set('date_to', filterDateTo.value);
+
+      feed.innerHTML = 'Loading...';
+      const res = await fetch(`/api/history?${params.toString()}`);
+      const rows = await res.json();
+
+      if (rows.length === 0) {
+        feed.innerHTML = '<p class="hint">No activity matches these filters yet.</p>';
+        return;
+      }
+
+      feed.innerHTML = rows.map(renderEntry).join('');
+    }
+
+    [filterEntityType, filterActor, filterDateFrom, filterDateTo].forEach(el =>
+      el.addEventListener('change', loadFeed)
+    );
+    document.getElementById('clear-filters').addEventListener('click', () => {
+      filterEntityType.value = ''; filterActor.value = '';
+      filterDateFrom.value = ''; filterDateTo.value = '';
+      loadFeed();
+    });
+
+    loadFilters().then(loadFeed);
+  </script>
+</body>
+</html>
