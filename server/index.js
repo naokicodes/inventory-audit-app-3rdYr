@@ -13,6 +13,7 @@ const dailyAuditRoutes = require('./routes/dailyAudit.js');
 const settingsRoutes = require('./routes/settings.js');
 const stockReceiptsRoutes = require('./routes/stockReceipts.js');
 const commissaryRoutes = require('./routes/commissary.js');
+const historyRoutes = require('./routes/history.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,6 +24,7 @@ app.use('/api', dailyAuditRoutes);
 app.use('/api', settingsRoutes);
 app.use('/api', stockReceiptsRoutes);
 app.use('/api', commissaryRoutes);
+app.use('/api', historyRoutes);
 
 app.listen(PORT, () => {
   console.log(`Inventory Audit App running at http://localhost:${PORT}`);
