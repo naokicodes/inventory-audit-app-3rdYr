@@ -18,7 +18,9 @@ const {
   computeMeatAudit,
   getUsage,
   getNewStock,
-  addDays
+  addDays,
+  computeDishAudit,
+  computeMixedDailyAudit
 } = require('./auditEngine.js');
 
 let passed = 0;
@@ -161,6 +163,89 @@ test('getNewStock excludes soft-deleted receipts from the SUM', () => {
 
   const newStock = getNewStock(db, restaurantId, meatId, '2026-08-06');
   assert.ok(Math.abs(newStock - 6.5) < 0.0001, `deleted receipt should not count, expected still 6.5, got ${newStock}`);
+});
+
+// --- Step 10: computeDishAudit / computeMixedDailyAudit ---
+// Reuses dishId (D003, Bagnet Sisig, BATCH_PREPPED) but its own dates
+// (2026-08-09 onward) so these don't collide with the meat-side prepped
+// rows already inserted above for 2026-08-01/02.
+
+test('dish audit: no prior portion_ending_actual -> MISSING_BEGINNING_STOCK', () => {
+  const result = computeDishAudit(db, restaurantId, dishId, '2026-08-10');
+  assert.strictEqual(result.portionBeginning, null);
+  assert.strictEqual(result.status, 'MISSING_BEGINNING_STOCK');
+});
+
+test('dish audit: portion_beginning carries from prior day portion_ending_actual', () => {
+  db.prepare('INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, dishId, '2026-08-09', 20);
+  db.prepare('INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, dishId, '2026-08-10', 10);
+  db.prepare('INSERT INTO sales (restaurant_id, dish_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, dishId, '2026-08-10', 12);
+  db.prepare('INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, dishId, '2026-08-10', 18);
+
+  const result = computeDishAudit(db, restaurantId, dishId, '2026-08-10');
+  // Hand-calculated: beginning=20, prepped=10, sold=12 -> ending calc = 18
+  assert.strictEqual(result.portionBeginning, 20);
+  assert.strictEqual(result.prepped, 10);
+  assert.strictEqual(result.sold, 12);
+  assert.strictEqual(result.portionEndingCalculated, 18);
+  assert.strictEqual(result.portionActual, 18);
+  assert.ok(Math.abs(result.portionVariance) < 0.0001);
+  assert.strictEqual(result.status, 'OK');
+});
+
+test('dish audit: shortage case (positive variance) on a second consecutive day', () => {
+  db.prepare('INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, dishId, '2026-08-11', 5);
+  db.prepare('INSERT INTO sales (restaurant_id, dish_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, dishId, '2026-08-11', 3);
+  db.prepare('INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, dishId, '2026-08-11', 19);
+
+  const result = computeDishAudit(db, restaurantId, dishId, '2026-08-11');
+  // beginning=18 (from 08-10 actual), prepped=5, sold=3 -> calc=20, actual=19 -> variance=1
+  assert.strictEqual(result.portionBeginning, 18);
+  assert.strictEqual(result.portionEndingCalculated, 20);
+  assert.ok(Math.abs(result.portionVariance - 1) < 0.0001);
+  assert.strictEqual(result.status, 'SHORTAGE');
+});
+
+test('dish audit: missing actual count is flagged, not treated as zero variance', () => {
+  const result = computeDishAudit(db, restaurantId, dishId, '2026-08-12');
+  assert.strictEqual(result.portionBeginning, 19); // carried from 08-11 actual
+  assert.strictEqual(result.portionActual, null);
+  assert.strictEqual(result.portionVariance, null);
+  assert.strictEqual(result.status, 'MISSING_ACTUAL_COUNT');
+});
+
+test('dish audit: a gap day with no actual breaks the beginning-stock chain for the next day', () => {
+  // 2026-08-12 above had no portion_ending_actual entered, so 08-13's
+  // lookup at 08-12 finds nothing - same missing-chain behavior as the
+  // meat side's opening-stock gap (session-status.md step 12).
+  const result = computeDishAudit(db, restaurantId, dishId, '2026-08-13');
+  assert.strictEqual(result.portionBeginning, null);
+  assert.strictEqual(result.status, 'MISSING_BEGINNING_STOCK');
+});
+
+test('mixed daily audit: tags meats and BATCH_PREPPED dishes, excludes DIRECT dishes', () => {
+  db.prepare('INSERT INTO dishes (restaurant_id, dish_code, name, prep_type) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, 'D010', 'A La Carte Item', 'DIRECT');
+
+  const rows = computeMixedDailyAudit(db, restaurantId, '2026-08-10');
+  const meatRows = rows.filter(r => r.type === 'MEAT');
+  const dishRows = rows.filter(r => r.type === 'DISH');
+
+  assert.strictEqual(meatRows.length, 1);
+  assert.strictEqual(meatRows[0].code, 'M03');
+  assert.strictEqual(meatRows[0].item_id, meatId);
+
+  assert.strictEqual(dishRows.length, 1); // D003 only - D010 is DIRECT, excluded
+  assert.strictEqual(dishRows[0].code, 'D003');
+  assert.strictEqual(dishRows[0].item_id, dishId);
+  assert.strictEqual(dishRows[0].portionEndingCalculated, 18); // reuses 08-10 scenario above
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

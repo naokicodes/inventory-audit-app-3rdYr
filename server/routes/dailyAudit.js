@@ -4,7 +4,7 @@
 
 const express = require('express');
 const db = require('../db/connection.js');
-const { computeMeatAudit } = require('../engines/auditEngine.js');
+const { computeMeatAudit, computeMixedDailyAudit } = require('../engines/auditEngine.js');
 
 const router = express.Router();
 
@@ -70,6 +70,27 @@ router.get('/daily-audit', (req, res) => {
     };
   });
 
+  res.json(rows);
+});
+
+// GET /api/daily-audit/mixed?restaurant_id=1&date=2026-08-25
+// Step 10 (session-status.md): the Landing mixed grid - meats and
+// BATCH_PREPPED dishes together in one array, each row tagged `type`
+// ('MEAT' or 'DISH'). Additive and unwired: nothing in the frontend
+// calls this yet, and GET /api/daily-audit above is untouched and still
+// backs the live daily-audit.html screen (meats-only) until step 11
+// switches it over. Backend + tests only for this step - no adjustments/
+// remarks decoration here yet, unlike the older endpoint above; that's
+// left for step 11 to add if the Landing UI needs it, per rule 16 (don't
+// expand a step past its own text).
+router.get('/daily-audit/mixed', (req, res) => {
+  const restaurantId = Number(req.query.restaurant_id);
+  const date = req.query.date;
+  if (!restaurantId || !date) {
+    return res.status(400).json({ error: 'restaurant_id and date are required' });
+  }
+
+  const rows = computeMixedDailyAudit(db, restaurantId, date);
   res.json(rows);
 });
 

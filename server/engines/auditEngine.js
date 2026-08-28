@@ -150,6 +150,122 @@ function computeDailyAudit(db, restaurantId, businessDate) {
   }));
 }
 
+// --- Step 10: BATCH_PREPPED dish (portion) audit ---
+// Portion formulas from docs/data-model.md section 6. Deliberately NOT a
+// re-run of computeMeatAudit with renamed fields - dish/portion tracking
+// has no adjustments or opening_stock-style fallback in the data model,
+// so the shape here follows the doc's actual (simpler) formula rather
+// than inventing parity with the meat side.
+
+/**
+ * Portion beginning = yesterday's portion_ending_actual count.
+ * No fallback to an opening-stock-style table for dishes - data-model.md
+ * section 6 doesn't define one (unlike beginning_stock for meats). A
+ * dish with no portion tracking in use yet (see daily-workflow.md step 5
+ * - it's optional) will have this null indefinitely, same underlying
+ * shape as the meat side's known "opening stock" gap (session-status.md
+ * step 12) but not itself that bug - just the doc's formula, applied.
+ */
+function getPortionBeginning(db, restaurantId, dishId, businessDate) {
+  const priorDate = addDays(businessDate, -1);
+  const prev = db.prepare(
+    `SELECT portions_counted FROM portion_ending_actual WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?`
+  ).get(restaurantId, dishId, priorDate);
+  return prev ? prev.portions_counted : null;
+}
+
+/** Portions actually cooked today for this dish (from the Prepped screen). */
+function getPrepped(db, restaurantId, dishId, businessDate) {
+  const row = db.prepare(
+    `SELECT SUM(portions_produced) as qty FROM prepped WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?`
+  ).get(restaurantId, dishId, businessDate);
+  return row.qty || 0;
+}
+
+/** Portions sold today for this dish (from the Loyverse-synced sales table). */
+function getSoldPortions(db, restaurantId, dishId, businessDate) {
+  const row = db.prepare(
+    `SELECT SUM(quantity) as qty FROM sales WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?`
+  ).get(restaurantId, dishId, businessDate);
+  return row.qty || 0;
+}
+
+function getPortionEndingActual(db, restaurantId, dishId, businessDate) {
+  const row = db.prepare(
+    `SELECT portions_counted FROM portion_ending_actual WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?`
+  ).get(restaurantId, dishId, businessDate);
+  return row ? row.portions_counted : null;
+}
+
+/**
+ * Full portion audit for one BATCH_PREPPED dish, one date. Mirrors
+ * computeMeatAudit's null-when-missing-data behavior, but follows
+ * data-model.md section 6's portion formulas exactly - no adjustments
+ * layer (the doc doesn't define one for portions).
+ */
+function computeDishAudit(db, restaurantId, dishId, businessDate) {
+  const portionBeginning = getPortionBeginning(db, restaurantId, dishId, businessDate);
+  const prepped = getPrepped(db, restaurantId, dishId, businessDate);
+  const sold = getSoldPortions(db, restaurantId, dishId, businessDate);
+  const portionActual = getPortionEndingActual(db, restaurantId, dishId, businessDate);
+
+  if (portionBeginning === null) {
+    return { portionBeginning: null, prepped, sold, portionEndingCalculated: null, portionActual, portionVariance: null, status: 'MISSING_BEGINNING_STOCK' };
+  }
+
+  const portionEndingCalculated = portionBeginning + prepped - sold;
+
+  if (portionActual === null) {
+    return { portionBeginning, prepped, sold, portionEndingCalculated, portionActual: null, portionVariance: null, status: 'MISSING_ACTUAL_COUNT' };
+  }
+
+  const portionVariance = portionEndingCalculated - portionActual; // sign convention unchanged: positive = shortage
+
+  const EPSILON = 0.01;
+  let status;
+  if (Math.abs(portionVariance) <= EPSILON) status = 'OK';
+  else if (portionVariance > 0) status = 'SHORTAGE';
+  else status = 'SURPLUS';
+
+  return { portionBeginning, prepped, sold, portionEndingCalculated, portionActual, portionVariance, status };
+}
+
+/**
+ * Landing mixed grid: meats + BATCH_PREPPED dishes as one array, each row
+ * tagged with `type` ('MEAT' or 'DISH'), per session-status.md step 10.
+ * DIRECT dishes are excluded - they're never a Landing row themselves,
+ * only a usage driver for meats via recipe_bom (see data-model.md
+ * section 3/6). Nothing calls this yet; it's additive, alongside the
+ * existing computeDailyAudit/GET /api/daily-audit, not a replacement.
+ */
+function computeMixedDailyAudit(db, restaurantId, businessDate) {
+  const meatRows = computeDailyAudit(db, restaurantId, businessDate).map(row => ({
+    type: 'MEAT',
+    item_id: row.meat_id,
+    code: row.meat_code,
+    name: row.name,
+    unit: row.unit,
+    ...row
+  }));
+
+  const dishes = db.prepare(
+    `SELECT id, dish_code, name FROM dishes WHERE restaurant_id = ? AND active = 1 AND prep_type = 'BATCH_PREPPED' ORDER BY dish_code`
+  ).all(restaurantId);
+
+  const dishRows = dishes.map(dish => ({
+    type: 'DISH',
+    item_id: dish.id,
+    code: dish.dish_code,
+    name: dish.name,
+    unit: 'portions',
+    dish_id: dish.id,
+    dish_code: dish.dish_code,
+    ...computeDishAudit(db, restaurantId, dish.id, businessDate)
+  }));
+
+  return [...meatRows, ...dishRows];
+}
+
 module.exports = {
   addDays,
   getBeginningStock,
@@ -158,5 +274,11 @@ module.exports = {
   getAdjustmentsTotal,
   getEndingActual,
   computeMeatAudit,
-  computeDailyAudit
+  computeDailyAudit,
+  getPortionBeginning,
+  getPrepped,
+  getSoldPortions,
+  getPortionEndingActual,
+  computeDishAudit,
+  computeMixedDailyAudit
 };
