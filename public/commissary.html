@@ -21,9 +21,13 @@
     .balance-card .code { color: #888; font-size: 0.8rem; }
     .balance-card .qty { font-size: 1.4rem; font-weight: bold; }
     .balance-card .qty.negative { color: crimson; }
+    .actor-bar { margin-bottom: 1rem; font-size: 0.85rem; }
+    .actor-bar input { padding: 0.25rem; width: 12rem; }
+    .row-actions button { font-size: 0.75rem; padding: 0.15rem 0.4rem; margin-right: 0.25rem; }
+    tr.editing input { width: 100%; padding: 0.2rem; font-size: 0.85rem; }
   </style>
 </head>
-<body style="max-width: 1000px;">
+<body style="max-width: 1100px;">
   <nav>
     <a href="index.html">Home</a>
     <a href="daily-audit.html">Landing</a>
@@ -34,6 +38,10 @@
 
   <h1>Commissary</h1>
   <p class="hint">Raw-in / backed-out yield tracking at the commissary, before any meat is assigned to a restaurant. Shipping to a restaurant is logged on the Stock Receipts page, not here.</p>
+
+  <div class="actor-bar">
+    <label>Your name (for the activity log) <input type="text" id="actor-name" placeholder="e.g. Dan"></label>
+  </div>
 
   <h2>On-hand balance</h2>
   <p class="hint">Backed-in (from yield log) minus shipped-out (Stock Receipts rows with source = Commissary).</p>
@@ -60,6 +68,7 @@
   <div id="yield-table">Loading...</div>
 
   <script>
+    const actorInput = document.getElementById('actor-name');
     const newDate = document.getElementById('new-date');
     const newMeat = document.getElementById('new-meat');
     const newRaw = document.getElementById('new-raw');
@@ -70,7 +79,13 @@
     const filterMeat = document.getElementById('filter-meat');
     const filterDate = document.getElementById('filter-date');
 
+    let lastRows = []; // most recently loaded yield log rows, for edit lookups
+
     newDate.value = new Date().toISOString().slice(0, 10);
+    actorInput.value = localStorage.getItem('inventory_actor') || '';
+    actorInput.addEventListener('change', () => localStorage.setItem('inventory_actor', actorInput.value.trim()));
+
+    function actor() { return actorInput.value.trim() || null; }
 
     function fmt(n) {
       return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
@@ -103,6 +118,25 @@
       `).join('')}</div>`;
     }
 
+    function renderRow(r) {
+      return `
+        <tr data-id="${r.id}">
+          <td class="cell-date">${r.business_date}</td>
+          <td>${r.commissary_meat_code} - ${r.commissary_meat_name} <span class="hint">(${r.unit})</span></td>
+          <td class="cell-raw">${fmt(r.raw_weight_in)}</td>
+          <td class="cell-backed">${fmt(r.backed_weight_out)}</td>
+          <td>${fmtPct(r.actualLossPct)}</td>
+          <td class="${r.status ? 'status-' + r.status : ''}">${r.status || '-'}</td>
+          <td>${fmt(r.excessLoss)}</td>
+          <td class="cell-notes">${r.notes || ''}</td>
+          <td class="row-actions">
+            <button class="edit-btn">Edit</button>
+            <button class="delete-btn">Delete</button>
+          </td>
+        </tr>
+      `;
+    }
+
     async function loadYieldLog() {
       const params = new URLSearchParams();
       if (filterMeat.value) params.set('commissary_meat_id', filterMeat.value);
@@ -110,9 +144,9 @@
 
       document.getElementById('yield-table').innerHTML = 'Loading...';
       const res = await fetch(`/api/commissary/yield-log?${params.toString()}`);
-      const rows = await res.json();
+      lastRows = await res.json();
 
-      if (rows.length === 0) {
+      if (lastRows.length === 0) {
         document.getElementById('yield-table').innerHTML = '<p class="hint">No yield events match these filters yet.</p>';
         return;
       }
@@ -122,23 +156,80 @@
           <thead>
             <tr>
               <th>Date</th><th>Meat</th><th>Raw In</th><th>Backed Out</th>
-              <th>Actual Loss %</th><th>Status</th><th>Excess Loss</th><th>Notes</th>
+              <th>Actual Loss %</th><th>Status</th><th>Excess Loss</th><th>Notes</th><th></th>
             </tr>
           </thead>
-          <tbody>${rows.map(r => `
-            <tr>
-              <td>${r.business_date}</td>
-              <td>${r.commissary_meat_code} - ${r.commissary_meat_name} <span class="hint">(${r.unit})</span></td>
-              <td>${fmt(r.raw_weight_in)}</td>
-              <td>${fmt(r.backed_weight_out)}</td>
-              <td>${fmtPct(r.actualLossPct)}</td>
-              <td class="${r.status ? 'status-' + r.status : ''}">${r.status || '-'}</td>
-              <td>${fmt(r.excessLoss)}</td>
-              <td>${r.notes || ''}</td>
-            </tr>
-          `).join('')}</tbody>
+          <tbody>${lastRows.map(renderRow).join('')}</tbody>
         </table>
       `;
+
+      attachRowHandlers();
+    }
+
+    function attachRowHandlers() {
+      document.querySelectorAll('#yield-table .edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => startEdit(btn.closest('tr')));
+      });
+      document.querySelectorAll('#yield-table .delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => doDelete(btn.closest('tr')));
+      });
+    }
+
+    function startEdit(tr) {
+      const id = tr.dataset.id;
+      const row = lastRows.find(r => String(r.id) === id);
+      if (!row) return;
+
+      tr.classList.add('editing');
+      tr.querySelector('.cell-date').innerHTML = `<input type="date" class="edit-date" value="${row.business_date}">`;
+      tr.querySelector('.cell-raw').innerHTML = `<input type="number" step="0.01" class="edit-raw" value="${row.raw_weight_in}">`;
+      tr.querySelector('.cell-backed').innerHTML = `<input type="number" step="0.01" class="edit-backed" value="${row.backed_weight_out}">`;
+      tr.querySelector('.cell-notes').innerHTML = `<input type="text" class="edit-notes" value="${row.notes || ''}">`;
+      tr.querySelector('.row-actions').innerHTML = `
+        <button class="save-btn">Save</button>
+        <button class="cancel-btn">Cancel</button>
+      `;
+      tr.querySelector('.save-btn').addEventListener('click', () => saveEdit(tr, id));
+      tr.querySelector('.cancel-btn').addEventListener('click', () => loadYieldLog());
+    }
+
+    async function saveEdit(tr, id) {
+      const business_date = tr.querySelector('.edit-date').value;
+      const raw_weight_in = tr.querySelector('.edit-raw').value;
+      const backed_weight_out = tr.querySelector('.edit-backed').value;
+      const notes = tr.querySelector('.edit-notes').value.trim();
+
+      try {
+        const res = await fetch(`/api/commissary/yield-log/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ business_date, raw_weight_in, backed_weight_out, notes: notes || null, actor: actor() })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+        await Promise.all([loadBalances(), loadYieldLog()]);
+      } catch (err) {
+        alert('Error saving edit: ' + err.message);
+        await loadYieldLog();
+      }
+    }
+
+    async function doDelete(tr) {
+      const id = tr.dataset.id;
+      if (!confirm('Delete this yield event? It stays in the activity history, but drops out of the balance and every calculation.')) return;
+
+      try {
+        const res = await fetch(`/api/commissary/yield-log/${id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actor: actor() })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+        await Promise.all([loadBalances(), loadYieldLog()]);
+      } catch (err) {
+        alert('Error deleting: ' + err.message);
+      }
     }
 
     document.getElementById('add-yield').addEventListener('click', async () => {
@@ -161,7 +252,7 @@
         const res = await fetch('/api/commissary/yield-log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes: notes || null })
+          body: JSON.stringify({ commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes: notes || null, actor: actor() })
         });
         const result = await res.json();
         if (!result.ok) throw new Error(result.error || 'Unknown error');

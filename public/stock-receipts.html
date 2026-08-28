@@ -18,9 +18,14 @@
     .warn { color: crimson; font-size: 0.8rem; }
     .source-DIRECT { color: #333; }
     .source-COMMISSARY { color: #06c; font-weight: bold; }
+    .actor-bar { margin-bottom: 1rem; font-size: 0.85rem; }
+    .actor-bar input { padding: 0.25rem; width: 12rem; }
+    .row-actions button { font-size: 0.75rem; padding: 0.15rem 0.4rem; margin-right: 0.25rem; }
+    tr.editing input, tr.editing select { width: 100%; padding: 0.2rem; font-size: 0.85rem; }
+    .deleted-row { opacity: 0.5; text-decoration: line-through; }
   </style>
 </head>
-<body style="max-width: 1000px;">
+<body style="max-width: 1100px;">
   <nav>
     <a href="index.html">Home</a>
     <a href="daily-audit.html">Landing</a>
@@ -31,6 +36,10 @@
 
   <h1>Stock Receipts</h1>
   <p class="hint">One log for everything a restaurant receives - direct deliveries and commissary shipments alike. Landing's New Stock cell is a read-only sum of this log.</p>
+
+  <div class="actor-bar">
+    <label>Your name (for the activity log) <input type="text" id="actor-name" placeholder="e.g. Dan"></label>
+  </div>
 
   <div class="add-form">
     <label>Date <input type="date" id="new-date"></label>
@@ -65,6 +74,7 @@
   <div id="receipts-table">Loading...</div>
 
   <script>
+    const actorInput = document.getElementById('actor-name');
     const newDate = document.getElementById('new-date');
     const newRestaurant = document.getElementById('new-restaurant');
     const newMeat = document.getElementById('new-meat');
@@ -80,8 +90,13 @@
 
     let restaurants = [];
     let currentMeats = []; // meats for whichever restaurant is selected in the add form
+    let lastRows = []; // most recently loaded receipts, keyed for edit lookups
 
     newDate.value = new Date().toISOString().slice(0, 10);
+    actorInput.value = localStorage.getItem('inventory_actor') || '';
+    actorInput.addEventListener('change', () => localStorage.setItem('inventory_actor', actorInput.value.trim()));
+
+    function actor() { return actorInput.value.trim() || null; }
 
     function fmt(n) {
       return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
@@ -114,6 +129,25 @@
       }
     }
 
+    function renderRow(r) {
+      return `
+        <tr data-id="${r.id}">
+          <td class="cell-date">${r.business_date}</td>
+          <td>${r.restaurant_name}</td>
+          <td>${r.meat_code} - ${r.meat_name} <span class="hint">(${r.unit})</span></td>
+          <td class="cell-qty">${fmt(r.quantity)}</td>
+          <td class="cell-source source-${r.source}">${r.source}</td>
+          <td>${r.commissary_meat_code ? `${r.commissary_meat_code} - ${r.commissary_meat_name}` : '-'}</td>
+          <td class="cell-notes">${r.notes || ''}</td>
+          <td class="hint">${r.created_at}</td>
+          <td class="row-actions">
+            <button class="edit-btn">Edit</button>
+            <button class="delete-btn">Delete</button>
+          </td>
+        </tr>
+      `;
+    }
+
     async function loadReceipts() {
       const params = new URLSearchParams();
       if (filterRestaurant.value) params.set('restaurant_id', filterRestaurant.value);
@@ -122,9 +156,9 @@
 
       document.getElementById('receipts-table').innerHTML = 'Loading...';
       const res = await fetch(`/api/stock-receipts?${params.toString()}`);
-      const rows = await res.json();
+      lastRows = await res.json();
 
-      if (rows.length === 0) {
+      if (lastRows.length === 0) {
         document.getElementById('receipts-table').innerHTML = '<p class="hint">No receipts match these filters yet.</p>';
         return;
       }
@@ -134,23 +168,84 @@
           <thead>
             <tr>
               <th>Date</th><th>Restaurant</th><th>Meat</th><th>Qty</th>
-              <th>Source</th><th>Commissary Meat</th><th>Notes</th><th>Entered</th>
+              <th>Source</th><th>Commissary Meat</th><th>Notes</th><th>Entered</th><th></th>
             </tr>
           </thead>
-          <tbody>${rows.map(r => `
-            <tr>
-              <td>${r.business_date}</td>
-              <td>${r.restaurant_name}</td>
-              <td>${r.meat_code} - ${r.meat_name} <span class="hint">(${r.unit})</span></td>
-              <td>${fmt(r.quantity)}</td>
-              <td class="source-${r.source}">${r.source}</td>
-              <td>${r.commissary_meat_code ? `${r.commissary_meat_code} - ${r.commissary_meat_name}` : '-'}</td>
-              <td>${r.notes || ''}</td>
-              <td class="hint">${r.created_at}</td>
-            </tr>
-          `).join('')}</tbody>
+          <tbody>${lastRows.map(renderRow).join('')}</tbody>
         </table>
       `;
+
+      attachRowHandlers();
+    }
+
+    function attachRowHandlers() {
+      document.querySelectorAll('#receipts-table .edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => startEdit(btn.closest('tr')));
+      });
+      document.querySelectorAll('#receipts-table .delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => doDelete(btn.closest('tr')));
+      });
+    }
+
+    function startEdit(tr) {
+      const id = tr.dataset.id;
+      const row = lastRows.find(r => String(r.id) === id);
+      if (!row) return;
+
+      tr.classList.add('editing');
+      tr.querySelector('.cell-date').innerHTML = `<input type="date" class="edit-date" value="${row.business_date}">`;
+      tr.querySelector('.cell-qty').innerHTML = `<input type="number" step="0.01" class="edit-qty" value="${row.quantity}">`;
+      tr.querySelector('.cell-source').innerHTML = `
+        <select class="edit-source">
+          <option value="DIRECT" ${row.source === 'DIRECT' ? 'selected' : ''}>Direct</option>
+          <option value="COMMISSARY" ${row.source === 'COMMISSARY' ? 'selected' : ''}>Commissary</option>
+        </select>`;
+      tr.querySelector('.cell-notes').innerHTML = `<input type="text" class="edit-notes" value="${row.notes || ''}">`;
+      tr.querySelector('.row-actions').innerHTML = `
+        <button class="save-btn">Save</button>
+        <button class="cancel-btn">Cancel</button>
+      `;
+      tr.querySelector('.save-btn').addEventListener('click', () => saveEdit(tr, id));
+      tr.querySelector('.cancel-btn').addEventListener('click', () => loadReceipts());
+    }
+
+    async function saveEdit(tr, id) {
+      const business_date = tr.querySelector('.edit-date').value;
+      const quantity = tr.querySelector('.edit-qty').value;
+      const source = tr.querySelector('.edit-source').value;
+      const notes = tr.querySelector('.edit-notes').value.trim();
+
+      try {
+        const res = await fetch(`/api/stock-receipts/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ business_date, quantity, source, notes: notes || null, actor: actor() })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+        await loadReceipts();
+      } catch (err) {
+        alert('Error saving edit: ' + err.message);
+        await loadReceipts();
+      }
+    }
+
+    async function doDelete(tr) {
+      const id = tr.dataset.id;
+      if (!confirm('Delete this receipt? It stays in the activity history, but drops out of every calculation.')) return;
+
+      try {
+        const res = await fetch(`/api/stock-receipts/${id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actor: actor() })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+        await loadReceipts();
+      } catch (err) {
+        alert('Error deleting: ' + err.message);
+      }
     }
 
     document.getElementById('add-receipt').addEventListener('click', async () => {
@@ -174,7 +269,7 @@
         const res = await fetch('/api/stock-receipts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ restaurant_id, meat_id, business_date, quantity, source, notes: notes || null })
+          body: JSON.stringify({ restaurant_id, meat_id, business_date, quantity, source, notes: notes || null, actor: actor() })
         });
         const result = await res.json();
         if (!result.ok) throw new Error(result.error || 'Unknown error');
