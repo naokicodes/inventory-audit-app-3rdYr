@@ -64,10 +64,21 @@ CREATE TABLE IF NOT EXISTS recipe_bom (
 -- deliveries are irregular and can repeat within a day. new_stock(meat,
 -- date) becomes SUM(quantity) over matching non-deleted rows for that
 -- date - see data-model.md section 5/6.
+--
+-- restaurant_id/meat_id are nullable as of step 9 (2026-08-28): NULL on
+-- both together represents an "Unallocated" commissary shipment - shipped
+-- from the commissary but not yet assigned to a restaurant. Only valid
+-- when source = COMMISSARY (a DIRECT receipt always has a restaurant).
+-- See data-model.md section 5 and commissary-and-stock-receipts.md Part 2.
+-- NOTE: this table may already exist with the OLD NOT NULL constraints in
+-- someone's local inventory.db - CREATE TABLE IF NOT EXISTS below cannot
+-- loosen that retroactively. server/db/migrate.js handles the one-time
+-- rebuild for pre-existing databases; it runs before this file, in
+-- connection.js.
 CREATE TABLE IF NOT EXISTS stock_receipts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  restaurant_id INTEGER NOT NULL,
-  meat_id INTEGER NOT NULL,
+  restaurant_id INTEGER,
+  meat_id INTEGER,
   business_date TEXT NOT NULL,    -- ISO format YYYY-MM-DD
   quantity REAL NOT NULL,
   source TEXT NOT NULL CHECK (source IN ('DIRECT', 'COMMISSARY')),
@@ -79,7 +90,14 @@ CREATE TABLE IF NOT EXISTS stock_receipts (
   deleted_at TEXT,                -- soft delete only, no hard DELETE
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (meat_id) REFERENCES meats(id),
-  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id)
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  -- Both null together, and only for a COMMISSARY-source row (an
+  -- Unallocated shipment). A DIRECT receipt must always have a
+  -- restaurant+meat; a COMMISSARY receipt may have both, or neither.
+  CHECK (
+    (restaurant_id IS NOT NULL AND meat_id IS NOT NULL)
+    OR (restaurant_id IS NULL AND meat_id IS NULL AND source = 'COMMISSARY')
+  )
 );
 
 CREATE TABLE IF NOT EXISTS ending_actual (
