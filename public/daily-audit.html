@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Daily Audit - Inventory Audit App</title>
+  <title>Landing - Inventory Audit App</title>
   <link rel="stylesheet" href="style.css">
   <style>
     table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
@@ -10,15 +10,18 @@
     th { background: #f0f0f0; text-align: center; }
     td:first-child, th:first-child { text-align: left; }
     td.calculated { background: #f7f7f7; color: #555; }
+    td.na { background: #fafafa; color: #ccc; }
     input[type="number"] { width: 4.5rem; padding: 0.3rem; }
     input[type="text"] { width: 8rem; padding: 0.3rem; }
     .status-OK { color: green; font-weight: bold; }
     .status-SHORTAGE { color: crimson; font-weight: bold; }
     .status-SURPLUS { color: darkorange; font-weight: bold; }
     .status-MISSING_ACTUAL_COUNT, .status-MISSING_BEGINNING_STOCK { color: #999; font-style: italic; }
+    .type-badge { font-size: 0.7em; color: #999; margin-left: 0.3em; }
+    tr.dish-row td:first-child { border-left: 3px solid #ccc; }
   </style>
 </head>
-<body style="max-width: 1100px;">
+<body style="max-width: 1200px;">
   <nav>
     <a href="index.html">Home</a>
     <a href="daily-audit.html">Landing</a>
@@ -28,8 +31,8 @@
     <a href="history.html">History</a>
   </nav>
 
-  <h1>Daily Audit</h1>
-  <p style="color:#666; font-size: 0.85rem;">New Stock is read-only here - enter deliveries on the <a href="stock-receipts.html">Stock Receipts</a> page.</p>
+  <h1>Landing</h1>
+  <p style="color:#666; font-size: 0.85rem;">New Stock is read-only here - enter deliveries on the <a href="stock-receipts.html">Stock Receipts</a> page. Dish rows (Prepped / Portion Ending) are display-only for now - editing them isn't wired up yet.</p>
 
   <div class="controls">
     <label>
@@ -68,39 +71,69 @@
       restaurantSelect.innerHTML = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
     }
 
+    // Meat row: same editable fields/save flow as before this step.
+    function meatRowHtml(r) {
+      return `
+        <tr data-meat-id="${r.meat_id}">
+          <td>${r.name} <span class="type-badge">(${r.unit})</span></td>
+          <td class="calculated">${fmt(r.beginning)}</td>
+          <td class="calculated">${fmt(r.newStock)}</td>
+          <td class="calculated">${fmt(r.usage)}</td>
+          <td><input type="number" step="0.01" class="in_house" value="${r.in_house ?? ''}" placeholder="0"></td>
+          <td><input type="number" step="0.01" class="wastage" value="${r.wastage ?? ''}" placeholder="0"></td>
+          <td><input type="number" step="0.01" class="other" value="${r.other ?? ''}" placeholder="0"></td>
+          <td class="calculated">${fmt(r.endingCalculated)}</td>
+          <td><input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0"></td>
+          <td class="calculated">${fmt(r.unexplainedVariance)}</td>
+          <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""></td>
+          <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
+        </tr>
+      `;
+    }
+
+    // Dish row: read-only per step 11 - there's no write path yet for
+    // prepped/portion_ending_actual, so every cell here is calculated/
+    // display-only. Beginning/New Stock/Usage columns map to the dish's
+    // portion beginning/prepped/sold; In-House/Wastage/Other/Remarks
+    // don't apply to dishes (no adjustments layer for portions per
+    // data-model.md section 6), shown as "-" rather than left blank.
+    function dishRowHtml(r) {
+      return `
+        <tr class="dish-row">
+          <td>${r.name} <span class="type-badge">(portions)</span></td>
+          <td class="calculated">${fmt(r.portionBeginning)}</td>
+          <td class="calculated">${fmt(r.prepped)}</td>
+          <td class="calculated">${fmt(r.sold)}</td>
+          <td class="na">-</td>
+          <td class="na">-</td>
+          <td class="na">-</td>
+          <td class="calculated">${fmt(r.portionEndingCalculated)}</td>
+          <td class="calculated">${fmt(r.portionActual)}</td>
+          <td class="calculated">${fmt(r.portionVariance)}</td>
+          <td class="na">-</td>
+          <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
+        </tr>
+      `;
+    }
+
     async function loadGrid() {
       const restaurantId = restaurantSelect.value;
       const date = dateInput.value;
       if (!restaurantId || !date) return;
 
       gridContainer.innerHTML = 'Loading...';
-      const res = await fetch(`/api/daily-audit?restaurant_id=${restaurantId}&date=${date}`);
+      const res = await fetch(`/api/daily-audit/mixed?restaurant_id=${restaurantId}&date=${date}`);
       const rows = await res.json();
 
-      const tableRows = rows.map(r => `
-        <tr data-meat-id="${r.meat_id}">
-          <td>${r.name} <span style="color:#999;font-size:0.8em;">(${r.unit})</span></td>
-          <td class="calculated">${fmt(r.beginning)}</td>
-          <td class="calculated">${fmt(r.new_stock)}</td>
-          <td class="calculated">${fmt(r.usage)}</td>
-          <td><input type="number" step="0.01" class="in_house" value="${r.in_house ?? ''}" placeholder="0"></td>
-          <td><input type="number" step="0.01" class="wastage" value="${r.wastage ?? ''}" placeholder="0"></td>
-          <td><input type="number" step="0.01" class="other" value="${r.other ?? ''}" placeholder="0"></td>
-          <td class="calculated">${fmt(r.ending_calculated)}</td>
-          <td><input type="number" step="0.01" class="ending_actual" value="${r.ending_actual ?? ''}" placeholder="0"></td>
-          <td class="calculated">${fmt(r.unexplained_variance)}</td>
-          <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""></td>
-          <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
-        </tr>
-      `).join('');
+      const tableRows = rows.map(r => r.type === 'MEAT' ? meatRowHtml(r) : dishRowHtml(r)).join('');
 
       gridContainer.innerHTML = `
         <table>
           <thead>
             <tr>
-              <th>Meat</th><th>Beginning</th><th>New Stock</th><th>Usage</th>
+              <th>Item</th><th>Beginning</th><th>New Stock / Prepped</th><th>Usage / Sold</th>
               <th>In-House</th><th>Wastage</th><th>Other (+/-)</th>
-              <th>Ending (calc)</th><th>Ending (actual)</th><th>Variance</th>
+              <th>Ending (calc)</th><th>Ending (actual)</th><th>Over/Short</th>
               <th>Remarks</th><th>Status</th>
             </tr>
           </thead>
@@ -109,6 +142,9 @@
       `;
     }
 
+    // Unchanged from before this step: only meat rows carry
+    // data-meat-id, so this naturally skips dish rows - nothing to save
+    // for them yet.
     async function save() {
       const restaurantId = Number(restaurantSelect.value);
       const date = dateInput.value;
