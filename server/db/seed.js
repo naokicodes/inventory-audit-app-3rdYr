@@ -14,6 +14,9 @@ const db = require('./connection.js');
 const dataPath = path.join(__dirname, 'seed-data.json');
 const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
+const commissaryDataPath = path.join(__dirname, 'commissary-seed-data.json');
+const commissaryData = JSON.parse(fs.readFileSync(commissaryDataPath, 'utf8'));
+
 // 1. Restaurant
 db.prepare('INSERT OR IGNORE INTO restaurants (name, code) VALUES (?, ?)')
   .run(data.restaurant.name, data.restaurant.code);
@@ -72,7 +75,20 @@ for (const r of data.recipe_bom) {
   bomInserted++;
 }
 
+// 5. Commissary meats - global list, independent of restaurant meats.
+// Only the 3 meats with hand-verified real xlsx values are here (see
+// commissary-seed-data.json's note) - not the full M01-M15 set yet.
+const insertCommissaryMeat = db.prepare(
+  'INSERT OR IGNORE INTO commissary_meats (code, name, unit, allowed_leeway_pct, cost_per_unit) VALUES (?, ?, ?, ?, ?)'
+);
+let commissaryMeatsInserted = 0;
+for (const cm of commissaryData.commissary_meats) {
+  const result = insertCommissaryMeat.run(cm.code, cm.name, cm.unit, cm.allowed_leeway_pct, cm.cost_per_unit ?? null);
+  if (result.changes > 0) commissaryMeatsInserted++;
+}
+
 console.log(`Restaurant: ${data.restaurant.name} (id=${restaurantId})`);
 console.log(`Meats: ${meatsInserted} inserted (of ${data.meats.length} in file)`);
 console.log(`Dishes: ${dishesInserted} inserted (of ${data.dishes.length} in file)`);
 console.log(`Recipe_BOM: ${bomInserted} inserted, ${bomSkipped} skipped (already existed or missing match)`);
+console.log(`Commissary meats: ${commissaryMeatsInserted} inserted (of ${commissaryData.commissary_meats.length} in file - full real Meats sheet, M01-M14)`);
