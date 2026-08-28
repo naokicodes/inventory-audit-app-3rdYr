@@ -138,4 +138,50 @@ router.delete('/settings/recipes/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- COMMISSARY MAPPING ----------
+// commissary_meat_map admin screen (step 8) - see
+// docs/commissary-and-stock-receipts.md Part 1 and docs/data-model.md
+// section 10a. Config/reference data, not a daily transactional log -
+// deliberately NOT wired into activity_log (rules-for-claude-code.md
+// rule 9 scopes that to stock_receipts and commissary_yield_log only).
+// No PUT/edit for v1 - a wrong mapping is delete + re-add.
+
+router.get('/settings/commissary-mappings', (req, res) => {
+  const restaurantId = Number(req.query.restaurant_id);
+  if (!restaurantId) return res.status(400).json({ error: 'restaurant_id required' });
+
+  const rows = db.prepare(`
+    SELECT cmm.id, cmm.commissary_meat_id, cm.code as commissary_meat_code, cm.name as commissary_meat_name,
+           cmm.meat_id, m.meat_code, m.name as meat_name
+    FROM commissary_meat_map cmm
+    JOIN commissary_meats cm ON cm.id = cmm.commissary_meat_id
+    JOIN meats m ON m.id = cmm.meat_id
+    WHERE cmm.restaurant_id = ?
+    ORDER BY cm.code
+  `).all(restaurantId);
+
+  res.json(rows);
+});
+
+router.post('/settings/commissary-mappings', (req, res) => {
+  const { restaurant_id, commissary_meat_id, meat_id } = req.body;
+  if (!restaurant_id || !commissary_meat_id || !meat_id) {
+    return res.status(400).json({ error: 'restaurant_id, commissary_meat_id, and meat_id are required' });
+  }
+  try {
+    const result = db.prepare(
+      `INSERT INTO commissary_meat_map (commissary_meat_id, restaurant_id, meat_id) VALUES (?, ?, ?)`
+    ).run(commissary_meat_id, restaurant_id, meat_id);
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That commissary meat is already mapped for this restaurant.' : err.message });
+  }
+});
+
+router.delete('/settings/commissary-mappings/:id', (req, res) => {
+  const result = db.prepare(`DELETE FROM commissary_meat_map WHERE id = ?`).run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Mapping not found' });
+  res.json({ ok: true });
+});
+
 module.exports = router;
