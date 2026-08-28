@@ -10,6 +10,52 @@ this is for things that took real debugging, changed a decision, or are
 worth remembering if they happen again.
 
 ---
+## 2026-08-28 — Step 8 shipped: Commissary Mapping admin screen
+
+**What shipped**: a "Commissary Mapping" tab on `settings.html` (same tab
+pattern as Meats/Dishes/Recipes), plus three new routes in
+`server/routes/settings.js`: `GET /api/settings/commissary-mappings`
+(list current mappings for the selected restaurant, joined with
+commissary-meat and restaurant-meat code/name for readability), `POST
+/api/settings/commissary-mappings` (create one `commissary_meat_map` row),
+and `DELETE /api/settings/commissary-mappings/:id`. The add-form is a
+commissary-meat dropdown (sourced from the existing `GET
+/api/commissary/meats`, reused as-is, no duplicate endpoint) × this
+restaurant's own meat dropdown (existing `GET /api/settings/meats`).
+Matches `commissary-and-stock-receipts.md` Part 1 and `data-model.md`
+section 10a exactly: no edit for v1 (delete + re-add), no `activity_log`
+wiring (this table is config/reference data, deliberately outside rule 9's
+scope). No schema change - `commissary_meat_map` already existed, just had
+no UI. `server/index.js` unchanged - `settings.js` was already mounted at
+`/api`.
+
+**Deliberately not built in this step**: step 9 (unallocated-receipts
+assignment flow) - untouched, as planned; it depends on this screen
+existing first, which it now does.
+
+**How it was verified**: this session had no npm registry access (`npm
+install` returned `403 Forbidden`, unlike the step-7 session) - `npm run
+dev` could not run, so there was no live-browser click-test this time.
+Verification bar used instead (per `session-status.md`'s stated fallback):
+a new `server/routes/settings.test.js`, same real-in-memory-`node:sqlite`
+approach as `history.test.js` (real schema, real seeded restaurants/meats/
+commissary_meats, no Express, no mocking), driving the exact SQL the three
+new route handlers run. 10/10 new tests green, covering: empty list before
+any mapping, create + list with joined code/name fields, per-restaurant
+isolation (restaurant B's mapping doesn't leak into restaurant A's list),
+the `UNIQUE (commissary_meat_id, restaurant_id)` constraint rejecting a
+duplicate for the *same* restaurant while allowing the *same* commissary
+meat to map into a *different* restaurant, delete removing a row (and
+reporting zero `changes` on an already-gone id, which the route reads as
+404), and the delete+re-add v1 "edit" path actually working after a
+delete frees the UNIQUE slot. Full suite re-run after the change: 55/55
+green (45 prior + these 10). Still open: an actual browser click-test of
+the new tab's add-form/dropdowns/remove-button, and the still-outstanding
+step-6-era item (Stock Receipts/Commissary pages' own Edit/Delete UI, not
+touched this session) - both blocked on the same thing, npm registry
+access, whenever a future session has it.
+
+---
 ## 2026-08-28 — Step 7 shipped: Admin History tab (read-only feed over `activity_log`)
 
 **What shipped**: `GET /api/history` and `GET /api/history/filters`
