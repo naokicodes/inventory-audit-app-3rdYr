@@ -88,15 +88,17 @@ so always start here.
     `prepped`/`sold`/`portionEndingCalculated`/`portionActual`/
     `portionVariance` for dish rows). A real click-through is still owed,
     same as the existing open item below.
-  - **Not yet pushed**: the three step-10 files
-    (`auditEngine.js`/`auditEngine.test.js`/`dailyAudit.js`) and the two
-    step-11 files (`dailyAudit.js` again/`daily-audit.html`) were handed
-    to the project owner as downloads to drop into the real local clone
-    and commit/push themselves, since this session had no `.git` to
-    commit into. **If you're a session picking this up, check with the
-    project owner whether steps 10–11 have actually landed in the repo
-    before assuming this status doc reflects `git log`** — that's a
-    process gap worth watching for, not a normal state.
+  - **Pushed and verified** (2026-08-29): a fresh session cloned `main`
+    independently, confirmed the step-10/11 commits are present
+    (`7b0c541`, `2ff3032`, `5b31717`), ran the full test suite from a
+    clean `npm install` (6/6 suites, 0 failures), and did a live smoke
+    test — seeded a real DB, booted the actual Express server, and hit
+    `GET /api/daily-audit/mixed` for real, confirming the response shape
+    matches what `daily-audit.html` reads. The earlier "not yet pushed /
+    check with the project owner" caveat is resolved; no need to verify
+    this again. A true browser click-through is still not done (see
+    "Known open items" below) — the live smoke test confirms the backend
+    contract, not the UI interaction.
 
 **Next up is step 12** (Opening-stock fix) — see the roadmap below.
 
