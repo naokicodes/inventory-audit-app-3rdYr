@@ -1,116 +1,100 @@
 # Handoff — Inventory Audit App (Commissary + Stock Receipts + Activity Log)
 
-Status: **Steps 1–5 done. Steps 4 and 5's edit/delete both deferred to
-step 6 (deliberate, same reason both times). Steps 6–7 remain.**
+Status: **Steps 1–6 done. Step 7 (Admin History tab) is next and last for
+this phase.**
 This doc is written so a fresh conversation can pick up with no prior context
 beyond what's in this repo's `docs/` folder.
 
 ---
 
-## Done (steps 1–4) — unchanged from last handoff, see repo's `docs/changelog.md`
+## Done (steps 1–5) — unchanged from last handoff, see repo's `docs/changelog.md`
 Schema migration, `getNewStock()` → SUM over `stock_receipts`,
-`commissaryYieldEngine.js`'s core (loss %/status/excess loss), and the
-Stock Receipts page + route — all tested green. `new_stock` is fully
-retired (table dropped from `schema.sql`, nothing references it).
+`commissaryYieldEngine.js`, Stock Receipts page + route, and Commissary
+page + route (balance formula fully re-verified against
+`Commi_Audit_Master.xlsx` — M03/M05/M08 all match the sheet's own cached
+balances exactly). `new_stock` is fully retired. `commissary_meats` has
+all 14 real rows seeded.
 
-## Done (step 5) — Commissary page + route ✅
+## Done (step 6) — Activity log wired in ✅
 
 **Shipped:**
-- `commissaryYieldEngine.js` — added `getCommissaryBalance(db, commissaryMeatId)`
-  and `listCommissaryBalances(db)`. Formula (from
-  `commissary-and-stock-receipts.md` Part 1, unchanged):
-  ```
-  commissary_balance(commissary_meat) =
-    SUM(commissary_yield_log.backed_weight_out WHERE commissary_meat_id = ? AND deleted_at IS NULL)
-    - SUM(stock_receipts.quantity WHERE commissary_meat_id = ? AND source = 'COMMISSARY' AND deleted_at IS NULL)
-  ```
-  Returns 0 (not null) for a meat with no activity yet.
-- `server/routes/commissary.js` — four endpoints:
-  - `GET /api/commissary/meats` — active commissary meats for the
-    yield-entry dropdown.
-  - `GET /api/commissary/yield-log?business_date=&commissary_meat_id=` —
-    filterable list, computed loss%/status/excess-loss joined in per row,
-    newest first, excludes soft-deleted.
-  - `GET /api/commissary/balances` — live on-hand balance per active
-    commissary meat.
-  - `POST /api/commissary/yield-log` — creates a yield event. Validates
-    `commissary_meat_id` exists.
-- `public/commissary.html` — yield-entry form + live balance cards +
-  filterable yield log list. Same vanilla-JS/fetch pattern as
-  `stock-receipts.html`. Nav link added to every page.
-- `server/index.js` — mounted the new router.
-- `server/db/commissary-seed-data.json` (new) + `seed.js` — **all 14 real
-  commissary meats** from `Commi_Audit_Master.xlsx`'s `Meats` sheet
-  (M01–M14, `M15` is blank in the sheet and skipped), including
-  `cost_per_unit` where present.
+- `server/db/activityLog.js` (new) — two shared helpers:
+  - `withTransaction(db, fn)` — hand-rolled `BEGIN`/`COMMIT`/`ROLLBACK`.
+    `node:sqlite`'s `DatabaseSync` has no `.transaction()` wrapper
+    (confirmed by inspecting its prototype directly - only
+    `.exec()`/`.prepare()`/`.close()`/etc exist), so this is the
+    transaction primitive rule 9 needs. Any throw inside `fn` rolls back
+    before rethrowing - verified with a real test that counts rows
+    before/after a simulated mid-transaction failure, not just that the
+    error propagated.
+  - `logActivity(db, {actor, entityType, entityId, action, before, after, source})`
+    — inserts one `activity_log` row, JSON-serializing `before`/`after`
+    at this one call site.
+- `server/db/activityLog.test.js` (new) — 6/6 green, covering the
+  atomicity guarantee above plus CREATE/UPDATE/DELETE snapshot shapes and
+  input validation (rejects a garbage `action` or `source` rather than
+  silently accepting it).
+- `server/routes/stockReceipts.js` — `POST` now wraps the insert + a
+  `CREATE` activity_log entry in one transaction. Two new endpoints:
+  - `PATCH /api/stock-receipts/:id` — editable: `quantity`,
+    `business_date`, `source`, `notes`. NOT editable: `restaurant_id`/
+    `meat_id` (that's really a different receipt - delete + re-create).
+    Switching `source` to `COMMISSARY` re-resolves `commissary_meat_id`
+    server-side via `commissary_meat_map`, exactly like `POST` does -
+    never trusted from the client, even on edit. 404s on an
+    already-soft-deleted row.
+  - `DELETE /api/stock-receipts/:id` — soft delete only (`deleted_at`),
+    logs `before` = full row snapshot, `after` = null (per the
+    `activity_log` schema's convention for deletes). 404s if already
+    deleted (no double-logging).
+- `server/routes/commissary.js` — same treatment for
+  `commissary_yield_log`: `POST` now transaction-wrapped with a `CREATE`
+  log, plus new `PATCH /api/commissary/yield-log/:id` (editable:
+  `raw_weight_in`, `backed_weight_out`, `business_date`, `notes` - not
+  `commissary_meat_id`) and `DELETE /api/commissary/yield-log/:id`
+  (soft). Verified an edit to `backed_weight_out` correctly changes what
+  `getCommissaryBalance` returns on the next call, and a soft-deleted
+  yield row is excluded from the balance the same way a soft-deleted
+  `stock_receipts` row already was.
+- `public/stock-receipts.html` / `public/commissary.html` — both pages
+  now have inline **Edit** (row becomes editable inputs, Save/Cancel
+  buttons) and **Delete** (confirm dialog explaining the row isn't gone,
+  just excluded from calculations) per row. Both pages also got a
+  "Your name" field near the top, persisted in `localStorage`
+  (`inventory_actor` key) and sent as `actor` on every create/edit/
+  delete, so `activity_log.actor` has something better than null.
 
-**Deliberately not built in step 5** (same reasoning as step 4, flagged
-not forgotten): no edit/soft-delete on `commissary_yield_log`.
-`rules-for-claude-code.md` rule 9 requires activity_log wiring on every
-write to this table, and that's step 6. Create + read only for now.
+**Not built yet, on purpose**: no UI reading `activity_log` back yet -
+that's step 7, kept as its own commit since it's a pure read with zero
+risk to the write paths this step touched.
 
-**Balance formula fully verified against the real xlsx** (worth reading —
-this was almost lost): an earlier same-day session already did this
-verification, but ran out of context before it landed in the repo, so it
-had to be redone from scratch once `Commi_Audit_Master.xlsx` was
-re-uploaded. Redone properly this time:
-- Read `Commissary_Stock`'s actual formulas — confirmed `E` (Total Out)
-  sums Outbound_Log rows by MeatID **regardless of destination**,
-  including "Unallocated" ones.
-- Hand-summed the real per-meat rows from `Yield_Log`/`Outbound_Log` and
-  matched `Commissary_Stock`'s cached numbers exactly: M03 Belly Slab
-  29.7 − 14.9 = **14.8**; M05 JOWL 103.8 − 87.5 = **16.3**; M08 Shortplate
-  46.9 − 33.5 = **13.4**.
-- `commissaryYieldEngine.test.js`'s balance tests use the real Belly Slab
-  rows as fixtures. One deliberate, documented exception: the test's own
-  balance comes out to 19.8, not the sheet's 14.8 — a real 5.0kg
-  "Unallocated"-destination row exists in the sheet but isn't
-  reproduced, since `stock_receipts.restaurant_id` is `NOT NULL` and this
-  schema can't represent it yet (see "Open design gap" below). This is
-  flagged in the test itself, not hidden. 22/22 tests green.
-
-**Verification note — could not run the live server this session either.**
-Same sandbox limitation as step 4 (no network, `npm install` fails).
+**Verification note — still no live `npm run dev` this session.** Same
+sandbox limitation as steps 4/5 (no network, `npm install` fails).
 Verified instead by:
 - `node --check` on every new/changed server file.
 - Full `auditEngine.test.js` (9/9) + `commissaryYieldEngine.test.js`
-  (22/22) suites green.
-- A fresh `seed.js` run confirming all 14 real commissary meats load with
-  correct code/name/unit/leeway/cost values.
-- A standalone script exercising `commissary.js`'s exact route logic
-  directly against `node:sqlite` (bypassing Express, unavailable):
-  confirmed GET meats returns the seeded list, POST validation (missing
-  fields, unknown `commissary_meat_id`), GET yield-log's computed fields
-  and date filter, and GET balances reflecting a real before/after change
-  when a COMMISSARY-sourced `stock_receipts` row is added.
+  (22/22) + new `activityLog.test.js` (6/6) - **37/37 total**.
+- Two standalone scripts exercising `stockReceipts.js`'s and
+  `commissary.js`'s exact new route logic (POST/PATCH/DELETE, transaction
+  + logging included) directly against `node:sqlite`, bypassing Express
+  (still unavailable): confirmed full `CREATE → UPDATE → UPDATE → DELETE`
+  and `CREATE → UPDATE → DELETE` `activity_log` trails in the right
+  order, `deleted_at IS NULL` correctly excludes deleted rows from list
+  queries, PATCH/DELETE both 404 on an already-deleted row, and (for
+  commissary specifically) that `getCommissaryBalance` live-reflects an
+  edit or delete to the underlying yield log row.
+- A fresh `seed.js` run, unaffected by any of this session's changes.
 
-**→ Next session should run `npm run dev` for real** (commissary meat
-dropdown populates, log a yield event, confirm the balance card updates,
-confirm it also shows up correctly filtered on the yield log list) before
-starting step 6 — same as step 4's outstanding item, now for two pages
-instead of one.
-
-**Open design gap, flagged not resolved**: `Outbound_Log`'s Instructions
-sheet allows a destination of "Unallocated" when a shipment's restaurant
-split hasn't been decided yet. `stock_receipts.restaurant_id` is
-`NOT NULL`, so there's currently no way to represent this. Doesn't affect
-the balance formula (it's destination-agnostic), but means our app can't
-fully reproduce the sheet's exact balance for a meat that has an
-Unallocated row outstanding. Options for whoever makes this call: allow
-`restaurant_id` to be nullable with an "unallocated" state, or something
-else — not decided here on purpose.
+**→ Next session should run `npm run dev` for real** - same outstanding
+item as steps 4 and 5, now covering the new Edit/Delete flows on both
+pages too (click Edit, change a value, Save, confirm the row and any
+downstream balance/computed field updates; click Delete, confirm it
+drops out of the list but the "Your name" you typed shows up correctly
+once step 7's history view exists to check it).
 
 ---
 
-## Remaining (steps 6–7) — original task text, unedited
-
-### 6. Wire in the activity log
-Every create/update/soft-delete on `stock_receipts` and
-`commissary_yield_log` writes a matching `activity_log` row (before/after
-JSON) in the same transaction. No hard DELETE on either table — `deleted_at`
-only. **This is also where steps 4 and 5's edit/delete endpoints get
-built** (see "deliberately not built" notes above) — both were
-intentionally left out to avoid writing without logging.
+## Remaining (step 7) — original task text, unedited
 
 ### 7. Admin History tab
 Reverse-chronological feed reading `activity_log`, filterable by entity
@@ -119,41 +103,55 @@ actually lets you catch a manipulated number later.
 
 ---
 
-## Things the next session should know before starting step 6
+## Things the next session should know before starting step 7
 
-1. **Transaction pattern still needs to be worked out.** Check whether
-   `node:sqlite`'s `DatabaseSync` exposes `.exec('BEGIN')/.exec('COMMIT')`
-   or a `db.transaction(...)` wrapper before hand-rolling one. This
-   touches the write paths in both `stockReceipts.js` and `commissary.js`
-   (their existing `POST` handlers, unchanged since steps 4/5, plus new
-   `PATCH`/`DELETE`-equivalent endpoints for both).
-2. **Soft delete convention already in schema**: both `stock_receipts`
-   and `commissary_yield_log` have `deleted_at TEXT` (nullable). "Delete"
-   in the UI = `UPDATE ... SET deleted_at = ?`, never `DELETE FROM`.
+1. **`activity_log` schema** (`server/db/schema.sql`): `id`, `timestamp`
+   (auto), `actor` (plain text, nullable), `entity_type` (currently only
+   `'stock_receipts'` or `'commissary_yield_log'` in practice, but the
+   column itself is unconstrained text), `entity_id`, `action` (`CREATE`/
+   `UPDATE`/`DELETE`), `before`/`after` (JSON text, nullable), `source`
+   (`SYSTEM`/`MANUAL` - everything written so far is `MANUAL`, since
+   there's no automated/system-triggered write yet).
+2. **There's real data to look at already** - step 6's route-simulation
+   scripts (not committed, they lived in `/tmp` during that session) and
+   any live `POST`/`PATCH`/`DELETE` calls this session's tests made
+   against a real (if ephemeral) `node:sqlite` db all produced correctly
+   shaped rows. Trust the schema and the `activityLog.test.js` fixtures
+   as the reference for what a row looks like; no need to re-derive the
+   shape from scratch.
 3. **Route/page pattern to follow** (four working examples now):
-   `dailyAudit.js`, `settings.js`, `stockReceipts.js`, `commissary.js` —
+   `dailyAudit.js`, `settings.js`, `stockReceipts.js`, `commissary.js` -
    all plain Express routers mounted under `/api` in `server/index.js`,
    `db.prepare(...).all()/.get()/.run()` from `node:sqlite`, JSON in/out.
    Frontend: plain HTML/JS per page, `fetch` calls, shared `style.css`,
-   nav links on every page.
-4. **The "Unallocated" destination gap** (see above) will likely surface
-   again once edit/delete exists for `stock_receipts` — not step 6's job
-   to fix, but worth having in mind since it's the same table.
-5. **`npm run dev` still hasn't been live-tested** — do this for both
-   Stock Receipts and Commissary before or during step 6, not after.
+   nav links on every page. A new `activity-history.html` should follow
+   the same shape - filterable list, this time read-only (no add-form).
+4. **The before→after diff** doesn't need to be fancy - the doc's own
+   language is "a simple before→after diff per row" and the "Discord
+   history" model (a plain readable feed, not a separate audit-per-table
+   UI). A straightforward two-column or key-by-key comparison of the
+   parsed `before`/`after` JSON is enough; don't over-build this.
+5. **The "Unallocated" destination gap** (flagged since step 5, still
+   open) may come up again if this session's testing surfaces edits to
+   `stock_receipts` rows tied to commissary shipments - not step 7's job
+   to fix, just worth having in mind.
+6. **`npm run dev` still hasn't been live-tested** - do this before or
+   during step 7, covering all three pages now (Stock Receipts,
+   Commissary, and the new Admin History).
 
 ---
 
 ## Suggested order for the next session
-1. Run `npm run dev` for real and click through both Stock Receipts and
-   Commissary pages (neither has been live-tested yet — see verification
-   notes above).
-2. Work out the `node:sqlite` transaction pattern (item 1 above) in
-   isolation first — a small standalone script, before touching the real
-   routes.
-3. Step 6: add `activity_log` writes to the existing `POST` handlers on
-   both tables, then build the edit/soft-delete endpoints for both
-   (deferred from steps 4 and 5), each logging before/after JSON in the
-   same transaction as the write.
-4. Step 7 (Admin History tab) — purely reads `activity_log`, so it's
-   naturally last; nothing to show until step 6 is producing rows.
+1. Run `npm run dev` for real and click through all three pages,
+   including the new Edit/Delete flows from step 6 (none of which have
+   been live-tested yet - see verification notes above).
+2. Add a `GET /api/activity-log?entity_type=&business_date_range=&actor=`
+   endpoint (or similar filter set - check `activity_log`'s actual
+   columns above) to a new `server/routes/activityLog.js`, mounted the
+   same way as the other four routers.
+3. Build `public/activity-history.html` - reverse-chronological list,
+   filterable, with a simple before→after diff per row. Nav link added
+   everywhere, matching the other three pages.
+4. Once step 7 is done, this phase's original 7-step plan is complete -
+   check `docs/session-status.md`'s "Original remaining scope" section
+   for what comes after (Landing rebuild, Sales tab, command panel).

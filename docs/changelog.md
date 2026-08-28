@@ -11,6 +11,75 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-28 (latest) — Activity log wired in (step 6): edit/delete for both tables, full audit trail
+
+**Shipped:**
+- `server/db/activityLog.js` (new) — two shared helpers used by both
+  write routes:
+  - `withTransaction(db, fn)` — hand-rolled `BEGIN`/`COMMIT`/`ROLLBACK`.
+    `node:sqlite`'s `DatabaseSync` has no `.transaction()` wrapper
+    (checked directly: only `.exec()`/`.prepare()`/etc. exist), so this
+    is the transaction primitive rule 9 needs. A throw inside `fn` rolls
+    back before rethrowing.
+  - `logActivity(db, {...})` — inserts one `activity_log` row,
+    JSON-serializing `before`/`after` consistently at the one call site
+    instead of leaving that to each route.
+- `server/db/activityLog.test.js` (new) — 6 tests, the important one
+  being **atomicity**: an error thrown after both the target write and
+  its log entry have run, still inside the same transaction, rolls back
+  *both* — verified by counting rows before/after, not just checking the
+  error propagated. Also covers CREATE/UPDATE/DELETE snapshot shapes and
+  input validation (rejects a garbage `action`/`source`). 6/6 green.
+- `stockReceipts.js` — `POST` now wraps the insert + its `CREATE` log
+  entry in one transaction (previously just an insert, no log). Two new
+  endpoints: `PATCH /api/stock-receipts/:id` (editable fields: quantity,
+  business_date, source, notes — not restaurant/meat, which would really
+  be a different receipt; switching `source` to `COMMISSARY` re-resolves
+  `commissary_meat_id` server-side the same way `POST` does, never
+  trusted from the client) and `DELETE /api/stock-receipts/:id` (soft —
+  `deleted_at` only, logs `before` = full row, `after` = null). Both 404
+  on an already-deleted row rather than silently no-op'ing or
+  double-logging.
+- `commissary.js` — same treatment for `commissary_yield_log`: `POST`
+  now transaction-wrapped with a `CREATE` log, plus new
+  `PATCH /api/commissary/yield-log/:id` and
+  `DELETE /api/commissary/yield-log/:id`. Confirmed via test that editing
+  `backed_weight_out` correctly changes what `getCommissaryBalance`
+  returns, and that a soft-deleted yield row is excluded from the
+  balance the same way a soft-deleted `stock_receipts` row already was.
+- `public/stock-receipts.html` / `public/commissary.html` — both pages
+  now have inline Edit (row becomes editable inputs, Save/Cancel) and
+  Delete (confirm dialog) per row, plus an "Your name" field
+  (persisted in `localStorage`, sent as `actor` on every write) so the
+  activity log has something better than null for who made a change.
+  Deleting asks for confirmation and explains the row isn't gone, just
+  excluded from calculations.
+
+**Not built yet, on purpose**: no Admin History UI reading `activity_log`
+back — that's step 7, deliberately kept as its own commit since it's a
+pure read with no risk to the write paths this entry touches.
+
+**Verification note — still no live `npm run dev` this session**, same
+sandbox limitation as steps 4/5 (no network). Verified instead by:
+- `node --check` on every new/changed file.
+- Full `auditEngine.test.js` (9/9) + `commissaryYieldEngine.test.js`
+  (22/22) + new `activityLog.test.js` (6/6) — 37/37 total.
+- Two standalone scripts exercising `stockReceipts.js`'s and
+  `commissary.js`'s exact new route logic (POST/PATCH/DELETE, including
+  the transaction+log wiring) directly against `node:sqlite`: confirmed
+  full CREATE→UPDATE→UPDATE→DELETE and CREATE→UPDATE→DELETE
+  `activity_log` trails in order, `deleted_at IS NULL` correctly
+  excludes deleted rows from list queries, PATCH/DELETE both 404 on an
+  already-deleted row, and (for commissary) that `getCommissaryBalance`
+  live-reflects an edit or delete to the underlying yield log row.
+- A fresh `seed.js` run, unaffected by any of this session's changes.
+
+**→ Next session should run `npm run dev` for real** — same outstanding
+item as steps 4 and 5, now three pages deep (Stock Receipts, Commissary,
+and their new edit/delete flows) — before starting step 7.
+
+---
+
 ## 2026-08-28 (even later) — Commissary balance formula fully re-verified against the real xlsx; full M01-M14 seed data
 
 **Context**: `Commi_Audit_Master.xlsx` was re-uploaded after the previous
