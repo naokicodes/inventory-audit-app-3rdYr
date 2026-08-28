@@ -2,12 +2,10 @@
 // yield tracking), separate from Stock Receipts (the receiving side).
 // See docs/commissary-and-stock-receipts.md Part 1.
 //
-// Same "deliberately not built yet" note as stockReceipts.js: no
-// edit/soft-delete endpoints here. rules-for-claude-code.md rule 9
-// requires every write to commissary_yield_log to log to activity_log in
-// the same transaction, and activity_log isn't wired in yet (step 6).
-// Create + read only for now, exactly mirroring step 4's choice for
-// stock_receipts.
+// Step 6: every create/update/soft-delete here writes a matching
+// activity_log row in the same transaction (rules-for-claude-code.md
+// rule 9), via the shared withTransaction/logActivity helpers. No hard
+// DELETE - "delete" means UPDATE ... SET deleted_at.
 
 const express = require('express');
 const db = require('../db/connection.js');
@@ -15,8 +13,13 @@ const {
   computeYieldRow,
   listCommissaryBalances
 } = require('../engines/commissaryYieldEngine.js');
+const { withTransaction, logActivity } = require('../db/activityLog.js');
 
 const router = express.Router();
+
+function getYieldLogRow(id) {
+  return db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(id);
+}
 
 // GET /api/commissary/meats
 // Active commissary meats, for the yield-entry form's dropdown. Global
@@ -66,9 +69,9 @@ router.get('/commissary/balances', (req, res) => {
 });
 
 // POST /api/commissary/yield-log
-// Body: { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes }
+// Body: { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes, actor }
 router.post('/commissary/yield-log', (req, res) => {
-  const { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes } = req.body;
+  const { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes, actor } = req.body;
 
   if (!commissary_meat_id || !business_date || raw_weight_in === undefined || raw_weight_in === null || raw_weight_in === ''
       || backed_weight_out === undefined || backed_weight_out === null || backed_weight_out === '') {
@@ -80,12 +83,105 @@ router.post('/commissary/yield-log', (req, res) => {
     return res.status(400).json({ error: 'Unknown commissary_meat_id' });
   }
 
-  const result = db.prepare(`
-    INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), notes || null);
+  try {
+    const id = withTransaction(db, () => {
+      const result = db.prepare(`
+        INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), notes || null, actor || null);
 
-  res.json({ ok: true, id: result.lastInsertRowid });
+      const after = getYieldLogRow(result.lastInsertRowid);
+      logActivity(db, {
+        actor: actor || null,
+        entityType: 'commissary_yield_log',
+        entityId: result.lastInsertRowid,
+        action: 'CREATE',
+        before: null,
+        after,
+        source: 'MANUAL'
+      });
+      return result.lastInsertRowid;
+    });
+
+    res.json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save yield event: ' + err.message });
+  }
+});
+
+// PATCH /api/commissary/yield-log/:id
+// Body: { raw_weight_in?, backed_weight_out?, business_date?, notes?, actor }
+// commissary_meat_id is not editable here - a different meat is a
+// different event; delete + re-create instead.
+router.patch('/commissary/yield-log/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const { raw_weight_in, backed_weight_out, business_date, notes, actor } = req.body;
+
+  const existing = getYieldLogRow(id);
+  if (!existing || existing.deleted_at) {
+    return res.status(404).json({ error: 'Yield log entry not found' });
+  }
+
+  const nextRawIn = raw_weight_in !== undefined && raw_weight_in !== null && raw_weight_in !== '' ? Number(raw_weight_in) : existing.raw_weight_in;
+  const nextBackedOut = backed_weight_out !== undefined && backed_weight_out !== null && backed_weight_out !== '' ? Number(backed_weight_out) : existing.backed_weight_out;
+  const nextDate = business_date || existing.business_date;
+  const nextNotes = notes !== undefined ? (notes || null) : existing.notes;
+
+  try {
+    withTransaction(db, () => {
+      db.prepare(`
+        UPDATE commissary_yield_log SET raw_weight_in = ?, backed_weight_out = ?, business_date = ?, notes = ?
+        WHERE id = ?
+      `).run(nextRawIn, nextBackedOut, nextDate, nextNotes, id);
+
+      const after = getYieldLogRow(id);
+      logActivity(db, {
+        actor: actor || null,
+        entityType: 'commissary_yield_log',
+        entityId: id,
+        action: 'UPDATE',
+        before: existing,
+        after,
+        source: 'MANUAL'
+      });
+    });
+
+    res.json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update yield event: ' + err.message });
+  }
+});
+
+// DELETE /api/commissary/yield-log/:id
+// Soft delete only - sets deleted_at, never a hard DELETE. Body may
+// include { actor } for the activity log.
+router.delete('/commissary/yield-log/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const { actor } = req.body || {};
+
+  const existing = getYieldLogRow(id);
+  if (!existing || existing.deleted_at) {
+    return res.status(404).json({ error: 'Yield log entry not found' });
+  }
+
+  try {
+    withTransaction(db, () => {
+      db.prepare(`UPDATE commissary_yield_log SET deleted_at = datetime('now') WHERE id = ?`).run(id);
+      logActivity(db, {
+        actor: actor || null,
+        entityType: 'commissary_yield_log',
+        entityId: id,
+        action: 'DELETE',
+        before: existing,
+        after: null,
+        source: 'MANUAL'
+      });
+    });
+
+    res.json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete yield event: ' + err.message });
+  }
 });
 
 module.exports = router;
