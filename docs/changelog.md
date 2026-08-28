@@ -10,6 +10,46 @@ this is for things that took real debugging, changed a decision, or are
 worth remembering if they happen again.
 
 ---
+
+## 2026-08-28 — Step 9 session lost to usage limit before commit; repo made public
+
+**What happened**: a session fully planned and implemented step 9
+(Unallocated-receipts support) — schema change, migration helper,
+`stockReceipts.js` route changes, 18/18 new tests, an update to
+`commissaryYieldEngine.test.js`'s Belly Slab test — then hit its usage
+limit partway through the `stock-receipts.html` UI work, before
+committing anything or updating `changelog.md`/`session-status.md`.
+Confirmed directly against the live repo: none of that code exists here.
+The work is gone, not just uncommitted-but-recoverable.
+
+**Two design calls from that lost session are worth preserving even
+though the code isn't**, so the next attempt doesn't have to re-derive
+them:
+
+1. A migration helper is required, not optional — `schema.sql` uses
+   `CREATE TABLE IF NOT EXISTS`, which can't retroactively loosen a
+   `NOT NULL` constraint on a table that already exists in someone's
+   local `inventory.db`.
+2. Assigning an unallocated `stock_receipts` row to a restaurant must
+   validate that the resolved `commissary_meat_map` entry points at the
+   *same* `commissary_meat_id` already stored on that row — reject the
+   assignment otherwise, to prevent silently misattributing which
+   physical commissary pool a shipment was drawn from.
+
+Both are now written into `docs/session-status.md`'s step 9 section as
+requirements for the redo.
+
+**Also done this session**: the repo was made public (previously private).
+No code change — `.env`, `*.db`, and `/uploads/` are and have always been
+gitignored, so nothing secret was ever committed. This was done to
+simplify tooling/access, not for any functional reason.
+
+**Not done in this entry**: no code. Step 9 needs a full rebuild from
+`docs/data-model.md` section 5 and `docs/commissary-and-stock-receipts.md`
+Part 2, treated as not-yet-started.
+
+---
+
 ## 2026-08-28 — Step 8 shipped: Commissary Mapping admin screen
 
 **What shipped**: a "Commissary Mapping" tab on `settings.html` (same tab
