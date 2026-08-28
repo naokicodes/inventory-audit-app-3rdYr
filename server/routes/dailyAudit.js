@@ -13,6 +13,38 @@ router.get('/restaurants', (req, res) => {
   res.json(restaurants);
 });
 
+// Shared by both GET routes below: looks up the existing in_house/wastage/
+// other adjustment amounts and the ending_actual remarks for one meat/date,
+// so a meat row can show what's already been typed for it (not just the
+// calculated columns). Kept as one helper so the two routes can't drift
+// out of sync on how this decoration works.
+function getMeatInputDecoration(restaurantId, date) {
+  const adjTypes = db.prepare(`SELECT id, name FROM adjustment_types WHERE active = 1`).all();
+  const inHouseTypeId = adjTypes.find(t => t.name === 'Staff Meal / In-House')?.id;
+  const wastageTypeId = adjTypes.find(t => t.name === 'Wastage')?.id;
+  const otherTypeId = adjTypes.find(t => t.name === 'Other / Uncategorized')?.id;
+
+  const getExistingAdjustment = db.prepare(
+    `SELECT quantity FROM adjustments WHERE restaurant_id = ? AND meat_id = ? AND business_date = ? AND adjustment_type_id = ?`
+  );
+  const getRemarks = db.prepare(
+    `SELECT notes FROM ending_actual WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
+  );
+
+  return (meatId) => {
+    const inHouse = inHouseTypeId ? getExistingAdjustment.get(restaurantId, meatId, date, inHouseTypeId) : null;
+    const wastage = wastageTypeId ? getExistingAdjustment.get(restaurantId, meatId, date, wastageTypeId) : null;
+    const other = otherTypeId ? getExistingAdjustment.get(restaurantId, meatId, date, otherTypeId) : null;
+    const remarksRow = getRemarks.get(restaurantId, meatId, date);
+    return {
+      in_house: inHouse ? inHouse.quantity : null,
+      wastage: wastage ? wastage.quantity : null,
+      other: other ? other.quantity : null,
+      remarks: remarksRow ? remarksRow.notes : ''
+    };
+  };
+}
+
 // GET /api/daily-audit?restaurant_id=1&date=2026-08-25
 // One row per active meat, with every column the grid needs - calculated
 // values from the audit engine, plus existing input values if already
@@ -28,24 +60,11 @@ router.get('/daily-audit', (req, res) => {
     `SELECT id, meat_code, name, unit FROM meats WHERE restaurant_id = ? AND active = 1 ORDER BY meat_code`
   ).all(restaurantId);
 
-  const adjTypes = db.prepare(`SELECT id, name FROM adjustment_types WHERE active = 1`).all();
-  const inHouseTypeId = adjTypes.find(t => t.name === 'Staff Meal / In-House')?.id;
-  const wastageTypeId = adjTypes.find(t => t.name === 'Wastage')?.id;
-  const otherTypeId = adjTypes.find(t => t.name === 'Other / Uncategorized')?.id;
-
-  const getExistingAdjustment = db.prepare(
-    `SELECT quantity FROM adjustments WHERE restaurant_id = ? AND meat_id = ? AND business_date = ? AND adjustment_type_id = ?`
-  );
-  const getRemarks = db.prepare(
-    `SELECT notes FROM ending_actual WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
-  );
+  const decorate = getMeatInputDecoration(restaurantId, date);
 
   const rows = meats.map(meat => {
     const audit = computeMeatAudit(db, restaurantId, meat.id, date);
-    const inHouse = inHouseTypeId ? getExistingAdjustment.get(restaurantId, meat.id, date, inHouseTypeId) : null;
-    const wastage = wastageTypeId ? getExistingAdjustment.get(restaurantId, meat.id, date, wastageTypeId) : null;
-    const other = otherTypeId ? getExistingAdjustment.get(restaurantId, meat.id, date, otherTypeId) : null;
-    const remarksRow = getRemarks.get(restaurantId, meat.id, date);
+    const inputs = decorate(meat.id);
 
     return {
       meat_id: meat.id,
@@ -58,15 +77,15 @@ router.get('/daily-audit', (req, res) => {
       // this screen. See docs/commissary-and-stock-receipts.md Part 2.
       new_stock: audit.newStock,
       usage: audit.usage,
-      in_house: inHouse ? inHouse.quantity : null,
-      wastage: wastage ? wastage.quantity : null,
-      other: other ? other.quantity : null,
+      in_house: inputs.in_house,
+      wastage: inputs.wastage,
+      other: inputs.other,
       ending_calculated: audit.endingCalculated,
       ending_actual: audit.actual,
       variance: audit.variance,
       unexplained_variance: audit.unexplainedVariance,
       status: audit.status,
-      remarks: remarksRow ? remarksRow.notes : ''
+      remarks: inputs.remarks
     };
   });
 
@@ -74,15 +93,17 @@ router.get('/daily-audit', (req, res) => {
 });
 
 // GET /api/daily-audit/mixed?restaurant_id=1&date=2026-08-25
-// Step 10 (session-status.md): the Landing mixed grid - meats and
+// Step 11 (session-status.md): backs the Landing mixed grid - meats and
 // BATCH_PREPPED dishes together in one array, each row tagged `type`
-// ('MEAT' or 'DISH'). Additive and unwired: nothing in the frontend
-// calls this yet, and GET /api/daily-audit above is untouched and still
-// backs the live daily-audit.html screen (meats-only) until step 11
-// switches it over. Backend + tests only for this step - no adjustments/
-// remarks decoration here yet, unlike the older endpoint above; that's
-// left for step 11 to add if the Landing UI needs it, per rule 16 (don't
-// expand a step past its own text).
+// ('MEAT' or 'DISH'). MEAT rows are now decorated with the same
+// in_house/wastage/other/remarks lookup GET /api/daily-audit uses, via
+// the shared helper above - the Landing UI keeps editing meat rows in
+// place, so it needs to see what's already been typed, same as before.
+// DISH rows carry only what computeDishAudit already returns (prepped,
+// sold, portion beginning/ending/actual, status) - read-only for this
+// step, per session-status.md; there's no write path for prepped/
+// portion_ending_actual yet, so nothing to decorate there.
+// GET /api/daily-audit above is untouched and still works standalone.
 router.get('/daily-audit/mixed', (req, res) => {
   const restaurantId = Number(req.query.restaurant_id);
   const date = req.query.date;
@@ -90,7 +111,12 @@ router.get('/daily-audit/mixed', (req, res) => {
     return res.status(400).json({ error: 'restaurant_id and date are required' });
   }
 
-  const rows = computeMixedDailyAudit(db, restaurantId, date);
+  const decorate = getMeatInputDecoration(restaurantId, date);
+  const rows = computeMixedDailyAudit(db, restaurantId, date).map(row => {
+    if (row.type !== 'MEAT') return row;
+    return { ...row, ...decorate(row.item_id) };
+  });
+
   res.json(rows);
 });
 
