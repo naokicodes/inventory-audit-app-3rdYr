@@ -134,6 +134,15 @@ chosen restaurant, same validation `POST` already applies). Both the create
 and the later assignment go through the existing `activity_log` machinery —
 assignment is logged as an `UPDATE`, same as any other edit.
 
+**Continuity requirement (added 2026-08-28):** the `commissary_meat_map`
+lookup used to resolve `meat_id` on assignment must resolve to the *same*
+`commissary_meat_id` already stored on the row being assigned — reject the
+assignment otherwise. Without this check, assignment could silently
+misattribute which physical commissary pool a shipment was actually drawn
+from, undermining the balance/traceability this table exists for. (This
+was flagged by a coding session as an ambiguity the docs didn't resolve;
+confirmed correct and written in here rather than left implicit.)
+
 **Why this approach over a placeholder "Unallocated" row in `restaurants`**:
 a placeholder restaurant would pollute restaurant-scoped reporting (it would
 show up in "restaurants" dropdowns, weekly summaries, etc. as if it were a
