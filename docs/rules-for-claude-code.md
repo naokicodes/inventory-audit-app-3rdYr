@@ -34,8 +34,11 @@ standing constraints, not suggestions — they exist to keep a solo,
    the doc gets updated deliberately (outside of a pure coding session),
    not edited inline as a side effect of writing code.
 8. **Small, focused commits — but committing is a separate, later step**
-   from testing. Don't feel pressure to commit before something is
-   actually working; freely iterate first.
+   from testing. Don't feel pressure to commit something broken as if it
+   were finished; freely iterate first. That's different from a
+   deliberate, honestly-labeled WIP commit when a step runs out of
+   session time — see rule 17, which is the one case where landing
+   unfinished work is the right call, not the wrong one.
 9. **Every write to `stock_receipts` or `commissary_yield_log` logs to
    `activity_log`** with a before/after snapshot, in the same transaction
    as the write it's logging. Deletes on those two tables are soft
@@ -76,6 +79,18 @@ standing constraints, not suggestions — they exist to keep a solo,
       not one, unless both are genuinely trivial.
     - A step description that reads as "X, Y, and Z" (three-plus
       distinct deliverables) should usually be three steps.
+    - **A step's own text in `session-status.md` should be the whole
+      task, not a pointer to go implement a spec section yourself.**
+      Even when a full design doc already exists (step 9's did — two
+      docs fully specified the schema, the validation rules, and the
+      workflow — and it still took a session to a total loss before it
+      landed), don't hand a future session "go build Unallocated
+      receipts per data-model.md section 5." Hand it the narrow slice —
+      "add the nullable columns and the migration, nothing else" — with
+      the spec cited for *background*, not as the task itself. A session
+      shouldn't have to read and internalize a multi-part design before
+      it can start; that reading is real cost too, and it's cost every
+      single session pays again if the step stays large.
     - **Commit as soon as a step's own tests pass** — don't bundle
       "finish the step" and "commit it" as separate later actions within
       the same session if the step is already done; per rule 8, testing
@@ -83,12 +98,44 @@ standing constraints, not suggestions — they exist to keep a solo,
       the gap between them should be minutes, not "whenever I get
       around to it."
     - If a step turns out bigger than expected once inside it, stop at
-      the next clean, tested, committable boundary and hand off via
-      `session-status.md` rather than pushing to finish the whole
-      original step in one sitting.
+      the next clean boundary and hand off via `session-status.md` — see
+      rule 17 for what to do if that boundary isn't a fully working,
+      tested state.
     - See `session-status.md`'s roadmap for what this looks like applied
       to the actual remaining work (steps 10 onward were re-split for
       exactly this reason on 2026-08-28).
+17. **WIP hand-offs are allowed — provisionally, treat this as
+    experimental and revisit if it causes problems.** Until 2026-08-28
+    the rule was implicitly "land a whole tested step or land nothing,"
+    which is exactly what turned step 9's usage cutoff into a total
+    loss instead of partial progress. The policy now is the opposite
+    default: **partial, honestly-labeled progress is better than no
+    commit at all**, even if what's committed doesn't fully work yet.
+    That only holds if the hand-off is done properly:
+    - Prefix the commit message `wip:` (e.g. `wip(step10): landing
+      mixed-grid query - meats rows done, dish rows not started`) so
+      it's unmistakable from the git log alone, without needing to open
+      `session-status.md`, that this isn't a finished step.
+    - **Never leave previously-working behavior broken.** New,
+      incomplete work must be isolated — a new file, an unwired route,
+      a code path nothing else calls yet — rather than landed
+      half-finished on top of something that currently works. If
+      finishing the step requires editing an existing working file in a
+      way that would leave it broken partway through, that's a sign the
+      step should be re-split (rule 16), not a reason to skip
+      committing.
+    - Run the full existing test suite before committing WIP, same as
+      any other commit — "incomplete" describes the new work's scope,
+      not permission to regress what's already tested and passing.
+    - Update `session-status.md`'s entry for that step with a precise
+      **done / not done / untested** breakdown — not "step 10 is in
+      progress," but specifically what exists, what's missing, and what
+      hasn't been run. The next session's job is to read that and
+      continue from exactly where this one stopped, not to re-plan the
+      step or re-derive what's already decided.
+    - This is a fallback for when a step genuinely runs long, not a
+      substitute for rule 16 — the goal is still to size steps so this
+      rule rarely gets used.
 
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.
