@@ -11,6 +11,65 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 13: Live recalculation on Landing
+Frontend-only, `public/daily-audit.html`. Ending(calc)/Over-Short/Status
+now update live in the browser as a meat row's editable inputs change,
+without waiting for save+reload.
+
+**Scope note**: the roadmap line named "New Stock/Usage/Actual" as the
+triggers, but New Stock and Usage are read-only calculated cells on this
+screen (they come from Stock Receipts / sales, not typed here) - they
+can't literally change in the browser. Live recalc is wired to what's
+actually editable and actually feeds the two formulas: Beginning (only
+on the rare row where it's still the opening-stock input), In-House,
+Wastage, Other, and Ending (actual). Same scope-clarification pattern as
+step 11's dish-rows-read-only call - documented here rather than silently
+assumed.
+
+**Implementation**: `recalcMeatRow()` mirrors
+`server/engines/auditEngine.js`'s `computeMeatAudit` math exactly -
+`endingCalculated = beginning + newStock - usage`,
+`unexplainedVariance = (endingCalculated - adjustments) - actual`, same
+`EPSILON = 0.01`, same OK/SHORTAGE/SURPLUS/MISSING_* thresholds - so a
+live-recalculated value always matches what Save+reload would produce
+for the same inputs. New Stock/Usage/Beginning (when fixed) are stashed
+as `data-*` attributes on each `<tr>` at render time; one delegated
+`input` listener on `#grid-container` (not re-attached per `loadGrid()`
+call) catches changes on `.opening_stock`/`.in_house`/`.wastage`/
+`.other`/`.ending_actual` and updates the `.ending-calc`/`.over-short`/
+`.row-status` cells in place. Dish rows are untouched (no editable
+fields on them, nothing to recalc). Save/reload flow (`save()`) is
+untouched - recalc is a pure display overlay, no new network calls, no
+change to what gets persisted.
+
+**Not done**: nothing deliberately deferred within this step's own
+scope - New Stock/Usage don't need live recalc (see scope note above),
+and dish rows have nothing to recalc. Broader gaps (still open, not this
+step's job): dish rows are still fully read-only (a separate future
+step, per step 11), and Restaurant B/C onboarding is unrelated to this.
+
+**Verified**: no engine/schema/backend change, so no new automated tests
+per rule 6. Hand-mirrored `recalcMeatRow`'s formula against the existing
+"known adjustment (waste) reduces unexplained variance" fixture in
+`auditEngine.test.js` (beginning 20, waste adjustment 1.0, actual 19.0 ->
+expect endingCalculated 20, unexplainedVariance ~0, status OK) via a
+standalone `node -e` script reproducing the same logic - matched exactly.
+Extracted the inline `<script>` and ran `node --check` for syntax. Ran
+the full existing test suite (all 7 files) before and after the change -
+identical pass counts both times (15/22/6/6/8/10/17 across the seven
+files = 84 total, 0 failures), confirming no regression. Note: this is
+84, not the "78/78" figure step 12's entry below claims - that number
+looks stale/off by count of files, not something this session
+introduced or corrected; flagging rather than editing historical
+entries. Same sandbox constraint as
+steps 11/12: this session worked from an uploaded zip, no `.git`, and
+this time no network at all (both `git clone` and `npm install` were
+blocked by the egress allowlist, unlike the step-12 session) - so no
+live Express server, no browser click-through. A real click-through
+(typing into In-House/Wastage/Other/Ending-actual and watching the cells
+update) is still owed, same open item as the Stock Receipts/Commissary
+UI flows already logged below.
+
 ## 2026-08-29 — Step 12: Opening-stock fix
 No schema change needed: `opening_stock` (one row per restaurant+meat,
 `UNIQUE(restaurant_id, meat_id)`) already existed in `schema.sql`, and

@@ -1,12 +1,12 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-12 completion).
+Last updated: 2026-08-29 (post step-13 completion).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
 so always start here.
 
-## Where things stand: steps 1–12 done (12 pending commit — see below).
+## Where things stand: steps 1–13 done (12–13 pending commit — see below).
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -130,8 +130,46 @@ so always start here.
     needed, same as step 10/11's "Pushed and verified" entry above once
     resolved that same way.
 
-**Next up is step 13** (Live recalculation on Landing) — see the roadmap
-below.
+- **Step 13** (Live recalculation on Landing): done. `public/daily-audit.html`
+  only — Ending(calc)/Over-Short/Status now update live as a meat row's
+  editable inputs change, no save+reload needed. Scope note made
+  explicitly this session (see `changelog.md`'s step-13 entry): the
+  roadmap line said "New Stock/Usage/Actual" but New Stock and Usage
+  aren't editable on this screen, so live recalc is wired to what
+  actually feeds the formula and is actually editable — Beginning (only
+  when it's still the opening-stock input), In-House, Wastage, Other,
+  Ending (actual). `recalcMeatRow()` mirrors `auditEngine.js`'s
+  `computeMeatAudit` formula and thresholds exactly, via one delegated
+  `input` listener on `#grid-container`. Dish rows untouched (nothing
+  editable to recalc). Save/reload flow untouched — this is a pure
+  display overlay, no new network calls.
+  - **Verified**: no engine/backend change, so no new automated tests
+    (rule 6 scopes those to the audit/yield engines). Hand-mirrored the
+    recalc formula against the existing waste-adjustment fixture in
+    `auditEngine.test.js` via a standalone script — matched exactly.
+    `node --check` on the extracted inline script. Full existing test
+    suite re-run before and after — identical 84 passing / 0 failing
+    across all 7 test files both times, no regression. (Note: 84, not
+    the "78/78" figure step 12's entry claims — see `changelog.md`'s
+    step-13 entry; flagged, not corrected retroactively.)
+  - **Not yet committed**: same as step 12 — this session worked from an
+    uploaded zip, no `.git` present. Unlike step 12's session, this one
+    also had **no network at all** (`git clone` and `npm install` were
+    both blocked), so there was no `npm install`/live Express
+    server/browser this time — no live HTTP smoke test, no click-through.
+    Next session with git access should commit this as-is, no
+    re-verification needed, same as step 10/11/12's pattern.
+  - **Known gap carried forward**: a real browser click-through (typing
+    into an input, watching Ending(calc)/Over-Short/Status update) is
+    still owed — same open item as Stock Receipts' Unallocated/Assign
+    flow and Commissary's Edit/Delete flows below.
+
+**Next up is step 14** (Command panel scaffold) — see the roadmap
+below. Steps 10–11 are already committed and pushed (verified above).
+Steps 12–13 are done in code but not yet committed (no `.git` in the
+working environment for either of those two sessions) — whoever next
+has git access should commit steps 12 then 13, in order, before starting
+step 14.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -171,9 +209,7 @@ second-guess decisions already made, per rule 3.
   via live HTTP payload replay instead (see `changelog.md`). Strong
   verification, but not the same as clicking it. Commissary's own
   Edit/Delete UI flows are in the same boat — never fully click-tested.
-- **Live recalculation** (older, still unfixed): Ending(calc)/Over-Short
-  only update after a full save+reload, not live in the browser. This is
-  step 13 below.
+- ~~**Live recalculation**~~ — done, step 13 above.
 - Restaurant B/C still aren't seeded — Restaurant A only. Step 8's admin
   screen removes the main blocker to onboarding them (mapping is now
   reachable in the UI); they'll still need their own
@@ -217,10 +253,8 @@ of sizing them correctly, not a separate concern.
     decision and the not-yet-pushed caveat.
 12. **[Done] Opening-stock fix.** See "Where things stand" above for
     detail.
-13. **[Not started] Live recalculation on Landing.** Ending(calc)/
-    Over-Short update live in the browser as New Stock/Usage/Actual
-    change, instead of only after a full save+reload. Frontend-only,
-    built on top of steps 10–12 once they're stable.
+13. **[Done] Live recalculation on Landing.** See "Where things stand"
+    above for detail, including the New-Stock/Usage scope note.
 14. **[Not started] Command panel scaffold.** A UI element that can
     appear on any tab, with a small pluggable command registry — no real
     commands yet beyond a no-op proving the plumbing works end to end
