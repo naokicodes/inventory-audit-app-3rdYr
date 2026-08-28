@@ -1,15 +1,15 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-28 (step 7 session). This is the authoritative
+Last updated: 2026-08-28 (step 8 session). This is the authoritative
 "where we left off" doc. **Read this before `HANDOFF.md`** — HANDOFF.md is a
 point-in-time snapshot written at the end of the step-6 session and is now
-two steps stale (it still says "step 7 is next and last for this phase,"
+three steps stale (it still says "step 7 is next and last for this phase,"
 which was true when it was written but no longer reflects the full plan —
-see "Steps 8-9 added" below, and step 7 itself is now done). This file is
-the one that gets updated every session going forward; treat it as current
-truth, HANDOFF.md as historical context only.
+see "Steps 8-9 added" below, and steps 7 and 8 are now both done). This
+file is the one that gets updated every session going forward; treat it as
+current truth, HANDOFF.md as historical context only.
 
-## Where things stand: step 7 done, step 8 is next
+## Where things stand: step 8 done, step 9 is next
 
 - **Step 1-3** (schema, audit engine, commissary yield engine core):
   done, tested, unchanged in a while.
@@ -29,36 +29,48 @@ truth, HANDOFF.md as historical context only.
   `commissary-and-stock-receipts.md` Part 3 exactly. "History" added to
   the nav on all five existing pages. 8/8 new tests green
   (`server/routes/history.test.js`), 45/45 total. Verified live (see
-  "Known open items" below — this is the first session `npm run dev`
+  "Known open items" below — this was the first session `npm run dev`
   actually ran). Full detail in `docs/changelog.md`'s 2026-08-28 "Step 7
   shipped" entry.
+- **Step 8** (Commissary meat mapping admin screen): done. New
+  "Commissary Mapping" tab on `settings.html` (same tab pattern as
+  Meats/Dishes/Recipes) + three new routes in `server/routes/settings.js`
+  (`GET`/`POST`/`DELETE /api/settings/commissary-mappings`). No schema
+  change (`commissary_meat_map` already existed, just had no UI), no
+  `activity_log` wiring (deliberately out of scope, config data not a
+  daily transactional log — matches `commissary-and-stock-receipts.md`
+  Part 1 and `data-model.md` section 10a exactly). No edit for v1, delete
+  + re-add only, per spec. 10/10 new tests green
+  (`server/routes/settings.test.js`), 55/55 total. **Not** verified
+  live/in-browser this session — no npm registry access this time (`npm
+  install` → `403 Forbidden`), so `npm run dev` didn't run; verified at
+  the DB/route-logic level instead (same approach `history.test.js` used).
+  Full detail in `docs/changelog.md`'s 2026-08-28 "Step 8 shipped" entry.
 
-**Next up is step 8**: Commissary meat mapping admin screen — a
-"Commissary Mapping" tab on `settings.html` (same pattern as the existing
-Meats/Dishes/Recipes tabs) + a route in `settings.js`. See
-`docs/commissary-and-stock-receipts.md` Part 1 and `docs/data-model.md`
-section 10a. Do step 8 before step 9 (step 9's assignment flow needs
-mappings to be manageable in the UI first — see "Steps 8-9 added" below).
+**Next up is step 9**: Unallocated-destination support for
+`stock_receipts`. See `docs/data-model.md` section 5 and
+`docs/commissary-and-stock-receipts.md` Part 2's "Unallocated" note. It's
+unblocked now that step 8 shipped (mappings are reachable/manageable in
+the UI, not just via hand-written SQL).
 
 ## Steps 8-9 added (2026-08-28 architecture review)
 
-Between step-6's handoff and this update, an architecture review surfaced
-two gaps that were already flagged in the docs but not yet scheduled as
-their own steps. Both are now **resolved decisions**, written into
-`docs/data-model.md` and `docs/commissary-and-stock-receipts.md` — the
-docs are the source of truth for *what* to build; this entry just tracks
-*when*.
+Between step-6's handoff and the step-7 update, an architecture review
+surfaced two gaps that were already flagged in the docs but not yet
+scheduled as their own steps. Both are **resolved decisions**, written
+into `docs/data-model.md` and `docs/commissary-and-stock-receipts.md` —
+the docs are the source of truth for *what* to build; this entry just
+tracks *when*.
 
-**Step 8 — Commissary meat mapping admin screen.**
-`commissary_meat_map` currently has no UI at all; the only way to create a
-mapping row is a developer writing SQL directly. This blocks Restaurant
-B/C onboarding and is why `stock_receipts`' "not mapped yet — set this up
-in Settings" message currently points at a screen that doesn't exist. Add
-a "Commissary Mapping" tab to `settings.html` (same pattern as the
-existing Meats/Dishes/Recipes tabs) + a route in `settings.js`. No
-activity-log wiring needed (out of rule 9's scope — this is config data,
-not a daily transactional log). See `commissary-and-stock-receipts.md`
-Part 1 and `data-model.md` section 10a for the full spec.
+**Step 8 — Commissary meat mapping admin screen. DONE (2026-08-28,
+this session)** — see the step 8 entry above and
+`docs/changelog.md`'s matching entry for what actually shipped.
+Originally: `commissary_meat_map` had no UI at all; the only way to
+create a mapping row was a developer writing SQL directly, which blocked
+Restaurant B/C onboarding and was why `stock_receipts`' "not mapped yet —
+set this up in Settings" message pointed at a screen that didn't exist.
+See `commissary-and-stock-receipts.md` Part 1 and `data-model.md` section
+10a for the full spec this was built against.
 
 **Step 9 — Unallocated-destination support for stock_receipts.**
 The real xlsx's `Outbound_Log` allows a commissary shipment with no
@@ -81,18 +93,21 @@ first would mean testing it against data nobody but a developer can create.
 
 ## Known open items (not the next step's problem, just not forgotten)
 
-- **`npm run dev` ran live for the first time this session** (step 7) —
-  this sandbox had network access to the npm registry, unlike steps 4-6.
-  `npm install` succeeded and the real server started. This was used to
-  verify step 7's new routes/page end-to-end against real seeded data
-  (real `POST`/`PATCH`/`DELETE` calls, real `activity_log` rows, real
-  `/api/history` filtering). **Not yet done**: a real click-through of
-  the Stock Receipts and Commissary pages' own UI (the Edit/Delete flows,
-  actor field, mapping-warning message) in an actual browser — this
-  session only exercised those two routes via `curl` to generate test
-  data for History, it didn't validate their frontends. Still worth doing
-  before or during step 8, and network access in future sandbox sessions
-  isn't guaranteed to still be there — don't assume it without checking.
+- **`npm run dev` ran live for the step-7 session** (network access to
+  the npm registry was available that one time, unlike steps 4-6) and was
+  used to verify step 7's new routes/page end-to-end against real seeded
+  data (real `POST`/`PATCH`/`DELETE` calls, real `activity_log` rows,
+  real `/api/history` filtering). **This step-8 session had no registry
+  access again** (`npm install` → `403 Forbidden`) — confirms the docs'
+  standing caution that network access isn't guaranteed session-to-
+  session, don't assume it without checking. Still **not yet done**, and
+  now carried by two steps instead of one: a real click-through of (a)
+  the Stock Receipts and Commissary pages' own UI (Edit/Delete flows,
+  actor field, mapping-warning message) — untouched since step 6/7 — and
+  (b) this session's new Commissary Mapping tab (add-form, dropdowns,
+  remove button) on `settings.html`. Both are blocked on the same thing
+  and worth doing together whenever a future session actually has
+  registry access.
 - **Opening stock bug** (older, still unfixed): a meat/dish with no
   prior tracking has `beginning` null forever. Fix: make the Beginning
   cell editable only on a row's first-ever appearance, write once to
@@ -100,8 +115,10 @@ first would mean testing it against data nobody but a developer can create.
 - **Live recalculation** (older, still unfixed): Ending(calc)/Over-Short
   only update after a full save+reload, not live in the browser.
 - Restaurant B/C still aren't seeded — Restaurant A only. Step 8's admin
-  screen removes the main blocker to onboarding them (mapping); they'll
-  still need their own `meats`/`dishes`/`recipe_bom` seeded via Settings.
+  screen (now shipped) removes the main blocker to onboarding them
+  (mapping); they'll still need their own `meats`/`dishes`/`recipe_bom`
+  seeded via Settings, and the mapping screen itself still needs an
+  actual browser click-test (see above) before leaning on it for that.
 
 ## Original remaining scope (renumbered — steps 10-12, was 8-10)
 
