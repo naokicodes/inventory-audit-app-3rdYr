@@ -11,6 +11,126 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-28 (even later) — Commissary balance formula fully re-verified against the real xlsx; full M01-M14 seed data
+
+**Context**: `Commi_Audit_Master.xlsx` was re-uploaded after the previous
+entry below was written. Re-read `Meats`, `Yield_Log`, `Outbound_Log`, and
+`Commissary_Stock` directly (`Instructions` too, for the Outbound_Log
+destination note). This entry corrects/completes the previous one, which
+had to proceed without the file.
+
+**Balance formula verified exactly**, hand-checked two ways:
+- `Commissary_Stock`'s own formulas (`D`=SUMIF Yield_Log backed-out by
+  MeatID, `E`=SUMIF Outbound_Log qty-out by MeatID, `F`=D-E) were read
+  directly — confirms `E` sums outbound rows **regardless of destination**,
+  including "Unallocated" ones. So the earlier-flagged schema gap (can't
+  represent an unallocated shipment) doesn't affect the formula's
+  correctness against the sheet — it only affects whether *our app* can
+  reproduce the sheet's exact number when an Unallocated row exists for a
+  meat.
+- Manually summed the real per-meat rows and matched the sheet's cached
+  numbers exactly: M03 Belly Slab 29.7 backed in − 14.9 out = **14.8**;
+  M05 JOWL 103.8 − 87.5 = **16.3**; M08 Shortplate 46.9 − 33.5 = **13.4**.
+
+**`commissaryYieldEngine.test.js` rewritten with real fixtures**: the
+Belly Slab balance tests now use the actual 3 real Yield_Log rows (backed-in
+sums to the sheet's exact 29.7) and the actual 3 restaurant-assigned
+Outbound_Log rows (2.2 + 5.7 + 2.0 = 9.9). Balance comes out to **19.8**,
+not the sheet's 14.8 — that's not a bug, it's the schema gap made visible:
+a 4th real row (2026-07-02, 5.0kg, destination "Unallocated") exists in the
+sheet but isn't reproduced, since `stock_receipts.restaurant_id` is
+`NOT NULL` and can't represent it yet. Documented in the test itself so the
+gap stays visible rather than silently glossed over. 22/22 green.
+
+**`commissary-seed-data.json` filled in completely**: all 14 real rows from
+the `Meats` sheet (M01–M14; M15 is blank in the sheet), including
+`cost_per_unit` where the sheet has it. `seed.js` updated to insert it.
+Fresh `seed.js` run confirmed all 14 load cleanly with the right values.
+
+**Still open, unchanged from before**: the "Unallocated" destination gap
+itself — whether/how to let a `stock_receipts` row represent "shipped but
+not yet assigned to a restaurant" — is a real design decision, not
+resolved here. Flagged for a deliberate conversation, not decided as a
+side effect of this session. `npm run dev` still hasn't been run live
+(no network in this sandbox either) — do that before step 6.
+
+---
+
+## 2026-08-28 (later) — Commissary page + route (step 5); prior session's balance-verification work recovered/rebuilt
+
+**Context worth recording**: a prior session (same day) read `Commi_Audit_Master.xlsx`'s
+`Commissary_Stock`/`Outbound_Log` sheets, hand-verified the balance formula
+against the sheet's own cached numbers (e.g. M03 Belly Slab = 14.8), pulled
+real per-meat rows as test fixtures, and started wiring `getCommissaryBalance`
+into the engine — but that work never landed in the repo (the zip handed to
+this session matched the step-4 HANDOFF state exactly, with no balance
+function, no `commissary-seed-data.json`, none of it). The xlsx also wasn't
+re-uploaded this session, so the real-number verification couldn't be
+redone. Rebuilt what could be rebuilt from the documented formula and the
+already-committed test fixtures; flagged rather than faked the rest. See
+"Still open" below.
+
+**What shipped**:
+- `commissaryYieldEngine.js` — added `getCommissaryBalance(db, commissaryMeatId)`
+  and `listCommissaryBalances(db)`, implementing the formula from
+  `commissary-and-stock-receipts.md` Part 1 exactly (backed-in from
+  `commissary_yield_log` minus shipped-out from `stock_receipts` where
+  `source = COMMISSARY`, both filtered on `deleted_at IS NULL`). Returns 0
+  (not null) for a meat with no activity — "nothing on hand" is a real
+  answer.
+- `commissaryYieldEngine.test.js` — added tests for the above. **These
+  fixtures are constructed, not xlsx-sourced** (unlike the Yield_Log tests
+  above them) — the xlsx wasn't available this session. They check the
+  SUM-minus-SUM mechanics, the `deleted_at` filter on both sides, and that
+  `source = DIRECT` rows are never subtracted. 21/21 green (was 15/15
+  before this session's additions).
+- `server/db/commissary-seed-data.json` (new) + `seed.js` — seeds only the
+  3 commissary meats with real, already-verified values sitting in the
+  test fixtures (M03 Belly Slab, M05 JOWL, M08 Shortplate). Did **not**
+  fabricate the other ~12 of the real M01–M15 set without the xlsx to
+  check them against.
+- `server/routes/commissary.js` (new) — `GET /api/commissary/meats`,
+  `GET /api/commissary/yield-log` (filterable, computed fields joined in),
+  `GET /api/commissary/balances` (live view), `POST /api/commissary/yield-log`
+  (create only — see below). Mounted in `server/index.js`.
+- `public/commissary.html` (new) — yield-entry form, live balance cards,
+  filterable yield log list. Same vanilla-JS/fetch pattern as
+  `stock-receipts.html`. Nav link added to every page.
+
+**Deliberately not built** (same reasoning as step 4's stock_receipts):
+no edit/soft-delete on `commissary_yield_log` yet — `rules-for-claude-code.md`
+rule 9 requires activity_log wiring on every write to this table, and
+that's step 6. Create + read only.
+
+**Design gap flagged, not resolved** (per the prior session's notes,
+recovered from its summary): `Outbound_Log`'s Instructions sheet allows a
+destination of "Unallocated" when a shipment's restaurant split hasn't been
+decided yet, but `stock_receipts.restaurant_id` is `NOT NULL` — there's no
+way to represent "shipped from commissary but not yet assigned to a
+restaurant." Doesn't affect the balance formula (destination-agnostic), but
+is a minor workflow tightening vs. the old sheet. Left as an open item, not
+decided unilaterally.
+
+**Still open before this can be called fully verified** (✅ both resolved
+later the same day — see the entry above this one):
+1. ~~Re-verify `getCommissaryBalance` against real `Outbound_Log`/`Commissary_Stock`
+   rows once `Commi_Audit_Master.xlsx` is available again~~ — done, see
+   above.
+2. `commissary_meats` seed data is still only 3 of ~15 real rows — the
+   dropdown works but is incomplete until the xlsx's `Meats` sheet is
+   re-read.
+3. **Could not run `npm run dev` this session either** — same no-network
+   sandbox limitation as step 4. Verified via `node --check` on every new/
+   changed file, the full `auditEngine.test.js` + `commissaryYieldEngine.test.js`
+   suites (9/9, 21/21), a fresh `seed.js` run confirming the 3 commissary
+   meats load cleanly, and a standalone script exercising `commissary.js`'s
+   exact route logic against `node:sqlite` directly (GET meats, POST
+   validation incl. rejecting an unknown meat, GET yield-log with computed
+   fields and date filter, GET balances before/after a COMMISSARY receipt).
+   A live click-through still hasn't happened — do that before step 6.
+
+---
+
 ## 2026-08-28 — Stock Receipts page + route (step 4); `new_stock` retired
 
 **What shipped**: `server/routes/stockReceipts.js` (`GET /api/stock-receipts/meats`,
