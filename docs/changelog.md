@@ -11,6 +11,71 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 12: Opening-stock fix
+No schema change needed: `opening_stock` (one row per restaurant+meat,
+`UNIQUE(restaurant_id, meat_id)`) already existed in `schema.sql`, and
+`auditEngine.js`'s `getBeginningStock` already fell back to it correctly
+when there's no prior day's `ending_actual`. The gap this step closed was
+that nothing ever wrote to it - a meat with no tracking history had
+`beginning` null forever, with no way to seed it from the UI.
+
+**Backend**: `POST /api/daily-audit` now accepts an optional
+`opening_stock` field per row. When provided, it's written via `INSERT OR
+IGNORE INTO opening_stock (...)` - the table's own `UNIQUE(restaurant_id,
+meat_id)` constraint makes write-once a DB-level fact, not just a
+frontend convention, so a stale client resubmitting an old value is
+silently a no-op rather than a second write or an error. Deliberately
+NOT run through `activity_log` (rule 9 scopes that logging to
+`stock_receipts`/`commissary_yield_log` only, not silently extended to
+every input table).
+
+**Frontend**: `daily-audit.html`'s Beginning cell for MEAT rows renders
+as an editable input only when `r.beginning === null`; otherwise it's
+the same calculated/read-only cell as before. `save()` includes
+`opening_stock` in the payload only for rows that had that input. Dish
+rows and everything else on Landing untouched, per the step's own scope
+("Backend + the minimal frontend change... doesn't touch the rest of
+Landing").
+
+One design point worth naming: "editable only on a row's first-ever
+appearance" is enforced entirely by `beginning === null`, with no
+separate "is this the first day" flag anywhere. Once `opening_stock` is
+written, `getBeginningStock` never returns null for that meat again
+(the DB-level UNIQUE constraint means it can't be re-written even if it
+tried), so the cell naturally and permanently reverts to
+calculated/read-only on every later day - the null-check on the read
+side already *is* the "first appearance" check, nothing extra needed on
+the write side beyond the write-once guarantee.
+
+**Tests**: new `server/routes/dailyAudit.test.js` (6 tests, same
+mirrored-logic pattern as `stockReceipts.test.js`/`settings.test.js`) -
+null beginning before any write, a write becoming the beginning stock,
+a second write attempt being silently ignored (write-once, verified via
+both the returned value AND a row-count check), empty/undefined values
+writing nothing, per-(restaurant,meat) isolation, and confirming
+`opening_stock` is only ever the *fallback* - once a real `ending_actual`
+exists for a day, the next day's beginning comes from that, not
+`opening_stock`, per `data-model.md`'s formula.
+
+**Verification**: full suite green, 78/78 across all 7 test files (was
+72/72 before this step; +6 new). Went beyond the hand-mirrored test this
+time since the sandbox had working npm registry access this session:
+ran `npm install` (68 packages, clean), then did a genuine live HTTP
+smoke test - seeded a real DB (`node server/db/seed.js`), booted the
+actual Express server (`node server/index.js`), and POSTed
+`opening_stock` for a real meat row (Whole Chicken Raw, previously
+`beginning: null`) exactly as the frontend would. Confirmed via
+`GET /api/daily-audit/mixed` that `beginning` flipped from `null` to
+25.5, then POSTed a second attempt with a different value (999) and
+confirmed it was silently ignored - `beginning` stayed 25.5. This is a
+real click-through-equivalent for the backend contract (not a literal
+browser click, still logged under "Known open items"), stronger than
+what steps 10/11 had at handoff time.
+
+Scratch server process and the seeded `inventory.db`/`-shm`/`-wal` files
+from the smoke test were cleaned up after verification - nothing from
+that DB is part of this commit.
+
 ## 2026-08-29 — Steps 10-11: Landing mixed grid (meats + BATCH_PREPPED dishes), backend and frontend
 **Step 10 (backend, prior session's work, verified and handed off this
 session)**: `computeDishAudit`/`computeMixedDailyAudit` in
