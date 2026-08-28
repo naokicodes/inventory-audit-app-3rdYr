@@ -1,12 +1,12 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-11 completion).
+Last updated: 2026-08-29 (post step-12 completion).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
 so always start here.
 
-## Where things stand: steps 1–11 done (10–11 pending push — see below).
+## Where things stand: steps 1–12 done (12 pending commit — see below).
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -100,7 +100,38 @@ so always start here.
     "Known open items" below) — the live smoke test confirms the backend
     contract, not the UI interaction.
 
-**Next up is step 12** (Opening-stock fix) — see the roadmap below.
+- **Step 12** (Opening-stock fix): done. No schema change needed -
+  `opening_stock` and `getBeginningStock`'s fallback to it already
+  existed; the gap was that nothing ever wrote to it. `POST
+  /api/daily-audit` now accepts an optional `opening_stock` field per
+  row, written via `INSERT OR IGNORE` - the table's existing
+  `UNIQUE(restaurant_id, meat_id)` constraint makes write-once a DB-level
+  fact. `daily-audit.html`'s Beginning cell is editable only when
+  `r.beginning === null`; `save()` includes `opening_stock` only for
+  those rows. Nothing else on Landing touched. Not run through
+  `activity_log` (rule 9 scopes that to `stock_receipts`/
+  `commissary_yield_log` only). 6 new tests in a new
+  `dailyAudit.test.js`; full suite 78/78 (was 72/72). Verified beyond the
+  usual hand-mirrored test: `npm install` succeeded this session, so this
+  was checked with a real live HTTP smoke test against a booted Express
+  server (seeded DB, POST `opening_stock` for a real meat, confirmed
+  `beginning` flipped from null to the written value via `GET
+  /api/daily-audit/mixed`, then confirmed a second POST with a different
+  value was silently ignored). See `changelog.md`'s 2026-08-29 step-12
+  entry for full detail.
+  - **Not yet committed**: this session, like the step-11 session before
+    it, worked from an uploaded zip with no `.git` present - there's
+    nothing to commit *to*. Unlike step 11, `npm install` did work this
+    time (network allowlist covered the registry), which is what made
+    the live HTTP smoke test above possible even without git. The actual
+    commit (`wip:`-free, this step is fully done and tested) still needs
+    to happen wherever the real git history lives - next session with
+    git access should commit this exactly as-is, no re-verification
+    needed, same as step 10/11's "Pushed and verified" entry above once
+    resolved that same way.
+
+**Next up is step 13** (Live recalculation on Landing) — see the roadmap
+below.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -140,8 +171,6 @@ second-guess decisions already made, per rule 3.
   via live HTTP payload replay instead (see `changelog.md`). Strong
   verification, but not the same as clicking it. Commissary's own
   Edit/Delete UI flows are in the same boat — never fully click-tested.
-- **Opening stock bug** (older, still unfixed): a meat/dish with no prior
-  tracking has `beginning` null forever. This is step 12 below.
 - **Live recalculation** (older, still unfixed): Ending(calc)/Over-Short
   only update after a full save+reload, not live in the browser. This is
   step 13 below.
@@ -186,11 +215,8 @@ of sizing them correctly, not a separate concern.
 11. **[Done] Landing frontend: render the mixed grid.** See "Where things
     stand" above for detail, including the dish-rows-are-read-only
     decision and the not-yet-pushed caveat.
-12. **[Not started] Opening-stock fix.** A meat/dish with no prior
-    tracking currently has `beginning` null forever. Make the Beginning
-    cell editable only on a row's first-ever appearance, writing once to
-    `opening_stock`. Backend + the minimal frontend change to make that
-    cell editable — doesn't touch the rest of Landing.
+12. **[Done] Opening-stock fix.** See "Where things stand" above for
+    detail.
 13. **[Not started] Live recalculation on Landing.** Ending(calc)/
     Over-Short update live in the browser as New Stock/Usage/Actual
     change, instead of only after a full save+reload. Frontend-only,
