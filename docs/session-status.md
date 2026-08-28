@@ -1,15 +1,15 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-28 (architecture review). This is the authoritative
+Last updated: 2026-08-28 (step 7 session). This is the authoritative
 "where we left off" doc. **Read this before `HANDOFF.md`** — HANDOFF.md is a
 point-in-time snapshot written at the end of the step-6 session and is now
-one step stale (it still says "step 7 is next and last for this phase,"
+two steps stale (it still says "step 7 is next and last for this phase,"
 which was true when it was written but no longer reflects the full plan —
-see "Steps 8-9 added" below). This file is the one that gets updated every
-session going forward; treat it as current truth, HANDOFF.md as historical
-context only.
+see "Steps 8-9 added" below, and step 7 itself is now done). This file is
+the one that gets updated every session going forward; treat it as current
+truth, HANDOFF.md as historical context only.
 
-## Where things stand: step 6 done, step 7 is next
+## Where things stand: step 7 done, step 8 is next
 
 - **Step 1-3** (schema, audit engine, commissary yield engine core):
   done, tested, unchanged in a while.
@@ -21,12 +21,24 @@ context only.
   and `commissary.js`'s `POST`/`PATCH`/`DELETE`. Both HTML pages got inline
   Edit/Delete per row plus a persisted "actor" name field. 37/37 tests
   green total. See `docs/changelog.md`'s 2026-08-28 entries for full detail.
+- **Step 7** (Admin History tab): done. `server/routes/history.js`
+  (`GET /api/history`, `GET /api/history/filters`) + new
+  `public/history.html` page — reverse-chronological `activity_log` feed,
+  filterable by entity type/actor/date range, with a before→after diff per
+  entry. Pure read, no schema change, no new write path, matching
+  `commissary-and-stock-receipts.md` Part 3 exactly. "History" added to
+  the nav on all five existing pages. 8/8 new tests green
+  (`server/routes/history.test.js`), 45/45 total. Verified live (see
+  "Known open items" below — this is the first session `npm run dev`
+  actually ran). Full detail in `docs/changelog.md`'s 2026-08-28 "Step 7
+  shipped" entry.
 
-**Next up is step 7**: Admin History tab — reverse-chronological feed
-reading `activity_log`, filterable by entity type/date/actor, with a
-before→after diff per row. Purely a read on data step 6 is now producing;
-no new write paths, so it's naturally the safest step to build next. See
-`docs/commissary-and-stock-receipts.md` Part 3.
+**Next up is step 8**: Commissary meat mapping admin screen — a
+"Commissary Mapping" tab on `settings.html` (same pattern as the existing
+Meats/Dishes/Recipes tabs) + a route in `settings.js`. See
+`docs/commissary-and-stock-receipts.md` Part 1 and `docs/data-model.md`
+section 10a. Do step 8 before step 9 (step 9's assignment flow needs
+mappings to be manageable in the UI first — see "Steps 8-9 added" below).
 
 ## Steps 8-9 added (2026-08-28 architecture review)
 
@@ -69,12 +81,18 @@ first would mean testing it against data nobody but a developer can create.
 
 ## Known open items (not the next step's problem, just not forgotten)
 
-- **`npm run dev` has still never been run live** across steps 4, 5, or
-  6 — every sandbox session so far has had no network access, so
-  verification has been `node --check` + real test suites + standalone
-  scripts hitting the actual route logic against `node:sqlite` directly.
-  Do a real click-through (Stock Receipts AND Commissary pages,
-  including the Edit/Delete flows) before or during step 7.
+- **`npm run dev` ran live for the first time this session** (step 7) —
+  this sandbox had network access to the npm registry, unlike steps 4-6.
+  `npm install` succeeded and the real server started. This was used to
+  verify step 7's new routes/page end-to-end against real seeded data
+  (real `POST`/`PATCH`/`DELETE` calls, real `activity_log` rows, real
+  `/api/history` filtering). **Not yet done**: a real click-through of
+  the Stock Receipts and Commissary pages' own UI (the Edit/Delete flows,
+  actor field, mapping-warning message) in an actual browser — this
+  session only exercised those two routes via `curl` to generate test
+  data for History, it didn't validate their frontends. Still worth doing
+  before or during step 8, and network access in future sandbox sessions
+  isn't guaranteed to still be there — don't assume it without checking.
 - **Opening stock bug** (older, still unfixed): a meat/dish with no
   prior tracking has `beginning` null forever. Fix: make the Beginning
   cell editable only on a row's first-ever appearance, write once to
