@@ -23,6 +23,9 @@
     .row-actions button { font-size: 0.75rem; padding: 0.15rem 0.4rem; margin-right: 0.25rem; }
     tr.editing input, tr.editing select { width: 100%; padding: 0.2rem; font-size: 0.85rem; }
     .deleted-row { opacity: 0.5; text-decoration: line-through; }
+    .unallocated-badge { background: #fff3cd; color: #7a5b00; border-radius: 3px; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-weight: bold; }
+    .unassigned-toggle { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; }
+    tr.assigning select { width: 100%; padding: 0.2rem; font-size: 0.85rem; }
   </style>
 </head>
 <body style="max-width: 1100px;">
@@ -44,8 +47,9 @@
 
   <div class="add-form">
     <label>Date <input type="date" id="new-date"></label>
-    <label>Restaurant <select id="new-restaurant"></select></label>
-    <label>Meat <select id="new-meat"></select></label>
+    <label id="new-restaurant-label">Restaurant <select id="new-restaurant"></select></label>
+    <label id="new-meat-label">Meat <select id="new-meat"></select></label>
+    <label id="new-commissary-meat-label" style="display:none;">Commissary Meat <select id="new-commissary-meat"></select></label>
     <label>Quantity <input type="number" step="0.01" id="new-qty" placeholder="0"></label>
     <label>Source
       <select id="new-source">
@@ -53,9 +57,15 @@
         <option value="COMMISSARY">Commissary</option>
       </select>
     </label>
+    <label id="new-unassigned-label" class="unassigned-toggle" style="display:none;">
+      <input type="checkbox" id="new-unassigned"> Leave Unassigned
+    </label>
     <label>Notes <input type="text" id="new-notes" placeholder="optional"></label>
     <button id="add-receipt">Add Receipt</button>
   </div>
+  <p id="unassigned-hint" class="hint" style="display:none;">
+    Shipped from the commissary but not yet assigned to a restaurant - assign it later from the list below.
+  </p>
   <div id="mapping-warning" class="warn"></div>
   <div id="add-status" class="status-message"></div>
 
@@ -69,6 +79,7 @@
         <option value="COMMISSARY">Commissary</option>
       </select>
     </label>
+    <label class="unassigned-toggle"><input type="checkbox" id="filter-unallocated"> Unallocated only</label>
     <button id="clear-filters">Clear filters</button>
   </div>
 
@@ -78,9 +89,16 @@
     const actorInput = document.getElementById('actor-name');
     const newDate = document.getElementById('new-date');
     const newRestaurant = document.getElementById('new-restaurant');
+    const newRestaurantLabel = document.getElementById('new-restaurant-label');
     const newMeat = document.getElementById('new-meat');
+    const newMeatLabel = document.getElementById('new-meat-label');
+    const newCommissaryMeat = document.getElementById('new-commissary-meat');
+    const newCommissaryMeatLabel = document.getElementById('new-commissary-meat-label');
     const newQty = document.getElementById('new-qty');
     const newSource = document.getElementById('new-source');
+    const newUnassigned = document.getElementById('new-unassigned');
+    const newUnassignedLabel = document.getElementById('new-unassigned-label');
+    const unassignedHint = document.getElementById('unassigned-hint');
     const newNotes = document.getElementById('new-notes');
     const mappingWarning = document.getElementById('mapping-warning');
     const addStatus = document.getElementById('add-status');
@@ -88,9 +106,11 @@
     const filterRestaurant = document.getElementById('filter-restaurant');
     const filterDate = document.getElementById('filter-date');
     const filterSource = document.getElementById('filter-source');
+    const filterUnallocated = document.getElementById('filter-unallocated');
 
     let restaurants = [];
     let currentMeats = []; // meats for whichever restaurant is selected in the add form
+    let commissaryMeats = []; // for the "leave unassigned" commissary-meat dropdown
     let lastRows = []; // most recently loaded receipts, keyed for edit lookups
 
     newDate.value = new Date().toISOString().slice(0, 10);
@@ -120,8 +140,14 @@
       updateMappingWarning();
     }
 
+    async function loadCommissaryMeats() {
+      const res = await fetch('/api/commissary/meats');
+      commissaryMeats = await res.json();
+      newCommissaryMeat.innerHTML = commissaryMeats.map(m => `<option value="${m.id}">${m.code} - ${m.name}</option>`).join('');
+    }
+
     function updateMappingWarning() {
-      if (newSource.value !== 'COMMISSARY') { mappingWarning.textContent = ''; return; }
+      if (newSource.value !== 'COMMISSARY' || newUnassigned.checked) { mappingWarning.textContent = ''; return; }
       const meat = currentMeats.find(m => String(m.id) === String(newMeat.value));
       if (meat && !meat.commissary_meat_id) {
         mappingWarning.textContent = `${meat.name} isn't mapped to a commissary meat yet - set this up in Settings before receiving it from the commissary.`;
@@ -130,28 +156,59 @@
       }
     }
 
+    // "Leave Unassigned" is only ever offered when Source = Commissary -
+    // a DIRECT receipt always has a restaurant by definition. See
+    // commissary-and-stock-receipts.md Part 2's Unallocated receipts note.
+    function updateSourceUI() {
+      const isCommissary = newSource.value === 'COMMISSARY';
+      newUnassignedLabel.style.display = isCommissary ? '' : 'none';
+      if (!isCommissary && newUnassigned.checked) newUnassigned.checked = false;
+      updateUnassignedUI();
+    }
+
+    function updateUnassignedUI() {
+      const unassigned = newSource.value === 'COMMISSARY' && newUnassigned.checked;
+      newRestaurantLabel.style.display = unassigned ? 'none' : '';
+      newMeatLabel.style.display = unassigned ? 'none' : '';
+      newCommissaryMeatLabel.style.display = unassigned ? '' : 'none';
+      unassignedHint.style.display = unassigned ? '' : 'none';
+      updateMappingWarning();
+    }
+
     function renderRow(r) {
+      const isUnallocated = r.restaurant_id === null;
+      const restaurantCell = isUnallocated
+        ? '<span class="unallocated-badge">Unallocated</span>'
+        : r.restaurant_name;
+      const meatCell = isUnallocated
+        ? '<span class="hint">not yet assigned</span>'
+        : `${r.meat_code} - ${r.meat_name} <span class="hint">(${r.unit})</span>`;
+      const actions = isUnallocated
+        ? `<button class="assign-btn">Assign</button><button class="delete-btn">Delete</button>`
+        : `<button class="edit-btn">Edit</button><button class="delete-btn">Delete</button>`;
+
       return `
         <tr data-id="${r.id}">
           <td class="cell-date">${r.business_date}</td>
-          <td>${r.restaurant_name}</td>
-          <td>${r.meat_code} - ${r.meat_name} <span class="hint">(${r.unit})</span></td>
+          <td class="cell-restaurant">${restaurantCell}</td>
+          <td class="cell-meat">${meatCell}</td>
           <td class="cell-qty">${fmt(r.quantity)}</td>
           <td class="cell-source source-${r.source}">${r.source}</td>
           <td>${r.commissary_meat_code ? `${r.commissary_meat_code} - ${r.commissary_meat_name}` : '-'}</td>
           <td class="cell-notes">${r.notes || ''}</td>
           <td class="hint">${r.created_at}</td>
-          <td class="row-actions">
-            <button class="edit-btn">Edit</button>
-            <button class="delete-btn">Delete</button>
-          </td>
+          <td class="row-actions">${actions}</td>
         </tr>
       `;
     }
 
     async function loadReceipts() {
       const params = new URLSearchParams();
-      if (filterRestaurant.value) params.set('restaurant_id', filterRestaurant.value);
+      if (filterUnallocated.checked) {
+        params.set('unallocated', 'true');
+      } else if (filterRestaurant.value) {
+        params.set('restaurant_id', filterRestaurant.value);
+      }
       if (filterDate.value) params.set('business_date', filterDate.value);
       if (filterSource.value) params.set('source', filterSource.value);
 
@@ -186,6 +243,60 @@
       document.querySelectorAll('#receipts-table .delete-btn').forEach(btn => {
         btn.addEventListener('click', () => doDelete(btn.closest('tr')));
       });
+      document.querySelectorAll('#receipts-table .assign-btn').forEach(btn => {
+        btn.addEventListener('click', () => startAssign(btn.closest('tr')));
+      });
+    }
+
+    // Assigning an Unallocated row: pick a restaurant, then a meat from
+    // that restaurant's own list. The server re-validates the mapping AND
+    // the commissary_meat_id continuity check - this UI just collects the
+    // two IDs, it doesn't duplicate that validation client-side.
+    async function startAssign(tr) {
+      const id = tr.dataset.id;
+      tr.classList.add('assigning');
+      tr.querySelector('.cell-restaurant').innerHTML = `<select class="assign-restaurant"><option value="">Pick restaurant...</option>${
+        restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('')
+      }</select>`;
+      tr.querySelector('.cell-meat').innerHTML = `<select class="assign-meat"><option value="">Pick restaurant first</option></select>`;
+      tr.querySelector('.row-actions').innerHTML = `
+        <button class="save-assign-btn">Save</button>
+        <button class="cancel-btn">Cancel</button>
+      `;
+
+      const restaurantSelect = tr.querySelector('.assign-restaurant');
+      const meatSelect = tr.querySelector('.assign-meat');
+      restaurantSelect.addEventListener('change', async () => {
+        if (!restaurantSelect.value) { meatSelect.innerHTML = '<option value="">Pick restaurant first</option>'; return; }
+        const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${restaurantSelect.value}`);
+        const meats = await res.json();
+        meatSelect.innerHTML = meats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
+      });
+
+      tr.querySelector('.save-assign-btn').addEventListener('click', () => saveAssign(id, restaurantSelect, meatSelect));
+      tr.querySelector('.cancel-btn').addEventListener('click', () => loadReceipts());
+    }
+
+    async function saveAssign(id, restaurantSelect, meatSelect) {
+      const restaurant_id = Number(restaurantSelect.value);
+      const meat_id = Number(meatSelect.value);
+      if (!restaurant_id || !meat_id) {
+        alert('Pick both a restaurant and a meat before saving.');
+        return;
+      }
+      try {
+        const res = await fetch(`/api/stock-receipts/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurant_id, meat_id, actor: actor() })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+        await loadReceipts();
+      } catch (err) {
+        alert('Error assigning receipt: ' + err.message);
+        await loadReceipts();
+      }
     }
 
     function startEdit(tr) {
@@ -250,17 +361,32 @@
     }
 
     document.getElementById('add-receipt').addEventListener('click', async () => {
-      const restaurant_id = Number(newRestaurant.value);
-      const meat_id = Number(newMeat.value);
       const business_date = newDate.value;
       const quantity = newQty.value;
       const source = newSource.value;
       const notes = newNotes.value.trim();
+      const unassigned = source === 'COMMISSARY' && newUnassigned.checked;
 
-      if (!restaurant_id || !meat_id || !business_date || quantity === '') {
-        addStatus.textContent = 'Date, restaurant, meat, and quantity are required.';
-        addStatus.className = 'status-message error';
-        return;
+      const payload = { business_date, quantity, source, notes: notes || null, actor: actor() };
+
+      if (unassigned) {
+        const commissary_meat_id = Number(newCommissaryMeat.value);
+        if (!business_date || quantity === '' || !commissary_meat_id) {
+          addStatus.textContent = 'Date, quantity, and commissary meat are required for an Unallocated receipt.';
+          addStatus.className = 'status-message error';
+          return;
+        }
+        payload.commissary_meat_id = commissary_meat_id;
+      } else {
+        const restaurant_id = Number(newRestaurant.value);
+        const meat_id = Number(newMeat.value);
+        if (!restaurant_id || !meat_id || !business_date || quantity === '') {
+          addStatus.textContent = 'Date, restaurant, meat, and quantity are required.';
+          addStatus.className = 'status-message error';
+          return;
+        }
+        payload.restaurant_id = restaurant_id;
+        payload.meat_id = meat_id;
       }
 
       addStatus.textContent = 'Saving...';
@@ -270,12 +396,12 @@
         const res = await fetch('/api/stock-receipts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ restaurant_id, meat_id, business_date, quantity, source, notes: notes || null, actor: actor() })
+          body: JSON.stringify(payload)
         });
         const result = await res.json();
         if (!result.ok) throw new Error(result.error || 'Unknown error');
 
-        addStatus.textContent = 'Receipt added.';
+        addStatus.textContent = unassigned ? 'Unallocated receipt added - assign it to a restaurant later from the list below.' : 'Receipt added.';
         addStatus.className = 'status-message success';
         newQty.value = '';
         newNotes.value = '';
@@ -288,16 +414,25 @@
 
     newRestaurant.addEventListener('change', loadMeatsForNewForm);
     newMeat.addEventListener('change', updateMappingWarning);
-    newSource.addEventListener('change', updateMappingWarning);
+    newSource.addEventListener('change', updateSourceUI);
+    newUnassigned.addEventListener('change', updateUnassignedUI);
 
     [filterRestaurant, filterDate, filterSource].forEach(el => el.addEventListener('change', loadReceipts));
+    filterUnallocated.addEventListener('change', () => {
+      // Unallocated rows have no restaurant, so the two filters are
+      // mutually exclusive - checking one clears the other for clarity.
+      if (filterUnallocated.checked) filterRestaurant.value = '';
+      loadReceipts();
+    });
     document.getElementById('clear-filters').addEventListener('click', () => {
-      filterRestaurant.value = ''; filterDate.value = ''; filterSource.value = '';
+      filterRestaurant.value = ''; filterDate.value = ''; filterSource.value = ''; filterUnallocated.checked = false;
       loadReceipts();
     });
 
     loadRestaurants().then(() => {
       loadMeatsForNewForm();
+      loadCommissaryMeats();
+      updateSourceUI();
       loadReceipts();
     });
   </script>
