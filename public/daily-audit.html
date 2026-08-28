@@ -79,12 +79,19 @@
     // calculated/read-only on every later day. No separate "is this the
     // first day" check needed on the frontend - null-ness already is that
     // check.
+    // Step 13: data-new-stock/data-usage are always present (fixed at load
+    // - not editable on this screen, see intro paragraph above). data-
+    // beginning is only present when r.beginning !== null; when it's null,
+    // recalcMeatRow() reads the live .opening_stock input instead, so a
+    // still-empty opening count naturally keeps the row at "-" until typed
+    // (matches MISSING_BEGINNING_STOCK, same as the server would compute).
     function meatRowHtml(r) {
+      const beginningAttr = r.beginning === null ? '' : ` data-beginning="${r.beginning}"`;
       const beginningCell = r.beginning === null
         ? `<td><input type="number" step="0.01" class="opening_stock" placeholder="opening count"></td>`
         : `<td class="calculated">${fmt(r.beginning)}</td>`;
       return `
-        <tr data-meat-id="${r.meat_id}">
+        <tr data-meat-id="${r.meat_id}"${beginningAttr} data-new-stock="${r.newStock}" data-usage="${r.usage}">
           <td>${r.name} <span class="type-badge">(${r.unit})</span></td>
           ${beginningCell}
           <td class="calculated">${fmt(r.newStock)}</td>
@@ -92,11 +99,11 @@
           <td><input type="number" step="0.01" class="in_house" value="${r.in_house ?? ''}" placeholder="0"></td>
           <td><input type="number" step="0.01" class="wastage" value="${r.wastage ?? ''}" placeholder="0"></td>
           <td><input type="number" step="0.01" class="other" value="${r.other ?? ''}" placeholder="0"></td>
-          <td class="calculated">${fmt(r.endingCalculated)}</td>
+          <td class="calculated ending-calc">${fmt(r.endingCalculated)}</td>
           <td><input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0"></td>
-          <td class="calculated">${fmt(r.unexplainedVariance)}</td>
+          <td class="calculated over-short">${fmt(r.unexplainedVariance)}</td>
           <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""></td>
-          <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
+          <td class="row-status status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
         </tr>
       `;
     }
@@ -125,6 +132,72 @@
         </tr>
       `;
     }
+
+    // Step 13: live recalculation of Ending(calc)/Over-Short/Status as a
+    // meat row's editable inputs change, without a save+reload round trip.
+    // Mirrors server/engines/auditEngine.js's computeMeatAudit exactly -
+    // same formula, same EPSILON, same status thresholds - so what's shown
+    // live always matches what Save+reload would produce for the same
+    // inputs. New Stock and Usage are NOT part of this - they're read-only
+    // calculated cells on this screen (see intro paragraph), fixed at load
+    // time; only Beginning (when it's the opening-stock cell), In-House,
+    // Wastage, Other, and Ending (actual) are ever live-edited here.
+    const EPSILON = 0.01; // must match auditEngine.js
+
+    // '' -> null (field genuinely empty, matches "missing" in the engine).
+    // Non-numeric/partial input (e.g. a lone '-') -> null too, rather than
+    // showing NaN mid-recalc while the user is still typing.
+    function toNumOrNull(v) {
+      if (v === '' || v === null || v === undefined) return null;
+      const n = Number(v);
+      return Number.isNaN(n) ? null : n;
+    }
+
+    function recalcMeatRow(tr) {
+      const beginning = tr.dataset.beginning !== undefined
+        ? Number(tr.dataset.beginning)
+        : toNumOrNull(tr.querySelector('.opening_stock')?.value ?? '');
+      const newStock = Number(tr.dataset.newStock);
+      const usage = Number(tr.dataset.usage);
+      const inHouse = toNumOrNull(tr.querySelector('.in_house').value) || 0;
+      const wastage = toNumOrNull(tr.querySelector('.wastage').value) || 0;
+      const other = toNumOrNull(tr.querySelector('.other').value) || 0;
+      const actual = toNumOrNull(tr.querySelector('.ending_actual').value);
+
+      const endingCalcCell = tr.querySelector('.ending-calc');
+      const overShortCell = tr.querySelector('.over-short');
+      const statusCell = tr.querySelector('.row-status');
+
+      let endingCalculated = null, unexplainedVariance = null, status;
+      if (beginning === null) {
+        status = 'MISSING_BEGINNING_STOCK';
+      } else {
+        endingCalculated = beginning + newStock - usage;
+        if (actual === null) {
+          status = 'MISSING_ACTUAL_COUNT';
+        } else {
+          const adjustments = inHouse + wastage + other;
+          const expectedEnding = endingCalculated - adjustments;
+          unexplainedVariance = expectedEnding - actual;
+          if (Math.abs(unexplainedVariance) <= EPSILON) status = 'OK';
+          else if (unexplainedVariance > 0) status = 'SHORTAGE';
+          else status = 'SURPLUS';
+        }
+      }
+
+      endingCalcCell.textContent = fmt(endingCalculated);
+      overShortCell.textContent = fmt(unexplainedVariance);
+      statusCell.className = `row-status status-${status}`;
+      statusCell.textContent = status.replace(/_/g, ' ');
+    }
+
+    // Delegated once, not re-attached per loadGrid() call - avoids stacking
+    // duplicate listeners on every restaurant/date change.
+    gridContainer.addEventListener('input', (e) => {
+      if (!e.target.matches('.opening_stock, .in_house, .wastage, .other, .ending_actual')) return;
+      const tr = e.target.closest('tr[data-meat-id]');
+      if (tr) recalcMeatRow(tr);
+    });
 
     async function loadGrid() {
       const restaurantId = restaurantSelect.value;
