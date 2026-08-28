@@ -29,7 +29,15 @@ const insertMeat = db.prepare(
 );
 let meatsInserted = 0;
 for (const m of data.meats) {
-  const result = insertMeat.run(restaurantId, m.meat_code, m.name, m.unit, m.cost_per_unit ?? null);
+  // Normalize to uppercase on insert - matches the pattern settings.js's
+  // admin-add path already established (meat_code.toUpperCase()). Without
+  // this, meat_code has no COLLATE NOCASE in schema.sql (SQLite defaults
+  // to case-sensitive BINARY collation), so a bulk-loaded lowercase code
+  // would silently fail to match an uppercase one entered via the admin
+  // screen - or vice versa. No live bug today (seed-data.json is already
+  // all-uppercase) but a real risk for a future seed file with different
+  // casing - see docs/changelog.md.
+  const result = insertMeat.run(restaurantId, m.meat_code.toUpperCase(), m.name, m.unit, m.cost_per_unit ?? null);
   if (result.changes > 0) meatsInserted++;
 }
 
@@ -39,7 +47,8 @@ const insertDish = db.prepare(
 );
 let dishesInserted = 0;
 for (const d of data.dishes) {
-  const result = insertDish.run(restaurantId, d.dish_code, d.name, d.prep_type, d.cost_per_portion ?? null);
+  // Same case-normalization as meats above.
+  const result = insertDish.run(restaurantId, d.dish_code.toUpperCase(), d.name, d.prep_type, d.cost_per_portion ?? null);
   if (result.changes > 0) dishesInserted++;
 }
 
@@ -60,8 +69,12 @@ let bomSkipped = 0;
 const today = new Date().toISOString().slice(0, 10);
 
 for (const r of data.recipe_bom) {
-  const meat = getMeatId.get(restaurantId, r.meat_code);
-  const dish = getDishId.get(restaurantId, r.dish_code);
+  // Look up by uppercased code too, since that's how meats/dishes were
+  // just inserted above - a mixed-case recipe_bom.meat_code/dish_code
+  // in the source JSON would otherwise silently miss the match (BINARY
+  // collation, no COLLATE NOCASE - see the note on insertMeat above).
+  const meat = getMeatId.get(restaurantId, r.meat_code.toUpperCase());
+  const dish = getDishId.get(restaurantId, r.dish_code.toUpperCase());
   if (!meat || !dish) {
     console.log(`  SKIPPED: ${r.dish_code} / ${r.meat_code} - meat or dish not found`);
     bomSkipped++;
