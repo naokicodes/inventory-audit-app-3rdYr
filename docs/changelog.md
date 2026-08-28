@@ -10,6 +10,54 @@ this is for things that took real debugging, changed a decision, or are
 worth remembering if they happen again.
 
 ---
+## 2026-08-28 — Step 7 shipped: Admin History tab (read-only feed over `activity_log`)
+
+**What shipped**: `GET /api/history` and `GET /api/history/filters`
+(`server/routes/history.js`), plus a new `public/history.html` page - a
+reverse-chronological feed over `activity_log`, filterable by entity type,
+actor, and date range, with a before→after diff rendered per entry (CREATE
+shows all fields as new, DELETE shows all fields as removed, UPDATE shows
+only the fields that actually changed). "History" added to the nav on all
+five existing pages. Matches the spec in
+`commissary-and-stock-receipts.md` Part 3 and `data-model.md` section 11
+exactly - no schema change, no new write path. As expected going in, this
+was a pure read on data step 6 already produces.
+
+**Deliberately not built in this step**: nothing from steps 8/9
+(commissary mapping admin screen, Unallocated-destination support) - those
+remain untouched, confirmed via live testing (see below) that
+`commissary_meat_map` still has zero rows and `stock_receipts.restaurant_id`
+/`meat_id` are still `NOT NULL`, exactly the pre-step-8/9 state the docs
+describe.
+
+**How it was verified - and a first for this project**: `npm run dev`
+actually ran live this session (network access to the npm registry was
+available in this sandbox, unlike every prior session) - `npm install`
+succeeded, the real Express server started, and the new routes were
+exercised end-to-end: seeded real data, hit the real `POST`/`PATCH`
+`stock-receipts` and `POST commissary/yield-log` routes to generate genuine
+`activity_log` rows (a CREATE, an UPDATE, and a soft DELETE), then
+confirmed `GET /api/history`/`/history.html` against that real data -
+entity-type filter, actor filter, and inclusive date-range filtering
+(including a range that correctly excluded everything) all matched
+expectations, and CREATE/UPDATE/DELETE each rendered with the right
+before/after shape. This only click-tested the new History feature plus
+the two write routes needed to generate test data - it does NOT fully
+resolve the older "`npm run dev` has never been run live" item in
+`session-status.md`'s Known Open Items (Stock Receipts/Commissary's own
+Edit/Delete UI flows still haven't been click-tested end-to-end in a
+browser). Also ran the full existing test suite (37/37) plus 8 new tests
+in `server/routes/history.test.js` (same plain-script pattern as
+`activityLog.test.js`) - all green. The throwaway dev database created
+during this live testing was deleted afterward (it's gitignored regardless).
+
+**Files touched**: `server/routes/history.js` (new), `server/routes/history.test.js`
+(new), `public/history.html` (new), `server/index.js` (mounted the new
+router), and a "History" nav link added to `public/index.html`,
+`public/daily-audit.html`, `public/stock-receipts.html`,
+`public/commissary.html`, `public/settings.html`.
+
+---
 ## 2026-08-28 (architecture review, between step 6 and step 7) — Resolved two open gaps: commissary mapping UI and the Unallocated-destination schema limit
 
 **Context**: before starting step 7, took a step back to review the whole
