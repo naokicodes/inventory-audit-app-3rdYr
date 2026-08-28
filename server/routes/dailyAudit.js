@@ -121,11 +121,24 @@ router.get('/daily-audit/mixed', (req, res) => {
 });
 
 // POST /api/daily-audit
-// Body: { restaurant_id, business_date, rows: [{ meat_id, in_house, wastage, other, ending_actual, remarks }] }
+// Body: { restaurant_id, business_date, rows: [{ meat_id, in_house, wastage, other, ending_actual, remarks, opening_stock }] }
 // Routes each field to its correct table. Only writes fields that were
 // actually provided (not null/empty) - leaves everything else untouched.
 // Note: new_stock is no longer accepted here - it's entered on the Stock
 // Receipts page now (see docs/commissary-and-stock-receipts.md Part 2).
+//
+// opening_stock (step 12, session-status.md): a one-time value, only
+// meaningful the first time a meat has no computable beginning stock
+// (see auditEngine.js's getBeginningStock - no prior ending_actual and
+// no existing opening_stock row). `INSERT OR IGNORE` relies on
+// opening_stock's own UNIQUE(restaurant_id, meat_id) constraint
+// (schema.sql) to make the write-once guarantee a DB-level fact, not
+// just a frontend convention - a stale client that already has a
+// beginning value and resubmits it anyway is silently a no-op here,
+// never a second write or an error. Deliberately not run through
+// activity_log per rule 9 - that logging is scoped to stock_receipts
+// and commissary_yield_log only, not silently extended to every input
+// table.
 router.post('/daily-audit', (req, res) => {
   const { restaurant_id, business_date, rows } = req.body;
   if (!restaurant_id || !business_date || !Array.isArray(rows)) {
@@ -136,6 +149,11 @@ router.post('/daily-audit', (req, res) => {
   const inHouseTypeId = adjTypes.find(t => t.name === 'Staff Meal / In-House')?.id;
   const wastageTypeId = adjTypes.find(t => t.name === 'Wastage')?.id;
   const otherTypeId = adjTypes.find(t => t.name === 'Other / Uncategorized')?.id;
+
+  const insertOpeningStock = db.prepare(`
+    INSERT OR IGNORE INTO opening_stock (restaurant_id, meat_id, business_date, quantity)
+    VALUES (?, ?, ?, ?)
+  `);
 
   const upsertEndingActual = db.prepare(`
     INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity, notes)
@@ -159,6 +177,9 @@ router.post('/daily-audit', (req, res) => {
 
   let saved = 0;
   for (const row of rows) {
+    if (row.opening_stock !== null && row.opening_stock !== undefined && row.opening_stock !== '') {
+      insertOpeningStock.run(restaurant_id, row.meat_id, business_date, Number(row.opening_stock));
+    }
     if (row.ending_actual !== null && row.ending_actual !== undefined && row.ending_actual !== '') {
       upsertEndingActual.run(restaurant_id, row.meat_id, business_date, Number(row.ending_actual), row.remarks || null);
     }
