@@ -377,6 +377,42 @@ CREATE TABLE IF NOT EXISTS commissary_shipment_preset_lines (
   FOREIGN KEY (meat_id) REFERENCES meats(id)
 );
 
+-- commissary_conversion_standards: item 5 of the 2026-08-29 "Future
+-- considerations" list, design settled through discussion - see
+-- session-status.md's item 5 entry for the full reasoning.
+--
+-- Deliberately NOT the same table as commissary_shipment_presets. A
+-- preset is a demand decision (how a shipment gets split across named
+-- outputs - legitimately different week to week, several can coexist
+-- for the same pairing). A conversion standard is a rate fact (for
+-- however much input actually goes toward THIS specific output, how
+-- much of it should that produce) - closer to what recipe_bom already
+-- stores for dish-to-meat consumption than to a preset, and there
+-- should be exactly one per pairing, not several.
+--
+-- ratio_per_unit is confirmed as ratio-per-unit-of-input (e.g. "0.3
+-- Bagnet-units per kg of Jowl"), NOT a percentage-of-shipment or a
+-- typical-batch-size - matches the project owner's own real auditing
+-- standard from their contractors, and is the simplest shape to
+-- compute against. No classifier column anywhere in this schema
+-- distinguishes "raw" vs "portioned" commissary meats - a
+-- (commissary_meat, restaurant, meat) pairing HAVING a row here is
+-- itself the classifier. A pairing with no row is raw/dynamic,
+-- unchanged from step 20's original decision.
+CREATE TABLE IF NOT EXISTS commissary_conversion_standards (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,
+  restaurant_id INTEGER NOT NULL,
+  meat_id INTEGER NOT NULL,          -- the destination restaurant's own meat (the output)
+  ratio_per_unit REAL NOT NULL,      -- output units produced per 1 unit of commissary_meat input
+  notes TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
+  FOREIGN KEY (meat_id) REFERENCES meats(id),
+  UNIQUE (commissary_meat_id, restaurant_id, meat_id)
+);
+
 -- Loyverse name resolution (see docs/loyverse-sync.md) - created now since
 -- it's simple and referenced by the sync doc, even though sync itself is
 -- a later phase. Empty until that phase, no harm in having it exist.

@@ -443,5 +443,166 @@ test('deactivated presets are excluded from the pair listing but a NEW active pr
   assert.strictEqual(list.presets[0].id, r2.id);
 });
 
+// ---- Mirrors GET/POST/PUT /api/commissary/conversion-standards - item
+// 5 of the 2026-08-29 "Future considerations" list. See
+// session-status.md's item 5 entry for the full design reasoning.
+
+function listStandardsForPair(commissaryMeatId, restaurantId) {
+  if (!commissaryMeatId || !restaurantId) {
+    return { status: 400, error: 'commissary_meat_id and restaurant_id are required' };
+  }
+  const rows = db.prepare(`
+    SELECT cs.id, cs.commissary_meat_id, cs.restaurant_id, cs.meat_id,
+           m.meat_code, m.name as meat_name, cs.ratio_per_unit, cs.notes, cs.active
+    FROM commissary_conversion_standards cs
+    JOIN meats m ON m.id = cs.meat_id
+    WHERE cs.commissary_meat_id = ? AND cs.restaurant_id = ? AND cs.active = 1
+    ORDER BY m.meat_code
+  `).all(commissaryMeatId, restaurantId);
+  return { status: 200, rows };
+}
+
+function createStandard({ commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes }) {
+  if (!commissary_meat_id || !restaurant_id || !meat_id
+      || ratio_per_unit === undefined || ratio_per_unit === null || ratio_per_unit === '') {
+    return { status: 400, error: 'commissary_meat_id, restaurant_id, meat_id, and ratio_per_unit are required' };
+  }
+  if (Number(ratio_per_unit) <= 0) {
+    return { status: 400, error: 'ratio_per_unit must be positive' };
+  }
+  const commissaryMeat = db.prepare('SELECT id FROM commissary_meats WHERE id = ? AND active = 1').get(commissary_meat_id);
+  if (!commissaryMeat) return { status: 400, error: 'Unknown or inactive commissary_meat_id' };
+  const restaurant = db.prepare('SELECT id FROM restaurants WHERE id = ? AND active = 1').get(restaurant_id);
+  if (!restaurant) return { status: 400, error: 'Unknown or inactive restaurant_id' };
+  const meat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(meat_id, restaurant_id);
+  if (!meat) return { status: 400, error: `meat_id ${meat_id} is not an active meat belonging to restaurant_id ${restaurant_id}` };
+  const existing = db.prepare(`
+    SELECT id FROM commissary_conversion_standards WHERE commissary_meat_id = ? AND restaurant_id = ? AND meat_id = ?
+  `).get(commissary_meat_id, restaurant_id, meat_id);
+  if (existing) return { status: 400, error: 'A standard for this exact pairing already exists - edit it instead of creating another' };
+
+  const result = db.prepare(`
+    INSERT INTO commissary_conversion_standards (commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(commissary_meat_id, restaurant_id, meat_id, Number(ratio_per_unit), notes || null);
+  return { status: 200, ok: true, id: result.lastInsertRowid };
+}
+
+function updateStandard(id, { ratio_per_unit, notes, active }) {
+  const existing = db.prepare('SELECT * FROM commissary_conversion_standards WHERE id = ?').get(id);
+  if (!existing) return { status: 404, error: 'Conversion standard not found' };
+  if (ratio_per_unit !== undefined && Number(ratio_per_unit) <= 0) {
+    return { status: 400, error: 'ratio_per_unit must be positive' };
+  }
+  db.prepare(`UPDATE commissary_conversion_standards SET ratio_per_unit = ?, notes = ?, active = ? WHERE id = ?`).run(
+    ratio_per_unit !== undefined ? Number(ratio_per_unit) : existing.ratio_per_unit,
+    notes !== undefined ? notes : existing.notes,
+    active !== undefined ? (active ? 1 : 0) : existing.active,
+    id
+  );
+  return { status: 200, ok: true };
+}
+
+test('standards list requires both commissary_meat_id and restaurant_id', () => {
+  const r = listStandardsForPair(null, 1);
+  assert.strictEqual(r.status, 400);
+});
+
+test('standards list for a pair with none returns an empty array', () => {
+  const r = listStandardsForPair(1, 2);
+  assert.deepStrictEqual(r.rows, []);
+});
+
+test('creating a standard with missing ratio_per_unit is rejected', () => {
+  const r = createStandard({ commissary_meat_id: 1, restaurant_id: 1, meat_id: 1 });
+  assert.strictEqual(r.status, 400);
+});
+
+test('a zero or negative ratio_per_unit is rejected', () => {
+  const r1 = createStandard({ commissary_meat_id: 1, restaurant_id: 1, meat_id: 1, ratio_per_unit: 0 });
+  assert.strictEqual(r1.status, 400);
+  const r2 = createStandard({ commissary_meat_id: 1, restaurant_id: 1, meat_id: 1, ratio_per_unit: -0.3 });
+  assert.strictEqual(r2.status, 400);
+});
+
+test('creating a standard for an inactive commissary meat is rejected', () => {
+  const r = createStandard({ commissary_meat_id: 2, restaurant_id: 1, meat_id: 1, ratio_per_unit: 0.3 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /commissary_meat_id/);
+});
+
+test('creating a standard with a meat from a different restaurant is rejected', () => {
+  const r = createStandard({ commissary_meat_id: 1, restaurant_id: 1, meat_id: 4, ratio_per_unit: 0.3 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /not an active meat belonging to restaurant_id/);
+});
+
+test('a valid standard is created - the real Jowl-to-Bagnet example, 0.3 units per kg', () => {
+  const r = createStandard({ commissary_meat_id: 1, restaurant_id: 1, meat_id: 1, ratio_per_unit: 0.3, notes: 'from contractor spec' });
+  assert.strictEqual(r.ok, true);
+  const row = db.prepare('SELECT * FROM commissary_conversion_standards WHERE id = ?').get(r.id);
+  assert.strictEqual(row.ratio_per_unit, 0.3);
+  assert.strictEqual(row.active, 1, 'active defaults to 1');
+});
+
+test('creating a second standard for the exact same pairing is rejected', () => {
+  const r = createStandard({ commissary_meat_id: 1, restaurant_id: 1, meat_id: 1, ratio_per_unit: 0.5 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /already exists/);
+});
+
+test('a standard for a different meat under the same commissary meat/restaurant is a separate, valid row', () => {
+  const r = createStandard({ commissary_meat_id: 1, restaurant_id: 1, meat_id: 2, ratio_per_unit: 0.25 });
+  assert.strictEqual(r.ok, true);
+});
+
+test('the list route now returns both standards for this pair, ordered by meat_code', () => {
+  const r = listStandardsForPair(1, 1);
+  assert.strictEqual(r.rows.length, 2);
+  assert.strictEqual(r.rows[0].meat_code, 'M01');
+  assert.strictEqual(r.rows[1].meat_code, 'M02');
+});
+
+test('editing a nonexistent standard is rejected', () => {
+  const r = updateStandard(9999, { ratio_per_unit: 0.4 });
+  assert.strictEqual(r.status, 404);
+});
+
+test('editing ratio_per_unit to zero is rejected, existing value untouched', () => {
+  const existingId = db.prepare(`
+    SELECT id FROM commissary_conversion_standards WHERE commissary_meat_id = 1 AND restaurant_id = 1 AND meat_id = 1
+  `).get().id;
+  const r = updateStandard(existingId, { ratio_per_unit: 0 });
+  assert.strictEqual(r.status, 400);
+  const row = db.prepare('SELECT * FROM commissary_conversion_standards WHERE id = ?').get(existingId);
+  assert.strictEqual(row.ratio_per_unit, 0.3, 'the bad edit must not have taken effect - still the original 0.3');
+});
+
+test('deactivating a standard removes it from the pair listing', () => {
+  const before = listStandardsForPair(1, 1);
+  const targetId = before.rows[0].id;
+  const r = updateStandard(targetId, { active: false });
+  assert.strictEqual(r.status, 200);
+  const after = listStandardsForPair(1, 1);
+  assert.strictEqual(after.rows.length, before.rows.length - 1);
+});
+
+test('the implied-input math this feature exists for: ratio_per_unit correctly inverts to an implied input amount', () => {
+  // The real point of this table: given a shipment line's OUTPUT
+  // quantity and the pairing's ratio (output units per unit of input),
+  // the form should be able to compute the IMPLIED input. This is a
+  // pure arithmetic check on the stored number, not a new endpoint -
+  // the division happens client-side per session-status.md's item 5
+  // ("live on the shipment form"), this just confirms the stored ratio
+  // supports it correctly for the real Jowl->Bagnet example.
+  const row = db.prepare(`
+    SELECT ratio_per_unit FROM commissary_conversion_standards WHERE commissary_meat_id = 1 AND restaurant_id = 1 AND meat_id = 2
+  `).get();
+  const outputQuantity = 3; // e.g. 3 Sisig units on a shipment line
+  const impliedInputKg = outputQuantity / row.ratio_per_unit;
+  assert.strictEqual(row.ratio_per_unit, 0.25);
+  assert.strictEqual(impliedInputKg, 12, '3 units at 0.25 units/kg implies 12kg of input');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

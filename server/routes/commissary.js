@@ -375,6 +375,108 @@ router.put('/commissary/shipment-presets/:id', (req, res) => {
   }
 });
 
+// GET /api/commissary/conversion-standards?commissary_meat_id=&restaurant_id=
+// Item 5 of the 2026-08-29 "Future considerations" list - see
+// session-status.md's item 5 entry for the full reasoning. Deliberately
+// NOT the same table as shipment_presets: a preset is a demand
+// decision (the mix, can have several valid answers), a standard is a
+// rate fact (the conversion efficiency, exactly one per pairing).
+//
+// Both params required, same reasoning as shipment-presets: the
+// shipment form only wants this once both are picked. Returns every
+// active standard for that pair (rarely more than a handful of output
+// meats per commissary meat), so the form can compute implied input as
+// the auditor types each line, without a request per line.
+router.get('/commissary/conversion-standards', (req, res) => {
+  const commissaryMeatId = Number(req.query.commissary_meat_id);
+  const restaurantId = Number(req.query.restaurant_id);
+  if (!commissaryMeatId || !restaurantId) {
+    return res.status(400).json({ error: 'commissary_meat_id and restaurant_id are required' });
+  }
+
+  const rows = db.prepare(`
+    SELECT cs.id, cs.commissary_meat_id, cs.restaurant_id, cs.meat_id,
+           m.meat_code, m.name as meat_name, cs.ratio_per_unit, cs.notes, cs.active
+    FROM commissary_conversion_standards cs
+    JOIN meats m ON m.id = cs.meat_id
+    WHERE cs.commissary_meat_id = ? AND cs.restaurant_id = ? AND cs.active = 1
+    ORDER BY m.meat_code
+  `).all(commissaryMeatId, restaurantId);
+
+  res.json(rows);
+});
+
+// POST /api/commissary/conversion-standards
+// Body: { commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes? }
+// Admin creation of one standard. Same up-front validation shape as
+// shipment-presets. UNIQUE(commissary_meat_id, restaurant_id, meat_id)
+// in the schema is the real guarantee of "exactly one per pairing" -
+// this check is just a clearer error message before hitting it.
+router.post('/commissary/conversion-standards', (req, res) => {
+  const { commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes } = req.body;
+
+  if (!commissary_meat_id || !restaurant_id || !meat_id
+      || ratio_per_unit === undefined || ratio_per_unit === null || ratio_per_unit === '') {
+    return res.status(400).json({ error: 'commissary_meat_id, restaurant_id, meat_id, and ratio_per_unit are required' });
+  }
+  if (Number(ratio_per_unit) <= 0) {
+    return res.status(400).json({ error: 'ratio_per_unit must be positive' });
+  }
+
+  const commissaryMeat = db.prepare('SELECT id FROM commissary_meats WHERE id = ? AND active = 1').get(commissary_meat_id);
+  if (!commissaryMeat) return res.status(400).json({ error: 'Unknown or inactive commissary_meat_id' });
+
+  const restaurant = db.prepare('SELECT id FROM restaurants WHERE id = ? AND active = 1').get(restaurant_id);
+  if (!restaurant) return res.status(400).json({ error: 'Unknown or inactive restaurant_id' });
+
+  const meat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(meat_id, restaurant_id);
+  if (!meat) return res.status(400).json({ error: `meat_id ${meat_id} is not an active meat belonging to restaurant_id ${restaurant_id}` });
+
+  const existing = db.prepare(`
+    SELECT id FROM commissary_conversion_standards
+    WHERE commissary_meat_id = ? AND restaurant_id = ? AND meat_id = ?
+  `).get(commissary_meat_id, restaurant_id, meat_id);
+  if (existing) {
+    return res.status(400).json({ error: 'A standard for this exact pairing already exists - edit it instead of creating another' });
+  }
+
+  const result = db.prepare(`
+    INSERT INTO commissary_conversion_standards (commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(commissary_meat_id, restaurant_id, meat_id, Number(ratio_per_unit), notes || null);
+
+  res.json({ ok: true, id: result.lastInsertRowid });
+});
+
+// PUT /api/commissary/conversion-standards/:id
+// Body: { ratio_per_unit?, notes?, active? }
+// commissary_meat_id/restaurant_id/meat_id are not editable here - a
+// different pairing is a different standard (deactivate + create a
+// new one), same reasoning shipment-presets already uses for its own
+// non-editable identifying fields.
+router.put('/commissary/conversion-standards/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const { ratio_per_unit, notes, active } = req.body;
+
+  const existing = db.prepare('SELECT * FROM commissary_conversion_standards WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Conversion standard not found' });
+
+  if (ratio_per_unit !== undefined && Number(ratio_per_unit) <= 0) {
+    return res.status(400).json({ error: 'ratio_per_unit must be positive' });
+  }
+
+  db.prepare(`
+    UPDATE commissary_conversion_standards SET ratio_per_unit = ?, notes = ?, active = ? WHERE id = ?
+  `).run(
+    ratio_per_unit !== undefined ? Number(ratio_per_unit) : existing.ratio_per_unit,
+    notes !== undefined ? notes : existing.notes,
+    active !== undefined ? (active ? 1 : 0) : existing.active,
+    id
+  );
+
+  res.json({ ok: true });
+});
+
 // POST /api/commissary/yield-log
 // Body: { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes, actor }
 router.post('/commissary/yield-log', (req, res) => {
