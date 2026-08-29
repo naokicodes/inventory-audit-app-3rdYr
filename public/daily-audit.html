@@ -37,7 +37,7 @@
   </nav>
 
   <h1>Landing</h1>
-  <p style="color:#666; font-size: 0.85rem;">New Stock is read-only here - enter deliveries on the <a href="stock-receipts.html">Stock Receipts</a> page. Adjustments is read-only here too - enter wastage, staff meals, transfers, and other allocations on the <a href="allocations.html">Allocations</a> page. Dish rows (Prepped / Portion Ending) are display-only for now - editing them isn't wired up yet.</p>
+  <p style="color:#666; font-size: 0.85rem;">New Stock is read-only here - enter deliveries on the <a href="stock-receipts.html">Stock Receipts</a> page. Adjustments is read-only here too - enter wastage, staff meals, transfers, and other allocations on the <a href="allocations.html">Allocations</a> page. Dish rows (Prepped / Portion Ending) are editable, same Save button as meat rows.</p>
 
   <div class="controls">
     <label>
@@ -117,25 +117,27 @@
       `;
     }
 
-    // Dish row: read-only per step 11 - there's no write path yet for
-    // prepped/portion_ending_actual, so every cell here is calculated/
-    // display-only. Beginning/New Stock/Usage columns map to the dish's
-    // portion beginning/prepped/sold; Adjustments/Remarks don't apply to
-    // dishes (no adjustments layer for portions per data-model.md
-    // section 6), shown as "-" rather than left blank.
+    // Dish row: editable for Prepped/Portion Actual as of 2026-08-29 -
+    // the write path that's been missing since step 11 now exists
+    // (POST /api/daily-audit/portions). Beginning/Sold columns stay
+    // calculated/display-only (there's no manual write path for portion
+    // beginning - it always derives from yesterday's actual, same as
+    // meat beginning does once opening_stock is set). Adjustments/
+    // Remarks don't apply to dishes (no adjustments layer for portions
+    // per data-model.md section 6), shown as "-" rather than left blank.
     function dishRowHtml(r) {
       return `
-        <tr class="dish-row">
+        <tr class="dish-row" data-dish-id="${r.item_id}" data-portion-beginning="${r.portionBeginning ?? ''}" data-sold="${r.sold}">
           <td>${r.name} <span class="type-badge">(portions)</span></td>
           <td class="calculated">${fmt(r.portionBeginning)}</td>
-          <td class="calculated">${fmt(r.prepped)}</td>
+          <td><input type="number" step="0.01" class="prepped" value="${r.prepped ?? ''}" placeholder="0"></td>
           <td class="calculated">${fmt(r.sold)}</td>
           <td class="na">-</td>
-          <td class="calculated">${fmt(r.portionEndingCalculated)}</td>
-          <td class="calculated">${fmt(r.portionActual)}</td>
-          <td class="calculated">${fmt(r.portionVariance)}</td>
+          <td class="calculated portion-ending-calc">${fmt(r.portionEndingCalculated)}</td>
+          <td><input type="number" step="0.01" class="portion_actual" value="${r.portionActual ?? ''}" placeholder="0"></td>
+          <td class="calculated portion-variance">${fmt(r.portionVariance)}</td>
           <td class="na">-</td>
-          <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
+          <td class="dish-row-status status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
         </tr>
       `;
     }
@@ -195,12 +197,55 @@
       statusCell.textContent = status.replace(/_/g, ' ');
     }
 
+    // Live recalculation for a dish row's Portion Ending(calc)/Variance/
+    // Status as Prepped/Portion Actual are typed - same pattern as
+    // recalcMeatRow (step 13), mirroring computeDishAudit exactly (same
+    // formula, same EPSILON, same status thresholds). portionBeginning
+    // and sold are fixed at load time (data attributes), not editable on
+    // this screen - only prepped and portion_actual are ever live-edited
+    // for a dish row.
+    function recalcDishRow(tr) {
+      const portionBeginningRaw = tr.dataset.portionBeginning;
+      const portionBeginning = portionBeginningRaw === '' ? null : Number(portionBeginningRaw);
+      const sold = Number(tr.dataset.sold);
+      const prepped = toNumOrNull(tr.querySelector('.prepped').value) ?? 0;
+      const portionActual = toNumOrNull(tr.querySelector('.portion_actual').value);
+
+      const endingCalcCell = tr.querySelector('.portion-ending-calc');
+      const varianceCell = tr.querySelector('.portion-variance');
+      const statusCell = tr.querySelector('.dish-row-status');
+
+      let portionEndingCalculated = null, portionVariance = null, status;
+      if (portionBeginning === null) {
+        status = 'MISSING_BEGINNING_STOCK';
+      } else {
+        portionEndingCalculated = portionBeginning + prepped - sold;
+        if (portionActual === null) {
+          status = 'MISSING_ACTUAL_COUNT';
+        } else {
+          portionVariance = portionEndingCalculated - portionActual;
+          if (Math.abs(portionVariance) <= EPSILON) status = 'OK';
+          else if (portionVariance > 0) status = 'SHORTAGE';
+          else status = 'SURPLUS';
+        }
+      }
+
+      endingCalcCell.textContent = fmt(portionEndingCalculated);
+      varianceCell.textContent = fmt(portionVariance);
+      statusCell.className = `dish-row-status status-${status}`;
+      statusCell.textContent = status.replace(/_/g, ' ');
+    }
+
     // Delegated once, not re-attached per loadGrid() call - avoids stacking
     // duplicate listeners on every restaurant/date change.
     gridContainer.addEventListener('input', (e) => {
-      if (!e.target.matches('.opening_stock, .ending_actual')) return;
-      const tr = e.target.closest('tr[data-meat-id]');
-      if (tr) recalcMeatRow(tr);
+      if (e.target.matches('.opening_stock, .ending_actual')) {
+        const tr = e.target.closest('tr[data-meat-id]');
+        if (tr) recalcMeatRow(tr);
+      } else if (e.target.matches('.prepped, .portion_actual')) {
+        const tr = e.target.closest('tr[data-dish-id]');
+        if (tr) recalcDishRow(tr);
+      }
     });
 
     async function loadGrid() {
@@ -262,14 +307,34 @@
           body: JSON.stringify({ restaurant_id: restaurantId, business_date: date, rows })
         });
         const result = await res.json();
-        if (result.ok) {
-          statusEl.textContent = `Saved. Reloading...`;
-          statusEl.className = 'status-message success';
-          await loadGrid();
-          statusEl.textContent = `Saved ${result.saved} row(s).`;
-        } else {
-          throw new Error(result.error || 'Unknown error');
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+
+        // Dish rows (Prepped/Portion Actual) save separately - different
+        // table shape, different endpoint (POST /api/daily-audit/portions),
+        // same save button/status flow. Only sent if this restaurant/date
+        // actually has any BATCH_PREPPED dish rows loaded.
+        const dishTrs = gridContainer.querySelectorAll('tr[data-dish-id]');
+        let portionsSaved = 0;
+        if (dishTrs.length > 0) {
+          const portionRows = Array.from(dishTrs).map(tr => ({
+            dish_id: Number(tr.dataset.dishId),
+            prepped: tr.querySelector('.prepped').value,
+            portion_actual: tr.querySelector('.portion_actual').value
+          }));
+          const portionsRes = await fetch('/api/daily-audit/portions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ restaurant_id: restaurantId, business_date: date, rows: portionRows })
+          });
+          const portionsResult = await portionsRes.json();
+          if (!portionsResult.ok) throw new Error(portionsResult.error || 'Unknown error saving dish rows');
+          portionsSaved = portionsResult.saved;
         }
+
+        statusEl.textContent = `Saved. Reloading...`;
+        statusEl.className = 'status-message success';
+        await loadGrid();
+        statusEl.textContent = `Saved ${result.saved} meat row(s)${portionsSaved ? ` and ${portionsSaved} dish row(s)` : ''}.`;
       } catch (err) {
         statusEl.textContent = 'Error saving: ' + err.message;
         statusEl.className = 'status-message error';
