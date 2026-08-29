@@ -522,6 +522,38 @@ of sizing them correctly, not a separate concern.
     page, like Stock Receipts. Not the Command Panel widget. See step 21
     below for how the Command Panel itself is evolving instead.
 
+    **`commissary_meat_map`'s fate — RESOLVED 2026-08-29**: leave it
+    alone, don't touch it in step 20. It becomes vestigial once
+    `commissary_shipment_lines` exists — the auditor picks the
+    destination meat live in the shipment form, no pre-declared mapping
+    consulted. Not deleted (other code may still reference it), not
+    repurposed, not schema-changed. If a coder session finds it still
+    matters for something not accounted for here, flag it back rather
+    than deciding unilaterally.
+
+    **Split into three sequential sub-steps for handoff — too large for
+    one session, per rule 16's step-sizing philosophy**:
+    - **20a (schema only)**: add the six new tables above to
+      `schema.sql`. No engine, no routes, no UI. Testable in isolation —
+      schema creates cleanly, FKs resolve, a fresh `seed.js` run still
+      works unchanged.
+    - **20b (Commissary audit engine + read routes)**: a
+      `computeCommissaryMeatAudit`-shaped function mirroring
+      `computeMeatAudit`'s beginning/usage/ending/variance shape, but
+      with Stock In and Backed Up as two separate inflows and usage
+      summed across all destination shipments for that meat/date
+      (`commissary_shipments.total_quantity`, not sales×recipe). A GET
+      route exposing it, mirroring `dailyAudit.js`'s pattern. Depends on
+      20a existing.
+    - **20c (shipment logging: write route + page)**: `POST` route
+      creating one `commissary_shipments` row + N
+      `commissary_shipment_lines` rows in one transaction, each line
+      also writing a normal `stock_receipts` row for the destination
+      (reuses existing mechanics unchanged). Then the dedicated page
+      itself (form: source meat, destination, total, N output lines).
+      Depends on 20a and 20b (the page will want to show current
+      balance/context, not just blindly write).
+
     **Scope relative to step 19**: still doesn't block Restaurant B
     onboarding. FC's Bagnet/Sisig/Sinigang/DNG/etc. get onboarded as
     FC's own local stock items regardless of how this design lands —
