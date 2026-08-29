@@ -1215,8 +1215,9 @@ are visible before anyone starts designing in isolation.
 **Priority, made explicit 2026-08-29**: item 1 was the one auditing-
 service gap (real day-to-day recording need), items 2-5 are app-level
 (dashboard, cleanup, future-proofing, a refinement) — secondary.
-**Item 1 is now done** (below); nothing else on this list is currently
-flagged as urgent.
+**Item 1 is done. Item 5's design is now settled** (through real
+discussion, not assumed) and ready to build whenever picked up — see
+its entry below. Nothing else on this list is currently urgent.
 
 1. **[Done, 2026-08-29] Allocations item-to-item conversion type.**
    Built as `POST /api/allocations/conversion` + a "Converts to" field
@@ -1271,33 +1272,62 @@ flagged as urgent.
    Restaurant C onboarding so nothing stale gets copied into a fresh
    restaurant's setup.
 
-5. **REFINED 2026-08-29 — a two-way split resolves the conversion-ratio
-   tension, not a single blanket policy.** Originally framed as "step
-   20's dynamic-no-formula call vs. the dashboard needing ratios to
-   total against" — resolved by recognizing two different kinds of
-   commissary meat, not one:
-   - **Raw type** (plain Jowl shipped as itself, no portioning
-     happening): no ratio concept applies — genuinely just a quantity,
-     step 20's dynamic-entry call stands unchanged here.
-   - **Portioned type** (Bagnet, Sisig, Sinigang, DNG — named,
-     officially-portioned products with real margin implications): a
-     real **Standard** ratio should exist, the same pattern
-     `commissary_meats.allowed_leeway_pct` already uses for the
-     raw→processed yield step — actual shipment entries get *compared
-     against* the Standard (Actual vs. Calculated, variance flagged),
-     never blocking the save, consistent with how every other part of
-     this app already works. Not "step 20 was wrong," but "step 20's
-     call was right for raw meat and needs refining for named
-     portions" — a `commissary_meat_type` classifier (or similar) is
-     the likely shape, distinguishing which meats get a Standard at
-     all. This also directly serves item 2's dashboard rollup and the
-     original shipment-portioning question — the same Standard data
-     both reverse-converts (Bagnet → Jowl-equivalent, for the
-     dashboard) and forward-converts (Jowl → expected portion counts,
-     for shipment guidance). Not designed in detail yet — table shape,
-     where the Standard lives (on `commissary_meats` itself vs. a new
-     table), and whether it's per-destination-restaurant or global per
-     meat are all still open.
+5. **[Design settled 2026-08-29, not yet built] Three tables, each
+   doing one job — not one reused table, and not a single blanket
+   dynamic-entry policy.** Originally framed as "step 20's dynamic-
+   no-formula call vs. the dashboard needing ratios to total against" —
+   settled through discussion, not guessed:
+
+   - **Raw type stays exactly as step 20 decided.** Plain Jowl shipped
+     as itself: no ratio concept applies, genuinely dynamic, unchanged.
+
+   - **The key distinction for named portions turned out to be "the
+     mix" vs. "the rate," and they need different treatment.** Given
+     7kg of Jowl, *how it splits* across Bagnet/Sisig/Sinigang/DNG is a
+     demand decision (legitimately different week to week, no single
+     correct answer — `commissary_shipment_presets` already handles
+     this fine, several presets can coexist for the same pairing,
+     unchanged, not touched by this design). But *for however much
+     Jowl actually goes toward Bagnet specifically, how many Bagnet
+     portions that should produce* is a conversion-rate fact, not a
+     demand choice — closer to what `recipe_bom` already stores for
+     dish-to-meat consumption than to a preset. That's the thing worth
+     a real Standard.
+
+   - **New table, not a repurposed `commissary_shipment_presets`**:
+     one row per `(commissary_meat_id, restaurant_id, meat_id)` —
+     e.g. "Jowl → FC's Bagnet: 0.3 units per kg." Confirmed
+     **ratio-per-unit-of-input**, not a percentage-of-shipment or a
+     typical-batch-size shape — this matches the project owner's own
+     real auditing standard from their contractors directly, not
+     assumed, and is also the simplest to implement. Table name not
+     yet chosen (a real "not yet built" gap, unlike the rest of this
+     item).
+
+   - **No explicit raw-vs-portioned classifier column anywhere.** A
+     `(commissary_meat, restaurant, meat)` pairing with a Standard row
+     is portioned-type; one with no row is raw/dynamic. The row's
+     existence *is* the classifier.
+
+   - **The comparison this unlocks, mechanically**: each shipment
+     line implies an input amount (e.g. "3 Bagnet units at 0.3
+     units/kg" implies ~10kg of Jowl). Sum that across every line,
+     compare against the shipment's actual `total_quantity` — roughly
+     matches is consistent, well over means claiming more output than
+     standard efficiency supports, well under means some input isn't
+     accounted for by named outputs (could be legitimate - raw Jowl
+     shipped alongside portions - or could be shrinkage or a missed
+     line). Purely informational, never blocking, same philosophy as
+     every other Actual-vs-Calculated comparison in this app. Shown
+     live on the Shipment form as the auditor types each line (a
+     running "~X kg implied so far, of Y kg total"), not on a save-
+     time popup or after the fact.
+
+   - **This also directly unblocks item 2's dashboard** (below) — the
+     same per-pairing ratio table reverse-converts a restaurant's
+     portioned stock back to Jowl-equivalent for the cross-location
+     rollup, later, as its own separate piece of work, not bundled
+     into building this table.
 
 ## Things NOT to re-litigate (already decided, stable)
 
