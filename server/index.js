@@ -17,6 +17,7 @@ const historyRoutes = require('./routes/history.js');
 const commandsRoutes = require('./routes/commands.js');
 const salesRoutes = require('./routes/sales.js');
 const allocationsRoutes = require('./routes/allocations.js');
+const dashboardRoutes = require('./routes/dashboard.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,6 +32,7 @@ app.use('/api', historyRoutes);
 app.use('/api', commandsRoutes);
 app.use('/api', salesRoutes);
 app.use('/api', allocationsRoutes);
+app.use('/api', dashboardRoutes);
 
 app.listen(PORT, () => {
   console.log(`Inventory Audit App running at http://localhost:${PORT}`);
