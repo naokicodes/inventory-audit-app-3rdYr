@@ -11,6 +11,20 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 (later still) — Portion Conversion allocations (item 1, Future considerations)
+
+Converts stock of one item into a different item, same restaurant/date — e.g. FC's Sinigang becoming Dinuguan. New `POST /api/allocations/conversion`, a new `Portion Conversion` adjustment type, and a `linked_adjustment_id` column tying the two written rows together. Distinct from the existing `Allocation / Transfer` type, which moves the same item between locations.
+
+Schema: `adjustment_types.requires_conversion_target`, `adjustments.linked_adjustment_id`, plus a migration (`migrateConversionColumns`) for pre-existing databases — verified against a simulated old-shape DB, not just a fresh one.
+
+Frontend on `allocations.html`: a "Converts to" meat + quantity pair, shown only when the selected type requires it, routes to the new endpoint instead of the plain one.
+
+Caught and fixed one real bug before calling this done: `GET /api/settings/adjustment-types` wasn't selecting the new `requires_conversion_target` column, so the frontend would never have shown the conversion fields at all — found via a live check, not assumed.
+
+Real supplier pricing (6 values in `commissary-seed-data.json`) was also found sitting in this public repo and stripped this session — unrelated to this feature, caught in passing.
+
+7 new tests (18/18 in `allocations.test.js`), full suite 172/172, 0 regressions. Verified live end-to-end with the actual Sinigang→Dinuguan scenario from this project's own design discussions — correct signs written, correctly flows through to Landing's read.
+
 ## 2026-08-29 (later still) — Step 22: Landing Allocations merge, built and verified live
 
 **Built directly by the architect session**, continuing the "ship code
@@ -815,6 +829,7 @@ item (not remapped to anything Commissary-side), 1 `DISH` row for
 `Chicken Skewers` correctly tagged `BATCH_PREPPED`.
 
 ## 2026-08-29 — Step 18: BATCH_PREPPED over-sold warning
+
 New read-only route `GET /api/commands/oversold-check` in
 `server/routes/commands.js` (alongside step 15's sync-batch-stock),
 plus a new frontend file `public/commands/oversold-check.js` registered

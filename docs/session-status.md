@@ -1212,7 +1212,18 @@ everything built so far. None of these are designed yet — this section
 exists so they aren't lost, and so the real connections between them
 are visible before anyone starts designing in isolation.
 
-1. **Allocations needs an item-to-item conversion type.** Distinct from
+**Priority, made explicit 2026-08-29**: item 1 was the one auditing-
+service gap (real day-to-day recording need), items 2-5 are app-level
+(dashboard, cleanup, future-proofing, a refinement) — secondary.
+**Item 1 is now done** (below); nothing else on this list is currently
+flagged as urgent.
+
+1. **[Done, 2026-08-29] Allocations item-to-item conversion type.**
+   Built as `POST /api/allocations/conversion` + a "Converts to" field
+   on `allocations.html` — see `changelog.md`'s entry for full detail,
+   including a real bug caught and fixed (the settings route wasn't
+   returning the new flag) and the real supplier-pricing leak found and
+   fixed in passing. Distinct from
    step 22's `Allocation/Transfer` type, which moves the *same* item
    between *locations* (from/to fields). This is converting stock *of
    one item into a different item* at the same location — e.g. 2 units
