@@ -140,6 +140,18 @@ CREATE TABLE IF NOT EXISTS sales (
   FOREIGN KEY (dish_id) REFERENCES dishes(id)
 );
 
+-- Step 16: one MANUAL row per (restaurant, dish, date), so the Sales
+-- grid's "PATCH a single day's cell" can upsert safely. Scoped to
+-- MANUAL only (partial index) so a future LOYVERSE sync can post
+-- several raw transaction rows for the same dish/day without conflict -
+-- see data-model.md's sales section. Safe to add via plain
+-- CREATE-IF-NOT-EXISTS: this is a new index on a feature with no prior
+-- MANUAL rows possible before this step, not a constraint loosened on
+-- existing data (see the schema.sql gotcha in rules-for-claude-code.md).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_manual_unique
+  ON sales (restaurant_id, dish_id, business_date)
+  WHERE source = 'MANUAL';
+
 CREATE TABLE IF NOT EXISTS prepped (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   restaurant_id INTEGER NOT NULL,
