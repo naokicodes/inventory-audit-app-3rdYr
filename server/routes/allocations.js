@@ -27,6 +27,7 @@
 
 const express = require('express');
 const db = require('../db/connection.js');
+const { withTransaction } = require('../db/activityLog.js');
 
 const router = express.Router();
 
@@ -120,6 +121,85 @@ router.post('/allocations', (req, res) => {
   );
 
   res.json({ ok: true, id: result.lastInsertRowid });
+});
+
+// POST /api/allocations/conversion
+// Item 1 of the 2026-08-29 "Future considerations" list. Converts
+// stock of one item into a different item, same restaurant/date - e.g.
+// FC's Bagnet Sinigang becoming Dinuguan, since both trace back to the
+// same commissary Jowl. Distinct from the existing "Allocation /
+// Transfer" type, which moves the SAME item between LOCATIONS - this
+// moves DIFFERENT items at the SAME location.
+//
+// Body: { restaurant_id, business_date, from_meat_id, from_quantity,
+//         to_meat_id, to_quantity, notes?, created_by? }
+//
+// Writes two linked `adjustments` rows in one transaction, using the
+// existing sign convention (computeMeatAudit: expectedEnding =
+// endingCalculated - adjustments, so a POSITIVE quantity means stock
+// LEAVING, a NEGATIVE quantity means stock ENTERING):
+//   - from_meat_id gets quantity = +from_quantity (leaves that item's
+//     stock, same direction as Wastage/Transfer-out)
+//   - to_meat_id gets quantity = -to_quantity (enters that item's
+//     stock, same direction the old In-House/Wastage boxes never
+//     supported - conversions are the first place a NEGATIVE
+//     adjustment is legitimate)
+// The second row's linked_adjustment_id points back to the first row's
+// id, so the pair can be reconstructed/displayed together later even
+// though they're two independent rows (matches this table's existing
+// append-only, no-grouping-table design).
+//
+// adjustment_type_id is NOT accepted from the client - always resolved
+// server-side to the single "Portion Conversion" type, so a client
+// can't mislabel a conversion as some other type or vice versa.
+router.post('/allocations/conversion', (req, res) => {
+  const {
+    restaurant_id, business_date, from_meat_id, from_quantity,
+    to_meat_id, to_quantity, notes, created_by
+  } = req.body;
+
+  if (!restaurant_id || !business_date || !from_meat_id || !to_meat_id
+      || from_quantity === undefined || from_quantity === null || from_quantity === ''
+      || to_quantity === undefined || to_quantity === null || to_quantity === '') {
+    return res.status(400).json({ error: 'restaurant_id, business_date, from_meat_id, from_quantity, to_meat_id, and to_quantity are required' });
+  }
+  if (from_meat_id === to_meat_id) {
+    return res.status(400).json({ error: 'from_meat_id and to_meat_id must be different - this converts one item into another' });
+  }
+  if (Number(from_quantity) <= 0 || Number(to_quantity) <= 0) {
+    return res.status(400).json({ error: 'from_quantity and to_quantity must both be positive - the direction is implied, not signed by the caller' });
+  }
+
+  const restaurant = db.prepare('SELECT id FROM restaurants WHERE id = ? AND active = 1').get(restaurant_id);
+  if (!restaurant) return res.status(400).json({ error: 'Unknown or inactive restaurant_id' });
+
+  const fromMeat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(from_meat_id, restaurant_id);
+  if (!fromMeat) return res.status(400).json({ error: `from_meat_id ${from_meat_id} is not an active meat belonging to restaurant_id ${restaurant_id}` });
+
+  const toMeat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(to_meat_id, restaurant_id);
+  if (!toMeat) return res.status(400).json({ error: `to_meat_id ${to_meat_id} is not an active meat belonging to restaurant_id ${restaurant_id}` });
+
+  const type = db.prepare(`SELECT id FROM adjustment_types WHERE name = 'Portion Conversion' AND active = 1`).get();
+  if (!type) return res.status(500).json({ error: "The 'Portion Conversion' adjustment type is missing or inactive - this is a setup problem, not a request problem" });
+
+  const noteText = notes || null;
+  const actor = created_by || null;
+
+  const ids = withTransaction(db, () => {
+    const fromResult = db.prepare(`
+      INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(restaurant_id, from_meat_id, business_date, Number(from_quantity), type.id, noteText, actor);
+
+    const toResult = db.prepare(`
+      INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id, linked_adjustment_id, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(restaurant_id, to_meat_id, business_date, -Number(to_quantity), type.id, fromResult.lastInsertRowid, noteText, actor);
+
+    return { fromId: fromResult.lastInsertRowid, toId: toResult.lastInsertRowid };
+  });
+
+  res.json({ ok: true, from_adjustment_id: ids.fromId, to_adjustment_id: ids.toId });
 });
 
 module.exports = router;

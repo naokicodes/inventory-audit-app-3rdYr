@@ -196,7 +196,7 @@ router.delete('/settings/commissary-mappings/:id', (req, res) => {
 
 router.get('/settings/adjustment-types', (req, res) => {
   const rows = db.prepare(
-    `SELECT id, name, requires_transfer_locations, active FROM adjustment_types ORDER BY name`
+    `SELECT id, name, requires_transfer_locations, requires_conversion_target, active FROM adjustment_types ORDER BY name`
   ).all();
   res.json(rows);
 });
