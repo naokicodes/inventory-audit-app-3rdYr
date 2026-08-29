@@ -11,6 +11,143 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 19: Restaurant B (FC) onboarding
+New `server/db/seed-data-B.json`, extracted directly from
+`FC_MasterAudit.xlsx` via `openpyxl` (not hand-typed, not guessed):
+
+- **13 real meats** — `Meats` sheet rows `M14`-`M16` were blank
+  (`MeatID` present, `Name` empty), excluded.
+- **34 real dishes** — the `Dishes` sheet actually has 80 rows, but 46
+  of them (`D035`-`D080`) are unused template placeholders literally
+  named `"New Dish NN (rename me)"`. Confirmed by checking: every one
+  of the 34 real dishes has at least one `recipe_bom` row (or, for the
+  one `BATCH_PREPPED` dish, correctly has none), while all 46 excluded
+  ones have zero — consistent with them being genuinely unused, not a
+  data-loss risk from filtering wrong.
+- **35 real `recipe_bom` links** — of 200 raw rows in that sheet, only
+  36 had any real data; 35 link a meat, 1 (`Chicken Skewers`, `D022`,
+  the one `BATCH_PREPPED` dish) correctly has none — matches the
+  existing pattern where portions drive Batch-Prepped usage, not a
+  direct meat link. `Chicken Skewers` also independently corroborates
+  what the project owner described earlier about Whole Chicken's
+  fan-out (Skewers being one of the two named outputs) — good
+  cross-check between the raw data and the verbal description, found
+  without prompting for it.
+
+`server/db/seed.js` refactored: the restaurant-seeding logic (steps
+1-4) is now a `seedRestaurant(data)` function, called once per file in
+a `restaurantSeedFiles` array (`seed-data.json`, `seed-data-B.json`).
+Onboarding a future Restaurant C is a new JSON file + one array entry,
+no other code change — which is what step 19's original "no new code
+expected" framing turns out to have actually meant, once written
+properly instead of copy-pasted. Also fixed a stale comment above the
+commissary-meats block that still claimed "only 3 hand-verified
+meats," directly contradicted by its own next line's `console.log`
+saying 14 (the real, correct count, confirmed back in the step-9
+session — the comment just never got updated).
+
+**Deliberately scoped narrow**, per the project owner: FC's own meats
+(Bagnet, Sisig, Sinigang, DNG, etc.) are seeded as FC's own local stock
+items, exactly as `scope.md`'s step-20-adjacent note already
+concluded. No Commissary cross-referencing, no `commissary_meat_map`
+changes — none of steps 20-22's still-open design questions block
+this, confirmed true in practice, not just claimed in the abstract.
+
+**Verified**: full suite re-run at 9/9 files green (the `seed.js`
+refactor touches no schema, no engine, nothing the existing tests
+exercise, so this was a real regression check, not a formality).
+`seed.js` run twice live, confirming idempotency for both restaurants
+(0 inserted on the second run). A live server check: `GET
+/api/restaurants` lists both Restaurant A and FC; `GET
+/api/daily-audit/mixed?restaurant_id=2` for FC returns exactly the
+right shape — 13 `MEAT` rows including `Bagnet` as its own local stock
+item (not remapped to anything Commissary-side), 1 `DISH` row for
+`Chicken Skewers` correctly tagged `BATCH_PREPPED`.
+
+## 2026-08-29 — Step 18: BATCH_PREPPED over-sold warning
+New read-only route `GET /api/commands/oversold-check` in
+`server/routes/commands.js` (alongside step 15's sync-batch-stock),
+plus a new frontend file `public/commands/oversold-check.js` registered
+against the panel on all seven pages.
+
+**Interpretation call made explicitly, not silently**: the roadmap says
+"sold quantity should never exceed available prepped portions." Two
+readings existed: (a) same-day `sold(dish, date) > prepped(dish,
+date)`, or (b) the fuller running portion balance `computeDishAudit`
+already computes (`portionBeginning + prepped - sold`). Chose (a).
+Reason: (b) depends on `portionBeginning`, which comes from
+`portion_ending_actual` — a table with no write path anywhere in the
+app yet (per step 11's note, dish rows on Landing are still
+display-only). `computeDishAudit` returns `MISSING_BEGINNING_STOCK` for
+essentially every dish/date combo in the app's current state, which
+would make a warning built on (b) permanently dead code. (a) is
+meaningful today and can be widened to (b) later once a portion-count
+entry UI actually exists. Written into `session-status.md`'s step-18
+entry, not just this changelog note, so it's visible without reading
+the diff.
+
+Query: `SUM(sales.quantity)` vs `SUM(prepped.portions_produced)` per
+`(restaurant_id, dish_id, business_date)` for `BATCH_PREPPED` dishes
+only, flagged when sold exceeds prepped by more than a 0.01 epsilon (no
+prepped row at all counts as 0, i.e. fully over-sold). Purely
+informational — never writes anything, matching "surface this as a
+WARNING... not a hard block."
+
+Small scaffold tweak: added `white-space: pre-wrap` to
+`command-panel.js`'s `.cmd-result` CSS, so this command's multi-line
+warning list actually breaks onto separate lines instead of collapsing
+into one. The no-op command and sync-batch-stock's single-line results
+are unaffected.
+
+6 new tests added to `commands.test.js` (13/13 total in that file now):
+flagged when over, not flagged at exactly equal or under, no-prepped-row
+treated as 0, DIRECT dishes never considered, and confirms the check
+itself writes nothing. Full suite re-run: 9/9 files green.
+
+**Verified live**: seeded a real prepped=10/sold=15 pair for a real
+dish via a booted server, confirmed the endpoint returns the correct
+shortfall (5), confirmed a clean state returns `oversold_count: 0`,
+confirmed by direct DB read that the check wrote zero rows anywhere,
+and confirmed `oversold-check.js` is actually served on every page.
+**Not verified**: an actual browser click on the "Check over-sold"
+button in the live panel — same sandbox limitation as every frontend
+step this session (no headless browser available here).
+
+## 2026-08-29 — Step 17: Sales frontend (monthly grid)
+New page `public/sales.html` on top of step 16's backend. Rows = every
+active dish for the selected restaurant (both `DIRECT` and
+`BATCH_PREPPED` — sales applies to both, per `data-model.md`), columns
+= every day of the selected month (a `type="month"` input), cells =
+quantity inputs reading/writing `GET`/`PATCH /api/sales`.
+
+**Confirm-on-override, as specified**: an edit to a cell that already
+had a saved value (including clearing it to blank) triggers a
+`confirm()` dialog showing the current and new value before saving;
+cancelling reverts the input to its last-actually-saved value, not just
+whatever was in the DOM pre-edit. A brand-new entry into a previously-
+empty cell saves immediately, no prompt — matches the roadmap's "editable
+with a confirm prompt on manual override," read as override-of-existing,
+not every keystroke.
+
+Added a "Sales" nav link to all six existing pages plus itself (seven
+total now), and included `command-panel.js` +
+`commands/sync-batch-stock.js` on the new page too, consistent with
+step 14's "any tab" scaffold and its Landing precedent.
+
+**No new automated tests** — frontend-only step, no backend/schema/
+engine change (same as steps 11/13/14's precedent, rule 6's testing
+requirement is scoped to the audit/yield engines). Verified instead by:
+`node --check` on the extracted inline script (syntax), and a live
+end-to-end check against a real booted server — confirmed `sales.html`
+serves with the nav link and both scripts present, confirmed the six
+existing pages' nav actually picked up the new link, and replayed the
+exact `GET` → `PATCH` → `GET` sequence the page's JS performs, checking
+the returned JSON shape matches what `renderGrid()`/`onCellChange()`
+expect at each step. **Not verified**: an actual browser click-through
+of the grid, the confirm-dialog interaction, or the sticky dish-name
+column's rendering — same sandbox limitation as steps 13/14/15's open
+items (no headless browser available here).
+
 ## 2026-08-29 — Step 16: Sales backend (manual entry, backend + tests only)
 New route file `server/routes/sales.js`, mounted in `server/index.js`:
 - `GET /api/sales?restaurant_id=&year=&month=` — one row per active dish

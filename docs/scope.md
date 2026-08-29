@@ -47,6 +47,46 @@ an obvious/helpful addition. Small scale, deliberately.
   receipts and commissary yield entries only for now — extending it to
   every other input table is real, valid future work, not built yet (see
   `commissary-and-stock-receipts.md`, Part 3, scope boundary note).
+- **Not reconciling Commissary's raw meat against FC's portioned stock
+  items — yet.** Confirmed 2026-08-29: FC's `Bagnet`, `Sisig`,
+  `Sinigang`, and `DNG` meat rows aren't raw cuts — they're all
+  Commissary's Jowl, pre-portioned before shipping to FC (one raw input,
+  four named outputs). `commissaryYieldEngine.js` only models one input
+  → one output, so this isn't a small extension of it. FC's own daily
+  audit doesn't need this to work: its `Recipe_BOM` already links these
+  four items to dishes exactly like Restaurant A links Jowl-the-raw-cut
+  to its own dishes (a stock item consumed in varying quantities by
+  several dishes), so Restaurant B onboarding (step 19) should treat
+  them as FC's own local stock items, full stop — no attempt to remap
+  them to Commissary `MeatID`s during onboarding. A real
+  Commissary-Jowl-reconciles-against-FC's-four-portions check is valid
+  future work, its own step, not bundled into onboarding.
+
+  **2026-08-29 follow-up, confirmed by the project owner**:
+  - `Ground Beef → Burger Patty` was **wrong on two counts** — Ground
+    Beef is for Ragu/Bolognese, not Burger Patty, and FC sources its own
+    Ground Beef independently (not a Commissary-yield output at all;
+    Commissary separately stocks its own Ground Beef too, which it
+    distributes onward to other outlets — "Likod" and "Silingan" — not
+    modeled in this app yet). Removed as a candidate fan-out entirely.
+  - `Whole Chicken → Quarter Chicken + Chicken Fillet` is **confirmed
+    real**, same shape as Jowl: one Whole Chicken processes into 2
+    Chicken Skewers portions (breast) + 2 Quarter Chicken portions (leg
+    quarters) — a genuine one-input/multi-output fan-out, not a single
+    conversion. Chicken Fillet apparently uses "the same formula...atm"
+    per the project owner's own wording — worth reading as possibly
+    provisional/changeable, not a fixed constant, which matters for
+    whatever eventually models this (see below).
+  - `Burger Patty` is a blend of multiple meats, not a single-input
+    yield at all — explicitly out of scope for now per the project
+    owner ("let's not dive into that").
+  - **Direction requested for how to eventually model all of this**:
+    not hardcoded per-case logic, but a settings-configurable
+    conversion/yield system the project owner can adjust without a
+    developer — see `session-status.md`'s step 20 (draft schema
+    proposal, updated 2026-08-29 after checking a second real
+    spreadsheet and confirming a concrete schema gap in
+    `commissary_meat_map`) for the concrete shape under discussion.
 
 ## The worker-facing surface should stay small
 The auditor's actual daily task is transcribing numbers from staff photos

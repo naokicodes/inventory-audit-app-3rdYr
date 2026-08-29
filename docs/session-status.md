@@ -6,9 +6,9 @@ deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
 so always start here.
 
-## Where things stand: steps 1–16 done. Steps 1–15 committed and pushed
-to `main`; step 16 committed locally this session, not yet pushed (see
-below).
+## Where things stand: steps 1–19 done. Steps 1–14 committed and pushed
+to `main`; steps 15–18 committed locally this session, not yet pushed
+(see below).
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -225,21 +225,84 @@ below).
     the real HTTP call. Not verified: the step-17 grid UI doesn't exist
     yet (this step is backend + tests only, per its own scope), so
     there's nothing to click-test yet.
+- **Step 17** (Sales frontend): done. New page `public/sales.html` —
+  monthly grid, rows = active dishes, columns = days of the selected
+  month, on top of step 16's `GET`/`PATCH /api/sales`. Confirm-on-
+  override: editing an already-filled cell (including clearing it)
+  prompts before saving; a fresh entry into an empty cell doesn't.
+  "Sales" added to nav on all seven pages; the new page also gets
+  `command-panel.js` + `commands/sync-batch-stock.js`, matching step
+  14's "any tab" scaffold.
+  - **Verified**: `node --check` on the extracted inline script, plus a
+    live end-to-end check against a real booted server — confirmed the
+    page serves with the right nav/scripts, confirmed the six existing
+    pages' nav picked up the new link, and replayed the exact
+    `GET`→`PATCH`→`GET` sequence the page's own JS performs, checking
+    the response shape at each step matches what `renderGrid()`/
+    `onCellChange()` expect. No new automated tests — frontend-only,
+    same precedent as steps 11/13/14. **Not verified**: an actual
+    browser click-through of the grid or the confirm-dialog interaction
+    — no headless browser available in this sandbox, same open item as
+    steps 13–15's.
+- **Step 18** (BATCH_PREPPED over-sold warning): done. New route
+  `GET /api/commands/oversold-check` (read-only) + new frontend file
+  `public/commands/oversold-check.js`, registered on all seven pages.
+  Flags `(restaurant, dish, date)` combos where a `BATCH_PREPPED` dish's
+  same-day sold exceeds same-day prepped. **Interpretation call made
+  explicitly** (see `changelog.md`'s step-18 entry): reads "available
+  prepped portions" as same-day only, not the fuller running portion
+  balance `computeDishAudit` computes, since the latter depends on
+  `portion_ending_actual` having real data — which it never does yet
+  (step 11), so a check built on it would never fire. Small scaffold
+  tweak: added `white-space: pre-wrap` to `command-panel.js`'s
+  `.cmd-result` CSS so a multi-line warning list actually shows as
+  multiple lines.
+  - **Verified**: 6 new tests in `commands.test.js` (13/13 total in
+    that file), full suite re-run at 9/9 files green, AND a live
+    end-to-end check — seeded a real prepped/sold mismatch via a booted
+    server, confirmed the correct shortfall came back, confirmed a
+    clean state returns zero, confirmed by direct DB read that the
+    check itself writes nothing, and confirmed the script is served on
+    every page. Not verified: an actual browser click on the button —
+    same sandbox limitation as every frontend step this session.
+- **Step 19** (Restaurant B/FC onboarding): done. New
+  `server/db/seed-data-B.json` extracted directly from
+  `FC_MasterAudit.xlsx` (13 real meats, 34 real dishes, 35
+  `recipe_bom` links — 46 unused placeholder dish rows in the source
+  correctly excluded, not silently included). `seed.js` refactored to
+  loop over any number of restaurant seed files, not hand-duplicated.
+  Deliberately scoped narrow, per the project owner: FC's own local
+  catalog only, no Commissary cross-referencing — steps 20-22's open
+  design questions don't block this.
+  - **Verified**: full suite 9/9 files green, `seed.js` re-run twice
+    live confirming idempotency, and a live server check — both
+    restaurants list correctly, FC's mixed Landing grid returns the
+    right shape (13 MEAT rows including Bagnet as FC's own stock item,
+    1 DISH row for the Batch-Prepped Chicken Skewers).
 
-**Next up is step 17** (Sales frontend) — see the roadmap below. Steps
-10–14 are committed and pushed to `main`, independently verified
+Steps 20-22 remain **draft proposals under active discussion, not
+committed or built** — see their entries below for the current state of
+that conversation (Commissary extend-not-migrate and its own dedicated
+shipment page are resolved; the Command terminal page and the Landing
+Allocations merge are still open). **Next up, once architecture
+discussion wraps**: either continue steps 20-22 into real schema/code,
+or hand the 7 standby workers something else — project owner's call,
+not decided here.
+
+Steps 10–14 are committed and pushed to `main`, independently verified
 (2026-08-29): cloned fresh, confirmed the actual commits are present
 (`7b0c541`/`2ff3032`/`5b31717` for 10–11, `97a5e74`/`98e2c0a`/`0ba4dd1`
 for 12, `e16fd64` for 13, `866da77` for 14), ran the full suite from a
 clean install (green), and live-smoke-tested the opening-stock write
 path (step 12) against a real booted server. The step-12/13/14 "commit
 status unverified" caveat from the prior session is resolved — no need
-to re-check it. **Steps 15 and 16 are done and committed in this
-session's local clone only** — no push credentials available here (same
+to re-check it. **Steps 15 through 19, plus the architecture-discussion
+docs commits for steps 20-22, are done and committed in this session's
+local clone only** — no push credentials available here (same
 limitation noted for steps 10-11 originally). Whoever has git access
 should pull these commits into the real local clone and push before
-starting step 17, or step 17 will be built against a `main` that's two
-steps behind what this doc describes.
+handing anything to the standby workers, or they'll be working against
+a `main` that's badly behind what this doc describes.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -280,13 +343,9 @@ second-guess decisions already made, per rule 3.
   verification, but not the same as clicking it. Commissary's own
   Edit/Delete UI flows are in the same boat — never fully click-tested.
 - ~~**Live recalculation**~~ — done, step 13 above.
-- Restaurant B/C still aren't seeded — Restaurant A only. Step 8's admin
-  screen removes the main blocker to onboarding them (mapping is now
-  reachable in the UI); they'll still need their own
-  `meats`/`dishes`/`recipe_bom` seeded via Settings. A verified
-  `seed-data-B.json` (from `FC_MasterAudit.xlsx`, Restaurant B's real
-  workbook) is expected to be prepared separately, outside a coding
-  session — check with the project owner before assuming it's ready.
+- ~~**Restaurant B/C still aren't seeded**~~ — Restaurant B (FC) done as
+  of step 19, 2026-08-29. Restaurant C (Likod) is still unseeded — no
+  workbook for it exists yet, unlike FC's real `FC_MasterAudit.xlsx`.
 
 ## Remaining scope (steps 10–19)
 
@@ -336,21 +395,194 @@ of sizing them correctly, not a separate concern.
     stale "Loyverse only" line in `data-model.md`, and `sales` missing
     from `scope.md`'s deferred-activity-logging list) and an interaction
     bug the full-suite re-run caught between this step and step 15.
-17. **[Not started] Sales frontend.** The monthly grid UI (rows =
-    dishes, columns = Day 1..last day) on top of step 16, editable with
-    a confirm prompt on manual override.
-18. **[Not started] BATCH_PREPPED over-sold warning.** Sold quantity
-    should never exceed available prepped portions for a BATCH_PREPPED
-    dish — surface this as a WARNING through the step 14/15 command
-    panel, not a hard block. Small and self-contained now that steps
-    14–17 exist under it.
-19. **[Not started] Restaurant B onboarding** (once `seed-data-B.json`
-    is confirmed ready by the project owner — see "Known open items"
-    above): seed `meats`/`dishes`/`recipe_bom` for Restaurant B via the
-    Settings screens step 8 already built. No new code expected — this
-    is a data/verification step, not a feature step; worth keeping as
-    its own numbered item anyway so it isn't silently skipped or bundled
-    into something else.
+17. **[Done] Sales frontend.** See the 2026-08-29 changelog entry for
+    full detail — new `public/sales.html`, confirm-on-override behavior,
+    "Sales" added to nav on all seven pages.
+18. **[Done] BATCH_PREPPED over-sold warning.** See the 2026-08-29
+    changelog entry for full detail, including an interpretation call
+    made explicitly: reads "available prepped portions" as same-day
+    prepped only, not the fuller running portion balance, since the
+    latter depends on `portion_ending_actual`, which has no write path
+    anywhere in the app yet — a check built on it would be dead code
+    today. Worth revisiting once a portion-count entry UI exists.
+19. **[Done] Restaurant B (FC) onboarding.** Scoped deliberately narrow
+    per the project owner 2026-08-29: seed FC's own local catalog only,
+    no cross-referencing to Commissary — steps 20-22's design questions
+    don't block this, confirmed independently true.
+
+    New `server/db/seed-data-B.json`, extracted directly from
+    `FC_MasterAudit.xlsx` (not hand-typed): 13 real meats (`M14`-`M16`
+    were blank rows in the source, excluded), 34 real dishes (46
+    "New Dish NN (rename me)" placeholder template rows in the source
+    sheet excluded — not a data error, just an unfinished part of FC's
+    own workbook, worth knowing about), 35 real `recipe_bom` links.
+    `Chicken Skewers` (`D022`) is the one `BATCH_PREPPED` dish, correctly
+    has no `recipe_bom` row (matches the pattern — portions drive it,
+    not a direct meat link) — and matches exactly what the project owner
+    described earlier about Whole Chicken's fan-out, good independent
+    corroboration from the raw data.
+
+    `server/db/seed.js` refactored into a reusable `seedRestaurant()`
+    function, looped over both `seed-data.json` (Restaurant A) and the
+    new `seed-data-B.json` — adding a third restaurant later is a new
+    JSON file plus one line in the filenames array, no other code
+    change, which is what "no new code expected" in this step's
+    original description turned out to actually mean. Also fixed a
+    stale comment (claimed "only 3 hand-verified commissary meats,"
+    contradicted its own very next `console.log` line saying 14 — the
+    real count, confirmed correct back in the step-9 session).
+
+    **Verified**: full suite re-run at 9/9 files green (no regressions
+    from the seed.js refactor), a live re-run of `seed.js` twice
+    confirming idempotency (0 inserted the second time, for both
+    restaurants), and a live server check — `GET /api/restaurants` shows
+    both restaurants, `GET /api/daily-audit/mixed?restaurant_id=2` for
+    FC returns 13 MEAT rows + 1 DISH row with the right shape, Bagnet
+    correctly appears as FC's own local stock item (not remapped to
+    Commissary), matching step 20's onboarding decision exactly.
+20. **[Draft proposal, under active discussion — not committed] Give
+    Commissary its own Landing-style audit, and replace the too-rigid
+    `commissary_meat_map` with a real shipment/allocation event.**
+    Grounded in three real sources checked 2026-08-29, not guessed:
+    `Commi_Audit_Master.xlsx`'s `Commissary_Stock`/`Yield_Log`/
+    `Outbound_Log` sheets, the project owner's description of the real
+    process, and `UPDATED_PARDZ_INV_Commi.xlsx`'s "Remake V3" sheet — an
+    auditor-run paper version of exactly this that's already in use.
+
+    **What Remake V3 actually shows**: a top table per Commissary meat
+    (Beginning / Stock In / Backed Up / [destination]-Out, one column
+    per kitchen: FC, Silingan, and presumably Likod / not yet a column
+    here / Ending — **a real physical count**, not the always-computed
+    balance `Commissary_Stock` has today). Below it, one sub-table per
+    destination kitchen, breaking that kitchen's shipment into named
+    portions (Jowl → Bagnet/Sisig/Sinigang/Dinuguan for FC, etc.). This
+    resolves the open question from the prior session: **portioning
+    happens at shipping/allocation time, not at the raw→processed
+    Backed-Up step** — Backed Up stays a plain 1:1 yield (unchanged
+    engine), and only the outbound side needs new modeling. FC's own
+    sub-table still lists plain "JOWL" as one of its own rows too — raw
+    and portioned shipments of the same underlying meat coexist, matches
+    "dynamic, not a fixed formula."
+
+    **Concrete schema gap, confirmed by reading `schema.sql` directly,
+    not assumed**: `commissary_meat_map` has
+    `UNIQUE (commissary_meat_id, restaurant_id)` — it hard-assumes one
+    commissary meat maps to exactly one destination meat per restaurant.
+    That's precisely what Jowl→four-FC-items breaks. This table's job
+    needs to change from an enforced mapping to, at most, a loose
+    autofill reference — or be replaced outright by the shipment
+    concept below.
+
+    **Draft table shapes (react-to, not final)**:
+    - `commissary_ending_actual` (mirrors `ending_actual`) — the real
+      physical count Remake V3 already collects on paper but the app
+      has nowhere to put today. Closes the "trusted, never audited" gap
+      directly.
+    - `commissary_opening_stock` (mirrors `opening_stock`, step 12's
+      pattern) — first-ever beginning value per commissary meat; every
+      day after derives from the prior day's `commissary_ending_actual`,
+      same as restaurants.
+    - `commissary_stock_receipts` — raw meat arriving at Commissary from
+      an outside supplier ("Stock In"). Distinct from the existing
+      `stock_receipts` table, which is restaurant-facing; this is
+      Commissary receiving, not a restaurant receiving.
+    - `commissary_shipments` (id, commissary_meat_id, restaurant_id
+      destination, business_date, total_quantity, notes, ...) — one row
+      per outbound batch, `total_quantity` feeding the top table's
+      matching "[Kitchen]-Out" column and thus Commissary's own usage.
+    - `commissary_shipment_lines` (shipment_id, meat_id — the
+      *destination restaurant's own* meat row, e.g. FC's "Bagnet" —
+      quantity) — the named-portion breakdown. **Each line, on save,
+      also writes a normal `stock_receipts` row for the destination**
+      (source='COMMISSARY', `commissary_meat_id` set) — reuses existing,
+      already-tested destination-side mechanics unchanged; nothing new
+      needed there.
+    - Reconciliation between a shipment's `total_quantity` and the sum
+      of its lines is informational only, not enforced — different
+      units on each side (kg of Jowl vs. portion-units of Bagnet) make a
+      strict equality check not generally meaningful anyway, and an
+      enforced check would contradict "dynamic, no static formula."
+    - Settings-managed `commissary_shipment_presets` (+ preset lines) —
+      the "quick formulas" the project owner asked for, pure autofill
+      for the entry form, never authoritative; the auditor can always
+      change every number before saving.
+    - Auto-computed output-percentages for a future management
+      dashboard — derived on read from `commissary_shipment_lines` vs.
+      `total_quantity`, never feeding back into any audit-engine
+      calculation. Not urgent, no new table needed yet.
+
+    **Migrate-vs-extend — RESOLVED 2026-08-29**: extend, not migrate.
+    "Commissary is the root" was the project owner's own framing —
+    Commissary's own tables get built out first-class, restaurants build
+    onto that, rather than folding Commissary into `restaurants` to
+    inherit machinery that (per the analysis above) wasn't going to be
+    free anyway.
+
+    **Shipment-logging UI — RESOLVED 2026-08-29**: its own dedicated
+    page, like Stock Receipts. Not the Command Panel widget. See step 21
+    below for how the Command Panel itself is evolving instead.
+
+    **Scope relative to step 19**: still doesn't block Restaurant B
+    onboarding. FC's Bagnet/Sisig/Sinigang/DNG/etc. get onboarded as
+    FC's own local stock items regardless of how this design lands —
+    additive on top, not a prerequisite. Sequencing is the project
+    owner's call.
+
+21. **[Draft proposal, under active discussion — not committed] A
+    second, bigger Command surface: a dedicated console/terminal page,
+    separate from the step-14 floating widget.** Requested 2026-08-29.
+    The floating panel (steps 14/15/18) stays exactly as it is — quick,
+    single-click, "any tab" micro-actions. This is a *different*,
+    full-page surface for people who'd rather type than click through
+    forms, aimed specifically at Commissary's shipment logging first
+    (Commissary is "more dynamic" than the restaurants, which are "more
+    on the static side" — project owner's framing) — not a general
+    command line for every screen on day one. **Design constraint, not
+    yet built**: the terminal must call the *same* backend endpoints the
+    GUI forms do (e.g. the same shipment-logging route step 20 will
+    add), so it's a second input surface on one data path, never a
+    parallel system that could drift out of sync with what the forms
+    write. Command syntax, autocomplete, and history are all
+    undesigned — this is a placeholder for the idea, not a spec.
+
+22. **[Draft proposal, under active discussion — not committed] Merge
+    Landing's In-House/Wastage/Other into one read-only "Allocations"
+    cell, fed by a new dedicated Allocations page.** Requested
+    2026-08-29, framed explicitly as "do to Adjustments what the
+    2026-08-27 change already did to New Stock" — move detailed entry
+    off Landing onto its own page, Landing shows a read-only sum.
+
+    **Confirmed by reading the actual code, not assumed**: this is
+    smaller than it sounds. `computeMeatAudit` already only ever
+    produces *one* summed `adjustments` number
+    (`SUM(quantity) FROM adjustments WHERE ...`) — Landing's three boxes
+    are a frontend-only illusion. Each one silently writes to one
+    specific hardcoded `adjustment_type` row (`Wastage`,
+    `Staff Meal / In-House`, `Other / Uncategorized`) via
+    `server/routes/dailyAudit.js`'s delete-then-insert helper. **Bonus
+    finding**: the seeded `adjustment_types` table already has three
+    *more* real categories — `Allocation / Transfer`, `Spoilage`,
+    `Damaged` — with no entry path anywhere in the app today. A proper
+    Allocations page doesn't just simplify Landing, it finishes
+    something the schema already promised.
+
+    **Rough shape (not final)**: Landing's meat row shrinks to one
+    read-only `adjustments` cell (already computed, no engine change
+    needed). A new `public/allocations.html`-equivalent page, parallel
+    to Stock Receipts: restaurant, date, meat, `adjustment_type`
+    (dropdown from the full admin-managed list), quantity, notes, and
+    from/to location fields shown only when the chosen type has
+    `requires_transfer_locations = 1` (already a real column,
+    unused by any UI today). `dailyAudit.js`'s save handler drops the
+    three hardcoded type lookups/writes entirely — the `adjustments`
+    table becomes fully driven by this new page instead.
+
+    **Open question, not yet resolved**: whether the existing
+    `adjustment_types` admin CRUD (referenced in `daily-workflow.md` as
+    "admin-managed," but with no actual settings-screen UI found in the
+    repo) gets built alongside this, or stays a gap for later — the six
+    real rows exist only via seed data today, nothing lets the project
+    owner add a seventh without editing a JSON file by hand.
 
 ## Things NOT to re-litigate (already decided, stable)
 
