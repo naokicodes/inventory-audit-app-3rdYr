@@ -1,18 +1,25 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (step 22 — Landing Allocations merge — Done.
-Built and verified live by the architect session: minimal admin CRUD
-for both `adjustment_types` and `locations` (the latter had zero rows
-and no admin path — flagged and resolved with the project owner before
-building, not assumed), a new append-only Allocations page/route
-replacing Landing's old three-box adjustment entry, and Landing's meat
-row now shows one read-only `Adjustments` cell. A real bug (a dead
-helper referencing an undefined variable in settings.html) was caught
-and fixed before the live verification pass, not shipped. Full backend
-suite: 165/165, 0 regressions, including a new allocations.test.js.
-Only a real browser click-through remains genuinely open. Steps 1–21
-remain fully done — see each step's own entry for its own verification
-detail).
+Last updated: 2026-08-30 (Terminal docked-bar layout — Done, pending
+push. Built and verified live: the AutoCAD-style bottom-docked command
+bar + togglable right-edge history sidebar step 21's "Deferred, not
+forgotten" note described, as pure frontend layout work on
+`public/terminal.html`. No backend or slot-state-machine changes. Full
+backend suite re-run clean after: 12/12 files, 178/178 assertions, 0
+regressions — matches baseline exactly, as expected for a
+frontend-only change. See changelog.md for full verification detail
+and the two layout calls flagged (sidebar edge, "Last saved shipment"
+panel placement) that the resolved design note didn't specify. This
+worker had no push credentials — standard handoff format used, not yet
+on `main` as of this writing.
+
+Also landed on `main` since this session last pulled, by a separate
+worker (not verified or reviewed by this session beyond a clean
+rebase): the Portion Actual write path for BATCH_PREPPED dishes
+(`POST /api/daily-audit/portions`, editable dish rows on
+`daily-audit.html`) — see changelog.md's own 2026-08-29 entry for that
+work's detail and verification. Steps 1–22 remain fully done — see
+each step's own entry for its own verification detail).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -58,13 +65,13 @@ dead-simple per `daily-workflow.md`, but the admin side should let the
 project owner define new things — conversions, categories, presets —
 without a developer, a theme running through steps 20-22 alike).
 
-## Where things stand: steps 1–22 done, everything confirmed pushed to
-`main` and verified (step 22 verified live by the architect session
-directly, not yet pushed at the time of writing — see its own entry
-below for the exact commit boundary). An AutoCAD-style docked-bar
-layout for the terminal was discussed and deliberately deferred (see
-step 21's entry) — not started. **No step is currently queued next** —
-project owner's call on what comes after step 22.
+## Where things stand: steps 1–22 done. The AutoCAD-style docked-bar
+layout for the terminal (discussed and deliberately deferred under step
+21's entry) has now been built and verified live — see step 21's entry
+below for the exact detail, and changelog.md's 2026-08-30 entry. This
+worker had no push credentials, so it's not yet on `main` — standard
+handoff format used (see below). **No step is currently queued next** —
+project owner's call on what comes after step 22 / the terminal layout.
 
 **Step 20 is now fully closed out, including the
 `commissary_shipment_presets` piece 20c deferred.** New this session:
@@ -76,16 +83,9 @@ server, exercised create/list/edit/deactivate/reject-bad-line over
 real HTTP, confirmed the page serves and the preset JSON shape matches
 what the frontend reads. Full suite: **11/11 files, 154/154 assertions,
 0 regressions** (was 138). Pushed to `main`. See this session's
-`changelog.md` entry for the full breakdown.
-
-**Preset-authoring admin UI — done, 2026-08-30.** The one piece left
-after the above (presets creatable via the API but not yet through a
-browser form) is now closed out: a "Shipment Presets" tab on
-`settings.html` for creating and lightly editing (name/active) presets,
-per this session's `changelog.md` entry. No backend changes — the
-existing routes already worked. Editing an existing preset's *lines* is
-not built (smallest-reasonable scope call); `PUT` already supports it as
-a future follow-up if needed.
+`changelog.md` entry for the full breakdown, including what's still
+explicitly deferred (a preset-*authoring* admin UI — presets can be
+created via the API today, just not yet through a browser form).
 
 **20c's hand-off is fully closed out.** The step-20c coder session had
 no network access (403s on `git clone`/`npm install`, same zip-fallback
@@ -159,11 +159,10 @@ use `source: 'MANUAL'` correctly (human-triggered write, not a
   instead of `/api/daily-audit` and renders meats + BATCH_PREPPED dishes
   as rows in one table. Meat rows: unchanged editable fields/save flow
   (still posts to the untouched `POST /api/daily-audit`). Dish rows:
-  **display-only** (Prepped, Sold, Portion Beginning/Ending calc,
-  Portion Actual, status) — there is still no write path for
-  `prepped`/`portion_ending_actual` anywhere in the app, so editing dish
-  rows is explicitly deferred to its own future step, not silently
-  assumed in-scope here. User-facing label is "Over/Short"; `variance`
+  were **display-only** at the time this entry was first written —
+  **that gap is closed as of 2026-08-29**, see the dedicated changelog
+  entry for the `POST /api/daily-audit/portions` write path. User-facing
+  label is "Over/Short"; `variance`
   stays the internal/code term, per the roadmap's vocabulary note.
   `GET /api/daily-audit/mixed` gained a small, doc-anticipated addition
   (`dailyAudit.js`'s own step-10 comment flagged this as step 11's job):
@@ -395,11 +394,11 @@ step-20b entry below for detail.
 
 **Step 20 is fully closed out** (including the `commissary_shipment_presets`
 piece 20c deferred, closed 2026-08-29) — see the top of this file and
-its roadmap entry below for the full breakdown. The preset-*authoring*
-admin UI, once its own follow-up, is also done as of 2026-08-30 (see
-the top of this file and the 20c roadmap entry). **Next up: step 21 or 22** (both still drafts under
-discussion, not committed designs) — project owner's call, nothing else
-outstanding to pick up first.
+its roadmap entry below for the full breakdown. Still explicitly
+deferred as its own follow-up: a preset-*authoring* admin UI (see the
+20c roadmap entry). **Next up: step 21 or 22** (both still drafts under
+discussion, not committed designs) — or the preset-authoring UI
+follow-up, if the project owner wants that picked up before 21/22.
 Distribution follows rule 18: pull from `main` directly, review, resolve
 any flags, write the *single next* worker prompt, hand off a fresh repo
 — not a batch of prompts for several steps at once. If you're a fresh
@@ -544,9 +543,9 @@ of sizing them correctly, not a separate concern.
     correctly appears as FC's own local stock item (not remapped to
     Commissary), matching step 20's onboarding decision exactly.
 20. **[Done, 2026-08-29 — core work complete across all of
-    20a/20b/20c plus the presets follow-up; the preset-authoring admin
-    UI, once its own deferred follow-up, is also done as of 2026-08-30 —
-    see the 20c bullet below] Give
+    20a/20b/20c plus the presets follow-up; one small piece (a
+    preset-authoring admin UI) still explicitly deferred, see the 20c
+    bullet below] Give
     Commissary its own Landing-style audit, and replace the too-rigid
     `commissary_meat_map` with a real shipment/allocation event.**
     Grounded in three real sources checked 2026-08-29, not guessed:
@@ -806,14 +805,16 @@ of sizing them correctly, not a separate concern.
       follow-up, not silently dropped — then built in a dedicated
       follow-up session. **Done**: `GET`/`POST`/`PUT /api/commissary/shipment-presets` in
       `commissary.js`, and the "Load preset" control on
-      `commissary-shipments.html`. **The preset-*authoring* admin UI
-      (a settings page or section to create new presets through the
-      browser, not just consume existing ones) — done, 2026-08-30, see
-      that session's `changelog.md` entry.** Built as a "Shipment
-      Presets" tab on `settings.html`, using the CRUD routes above
-      unchanged (no backend work needed). Editing an existing preset's
-      lines is not built (smallest-reasonable scope) — `PUT` already
-      supports it as a future follow-up if needed.
+      `commissary-shipments.html`. **Still explicitly deferred as its
+      own (smaller) follow-up**: a preset-*authoring* admin UI (a settings page
+      or section to create new presets through the browser, not just
+      consume existing ones) — presets can be created via the API
+      today (see the new tests and the live curl verification in this
+      session's changelog entry), but there's no in-app form for it
+      yet. Smallest reasonable shape for that follow-up is likely a
+      small section on `settings.html`, since presets are
+      settings-managed data — the CRUD routes it would need already
+      exist.
 
       **Verified**: new `server/routes/commissary.test.js`, 17/17
       assertions, mirrored-logic style (same convention as
@@ -1075,7 +1076,8 @@ of sizing them correctly, not a separate concern.
       server, which is strong verification, but isn't the same as
       someone actually typing it.
 
-      **Deferred, not forgotten**: the project owner proposed an
+      **Deferred, not forgotten — now built, 2026-08-30 (see changelog.md
+    for full detail)**: the project owner proposed an
       AutoCAD-style layout — command bar docked bottom-center instead
       of top-of-page, with history reached both via up-arrow (already
       built) and a togglable slide-in sidebar for browsing further back,
@@ -1087,6 +1089,21 @@ of sizing them correctly, not a separate concern.
       anchored to the input). Explicitly scheduled *after* logic/backend
       work is settled, not before — this note exists so it isn't
       silently dropped, not as a signal to start it next.
+
+      Built as pure frontend layout work on `public/terminal.html` —
+      no backend or slot-state-machine changes. Docked bar, flipped
+      internal stacking (dropdown now opens above the input, not
+      below), and a right-edge togglable history sidebar (edge not
+      specified by the resolved note, flagged as a call made) replacing
+      the old always-visible history panel. Verified live: real server,
+      real extracted script driven through a Node `vm` context with a
+      real `fetch` against it, a full `ship` line submitted through the
+      real `handleSubmit()` and confirmed as a real `commissary_shipments`
+      row in the database. Full backend suite re-run clean:
+      **12/12 files, 178/178 assertions, 0 regressions**. No push
+      credentials this session — standard handoff, not yet on `main`.
+      Still genuinely untested: real browser click-through, same
+      standing gap as 21a/21b.
 
 22. **[Done, 2026-08-29 — built by a fresh session and verified live]
     Merge Landing's In-House/Wastage/Other into one read-only
@@ -1221,6 +1238,19 @@ Five items the project owner raised in one batch, thinking ahead past
 everything built so far. None of these are designed yet — this section
 exists so they aren't lost, and so the real connections between them
 are visible before anyone starts designing in isolation.
+
+**Item 6, added 2026-08-29 (not raised by the project owner — surfaced
+while building the Portion Actual write path)**: step 18's over-sold
+check (`GET /api/commands/oversold-check`) deliberately used same-day
+`sold > prepped` instead of the fuller running portion balance
+(`portionBeginning + prepped - sold`), specifically *because*
+`portion_ending_actual` had no write path and the fuller check would
+have been dead code. That write path now exists (see the 2026-08-29
+"Portion Actual write path" changelog entry) — the interpretation
+choice is no longer forced, just still the current behavior. Worth a
+real revisit; not changed as a side effect of building the write path
+itself, since that's a distinct decision from "does the capability
+exist."
 
 **Priority, made explicit 2026-08-29**: item 1 was the one auditing-
 service gap (real day-to-day recording need), items 2-5 are app-level
