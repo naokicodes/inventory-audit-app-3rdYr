@@ -230,6 +230,31 @@ standing constraints, not suggestions — they exist to keep a solo,
     sounds: if the only thing that changed since the last full-suite
     run is `.md` files, don't re-run it again just for that.
 
+20. **Commit messages: short subject line + 2-4 tight paragraphs,
+    max. Never a changelog copy-paste.** Added 2026-08-29 after a
+    session wrote 37-61 line commit messages that fully duplicated
+    verification detail already going into `changelog.md`, then burned
+    several more turns rewriting them once the mismatch with this
+    repo's own actual convention got flagged (check `git log` yourself
+    — real commits here are short and skimmable). The rule going
+    forward: one line summarizing what changed, then a few short
+    paragraphs on *why* if it's not obvious — never a bullet-by-bullet
+    restatement of every test that passed or every file that changed.
+    That detail belongs in `changelog.md`, once, not duplicated into
+    git history too. This applies to the architect conversation's own
+    commits as much as any coder worker's — if you're an architect
+    session reading this, your own commit messages so far in this
+    project's history have NOT consistently followed this rule; that's
+    the bad precedent this entry exists to correct, not just a coder
+    instruction.
+    - **When handing the project owner copy-pasteable terminal
+      commands with multiple `-m` flags, put them all on one line,
+      each `-m "..."` repeated directly — never a backslash
+      line-continuation across multiple lines.** Confirmed not to work
+      reliably in the project owner's actual terminal, cost real
+      back-and-forth to discover. `git commit -m "subject" -m "body
+      paragraph"` on one line is the format that works.
+
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.
 - Suggesting a hosted database or cloud deployment.

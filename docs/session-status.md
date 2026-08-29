@@ -25,20 +25,35 @@ already know.
 
 **If you're specifically a fresh *architecture* conversation** (the
 project owner talking through design, not dispatching a scoped coder
-task) — rules 18/19 cover the coding loop, but the open design
-questions live in this file's numbered roadmap below, not in chat
-history that won't be there. Steps 21 and 22 are mid-discussion, not
-finished designs — read both entries in full before saying anything
-about them; each is self-contained (grounded in real code/data checks,
-not just claims) and states its own open question plainly. Broader
-context worth knowing before jumping in: this app covers Commissary
-plus three restaurant outlets (Restaurant A / "Silingan", FC /
-"Restaurant B", and "Likod" — not yet onboarded, no workbook for it
+task) — two behavioral rules, not just reading assignments, matter more
+than anything else here:
+- **Don't search past chat history to reconstruct context.** This file
+  and `rules-for-claude-code.md` are written to be self-sufficient on
+  purpose — that's the entire point of rule 18. If something seems
+  missing, ask the project owner directly; spending tool calls mining
+  old conversations for context that should already be written down
+  here is exactly the waste this file exists to prevent.
+- **Hold the discussion before writing any code — even though the
+  tools to just build something are sitting right there.** Steps 21 and
+  22 are mid-discussion, not finished designs, and "you're an
+  architecture conversation" is not license to resolve their open
+  questions yourself and start coding. Read both entries in full first
+  (each is self-contained, grounded in real code/data checks, not just
+  claims, and states its own open question plainly) — then ask the
+  project owner about the open question, the way earlier architecture
+  turns in this project's history actually worked: several rounds of
+  back-and-forth before anything got built, not one read-through
+  followed by a build. If in doubt, ask one more clarifying question
+  before touching any code, not after.
+
+Broader context worth knowing before jumping in: this app covers
+Commissary plus three restaurant outlets (Restaurant A / "Silingan", FC
+/ "Restaurant B", and "Likod" — not yet onboarded, no workbook for it
 exists yet); Commissary is treated as the architectural root ("just
 another kitchen, one that serves other kitchens" — the project owner's
-own framing) that the restaurants build onto, not the other way
-around; and the stated direction for admin/config-level features is
-toward settings-driven flexibility (the auditor's daily screens stay
+own framing) that the restaurants build onto, not the other way around;
+and the stated direction for admin/config-level features is toward
+settings-driven flexibility (the auditor's daily screens stay
 dead-simple per `daily-workflow.md`, but the admin side should let the
 project owner define new things — conversions, categories, presets —
 without a developer, a theme running through steps 20-22 alike).
