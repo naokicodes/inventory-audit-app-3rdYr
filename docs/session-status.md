@@ -804,7 +804,7 @@ of sizing them correctly, not a separate concern.
     additive on top, not a prerequisite. Sequencing is the project
     owner's call.
 
-21. **[Design resolved 2026-08-29, not yet built] A second, bigger
+21. **[Done, 2026-08-29 — built as 21a+21b] A second, bigger
     Command surface: a dedicated console/terminal page, separate from
     the step-14 floating widget.** Requested 2026-08-29. The floating
     panel (steps 14/15/18) stays exactly as it is — quick, single-click,
@@ -1033,8 +1033,8 @@ of sizing them correctly, not a separate concern.
       work is settled, not before — this note exists so it isn't
       silently dropped, not as a signal to start it next.
 
-22. **[Done, 2026-08-29 — built and verified live by the architect
-    session] Merge Landing's In-House/Wastage/Other into one read-only
+22. **[Done, 2026-08-29 — built by a fresh session and verified live]
+    Merge Landing's In-House/Wastage/Other into one read-only
     "Allocations" cell, fed by a new dedicated Allocations page.**
     Requested 2026-08-29, framed explicitly as "do to Adjustments what
     the 2026-08-27 change already did to New Stock" — move detailed
