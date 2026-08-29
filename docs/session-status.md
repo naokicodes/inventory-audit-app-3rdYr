@@ -1,6 +1,8 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-20b, all confirmed pushed to `main`).
+Last updated: 2026-08-29 (post step-20c write route + page — **NOT YET
+pushed to `main`**, see the note below; step 20b and everything before it
+is still confirmed on `main`).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -11,8 +13,34 @@ architect conversation (pull from `main` → review/resolve flagged
 decisions → hand off one fresh repo + one next prompt), which this file
 assumes you already know.
 
-## Where things stand: steps 1–20b done, everything pushed to `main` —
-no local-only or uncommitted work anywhere as of 2026-08-29.
+## Where things stand: steps 1–20c done, step 20c NOT YET on `main` —
+see "20c hand-off" note immediately below before doing anything else.
+
+**20c hand-off (2026-08-29)**: step 20c (shipment logging: write route +
+page) is functionally complete — see its roadmap entry further down for
+the full done/verified breakdown — but this session had no GitHub/npm
+network access (same zip-fallback situation steps 12–19 hit; 403s on both
+`git clone` and `npm install`, confirmed, not just assumed), so **the
+changed/new files below exist only in this session's working copy, not
+on `main`**. This is NOT a rule-17 WIP hand-off — the step itself isn't
+partial or broken, just unpushed. Whoever has git access next should pull
+these in as a normal, complete commit (no `wip:` prefix needed) before
+starting step 21/22 or anything else:
+- Modified: `server/routes/commissary.js` (new `POST
+  /api/commissary/shipments`), `public/index.html`,
+  `public/daily-audit.html`, `public/stock-receipts.html`,
+  `public/commissary.html`, `public/sales.html`, `public/settings.html`,
+  `public/history.html` (all seven: one new `<a>` added to the nav block),
+  `docs/changelog.md`, `docs/session-status.md` (this file).
+- New: `server/routes/commissary.test.js`, `public/commissary-shipments.html`.
+- Once pulled: run the full test suite fresh (`node <each>.test.js` per
+  file, this repo's convention — see `docs/tech-stack.md`) to confirm
+  11/11 files green before trusting this session's own re-run number: 
+  **11/11 files, 138/138 assertions, 0 regressions**, and — since this
+  session couldn't — do the live-server verification step 20b's session
+  did (`npm install`, seed, boot, `POST` a real shipment, confirm via
+  `GET /api/commissary/daily-audit` and a direct `stock_receipts` read)
+  before considering 20c fully closed out.
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -297,14 +325,18 @@ decisions flagged from step 20b (the missing commissary-adjustments layer;
 the GET route's array-always response shape) are noted in its list entry
 below, not yet reviewed by the architect conversation.
 
-**Next up: step 20c** (shipment logging: write route + page) — see its
-entry below. Distribution follows rule 18 now: pull from `main`
-directly, review, resolve any flags, write the *single next* worker
-prompt, hand off a fresh repo — not a batch of prompts for several
-steps at once. If you're a fresh session with no memory of how this
-worked in practice, rule 18 in `rules-for-claude-code.md` is the
-complete description; this paragraph is just the current pointer into
-that flow.
+**Step 20c is done (see its roadmap entry below for the full breakdown)
+but not yet on `main`** — see the hand-off note at the top of this file.
+**Next up, once 20c is pulled and reviewed: step 21 or 22** (both still
+drafts under discussion, not committed designs) — or the
+`commissary_shipment_presets` piece step 20c explicitly deferred, if the
+project owner wants that picked up before 21/22. Distribution follows
+rule 18: pull from `main` directly, review, resolve any flags, write the
+*single next* worker prompt, hand off a fresh repo — not a batch of
+prompts for several steps at once. If you're a fresh session with no
+memory of how this worked in practice, rule 18 in
+`rules-for-claude-code.md` is the complete description; this paragraph is
+just the current pointer into that flow.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -611,15 +643,81 @@ of sizing them correctly, not a separate concern.
       **10/10 files green, 121/121 assertions, 0 regressions.** Repo was
       reachable via `git clone` this session (no zip fallback needed);
       pushed straight to `main` per rule 18.
-    - **20c (shipment logging: write route + page) — NEXT**: `POST`
-      route creating one `commissary_shipments` row + N
-      `commissary_shipment_lines` rows in one transaction, each line
-      also writing a normal `stock_receipts` row for the destination
-      (reuses existing mechanics unchanged). Then the dedicated page
-      itself (form: source meat, destination, total, N output lines).
-      Depends on 20a and 20b (the page will want to show current
-      balance/context, not just blindly write) — both now done, ready
-      to build on.
+    - **20c [Done, 2026-08-29 — NOT YET pushed to `main`, see hand-off
+      note at the top of this file] (shipment logging: write route +
+      page)**: new `POST /api/commissary/shipments` in
+      `server/routes/commissary.js` — one `commissary_shipments` row + N
+      `commissary_shipment_lines` rows in one transaction, each line ALSO
+      writing a normal `stock_receipts` row for the destination
+      (`source='COMMISSARY'`, `commissary_meat_id` set) via the exact
+      same table/columns `POST /api/stock-receipts` already uses — reused
+      unchanged, not reinvented, per the step's own instruction. Each
+      `stock_receipts` write gets its own `activity_log` CREATE in the
+      same transaction (rule 9); `commissary_shipments`/
+      `commissary_shipment_lines` themselves get none (not in rule 9's
+      scope, same treatment `commissary_stock_receipts` got in 20a). All
+      validation (active commissary meat, active restaurant, every
+      line's meat belongs to that restaurant and is active) happens
+      up-front, before the transaction opens, so a bad line fails clean
+      with nothing written — confirmed by a dedicated test. No
+      `commissary_meat_map` lookup anywhere in this route — matches
+      "commissary_meat_map's fate" above: the auditor picks the
+      destination meat live in the form. No reconciliation enforced
+      between `total_quantity` and the line sum (informational only, per
+      the step's own instruction — different units on each side).
+
+      New dedicated page `public/commissary-shipments.html` (own page,
+      not the Command Panel — per the already-resolved "Shipment-logging
+      UI" note above). Form: date, source commissary meat, total
+      quantity, a read-only context block (beginning/stockIn/backedUp/
+      "shipped out so far", pulled from step 20b's `GET
+      /api/commissary/daily-audit` on meat/date change — so the auditor
+      isn't typing blind, re-fetched after save so it reflects the new
+      shipment immediately), destination restaurant, 1+ output lines
+      (destination meat from the *existing* `GET /api/stock-receipts/
+      meats?restaurant_id=` route — no new GET route needed — plus
+      quantity, add/remove), an informational "Lines total: X (shipment
+      total: Y)" hint that never blocks Save, notes. "Shipments" added to
+      nav on all seven existing pages + the new page itself.
+
+      **Explicitly deferred, not attempted**: `commissary_shipment_presets`
+      / `commissary_shipment_preset_lines` (the "quick formulas"
+      autofill) — this step was already the largest of the three
+      20a/20b/20c sub-steps per the roadmap's own sizing note; presets
+      weren't attempted, not silently dropped. A future step should read
+      the preset tables (already in `schema.sql` since 20a) and add a
+      "load preset" autofill action to the form — never authoritative,
+      the auditor can still edit every number before saving.
+
+      **Verified**: new `server/routes/commissary.test.js`, 17/17
+      assertions, mirrored-logic style (same convention as
+      `commands.test.js`/`stockReceipts.test.js`) — covers missing/
+      invalid fields, no lines, unknown/inactive commissary meat,
+      unknown/inactive restaurant, a line's meat belonging to a
+      different restaurant or being inactive, a valid two-line shipment
+      landing both the shipment+lines and both destination
+      `stock_receipts` rows correctly, sum-of-lines allowed to differ
+      from `total_quantity` with no rejection, each `stock_receipts`
+      write getting its own `activity_log` CREATE,
+      `commissary_shipments`/`commissary_shipment_lines` correctly
+      getting zero `activity_log` entries, the new receipts feeding a
+      `getNewStock`-style sum for the destination, and a rejected line
+      rolling back cleanly with nothing written. **Environment
+      limitation, flagged rather than hidden**: no network this session
+      (`git clone`/`npm install` both 403'd, zip fallback used, same as
+      steps 12–19's sessions), so **no live Express server was possible**
+      — beyond the mirrored-logic test file, verification is a hand-run
+      script that exercises the REAL `commissaryAuditEngine.js` and the
+      EXACT transaction code copied from the actual route (not
+      re-derived) against a real in-memory DB, confirming `usage` moved
+      from 0 to 9 after a two-line shipment and the destination's
+      `stock_receipts` landed correctly — real production code, just
+      without an HTTP layer. Full suite re-run: **11/11 files green,
+      138/138 assertions, 0 regressions** (was 121). A true live-HTTP
+      smoke test (like step 20b's session did) and a browser
+      click-through of the new page are both still owed — see the
+      hand-off note at the top of this file for exactly what the next
+      session with git/network access should do first.
 
     **Scope relative to step 19**: still doesn't block Restaurant B
     onboarding. FC's Bagnet/Sisig/Sinigang/DNG/etc. get onboarded as

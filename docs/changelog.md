@@ -11,6 +11,154 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 20c: Shipment logging (write route + dedicated page)
+**Environment note, flagged up front**: this session worked from the
+uploaded zip fallback, not a `git clone` — `github.com` returned a 403
+("Host not in allowlist") and `npm install` also 403'd against
+`registry.npmjs.org`. Same bucket as steps 12-19's sessions, just
+resurfacing after step 20b's session had working git/network. Practical
+consequence: **no live Express server this session** — no `npm install`
+means no `express` module, so nothing could actually boot. Verification
+below is the mirrored-logic test file (same convention as
+`commands.test.js`/`stockReceipts.test.js`) plus a hand-run script that
+exercises the **real** `commissaryAuditEngine.js` and the **exact**
+transaction code from the route (copy-pasted from the actual file, not
+re-derived) against a real in-memory `node:sqlite` DB — not a live HTTP
+smoke test. Flagging this rather than claiming a live-server check that
+didn't happen.
+
+**Confirmed 20a/20b both landed** before starting, per the prompt's own
+instruction: all 7 `commissary_*` tables from step 20a present in
+`schema.sql` (`commissary_stock_receipts`, `commissary_shipments`,
+`commissary_shipment_lines`, `commissary_shipment_presets`,
+`commissary_shipment_preset_lines`, `commissary_ending_actual`,
+`commissary_opening_stock`), and step 20b's
+`server/engines/commissaryAuditEngine.js` +
+`GET /api/commissary/daily-audit` both present in
+`server/routes/commissary.js`.
+
+**Part 1 - write route**: `POST /api/commissary/shipments`, added to
+`server/routes/commissary.js` (not a new route file - this is
+commissary-owned data, same file as the step-20b read route). Body:
+`{ commissary_meat_id, restaurant_id, business_date, total_quantity,
+notes?, actor?, lines: [{ meat_id, quantity }, ...] }`. In one
+transaction: one `commissary_shipments` row, then per line one
+`commissary_shipment_lines` row AND one `stock_receipts` row for the
+destination (`source='COMMISSARY'`, `commissary_meat_id` set) - the exact
+same table/columns `POST /api/stock-receipts` already writes for a normal
+COMMISSARY receipt, reused unchanged rather than reinvented, per the
+prompt's explicit instruction. Each `stock_receipts` write gets its own
+`activity_log` CREATE row in the same transaction (rule 9) via the shared
+`withTransaction`/`logActivity` helpers - same pattern
+`commands.js`'s `sync-batch-stock` route already uses for "one write
+triggers another table's write, same transaction," used here as the
+reference implementation the prompt pointed at.
+
+Validation, all up-front (before the transaction opens, so a bad line
+fails cleanly with nothing written at all - confirmed by a dedicated
+test): `commissary_meat_id` must be an active commissary meat;
+`restaurant_id` must be an active restaurant; every line's `meat_id` must
+be one of *that* restaurant's own active meats (a line pointing at a
+different restaurant's meat, or an inactive meat, is rejected). No
+`commissary_meat_map` lookup anywhere in this route - per
+`session-status.md`'s "commissary_meat_map's fate" resolution, the
+auditor picks the destination meat live in the form; the mapping table is
+untouched (not deleted, not repurposed - out of scope for this step).
+
+**Not enforced, per explicit instruction**: no reconciliation between
+`total_quantity` and the sum of line quantities - different units on each
+side (kg of a raw commissary meat vs. portion-units of a named output)
+make a strict equality check not generally meaningful. The page shows
+this as an informational-only comparison (see Part 2); the backend
+doesn't compute or return it at all.
+
+**Explicitly deferred, not attempted**: `commissary_shipment_presets` /
+`commissary_shipment_preset_lines` (the "quick formulas" autofill). The
+prompt scoped this as out-of-scope-unless-small-enough-to-not-crowd-the-
+rest; building the write route + a full new page was already the largest
+of the three 20a/20b/20c sub-steps, so presets were not attempted this
+session, not silently dropped. A future step should read the preset
+tables from `schema.sql` (already there since 20a) and add a "load
+preset" autofill action to `commissary-shipments.html`'s form - the
+preset never becomes authoritative, the auditor can still edit every
+number before saving.
+
+**Part 2 - the dedicated page**: new `public/commissary-shipments.html`,
+its own page (like Stock Receipts), not the Command Panel widget - per
+session-status.md's already-resolved "Shipment-logging UI" note. Form:
+date, source commissary meat, total quantity, then a read-only context
+block (see below), then destination restaurant, then 1+ output lines
+(destination meat + quantity, "+ Add line"/"Remove" per row, always at
+least one line), notes, Log Shipment. Changing the destination restaurant
+re-fetches that restaurant's own active meats via the *existing*
+`GET /api/stock-receipts/meats?restaurant_id=` route (step 9) - no new
+GET route needed for this. "Shipments" added to nav on all seven existing
+pages plus the new page itself (nav block is identical across every page
+in this repo - confirmed textually identical before editing, then patched
+all seven with the same one-line insertion).
+
+**Read-only context above the form**: on commissary-meat/date change,
+fetches step 20b's `GET /api/commissary/daily-audit?date=&
+commissary_meat_id=` and renders `beginning`/`stockIn`/`backedUp`/`usage`
+(labeled "Shipped out so far") as plain read-only cards - so the auditor
+sees where this meat stands before typing a shipment against it, per the
+prompt's explicit requirement. Re-fetched after a successful save so
+"Shipped out so far" reflects the just-logged shipment immediately.
+
+**Informational line-sum display**: a small hint line below the output
+lines shows `Lines total: X (shipment total: Y)`, recomputed on every
+quantity keystroke - purely informational, never blocks Save, no
+styling implying an error even when they differ (which is expected and
+fine per the units note above).
+
+**Tests**: new `server/routes/commissary.test.js`, mirrored-logic style
+(17/17 assertions) - missing/invalid top-level fields, no lines, a line
+missing quantity, unknown/inactive `commissary_meat_id`, unknown/inactive
+`restaurant_id`, a line's `meat_id` belonging to a different restaurant,
+a line's `meat_id` being inactive, a valid two-line shipment landing both
+the shipment+lines and both destination `stock_receipts` rows correctly,
+sum-of-lines allowed to differ from `total_quantity` with no rejection,
+each `stock_receipts` write getting its own `activity_log` CREATE,
+confirmed `commissary_shipments`/`commissary_shipment_lines` themselves
+get zero `activity_log` entries (correctly out of rule 9's scope), the
+new receipts feeding a `getNewStock`-style sum for the destination
+meat/date, and a rejected line rolling back cleanly with nothing written.
+
+**Verified beyond the mirrored-logic file** (since no live server was
+possible - see the environment note above): a hand-run script
+(`node -e '...'`, not committed) that seeded a real in-memory DB, called
+the **real** `computeCommissaryDailyAudit` from
+`commissaryAuditEngine.js` before and after running the **exact**
+transaction code from the new route (not a re-derivation - copied
+directly from `commissary.js`), confirming `usage` went from `0` to `9`
+(the shipment's `total_quantity`) after two lines totaling `4 + 5 = 9`
+were written, and that the destination restaurant's `stock_receipts`
+correctly show `4` for one meat and `5` for the other on that date. This
+exercises the real production code path for the read side, just without
+an HTTP layer wrapping the write side.
+
+**Full existing test suite re-run after, all files individually**:
+**11/11 files green, 138/138 assertions, 0 regressions** (10 pre-existing
+files unchanged + this step's new file, 121 + 17 = 138).
+
+**Not verified, and known to remain unverified**: an actual browser
+click-through of the new page's form (no headless browser in this
+sandbox - same standing gap as every frontend step since step 11), and a
+true live-server HTTP round-trip (blocked by the network/npm situation
+above, not attempted for this step specifically - step 20b's session had
+this working, so it's expected to work again once network/git access is
+available for a future session).
+
+**Not committed to git this session** - no `.git` present (zip fallback),
+no network to `git init`+push even if a local repo were created. Whoever
+has GitHub access next should pull these changes in as a normal commit
+(not `wip:` - this step's own scope, per the breakdown above, is
+complete: write route + tests done, page done, presets explicitly
+deferred and documented, not a partial/broken hand-off) before starting
+whatever's next.
+
+---
+
 ## 2026-08-29 — Step 20b: Commissary audit engine + read route
 Repo cloned directly from GitHub (`https://github.com/naokicodes/inventory-audit-app-3rdYr`),
 network access worked fine this session — no zip fallback needed. Followed
