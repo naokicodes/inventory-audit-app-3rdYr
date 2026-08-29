@@ -11,6 +11,107 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 20b: Commissary audit engine + read route
+Repo cloned directly from GitHub (`https://github.com/naokicodes/inventory-audit-app-3rdYr`),
+network access worked fine this session — no zip fallback needed. Followed
+rule 18: reviewed step 20a's landed state before starting (confirmed via
+`git log`/`schema.sql` inspection, not just trusting the doc), then did
+this one step, then pushed.
+
+New `server/engines/commissaryAuditEngine.js` — a
+`computeCommissaryMeatAudit`-shaped function mirroring `computeMeatAudit`
+(`auditEngine.js`)'s beginning/inflow/usage/ending/variance shape, kept as
+its own file rather than folded into `auditEngine.js` (same separation
+`commissaryYieldEngine.js` already uses). `addDays` is reused from
+`auditEngine.js` rather than duplicated. Two real differences from every
+existing usage source, per the step's own spec:
+- **Two separate inflows**: `stockIn` (SUM `commissary_stock_receipts
+  .quantity`) and `backedUp` (SUM `commissary_yield_log.backed_weight_out`,
+  `deleted_at IS NULL` — the existing yield engine, read here unchanged).
+  No combined "new stock" field; both are returned separately, matching
+  the step's framing that these are genuinely two different things, not
+  one number in disguise.
+- **Usage = SUM of `commissary_shipments.total_quantity`** across every
+  destination restaurant for that commissary meat/date — not sales x
+  recipe, not prepped-portions. Commissary doesn't sell to end customers.
+
+Beginning derives from the prior day's `commissary_ending_actual`, falling
+back to `commissary_opening_stock` only on the very first tracked day —
+step 12's exact pattern, just against the commissary tables. Ending is the
+real physical count from `commissary_ending_actual`. Same OK/SHORTAGE/
+SURPLUS status logic and `EPSILON = 0.01` tolerance as `computeMeatAudit`.
+
+**Decision flagged for the architect conversation, not assumed**:
+`computeMeatAudit` has an `adjustments` layer (`expectedEnding =
+endingCalculated - adjustments`, from the restaurant-side `adjustments`
+table). None of step 20a's six commissary tables is an
+adjustments-equivalent — there's no commissary waste/adjustment log yet.
+So in `computeCommissaryMeatAudit`, `expectedEnding` always equals
+`endingCalculated`, and `unexplainedVariance` always equals `variance`.
+Both fields are still returned (shape parity with `computeMeatAudit`, and
+so a future commissary-adjustments concept wouldn't need a field rename),
+but right now they're redundant — this is a real gap from "same as every
+other actual-vs-calculated comparison in this app," not something quietly
+resolved by inventing an adjustments source. If the architect wants a real
+commissary adjustments table, that's new scope.
+
+New `GET /api/commissary/daily-audit?date=&commissary_meat_id=` in
+`server/routes/commissary.js` (not a new route file — it sits with the
+rest of Commissary's routes, already mounted at `/api`). `date` is
+required (400 without it). `commissary_meat_id` is an optional filter for
+a single meat/date lookup. **Response shape decision, flagged rather than
+assumed as the only correct answer**: always returns an array, whether
+filtered to one commissary meat or listing every active one for the date
+— chosen to mirror the optional-filter/list convention `GET
+/api/commissary/yield-log` (this same file) already uses, rather than
+switching to a single-object response when an id is given. Session-
+status.md left "one meat/date at a time, or a mixed-grid-style list" as an
+open call for this session to make; this is the call made, worth a look
+before it's load-bearing for a future UI.
+
+**Tests**: new `server/engines/commissaryAuditEngine.test.js`, same style
+as `auditEngine.test.js` (plain script, real `node:sqlite`, hand-verified
+numbers — 11/11 assertions passing). Scenario: commissary JOWL with
+`opening_stock=10`, `stockIn=5` (one `commissary_stock_receipts` row),
+`backedUp=3` (via a real `commissary_yield_log` row, `raw_weight_in=4`,
+one soft-deleted row confirmed excluded), `usage=3.5` (two
+`commissary_shipments` rows to two different destination restaurants, 2.0
++ 1.5), hand-calculated `endingCalculated = 10 + 5 + 3 - 3.5 = 14.5`.
+Covers day-2 beginning-carries-forward, shortage, surplus,
+missing-actual-count, missing-beginning-stock, the unfiltered
+`computeCommissaryDailyAudit` list (excludes inactive meats), and the
+single-meat filter.
+
+**Verified live against a real booted server**, not just the mirrored-
+logic test file: ran `npm install` (repo had no `node_modules`),
+`node server/db/seed.js` for a fresh `inventory.db`, booted
+`node server/index.js` (backgrounded with `setsid`/`nohup` so it survives
+between tool calls, plain `&` alone didn't persist and got connection-
+refused on the next call — noted here in case a future session hits the
+same thing). Confirmed:
+- `GET /api/commissary/daily-audit` with no `date` → `400 {"error":"date is
+  required"}`.
+- `GET /api/commissary/daily-audit?date=2026-08-01` with no data yet →
+  array of all 14 seeded commissary meats, every one
+  `MISSING_BEGINNING_STOCK`, matching the fresh-DB expectation.
+- Inserted `commissary_opening_stock`/`commissary_stock_receipts`/
+  `commissary_shipments`/`commissary_ending_actual` fixtures directly via
+  SQL for JOWL (step 20c's write routes don't exist yet, so this is the
+  only way to get data in right now — noted as expected, not a gap in
+  this step), plus wrote the `backed_weight_out` row through the **real**
+  `POST /api/commissary/yield-log` route (already exists, step 6) rather
+  than SQL, to exercise that inflow through actual app code.
+- `GET /api/commissary/daily-audit?date=2026-08-01&commissary_meat_id=5`
+  returned exactly the hand-calculated numbers: `beginning=10, stockIn=5,
+  backedUp=3, usage=3.5, endingCalculated=14.5, actual=14.5, variance=0,
+  status=OK` — live server output matches the test file's math exactly.
+
+**Full existing test suite re-run after**, all files individually (this
+repo's convention, no shared test runner): **10/10 files green, 121/121
+assertions, 0 regressions** (9 pre-existing files unchanged + this step's
+new file). `inventory.db`/`-shm`/`-wal` cleaned up before commit (gitignored,
+confirmed via `git status`).
+
 ## 2026-08-29 — Step 20a: Commissary schema (six new tables + one child)
 `server/db/schema.sql` only — no engine, routes, or UI, per step 20a's
 own scope. Worked from an uploaded zip (no `.git` in the sandbox, no

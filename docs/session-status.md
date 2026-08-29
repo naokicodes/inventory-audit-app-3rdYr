@@ -1,6 +1,6 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-20a, all confirmed pushed to `main`).
+Last updated: 2026-08-29 (post step-20b, all confirmed pushed to `main`).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -11,7 +11,7 @@ architect conversation (pull from `main` → review/resolve flagged
 decisions → hand off one fresh repo + one next prompt), which this file
 assumes you already know.
 
-## Where things stand: steps 1–20a done, everything pushed to `main` —
+## Where things stand: steps 1–20b done, everything pushed to `main` —
 no local-only or uncommitted work anywhere as of 2026-08-29.
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
@@ -284,16 +284,20 @@ no local-only or uncommitted work anywhere as of 2026-08-29.
     right shape (13 MEAT rows including Bagnet as FC's own stock item,
     1 DISH row for the Batch-Prepped Chicken Skewers).
 
-**Everything through step 20a is on real `main`, pulled and confirmed
+**Everything through step 20b is on real `main`, pulled and confirmed
 2026-08-29** — steps 10 through 19, all the architecture-discussion docs
-commits (steps 20-22's ongoing design conversation), and step 20a's
-schema addition. No local-only or uncommitted work remains anywhere.
-The two decisions worker 1 flagged from step 20a (no activity-log wiring
-on `commissary_stock_receipts`; preset scoping to one
+commits (steps 20-22's ongoing design conversation), step 20a's schema
+addition, and step 20b's Commissary audit engine + read route. No
+local-only or uncommitted work remains anywhere. The two decisions worker
+1 flagged from step 20a (no activity-log wiring on
+`commissary_stock_receipts`; preset scoping to one
 `(commissary_meat_id, restaurant_id)` pair) were both reviewed and
-confirmed correct — see the step-20 entry below for detail.
+confirmed correct — see the step-20 entry below for detail. Two more
+decisions flagged from step 20b (the missing commissary-adjustments layer;
+the GET route's array-always response shape) are noted in its list entry
+below, not yet reviewed by the architect conversation.
 
-**Next up: step 20b** (Commissary audit engine + read routes) — see its
+**Next up: step 20c** (shipment logging: write route + page) — see its
 entry below. Distribution follows rule 18 now: pull from `main`
 directly, review, resolve any flags, write the *single next* worker
 prompt, hand off a fresh repo — not a batch of prompts for several
@@ -559,22 +563,63 @@ of sizing them correctly, not a separate concern.
       with several named output lines for that meat→kitchen
       combination). No schema change needed either way, just wasn't
       written down explicitly before — now it is.
-    - **20b (Commissary audit engine + read routes) — NEXT**: a
-      `computeCommissaryMeatAudit`-shaped function mirroring
-      `computeMeatAudit`'s beginning/usage/ending/variance shape, but
-      with Stock In and Backed Up as two separate inflows and usage
-      summed across all destination shipments for that meat/date
-      (`commissary_shipments.total_quantity`, not sales×recipe). A GET
-      route exposing it, mirroring `dailyAudit.js`'s pattern. 20a's
-      tables now exist and are ready to build on.
-    - **20c (shipment logging: write route + page)**: `POST` route
-      creating one `commissary_shipments` row + N
+    - **20b [Done, 2026-08-29] (Commissary audit engine + read route)**:
+      new `server/engines/commissaryAuditEngine.js` —
+      `computeCommissaryMeatAudit` mirroring `computeMeatAudit`'s
+      beginning/inflow/usage/ending/variance shape, with Stock In
+      (`commissary_stock_receipts`) and Backed Up
+      (`commissary_yield_log.backed_weight_out`) as two separate inflow
+      fields (not merged into one "new stock"), and usage summed across
+      every destination restaurant's shipments for that meat/date
+      (`commissary_shipments.total_quantity`, not sales×recipe). Beginning
+      derives from prior-day `commissary_ending_actual`, falling back to
+      `commissary_opening_stock` only on the meat's first tracked day
+      (step 12's pattern). New `GET /api/commissary/daily-audit?date=&
+      commissary_meat_id=` in `server/routes/commissary.js`, always
+      returning an array (all active commissary meats for the date, or
+      one if `commissary_meat_id` is given) — mirrors
+      `GET /api/commissary/yield-log`'s existing optional-filter
+      convention in that same file.
+      **Two decisions flagged for the architect conversation, not
+      assumed unilaterally** (full detail in `changelog.md`'s step-20b
+      entry): (1) no commissary-side adjustments table exists among
+      step 20a's six tables, so `expectedEnding` always equals
+      `endingCalculated` and `unexplainedVariance` always equals
+      `variance` right now — both fields are still returned for shape
+      parity with `computeMeatAudit`, but they're currently redundant,
+      a real gap from "same as every other actual-vs-calculated
+      comparison in this app," not a silently-invented adjustments
+      source. (2) the GET route's always-an-array shape was this
+      session's call on the "one meat/date at a time, or a mixed-grid
+      -style list" open question — chosen to match
+      `/commissary/yield-log`'s existing convention rather than
+      switching to a single object when `commissary_meat_id` is given;
+      worth a second look before a future UI depends on it.
+      **Verified**: `server/engines/commissaryAuditEngine.test.js`,
+      11/11 assertions, real hand-calculated numbers (JOWL:
+      beginning=10, stockIn=5, backedUp=3, usage=3.5 →
+      endingCalculated=14.5, matches actual → OK; plus day-2
+      carry-forward, shortage, surplus, missing-actual,
+      missing-beginning, unfiltered list excluding inactive meats, and
+      the single-meat filter). Also verified live against a real booted
+      server (fresh seeded `inventory.db`, `node server/index.js`,
+      curl) — the live route returned the exact same hand-calculated
+      numbers as the test file, and the `backed_weight_out` fixture was
+      written through the real `POST /api/commissary/yield-log` route
+      (not raw SQL) to exercise that inflow through actual app code, not
+      just the mirrored engine. Full existing suite re-run after:
+      **10/10 files green, 121/121 assertions, 0 regressions.** Repo was
+      reachable via `git clone` this session (no zip fallback needed);
+      pushed straight to `main` per rule 18.
+    - **20c (shipment logging: write route + page) — NEXT**: `POST`
+      route creating one `commissary_shipments` row + N
       `commissary_shipment_lines` rows in one transaction, each line
       also writing a normal `stock_receipts` row for the destination
       (reuses existing mechanics unchanged). Then the dedicated page
       itself (form: source meat, destination, total, N output lines).
       Depends on 20a and 20b (the page will want to show current
-      balance/context, not just blindly write).
+      balance/context, not just blindly write) — both now done, ready
+      to build on.
 
     **Scope relative to step 19**: still doesn't block Restaurant B
     onboarding. FC's Bagnet/Sisig/Sinigang/DNG/etc. get onboarded as
