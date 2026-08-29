@@ -1,8 +1,11 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-20 full close-out, including the
-`commissary_shipment_presets` piece — confirmed pushed and verified
-live).
+Last updated: 2026-08-29 (step 21a handed off as WIP — terminal shell +
+slot state machine built and mirrored-logic-tested, live/browser
+verification still open; see step 21's entry below for the full
+done/not-done/untested breakdown. Steps 1–20 remain fully done, including
+the `commissary_shipment_presets` piece — confirmed pushed and verified
+live in an earlier session).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -35,8 +38,10 @@ without a developer, a theme running through steps 20-22 alike).
 
 ## Where things stand: steps 1–20 done (presets closed out 2026-08-29,
 minus its own explicitly-deferred authoring UI — see below), everything
-confirmed pushed to `main` and verified — no local-only or uncommitted
-work anywhere as of 2026-08-29.
+confirmed pushed to `main` and verified. **Step 21a is new WIP as of this
+session** — built and mirrored-logic-tested, handed off as files (no
+`.git` repo in this session's zip, no network access) rather than pushed;
+see step 21's entry below for exactly what's done/not-done/untested.
 
 **Step 20 is now fully closed out, including the
 `commissary_shipment_presets` piece 20c deferred.** New this session:
@@ -847,14 +852,64 @@ of sizing them correctly, not a separate concern.
 
     **Split into two sequential sub-steps for handoff, same pattern as
     step 20**:
-    - **21a (terminal shell + slot state machine, no live submission
-      yet)**: new `public/terminal.html` (or similar) with the input
-      line, hint bar, dropdown, and slot-position tracking wired for the
-      `ship` command's five slot types above, plus up-arrow history.
+    - **21a [WIP — done except live verification, see breakdown below]
+      (terminal shell + slot state machine, no live submission yet)**:
+      new `public/terminal.html` (or similar) with the input line, hint
+      bar, dropdown, and slot-position tracking wired for the `ship`
+      command's five slot types above, plus up-arrow history.
       Submitting a complete line can `console.log` the assembled payload
       for now rather than actually calling the API — mirrors step 14's
       "prove the plumbing works before the real command" pattern. No
       backend changes.
+
+      **Done**: `public/terminal.html` built — input line, hint bar,
+      filtering dropdown, and a state machine keyed on committed-token
+      count for all five slots (`ship` literal, `<commissary-meat>`,
+      `<restaurant>`, `<total-qty>`, one-or-more `<name:qty>` pairs).
+      Up-arrow/down-arrow history via `localStorage`
+      (`terminal_command_history`, last 25), falling back to dropdown
+      navigation when a dropdown is open. Enter on a complete valid line
+      assembles the payload and `console.log`s it (plus an on-page "Last
+      logged payload" panel) — does not call the API, per the step's own
+      boundary. `business_date` defaults to today (not one of the five
+      named slots — flagged, not silently assumed, see changelog).
+      Line-name resolution (slot 5) looks up the destination
+      restaurant's real active meats via the existing
+      `GET /api/stock-receipts/meats?restaurant_id=` — ordinary lookup,
+      not the preset-prefill 21b is scoped to add. "Terminal" nav link
+      added to all 8 existing pages. No backend changes.
+
+      **Not done**: nothing scoped to 21a is missing — 21b's real
+      submission + preset-prefill remain untouched, as intended.
+
+      **Untested**: no browser click-through (no headless browser in
+      any sandbox used so far, same standing gap every prior frontend
+      step in this project has carried) and no live-server HTTP check
+      (this handoff's zip has no `node_modules` and this sandbox has no
+      network access, so `npm install` / booting a real server wasn't
+      possible). What WAS verified: `node --check` on the extracted
+      inline script (syntax clean), a mirrored-logic trace test (11
+      assertions covering slot detection, space-containing-name token
+      resolution, partial filtering, a full valid line assembling
+      byte-for-byte into `commissary.js`'s real payload shape, and
+      rejection of an unknown restaurant/malformed pair/non-positive
+      qty/foreign destination-meat — all 11 passed), and the full
+      backend suite re-run clean (**11/11 files, 154/154 assertions, 0
+      regressions**). See this session's `changelog.md` entry for the
+      full breakdown.
+
+      **Handoff mechanics**: this sandbox has no `.git` directory at all
+      (no repo present in the zip, not just missing push credentials)
+      and no network access — full file handoff, not a push. New file:
+      `public/terminal.html`. Changed files: `public/index.html`,
+      `public/daily-audit.html`, `public/stock-receipts.html`,
+      `public/commissary.html`, `public/commissary-shipments.html`,
+      `public/sales.html`, `public/settings.html`, `public/history.html`
+      (each gained one `<a href="terminal.html">Terminal</a>` nav line),
+      plus this file and `changelog.md`. The project owner (or the next
+      session with git access) should `git add` all of the above and
+      commit — suggested message:
+      `feat(step21a): terminal shell + ship command slot state machine`.
     - **21b (real submission + preset-prefill)**: wires the completed
       `ship` line to the actual `POST /api/commissary/shipments` call,
       and wires slot 5's prefill to `commissary_shipment_presets` for

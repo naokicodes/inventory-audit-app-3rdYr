@@ -11,6 +11,74 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 21a: Terminal shell + slot state machine (WIP handoff - see below)
+New `public/terminal.html`: a Discord-slash-command-style input line, hint
+bar, and filtering dropdown, driven by a small state machine keyed on
+committed-token count (not a natural-language parser). Implements all
+five slot types from session-status.md's step 21 entry for the `ship`
+command: `ship` (literal), `<commissary-meat>`, `<restaurant>`,
+`<total-qty>`, and one-or-more `<name:qty>` pairs. Up-arrow recalls the
+last 25 submitted commands via `localStorage` (`terminal_command_history`);
+down-arrow steps back toward the in-progress draft, shell-style.
+ArrowUp/Down navigate the open dropdown instead when one is showing.
+
+**Step 21a's explicit boundary, honored**: Enter on a complete, valid line
+assembles the payload and `console.log`s it (also shown in an on-page
+"Last logged payload" panel for visibility beyond the browser console) -
+it does NOT call `POST /api/commissary/shipments`. No backend changes.
+Mirrors step 14's "prove the plumbing before the real command" pattern.
+
+**Two things not covered by the five named slot types, decided rather than
+silently assumed**:
+- `business_date` (required by the real route but not one of the five
+  slots) defaults automatically to today, same default
+  `commissary-shipments.html`'s date field already uses.
+- Token matching (commissary-meat / restaurant / line-name) compares the
+  typed token against each candidate's `code` OR a lowercased,
+  space-stripped version of its `name` - needed because names like
+  "Whole Chicken" contain spaces and the line is whitespace-tokenized.
+  Choosing an item from the dropdown always inserts the space-free form,
+  so a line built entirely by dropdown selection is always parseable.
+  Line-name resolution (slot 5) looks up the destination restaurant's
+  real active meats via the existing
+  `GET /api/stock-receipts/meats?restaurant_id=` endpoint (same one
+  `commissary-shipments.html` already uses) so the logged payload's
+  `meat_id` values are real, matching the "shaped exactly like the real
+  payload" requirement - this is ordinary lookup, not the preset-prefill
+  step 21b is scoped to add.
+
+**Nav**: added a "Terminal" link to all 8 existing pages' shared nav
+(`index.html`, `daily-audit.html`, `stock-receipts.html`, `commissary.html`,
+`commissary-shipments.html`, `sales.html`, `settings.html`, `history.html`),
+matching how every prior new page joined that same shared list.
+
+**Verified**: `node --check` on the extracted inline `<script>` (syntax
+clean). A mirrored-logic trace test (11 assertions, not committed as a
+repo test file - this project's `.test.js` pattern is backend/engine-only,
+confirmed by checking all 11 existing test files live under `server/`)
+exercised the pure parsing/validation/assembly functions against mock
+commissary-meat/restaurant/destination-meat data: slot detection by
+committed-token count, space-containing names resolving via the
+normalized token, partial-text filtering, a full valid line assembling
+byte-for-byte into `commissary.js`'s real payload shape, and rejection of
+an unknown restaurant, a malformed name:qty pair (no colon), a
+non-positive total-qty, and a destination-meat name that doesn't belong
+to the chosen restaurant. All 11 passed. **Not verified**: no browser
+click-through (this sandbox has no headless browser, same standing gap
+every prior frontend step in this project has carried) and no live-server
+HTTP check (no `node_modules` in this handoff's zip and no network access
+in this sandbox, so `npm install` / booting a real server wasn't
+possible this session - honestly flagged, not claimed).
+
+Full existing backend suite re-run after the nav edits (touches static
+HTML only, but re-run anyway rather than assume): **11/11 files, 154/154
+assertions, 0 regressions**.
+
+**Handoff mechanics**: this sandbox has no `.git` directory at all (not
+just no push credentials - no repo present in the zip) and no network
+access, so this is a full file-handoff per rule 18, not a push - see
+session-status.md's step 21 entry for the exact files and commands.
+
 ## 2026-08-29 — Step 20: commissary_shipment_presets closed out ("quick formulas")
 Closes the piece 20c explicitly deferred (see 20c's own entry below).
 Confirmed before starting: 20c genuinely on `main` (fresh `git clone`,

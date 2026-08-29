@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Terminal - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { max-width: 800px; }
+    .hint { color: #888; font-size: 0.8rem; margin-bottom: 1.5rem; }
+
+    .term { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem; background: #fafafa; }
+    .hint-bar {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #555;
+      min-height: 1.2rem;
+      margin-bottom: 0.4rem;
+      white-space: pre-wrap;
+    }
+    .hint-bar.error { color: crimson; }
+    .prompt-row { display: flex; align-items: center; gap: 0.5rem; }
+    .prompt-row .prompt-glyph { font-family: monospace; color: #888; }
+    #term-input {
+      flex: 1;
+      font-family: monospace;
+      font-size: 1rem;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .dropdown {
+      margin-top: 0.3rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      max-height: 12rem;
+      overflow-y: auto;
+      background: #fff;
+      display: none;
+    }
+    .dropdown.open { display: block; }
+    .dropdown-item {
+      padding: 0.4rem 0.6rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .dropdown-item .item-name { color: #333; }
+    .dropdown-item .item-sub { color: #999; margin-left: 0.4rem; }
+    .dropdown-item.active { background: #e8f0fe; }
+
+    #submit-status { margin-top: 0.75rem; }
+
+    .panels { display: flex; gap: 1.5rem; margin-top: 2rem; flex-wrap: wrap; }
+    .panel { flex: 1; min-width: 16rem; }
+    .panel h2 { font-size: 0.95rem; margin-bottom: 0.4rem; }
+    .history-list { list-style: none; padding: 0; margin: 0; font-family: monospace; font-size: 0.85rem; }
+    .history-list li {
+      padding: 0.3rem 0.4rem;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+    .history-list li:hover { background: #f5f5f5; }
+    .history-empty { color: #999; font-size: 0.85rem; }
+    pre.payload-preview {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 0.6rem;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="commissary-shipments.html">Shipments</a>
+    <a href="sales.html">Sales</a>
+    <a href="terminal.html">Terminal</a>
+    <a href="settings.html">Settings</a>
+    <a href="history.html">History</a>
+  </nav>
+
+  <h1>Terminal</h1>
+  <p class="hint">
+    A type-first alternative to the Commissary Shipments form, for people who'd
+    rather type than click. Discord-slash-command style: one input line, with a
+    hint bar and a filtering dropdown that follow whichever slot the cursor is
+    currently in. <strong>Step 21a</strong>: the slot state machine and a valid,
+    correctly-shaped shipment line are fully working, but Enter does not call the
+    API yet - a complete line is logged to the browser console and shown below
+    instead. Wiring the real <code>POST /api/commissary/shipments</code> call is
+    step 21b.
+  </p>
+
+  <div class="term">
+    <div class="hint-bar" id="hint-bar"></div>
+    <div class="prompt-row">
+      <span class="prompt-glyph">&gt;</span>
+      <input type="text" id="term-input" autocomplete="off" spellcheck="false"
+        placeholder="ship &lt;commissary-meat&gt; &lt;restaurant&gt; &lt;total-qty&gt; &lt;name:qty&gt; ...">
+    </div>
+    <div class="dropdown" id="dropdown"></div>
+  </div>
+
+  <div id="submit-status" class="status-message"></div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>Recent commands (&uarr; to recall)</h2>
+      <ul class="history-list" id="history-list"></ul>
+    </div>
+    <div class="panel">
+      <h2>Last logged payload</h2>
+      <p class="hint" style="margin-bottom:0.4rem;">Console-logged, not sent to the server yet.</p>
+      <pre class="payload-preview" id="payload-preview">(nothing submitted yet)</pre>
+    </div>
+  </div>
+
+  <script>
+    // ------------------------------------------------------------------
+    // Data: commissary meats, restaurants, and (once a restaurant is
+    // picked) that restaurant's own active meats - same endpoints
+    // commissary-shipments.html already uses, so the resolved meat_id
+    // values in the assembled payload are real, not placeholders.
+    // ------------------------------------------------------------------
+    let commissaryMeats = [];   // [{id, code, name, unit, ...}]
+    let restaurants = [];       // [{id, name, code}]
+    let destinationMeats = [];  // [{id, meat_code, name, unit, commissary_meat_id}] for the chosen restaurant
+
+    async function loadCommissaryMeats() {
+      const res = await fetch('/api/commissary/meats');
+      commissaryMeats = await res.json();
+    }
+    async function loadRestaurants() {
+      const res = await fetch('/api/restaurants');
+      restaurants = await res.json();
+    }
+    async function loadDestinationMeats(restaurantId) {
+      if (!restaurantId) { destinationMeats = []; return; }
+      const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${restaurantId}`);
+      destinationMeats = await res.json();
+    }
+
+    // ------------------------------------------------------------------
+    // Token matching helpers. Names can contain spaces ("Whole Chicken")
+    // but the input line is whitespace-tokenized, so matching compares
+    // the typed token against BOTH the item's code and a space-stripped,
+    // lowercased version of its name. Dropdown selection always inserts
+    // the space-stripped lowercase name (or the code, if that's what was
+    // typed) so the resulting token is always safely re-parseable.
+    // ------------------------------------------------------------------
+    function normalize(s) {
+      return String(s || '').toLowerCase().replace(/\s+/g, '');
+    }
+
+    // Canonical token to insert into the input when this candidate is
+    // chosen from the dropdown - prefer the normalized name (matches the
+    // doc's examples: "jowl", "fc", "bagnet"), falling back to the code
+    // for candidates with no name field.
+    function canonicalToken(candidate, nameField, codeField) {
+      const name = candidate[nameField];
+      return name ? normalize(name) : normalize(candidate[codeField]);
+    }
+
+    // Resolve a fully-typed token against a candidate list by code or
+    // normalized name (case-insensitive, space-insensitive).
+    function resolveExact(token, list, nameField, codeField) {
+      const norm = normalize(token);
+      return list.find(c =>
+        normalize(c[codeField]) === norm || normalize(c[nameField]) === norm
+      ) || null;
+    }
+
+    // Filter candidates for the dropdown by a (possibly partial) typed
+    // prefix, against code or normalized name.
+    function filterCandidates(partial, list, nameField, codeField) {
+      const norm = normalize(partial);
+      if (!norm) return list;
+      return list.filter(c =>
+        normalize(c[codeField]).includes(norm) || normalize(c[nameField]).includes(norm)
+      );
+    }
+
+    // ------------------------------------------------------------------
+    // Input parsing: split the raw input value into tokens by
+    // whitespace, tracking whether the text ends mid-token (an "active"
+    // partial token still being typed/filtered) or on a boundary (all
+    // tokens are "committed", cursor is starting a fresh one). The slot
+    // the cursor is currently in is purely a function of how many
+    // committed tokens exist - this is the "small state machine keyed
+    // on token position" the design calls for, not a parser with
+    // grammar/synonym handling.
+    // ------------------------------------------------------------------
+    function splitInput(value) {
+      const trailingSpace = /\s$/.test(value);
+      const rawTokens = value.split(/\s+/).filter(t => t.length > 0);
+      if (trailingSpace || rawTokens.length === 0) {
+        return { committed: rawTokens, active: '' };
+      }
+      return { committed: rawTokens.slice(0, -1), active: rawTokens[rawTokens.length - 1] };
+    }
+
+    // Slot indices: 0 = "ship" keyword, 1 = commissary-meat,
+    // 2 = restaurant, 3 = total-qty, 4+ = repeating name:qty pairs.
+    function slotForCommittedCount(n) {
+      if (n <= 3) return n;
+      return 4;
+    }
+
+    const SLOT_LABELS = {
+      0: 'command',
+      1: 'commissary-meat',
+      2: 'restaurant',
+      3: 'total-qty',
+      4: 'name:qty'
+    };
+
+    // ------------------------------------------------------------------
+    // State
+    // ------------------------------------------------------------------
+    const input = document.getElementById('term-input');
+    const hintBar = document.getElementById('hint-bar');
+    const dropdownEl = document.getElementById('dropdown');
+    const submitStatus = document.getElementById('submit-status');
+    const historyListEl = document.getElementById('history-list');
+    const payloadPreview = document.getElementById('payload-preview');
+
+    let dropdownItems = [];   // current filtered candidates, each {label, sub, token}
+    let dropdownIndex = -1;   // keyboard-highlighted index, -1 = none
+    let commandHistory = [];  // array of raw command strings, most recent first
+    let historyCursor = -1;   // -1 = not currently recalling; index into commandHistory
+    let draftBeforeRecall = '';
+
+    const HISTORY_KEY = 'terminal_command_history';
+    function loadHistory() {
+      try {
+        commandHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      } catch (e) {
+        commandHistory = [];
+      }
+    }
+    function saveHistory() {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(commandHistory.slice(0, 25)));
+    }
+    function pushHistory(raw) {
+      commandHistory = commandHistory.filter(c => c !== raw);
+      commandHistory.unshift(raw);
+      commandHistory = commandHistory.slice(0, 25);
+      saveHistory();
+      renderHistoryList();
+    }
+    function renderHistoryList() {
+      if (commandHistory.length === 0) {
+        historyListEl.innerHTML = '<li class="history-empty">Nothing submitted yet this session.</li>';
+        return;
+      }
+      historyListEl.innerHTML = commandHistory.map(raw =>
+        `<li data-cmd="${escapeAttr(raw)}">${escapeHtml(raw)}</li>`
+      ).join('');
+      historyListEl.querySelectorAll('li[data-cmd]').forEach(li => {
+        li.addEventListener('click', () => {
+          input.value = li.dataset.cmd;
+          historyCursor = -1;
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+          updateStateMachine();
+        });
+      });
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function escapeAttr(s) { return escapeHtml(s); }
+
+    // ------------------------------------------------------------------
+    // Core: figure out the current slot from the input's contents, then
+    // update the hint bar + dropdown to match. Called on every keystroke.
+    // ------------------------------------------------------------------
+    function updateStateMachine() {
+      const { committed, active } = splitInput(input.value);
+      const slot = slotForCommittedCount(committed.length);
+
+      dropdownItems = [];
+      dropdownIndex = -1;
+      let hintText = '';
+      let hintIsError = false;
+
+      // Validate committed tokens up to this point so a bad earlier
+      // token shows an error immediately rather than silently letting
+      // the user keep typing further slots - per the design's "keeps
+      // the hint bar showing that slot's expected type" rule.
+      const validation = validateCommitted(committed);
+      if (validation.error) {
+        hintText = validation.error;
+        hintIsError = true;
+        renderHint(hintText, hintIsError);
+        renderDropdown([]);
+        return;
+      }
+
+      if (slot === 0) {
+        hintText = committed.length === 0 && active === ''
+          ? 'Type a command. Only "ship" is supported.'
+          : '<command> - type "ship" to begin.';
+        dropdownItems = filterSimple(active, ['ship']);
+      } else if (slot === 1) {
+        hintText = '<commissary-meat> - which commissary meat is shipping out?';
+        dropdownItems = filterCandidates(active, commissaryMeats, 'name', 'code')
+          .map(m => ({ label: normalize(m.name), sub: `${m.code} - ${m.name} (${m.unit})`, token: canonicalToken(m, 'name', 'code') }));
+      } else if (slot === 2) {
+        hintText = '<restaurant> - which restaurant is receiving it?';
+        dropdownItems = filterCandidates(active, restaurants, 'name', 'code')
+          .map(r => ({ label: normalize(r.name), sub: `${r.code} - ${r.name}`, token: canonicalToken(r, 'name', 'code') }));
+      } else if (slot === 3) {
+        hintText = '<total-qty> - total quantity shipped (number).';
+        if (active !== '' && (isNaN(Number(active)) || Number(active) <= 0)) {
+          hintText = '<total-qty> must be a positive number.';
+          hintIsError = true;
+        }
+      } else {
+        // slot 4+: repeating name:qty pairs
+        const lineCount = committed.length - 3;
+        const colonIdx = active.indexOf(':');
+        if (colonIdx === -1) {
+          hintText = `<name:qty> (pair ${lineCount + 1}) - a destination line, e.g. bagnet:10. Enter submits once you have at least one.`;
+          if (destinationMeats.length === 0) {
+            hintText = 'Pick a restaurant first (slot 2) to see its destination meats here.';
+            hintIsError = true;
+          } else {
+            const namePart = active;
+            dropdownItems = filterCandidates(namePart, destinationMeats, 'name', 'meat_code')
+              .map(m => ({ label: normalize(m.name), sub: `${m.meat_code} - ${m.name} (${m.unit})`, token: canonicalToken(m, 'name', 'meat_code') + ':' }));
+          }
+        } else {
+          const namePart = active.slice(0, colonIdx);
+          const qtyPart = active.slice(colonIdx + 1);
+          const meat = resolveExact(namePart, destinationMeats, 'name', 'meat_code');
+          if (!meat) {
+            hintText = `Unknown destination meat "${namePart}" for this restaurant.`;
+            hintIsError = true;
+          } else if (qtyPart !== '' && (isNaN(Number(qtyPart)) || Number(qtyPart) <= 0)) {
+            hintText = `Quantity for ${namePart} must be a positive number.`;
+            hintIsError = true;
+          } else {
+            hintText = `Quantity for ${namePart} (${meat.unit}). Enter submits once you have at least one complete pair.`;
+          }
+        }
+      }
+
+      renderHint(hintText, hintIsError);
+      renderDropdown(dropdownItems);
+    }
+
+    function filterSimple(active, options) {
+      const norm = normalize(active);
+      return options.filter(o => normalize(o).includes(norm)).map(o => ({ label: o, sub: '', token: o }));
+    }
+
+    // Re-validates every already-committed token, in order, stopping at
+    // the first problem. Mirrors exactly what full-line validation does
+    // at Enter time, so the live hint bar and the final submit check can
+    // never disagree with each other.
+    function validateCommitted(committed) {
+      if (committed.length >= 1 && normalize(committed[0]) !== 'ship') {
+        return { error: `Unknown command "${committed[0]}". Only "ship" is supported.` };
+      }
+      if (committed.length >= 2) {
+        const meat = resolveExact(committed[1], commissaryMeats, 'name', 'code');
+        if (!meat) return { error: `Unknown commissary meat "${committed[1]}".` };
+      }
+      if (committed.length >= 3) {
+        const restaurant = resolveExact(committed[2], restaurants, 'name', 'code');
+        if (!restaurant) return { error: `Unknown restaurant "${committed[2]}".` };
+      }
+      if (committed.length >= 4) {
+        const qty = Number(committed[3]);
+        if (!committed[3] || isNaN(qty) || qty <= 0) {
+          return { error: `total-qty "${committed[3]}" must be a positive number.` };
+        }
+      }
+      if (committed.length >= 5) {
+        for (let i = 4; i < committed.length; i++) {
+          const pairError = validateLinePair(committed[i]);
+          if (pairError) return { error: pairError };
+        }
+      }
+      return { error: null };
+    }
+
+    function validateLinePair(token) {
+      const colonIdx = token.indexOf(':');
+      if (colonIdx === -1) return `"${token}" is not a valid name:qty pair.`;
+      const namePart = token.slice(0, colonIdx);
+      const qtyPart = token.slice(colonIdx + 1);
+      const meat = resolveExact(namePart, destinationMeats, 'name', 'meat_code');
+      if (!meat) return `Unknown destination meat "${namePart}" in "${token}".`;
+      const qty = Number(qtyPart);
+      if (!qtyPart || isNaN(qty) || qty <= 0) return `Quantity in "${token}" must be a positive number.`;
+      return null;
+    }
+
+    function renderHint(text, isError) {
+      hintBar.textContent = text;
+      hintBar.className = 'hint-bar' + (isError ? ' error' : '');
+    }
+
+    function renderDropdown(items) {
+      if (!items || items.length === 0) {
+        dropdownEl.className = 'dropdown';
+        dropdownEl.innerHTML = '';
+        return;
+      }
+      dropdownEl.className = 'dropdown open';
+      dropdownEl.innerHTML = items.map((item, i) =>
+        `<div class="dropdown-item${i === dropdownIndex ? ' active' : ''}" data-index="${i}">
+           <span class="item-name">${escapeHtml(item.label)}</span>
+           <span class="item-sub">${escapeHtml(item.sub)}</span>
+         </div>`
+      ).join('');
+      dropdownEl.querySelectorAll('.dropdown-item').forEach(el => {
+        el.addEventListener('click', () => {
+          selectDropdownItem(Number(el.dataset.index));
+        });
+      });
+    }
+
+    // Replaces the currently-active (still-being-typed) token with the
+    // chosen candidate's canonical token, adds a trailing space (moving
+    // the cursor into the next slot) unless it's a name:qty pair where
+    // the token already ends in ":" (colon starts the qty sub-part of
+    // the SAME slot, not a new one).
+    function selectDropdownItem(index) {
+      const item = dropdownItems[index];
+      if (!item) return;
+      const { committed } = splitInput(input.value);
+      const needsSpace = !item.token.endsWith(':');
+      const newValue = committed.concat(item.token).join(' ') + (needsSpace ? ' ' : '');
+      input.value = newValue;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      updateStateMachine();
+    }
+
+    // ------------------------------------------------------------------
+    // Full-line parse + payload assembly, run at Enter. Reuses the same
+    // committed-token validators the live hint bar already ran, so a
+    // line the hint bar accepted always assembles cleanly.
+    // ------------------------------------------------------------------
+    function tryAssemblePayload(rawValue) {
+      const { committed, active } = splitInput(rawValue);
+      // A trailing active (not-yet-committed) token counts as part of
+      // the line at Enter time too - the user doesn't have to type a
+      // trailing space before hitting Enter.
+      const allTokens = active !== '' ? committed.concat(active) : committed;
+
+      if (allTokens.length < 5) {
+        return { error: 'Incomplete line - need ship, commissary-meat, restaurant, total-qty, and at least one name:qty pair.' };
+      }
+      const validation = validateCommitted(allTokens);
+      if (validation.error) return { error: validation.error };
+
+      const commissaryMeat = resolveExact(allTokens[1], commissaryMeats, 'name', 'code');
+      const restaurant = resolveExact(allTokens[2], restaurants, 'name', 'code');
+      const totalQty = Number(allTokens[3]);
+      const lines = allTokens.slice(4).map(token => {
+        const colonIdx = token.indexOf(':');
+        const namePart = token.slice(0, colonIdx);
+        const qtyPart = token.slice(colonIdx + 1);
+        const meat = resolveExact(namePart, destinationMeats, 'name', 'meat_code');
+        return { meat_id: meat.id, quantity: Number(qtyPart) };
+      });
+
+      const actor = (localStorage.getItem('inventory_actor') || '').trim() || null;
+
+      const payload = {
+        commissary_meat_id: commissaryMeat.id,
+        restaurant_id: restaurant.id,
+        business_date: new Date().toISOString().slice(0, 10),
+        total_quantity: totalQty,
+        notes: null,
+        actor,
+        lines
+      };
+      return { payload };
+    }
+
+    function handleSubmit() {
+      const raw = input.value.trim();
+      if (raw === '') return;
+
+      const result = tryAssemblePayload(raw);
+      if (result.error) {
+        renderHint(result.error, true);
+        submitStatus.textContent = 'Not submitted: ' + result.error;
+        submitStatus.className = 'status-message error';
+        return;
+      }
+
+      // Step 21a boundary: log only, do NOT call the API yet (that's 21b).
+      console.log('[terminal] ship payload (not sent - 21a logs only):', result.payload);
+
+      pushHistory(raw);
+      payloadPreview.textContent = JSON.stringify(result.payload, null, 2);
+      submitStatus.textContent = 'Logged to console - not sent to the server (21a boundary). See "Last logged payload" below.';
+      submitStatus.className = 'status-message success';
+
+      input.value = '';
+      historyCursor = -1;
+      updateStateMachine();
+    }
+
+    // ------------------------------------------------------------------
+    // Keyboard handling: ArrowUp/ArrowDown navigate the open dropdown if
+    // one is showing; otherwise they recall command history, shell-style.
+    // Enter selects a highlighted dropdown item if one is active,
+    // otherwise attempts full-line submission. Tab also accepts the
+    // highlighted (or sole) dropdown item, same as Enter-to-select.
+    // ------------------------------------------------------------------
+    input.addEventListener('keydown', (e) => {
+      const dropdownOpen = dropdownEl.classList.contains('open') && dropdownItems.length > 0;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (dropdownOpen) {
+          dropdownIndex = Math.min(dropdownIndex + 1, dropdownItems.length - 1);
+          renderDropdown(dropdownItems);
+        } else {
+          if (historyCursor > -1) {
+            historyCursor--;
+            input.value = historyCursor === -1 ? draftBeforeRecall : commandHistory[historyCursor];
+            input.setSelectionRange(input.value.length, input.value.length);
+            updateStateMachine();
+          }
+        }
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (dropdownOpen) {
+          dropdownIndex = Math.max(dropdownIndex - 1, 0);
+          renderDropdown(dropdownItems);
+        } else {
+          if (commandHistory.length === 0) return;
+          if (historyCursor === -1) draftBeforeRecall = input.value;
+          historyCursor = Math.min(historyCursor + 1, commandHistory.length - 1);
+          input.value = commandHistory[historyCursor];
+          input.setSelectionRange(input.value.length, input.value.length);
+          updateStateMachine();
+        }
+        return;
+      }
+      if (e.key === 'Tab') {
+        if (dropdownOpen) {
+          e.preventDefault();
+          selectDropdownItem(dropdownIndex > -1 ? dropdownIndex : 0);
+        }
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (dropdownOpen && dropdownIndex > -1) {
+          selectDropdownItem(dropdownIndex);
+          return;
+        }
+        handleSubmit();
+        return;
+      }
+    });
+
+    input.addEventListener('input', () => {
+      historyCursor = -1;
+      updateStateMachine();
+    });
+
+    // Reload the destination-meats list whenever slot 2 (restaurant)
+    // becomes resolvable, so slot 4+ dropdowns are ready by the time the
+    // user gets there.
+    let lastRestaurantId = null;
+    input.addEventListener('input', () => {
+      const { committed } = splitInput(input.value);
+      if (committed.length >= 3) {
+        const restaurant = resolveExact(committed[2], restaurants, 'name', 'code');
+        const id = restaurant ? restaurant.id : null;
+        if (id !== lastRestaurantId) {
+          lastRestaurantId = id;
+          loadDestinationMeats(id).then(updateStateMachine);
+        }
+      } else if (lastRestaurantId !== null) {
+        lastRestaurantId = null;
+        destinationMeats = [];
+      }
+    });
+
+    (async function init() {
+      loadHistory();
+      renderHistoryList();
+      await Promise.all([loadCommissaryMeats(), loadRestaurants()]);
+      updateStateMachine();
+      input.focus();
+    })();
+  </script>
+  <script src="command-panel.js"></script>
+  <script src="commands/sync-batch-stock.js"></script>
+  <script src="commands/oversold-check.js"></script>
+</body>
+</html>
