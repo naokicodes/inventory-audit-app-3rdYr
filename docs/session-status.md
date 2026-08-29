@@ -1205,6 +1205,89 @@ of sizing them correctly, not a separate concern.
     isn't the same as someone actually clicking through the three new/
     changed pages once.
 
+## Future considerations (not scheduled, not designed — raised 2026-08-29)
+
+Five items the project owner raised in one batch, thinking ahead past
+everything built so far. None of these are designed yet — this section
+exists so they aren't lost, and so the real connections between them
+are visible before anyone starts designing in isolation.
+
+1. **Allocations needs an item-to-item conversion type.** Distinct from
+   step 22's `Allocation/Transfer` type, which moves the *same* item
+   between *locations* (from/to fields). This is converting stock *of
+   one item into a different item* at the same location — e.g. 2 units
+   of FC's Bagnet Sinigang becoming 2 units of Dinuguan, since both
+   trace back to the same Jowl. Needs a different shape (a "converts
+   to" item + quantity, not a from/to location) — don't conflate it
+   with the existing transfer type in the UI or the data model.
+
+2. **Management dashboard — cross-location stock rollup.** Upper
+   management currently does this by hand in a spreadsheet, described
+   as painful. Envisioned shape: rows = Commissary meat items (the root
+   meats), columns = each location (Commissary, Silingan/A, FC, Likod —
+   toggleable, up to 3 at once) + a grand total column. Real complexity:
+   some locations' stock isn't a 1:1 match to a root meat (FC's Bagnet
+   isn't literally "some kg of Jowl" without a conversion ratio) — the
+   rollup needs to reverse-convert portioned items back to their
+   raw-meat-equivalent to total correctly.
+
+3. **RESOLVED 2026-08-29, correcting an earlier mis-model** — yield
+   stays Commissary-only, but the fix is to stop treating Commissary as
+   a singleton, not to give restaurants their own yield table. The
+   original framing above (restaurant-level yield) was wrong: Likod
+   "processing meat itself" isn't a separate event at all — Commissary,
+   Restaurant A/Silingan, and Restaurant C/Likod are physically the
+   same site. What looks like Likod marinating/prepping meat for its
+   grill menu is Commissary's own yield step, just landing in Likod's
+   stock without needing real shipment logistics (no delivery, same
+   building). FC is the only genuinely remote location, which is why it
+   needs real Shipments. The right generalization, if a future site
+   ever *does* need its own on-site processing: **another Commissary
+   instance**, not a restaurant-level feature — turn Commissary from an
+   implicit singleton into a repeatable pattern (a `commissary_id`
+   scoping `commissary_meats`/`commissary_yield_log`/etc., the same way
+   `restaurant_id` already scopes restaurant data), not something
+   special-cased once. Not designed yet, but the direction is settled;
+   don't reopen "should restaurants get their own yield table."
+
+4. **A dedicated cleanup pass is owed.** Several design pivots this
+   project (Landing's three adjustment boxes → Allocations,
+   `commissary_meat_map` being retired, likely others not yet audited
+   for) probably left dead code, stale UI, or orphaned routes behind —
+   the same category of issue the stray-git-text bug and the
+   `commissary_meat_map` UI both turned out to be, just not
+   systematically hunted for yet. Worth its own step, ideally before
+   Restaurant C onboarding so nothing stale gets copied into a fresh
+   restaurant's setup.
+
+5. **REFINED 2026-08-29 — a two-way split resolves the conversion-ratio
+   tension, not a single blanket policy.** Originally framed as "step
+   20's dynamic-no-formula call vs. the dashboard needing ratios to
+   total against" — resolved by recognizing two different kinds of
+   commissary meat, not one:
+   - **Raw type** (plain Jowl shipped as itself, no portioning
+     happening): no ratio concept applies — genuinely just a quantity,
+     step 20's dynamic-entry call stands unchanged here.
+   - **Portioned type** (Bagnet, Sisig, Sinigang, DNG — named,
+     officially-portioned products with real margin implications): a
+     real **Standard** ratio should exist, the same pattern
+     `commissary_meats.allowed_leeway_pct` already uses for the
+     raw→processed yield step — actual shipment entries get *compared
+     against* the Standard (Actual vs. Calculated, variance flagged),
+     never blocking the save, consistent with how every other part of
+     this app already works. Not "step 20 was wrong," but "step 20's
+     call was right for raw meat and needs refining for named
+     portions" — a `commissary_meat_type` classifier (or similar) is
+     the likely shape, distinguishing which meats get a Standard at
+     all. This also directly serves item 2's dashboard rollup and the
+     original shipment-portioning question — the same Standard data
+     both reverse-converts (Bagnet → Jowl-equivalent, for the
+     dashboard) and forward-converts (Jowl → expected portion counts,
+     for shipment guidance). Not designed in detail yet — table shape,
+     where the Standard lives (on `commissary_meats` itself vs. a new
+     table), and whether it's per-destination-restaurant or global per
+     meat are all still open.
+
 ## Things NOT to re-litigate (already decided, stable)
 
 - Tech stack: Node.js + Express + `node:sqlite` (not better-sqlite3, not
