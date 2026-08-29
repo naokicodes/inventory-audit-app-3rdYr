@@ -11,6 +11,150 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 (later still) — Step 21b: real submission + preset-prefill, built and verified live
+
+**Built directly by the architect session**, same day as 21a's
+verification, following the project owner's "let's ship code ourselves
+for a few steps" call rather than dispatching another worker for
+already-well-specified, low-risk work.
+
+**Real submission**: `handleSubmit` (in `terminal.html`) now calls the
+real `POST /api/commissary/shipments` instead of `console.log`-ing the
+payload. Input is disabled while the request is in flight, to prevent
+a duplicate write from a stray keystroke. Three outcomes:
+- **Network failure**: input re-enabled, typed line left in place,
+  status explicitly says the line was NOT sent.
+- **Server rejection** (HTTP non-2xx): the real `{error: "..."}`
+  message from the route is shown verbatim in both the hint bar and
+  the status line; the typed line is preserved so the auditor can fix
+  and resubmit, matching how the GUI form behaves for equivalent bad
+  input.
+- **Success**: the real server response (`{ok, id, ...shipment,
+  lines}`) is shown in the renamed "Last saved shipment" panel (was
+  "Last logged payload" in 21a), history is updated, input clears.
+
+**Preset-prefill**: new `loadShipmentPresets(commissaryMeatId,
+restaurantId)` fetches `GET /api/commissary/shipment-presets` once both
+slot 1 (commissary-meat) and slot 2 (restaurant) resolve, merging every
+active preset's lines for that pair into a `meat_id -> default_quantity`
+map (first preset wins on a collision — pure autofill, no stronger
+handling needed since the auditor can always overwrite the inserted
+number). The slot-4 dropdown sorts preset-covered meats first and
+inserts their default quantity directly into the token
+(`bagnet:10` instead of a bare `bagnet:`), with a sub-text note and a
+hint-bar line stating how many lines came from a preset.
+
+**Verification — real server, real database, not mirrored logic**:
+booted the app against freshly-seeded data, created a real preset via
+`POST /api/commissary/shipment-presets` (Jowl→FC: Bagnet default 10,
+Sisig default 6). Then drove the *actual* extracted `terminal.html`
+script through a Node `vm` context, this time with a real `fetch`
+implementation backed by raw `http` requests against the live server
+(not a stub returning canned data) — confirmed: preset defaults
+populate correctly once both slots resolve; the slot-4 dropdown
+surfaces the preset-covered meats first with the right defaults and the
+correct hint-bar count; a full valid line submitted through the real
+`handleSubmit()` actually wrote a `commissary_shipments` row + 2
+`commissary_shipment_lines` rows + 2 `stock_receipts` rows to the live
+database and returned the real server response; and a line referencing
+a foreign `meat_id` was correctly rejected with the real server error
+message, without losing the typed input. Full backend suite re-run
+clean throughout: **11/11 files, 154/154 assertions, 0 regressions**
+(frontend-only change, no backend/schema touched). Test database
+cleaned up after each run.
+
+**Still genuinely untested**: same standing gap as 21a — no real
+mouse/keyboard browser click-through has happened. The `vm` simulation
+exercises the same code paths a browser would, driven against a real
+server, but it isn't a substitute for someone actually using it once.
+
+**Deferred, documented, not built**: the project owner proposed an
+AutoCAD-style layout (command bar docked bottom-center rather than
+top-of-page, history reachable via up-arrow plus a togglable slide-in
+sidebar for browsing further back, instead of the current always-visible
+history panel). Decided as non-modal — page content stays visible above
+the docked bar — with the sidebar and the slot guide/dropdown never
+competing for space since they sit on different axes. Deliberately
+scheduled after logic/backend work, not before; written down here so it
+isn't silently dropped from a future session's radar.
+
+**Files changed**: `public/terminal.html` only. No backend, schema, or
+other pages touched.
+
+---
+
+## 2026-08-29 (later) — Step 21a verified live + persistent slot guide added
+
+**Context**: the worker handoff below (step 21a) was pulled from `main`
+after the project owner pushed it, and independently re-verified by the
+architect session rather than trusted from the worker's own transcript.
+Separately, the project owner tried the described design and found the
+hint-bar-only approach hard to follow once the cursor moves past a slot
+— the hint disappears, so there's no way to see what you already typed
+for an earlier slot without scrolling back up the input line mentally.
+
+**Verification performed** (all fresh, not reused from the worker's
+claims): cloned the actual pushed commit, ran `npm install` +
+the full backend test suite (11/11 files, 154/154 assertions, 0
+regressions — matches what the worker reported, now independently
+confirmed). Read `commissary.js`'s real `POST /api/commissary/shipments`
+handler directly and compared it field-for-field against
+`terminal.html`'s assembled payload — matches exactly
+(`commissary_meat_id`, `restaurant_id`, `business_date`, `total_quantity`,
+`notes`, `actor`, `lines: [{meat_id, quantity}]`). Booted the real
+server against freshly-seeded data (real Restaurant A/FC/commissary
+catalogs, not fixtures) and confirmed `GET /terminal.html` serves 200
+with the expected markup, and that `/api/commissary/meats`,
+`/api/restaurants`, and `/api/stock-receipts/meats?restaurant_id=` (the
+three endpoints the terminal depends on) all return real, usable data.
+
+**Persistent slot guide added** (architect session, same day, not a
+separate worker dispatch — small and low-risk enough to build directly):
+a new `renderSlotGuide`/`computeSlotStatus` pair in `terminal.html`,
+rendered above the existing hint bar. Shows all five conceptual slots
+at once — `ship`, `<commissary-meat>`, `<restaurant>`, `<total-qty>`,
+`<name:qty pairs>` — with already-filled slots shown in green with
+their resolved value, the currently-active slot highlighted, upcoming
+slots dimmed, and the first invalid token flagged in red in place
+(e.g. `commissary-meat: "badmeat"?`), rather than letting later slots
+appear reachable once an earlier one is actually broken.
+`computeSlotStatus` deliberately reuses the exact same `resolveExact`/
+`validateLinePair` calls `validateCommitted` already uses for the hint
+bar and Enter-time validation, rather than re-implementing the checks —
+so the guide can never show a slot as valid that the hint bar or submit
+path would reject, or vice versa.
+
+**How the new code was tested**: no headless browser available (same
+standing gap as every prior frontend step), so the slot state machine
+and the new guide were exercised via Node's `vm` module — running the
+actual extracted `<script>` content in a proper JS context (correct
+`let`/`const` global scoping, unlike a bare `eval()`, which was tried
+first and produced misleading false failures due to direct-eval's
+block-scoping of `let`/`const` — worth remembering if a future session
+tries the same shortcut) with DOM elements stubbed by id. Drove
+`updateStateMachine()` through the full happy path (`ship jowl fc 20
+bagnet:12 sisig:5`, confirming each slot goes `active` → `done` with the
+correct resolved value at the right moment) and four error paths
+(unknown commissary meat, unknown restaurant, negative quantity, unknown
+destination meat) — confirmed the guide correctly freezes at the first
+bad token, and later slots stay `upcoming` rather than looking
+reachable. Full backend suite re-run again after this patch, still
+154/154, 0 regressions (expected — frontend-only change).
+
+**Files changed**: `public/terminal.html` only (CSS for
+`.slot-guide`/`.slot.done`/`.slot.active`/`.slot.upcoming`/`.slot.error`,
+the guide's container div, `computeSlotStatus`/`renderSlotGuide`
+functions, one call site added in `updateStateMachine`, and one
+sentence added to the page's own explanatory copy). No backend, no
+other pages, no schema.
+
+**Still open, same as the worker's own handoff noted**: no real
+mouse/keyboard browser click-through has happened. The `vm` simulation
+above exercises the same code paths a real browser would, but it isn't
+a substitute for someone actually using it once.
+
+---
+
 ## 2026-08-29 — Step 21a: Terminal shell + slot state machine (WIP handoff - see below)
 New `public/terminal.html`: a Discord-slash-command-style input line, hint
 bar, and filtering dropdown, driven by a small state machine keyed on

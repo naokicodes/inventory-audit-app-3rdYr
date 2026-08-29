@@ -9,6 +9,22 @@
     .hint { color: #888; font-size: 0.8rem; margin-bottom: 1.5rem; }
 
     .term { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem; background: #fafafa; }
+    .slot-guide {
+      font-family: monospace;
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .slot-guide .sep { color: #ccc; }
+    .slot-guide .slot { padding: 0.1rem 0.4rem; border-radius: 3px; }
+    .slot-guide .slot.done { color: #1a7f37; background: #eaf7ee; }
+    .slot-guide .slot.active { color: #1a1a1a; background: #e8f0fe; font-weight: bold; }
+    .slot-guide .slot.upcoming { color: #aaa; }
+    .slot-guide .slot.error { color: #b42318; background: #fdecea; }
+    .slot-guide .slot .slot-value { font-weight: normal; }
     .hint-bar {
       font-family: monospace;
       font-size: 0.85rem;
@@ -91,14 +107,20 @@
     A type-first alternative to the Commissary Shipments form, for people who'd
     rather type than click. Discord-slash-command style: one input line, with a
     hint bar and a filtering dropdown that follow whichever slot the cursor is
-    currently in. <strong>Step 21a</strong>: the slot state machine and a valid,
-    correctly-shaped shipment line are fully working, but Enter does not call the
-    API yet - a complete line is logged to the browser console and shown below
-    instead. Wiring the real <code>POST /api/commissary/shipments</code> call is
-    step 21b.
+    currently in, plus a persistent guide above it showing the whole command's
+    shape at once - filled slots in green with their resolved value, the
+    active slot highlighted, upcoming ones dimmed, and a bad token flagged red
+    right where it is, so you don't lose track of what you already typed once
+    you've moved past it. Once a commissary meat and restaurant are both
+    picked, destination lines already covered by a saved preset for that pair
+    show their default quantity and sort to the top of the list - still just
+    autofill, edit or ignore it freely. Enter on a complete line calls the
+    same <code>POST /api/commissary/shipments</code> endpoint the GUI form
+    uses - this is a real write, not a preview.
   </p>
 
   <div class="term">
+    <div class="slot-guide" id="slot-guide"></div>
     <div class="hint-bar" id="hint-bar"></div>
     <div class="prompt-row">
       <span class="prompt-glyph">&gt;</span>
@@ -116,8 +138,8 @@
       <ul class="history-list" id="history-list"></ul>
     </div>
     <div class="panel">
-      <h2>Last logged payload</h2>
-      <p class="hint" style="margin-bottom:0.4rem;">Console-logged, not sent to the server yet.</p>
+      <h2>Last saved shipment</h2>
+      <p class="hint" style="margin-bottom:0.4rem;">The full server response from the most recent successful submission.</p>
       <pre class="payload-preview" id="payload-preview">(nothing submitted yet)</pre>
     </div>
   </div>
@@ -132,6 +154,7 @@
     let commissaryMeats = [];   // [{id, code, name, unit, ...}]
     let restaurants = [];       // [{id, name, code}]
     let destinationMeats = [];  // [{id, meat_code, name, unit, commissary_meat_id}] for the chosen restaurant
+    let shipmentPresetDefaults = {};  // meat_id -> default_quantity, merged across all active presets for the current (commissary-meat, restaurant) pair
 
     async function loadCommissaryMeats() {
       const res = await fetch('/api/commissary/meats');
@@ -145,6 +168,26 @@
       if (!restaurantId) { destinationMeats = []; return; }
       const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${restaurantId}`);
       destinationMeats = await res.json();
+    }
+
+    // 21b: pure autofill, same principle as commissary-shipments.html's
+    // "Load preset" dropdown - merges every active preset's lines for this
+    // (commissary_meat_id, restaurant_id) pair into one meat_id -> default
+    // map. If two presets both cover the same destination meat with
+    // different defaults, the first one returned wins (server orders by
+    // name) - fine for autofill, since the auditor can always overwrite
+    // whatever qty gets inserted before hitting Enter.
+    async function loadShipmentPresets(commissaryMeatId, restaurantId) {
+      if (!commissaryMeatId || !restaurantId) { shipmentPresetDefaults = {}; return; }
+      const res = await fetch(`/api/commissary/shipment-presets?commissary_meat_id=${commissaryMeatId}&restaurant_id=${restaurantId}`);
+      const presets = await res.json();
+      const defaults = {};
+      for (const preset of presets) {
+        for (const line of preset.lines) {
+          if (defaults[line.meat_id] === undefined) defaults[line.meat_id] = line.default_quantity;
+        }
+      }
+      shipmentPresetDefaults = defaults;
     }
 
     // ------------------------------------------------------------------
@@ -225,6 +268,7 @@
     // State
     // ------------------------------------------------------------------
     const input = document.getElementById('term-input');
+    const slotGuideEl = document.getElementById('slot-guide');
     const hintBar = document.getElementById('hint-bar');
     const dropdownEl = document.getElementById('dropdown');
     const submitStatus = document.getElementById('submit-status');
@@ -291,6 +335,8 @@
       let hintText = '';
       let hintIsError = false;
 
+      renderSlotGuide(committed);
+
       // Validate committed tokens up to this point so a bad earlier
       // token shows an error immediately rather than silently letting
       // the user keep typing further slots - per the design's "keeps
@@ -334,8 +380,26 @@
             hintIsError = true;
           } else {
             const namePart = active;
+            const presetCount = Object.keys(shipmentPresetDefaults).length;
+            if (presetCount > 0) {
+              hintText += ` (${presetCount} line${presetCount === 1 ? '' : 's'} prefilled from a saved preset for this pair.)`;
+            }
             dropdownItems = filterCandidates(namePart, destinationMeats, 'name', 'meat_code')
-              .map(m => ({ label: normalize(m.name), sub: `${m.meat_code} - ${m.name} (${m.unit})`, token: canonicalToken(m, 'name', 'meat_code') + ':' }));
+              .map(m => {
+                const defaultQty = shipmentPresetDefaults[m.id];
+                const hasDefault = defaultQty !== undefined;
+                return {
+                  label: normalize(m.name),
+                  sub: hasDefault
+                    ? `${m.meat_code} - ${m.name} (${m.unit}) - preset default ${defaultQty}`
+                    : `${m.meat_code} - ${m.name} (${m.unit})`,
+                  token: canonicalToken(m, 'name', 'meat_code') + ':' + (hasDefault ? defaultQty : ''),
+                  hasDefault
+                };
+              })
+              // Preset-covered meats surface first - they're the ones the
+              // auditor is most likely to want for this meat+restaurant pair.
+              .sort((a, b) => (b.hasDefault - a.hasDefault));
           }
         } else {
           const namePart = active.slice(0, colonIdx);
@@ -403,6 +467,81 @@
       const qty = Number(qtyPart);
       if (!qtyPart || isNaN(qty) || qty <= 0) return `Quantity in "${token}" must be a positive number.`;
       return null;
+    }
+
+    // ------------------------------------------------------------------
+    // Persistent slot guide: unlike the hint bar (which only describes
+    // whichever single slot is currently active and disappears once the
+    // user moves past it), this stays visible for the whole line and
+    // shows all five conceptual slots at once - already-filled ones
+    // with their resolved value, the active one highlighted, upcoming
+    // ones dimmed, and the first bad token (if any) flagged in place.
+    // Mirrors validateCommitted/validateLinePair's own checks exactly
+    // so the guide can never disagree with what the hint bar or Enter
+    // would say about the same token.
+    // ------------------------------------------------------------------
+    function computeSlotStatus(committed) {
+      const results = {};
+      let errorIndex = -1;
+
+      if (committed.length >= 1) {
+        if (normalize(committed[0]) === 'ship') {
+          results[0] = { ok: true, display: 'ship' };
+        } else {
+          results[0] = { ok: false, display: committed[0] };
+          errorIndex = 0;
+        }
+      }
+      if (errorIndex === -1 && committed.length >= 2) {
+        const meat = resolveExact(committed[1], commissaryMeats, 'name', 'code');
+        if (meat) { results[1] = { ok: true, display: normalize(meat.name) }; }
+        else { results[1] = { ok: false, display: committed[1] }; errorIndex = 1; }
+      }
+      if (errorIndex === -1 && committed.length >= 3) {
+        const restaurant = resolveExact(committed[2], restaurants, 'name', 'code');
+        if (restaurant) { results[2] = { ok: true, display: normalize(restaurant.name) }; }
+        else { results[2] = { ok: false, display: committed[2] }; errorIndex = 2; }
+      }
+      if (errorIndex === -1 && committed.length >= 4) {
+        const qty = Number(committed[3]);
+        if (committed[3] && !isNaN(qty) && qty > 0) { results[3] = { ok: true, display: String(qty) }; }
+        else { results[3] = { ok: false, display: committed[3] }; errorIndex = 3; }
+      }
+      if (errorIndex === -1 && committed.length >= 5) {
+        const pairs = [];
+        for (let i = 4; i < committed.length; i++) {
+          const pairError = validateLinePair(committed[i]);
+          if (pairError) { errorIndex = i; results[i] = { ok: false, display: committed[i] }; break; }
+          pairs.push(committed[i]);
+        }
+        if (errorIndex === -1) results[4] = { ok: true, display: pairs.join(' ') };
+      }
+      return { results, errorIndex };
+    }
+
+    const SLOT_GUIDE_LABELS = ['ship', 'commissary-meat', 'restaurant', 'total-qty', 'name:qty pairs'];
+
+    function renderSlotGuide(committed) {
+      const { results, errorIndex } = computeSlotStatus(committed);
+      const currentSlot = slotForCommittedCount(committed.length);
+      const parts = SLOT_GUIDE_LABELS.map((label, i) => {
+        let cls, valueHtml = '';
+        if (errorIndex === i) {
+          cls = 'error';
+          valueHtml = `<span class="slot-value">"${escapeHtml(results[i].display)}"?</span>`;
+        } else if (errorIndex !== -1 && i > errorIndex) {
+          cls = 'upcoming';
+        } else if (results[i] && results[i].ok) {
+          cls = 'done';
+          valueHtml = `<span class="slot-value">${escapeHtml(results[i].display)}</span>`;
+        } else if (i === currentSlot) {
+          cls = 'active';
+        } else {
+          cls = 'upcoming';
+        }
+        return `<span class="slot ${cls}">${label}${valueHtml ? ': ' + valueHtml : ''}</span>`;
+      });
+      slotGuideEl.innerHTML = parts.join('<span class="sep">&rarr;</span>');
     }
 
     function renderHint(text, isError) {
@@ -490,7 +629,7 @@
       return { payload };
     }
 
-    function handleSubmit() {
+    async function handleSubmit() {
       const raw = input.value.trim();
       if (raw === '') return;
 
@@ -502,17 +641,62 @@
         return;
       }
 
-      // Step 21a boundary: log only, do NOT call the API yet (that's 21b).
-      console.log('[terminal] ship payload (not sent - 21a logs only):', result.payload);
+      // 21b: real submission. Disable the input while in flight so a
+      // second Enter (or a stray keystroke) can't fire a duplicate
+      // request against a live write path.
+      input.disabled = true;
+      submitStatus.textContent = 'Submitting...';
+      submitStatus.className = 'status-message';
 
+      let response;
+      try {
+        response = await fetch('/api/commissary/shipments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(result.payload)
+        });
+      } catch (networkErr) {
+        input.disabled = false;
+        submitStatus.textContent = 'Not submitted: network error - ' + networkErr.message + '. The line was NOT sent; nothing was cleared, try again.';
+        submitStatus.className = 'status-message error';
+        input.focus();
+        return;
+      }
+
+      let body;
+      try {
+        body = await response.json();
+      } catch (parseErr) {
+        body = null;
+      }
+
+      input.disabled = false;
+
+      if (!response.ok) {
+        // Server rejected it (bad meat/restaurant/line, etc.) - same
+        // failure the GUI form would hit for an equivalent payload.
+        // Leave the typed line in place so the auditor can fix and
+        // resubmit rather than retyping the whole thing.
+        const message = (body && body.error) ? body.error : `Server rejected the shipment (HTTP ${response.status}).`;
+        renderHint(message, true);
+        submitStatus.textContent = 'Not submitted: ' + message;
+        submitStatus.className = 'status-message error';
+        input.focus();
+        return;
+      }
+
+      // Success: this is a real write, same as submitting the GUI form -
+      // commissary_shipments + commissary_shipment_lines +
+      // stock_receipts rows now exist for real.
       pushHistory(raw);
-      payloadPreview.textContent = JSON.stringify(result.payload, null, 2);
-      submitStatus.textContent = 'Logged to console - not sent to the server (21a boundary). See "Last logged payload" below.';
+      payloadPreview.textContent = JSON.stringify(body, null, 2);
+      submitStatus.textContent = `Shipment #${body.id} recorded (${body.lines.length} line${body.lines.length === 1 ? '' : 's'}). See "Last saved shipment" below for the full saved record.`;
       submitStatus.className = 'status-message success';
 
       input.value = '';
       historyCursor = -1;
       updateStateMachine();
+      input.focus();
     }
 
     // ------------------------------------------------------------------
@@ -594,6 +778,27 @@
       } else if (lastRestaurantId !== null) {
         lastRestaurantId = null;
         destinationMeats = [];
+      }
+    });
+
+    // 21b: reload shipment presets whenever BOTH slot 1 (commissary-meat)
+    // and slot 2 (restaurant) are resolvable - presets are keyed on the
+    // pair, so there's nothing to fetch until both exist. Tracked
+    // separately from lastRestaurantId above since this needs slot 1 too.
+    let lastPresetPairKey = null;
+    input.addEventListener('input', () => {
+      const { committed } = splitInput(input.value);
+      let meat = null, restaurant = null;
+      if (committed.length >= 2) meat = resolveExact(committed[1], commissaryMeats, 'name', 'code');
+      if (committed.length >= 3) restaurant = resolveExact(committed[2], restaurants, 'name', 'code');
+      const key = (meat && restaurant) ? `${meat.id}:${restaurant.id}` : null;
+      if (key !== lastPresetPairKey) {
+        lastPresetPairKey = key;
+        if (key) {
+          loadShipmentPresets(meat.id, restaurant.id).then(updateStateMachine);
+        } else {
+          shipmentPresetDefaults = {};
+        }
       }
     });
 

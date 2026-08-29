@@ -1,10 +1,22 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (step 21a handed off as WIP — terminal shell +
-slot state machine built and mirrored-logic-tested, live/browser
-verification still open; see step 21's entry below for the full
-done/not-done/untested breakdown. Steps 1–20 remain fully done, including
-the `commissary_shipment_presets` piece — confirmed pushed and verified
+Last updated: 2026-08-29 (step 21a and 21b both Done — the full `ship`
+terminal now performs a real write. 21a's worker handoff was
+independently verified live by the architect session (real server boot,
+fresh full-suite re-run, payload shape checked against the actual route
+code); a persistent slot guide was added on top the same day. 21b (real
+`POST /api/commissary/shipments` submission + preset-prefill from
+`commissary_shipment_presets`) was then built and verified live by the
+architect session directly — real preset created via the API, a
+complete `vm`-driven script run against the real server confirmed a
+successful submission actually writes `commissary_shipments`/
+`commissary_shipment_lines`/`stock_receipts` rows, and a server-side
+rejection is surfaced correctly without losing the typed line. Only a
+real browser click-through remains genuinely open for both 21a and 21b
+— see step 21's entry below for the full breakdown. An AutoCAD-style
+docked-bar layout was discussed and deferred, not built, until logic
+work is settled. Steps 1–20 remain fully done, including the
+`commissary_shipment_presets` piece — confirmed pushed and verified
 live in an earlier session).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
@@ -36,12 +48,16 @@ dead-simple per `daily-workflow.md`, but the admin side should let the
 project owner define new things — conversions, categories, presets —
 without a developer, a theme running through steps 20-22 alike).
 
-## Where things stand: steps 1–20 done (presets closed out 2026-08-29,
+## Where things stand: steps 1–21 done (presets closed out 2026-08-29,
 minus its own explicitly-deferred authoring UI — see below), everything
-confirmed pushed to `main` and verified. **Step 21a is new WIP as of this
-session** — built and mirrored-logic-tested, handed off as files (no
-`.git` repo in this session's zip, no network access) rather than pushed;
-see step 21's entry below for exactly what's done/not-done/untested.
+confirmed pushed to `main` and verified. **Step 21 (both 21a and 21b) is
+Done** — the terminal page performs real shipment writes, verified live
+end-to-end by the architect session against a real server and real
+database, not just mirror-tested. An AutoCAD-style docked-bar layout
+pass was discussed and deliberately deferred (see step 21's entry).
+**Next up is step 22** (Landing Allocations merge — still draft/under
+discussion, see its own entry below) or a fresh step, project owner's
+call.
 
 **Step 20 is now fully closed out, including the
 `commissary_shipment_presets` piece 20c deferred.** New this session:
@@ -852,68 +868,163 @@ of sizing them correctly, not a separate concern.
 
     **Split into two sequential sub-steps for handoff, same pattern as
     step 20**:
-    - **21a [WIP — done except live verification, see breakdown below]
-      (terminal shell + slot state machine, no live submission yet)**:
-      new `public/terminal.html` (or similar) with the input line, hint
-      bar, dropdown, and slot-position tracking wired for the `ship`
-      command's five slot types above, plus up-arrow history.
-      Submitting a complete line can `console.log` the assembled payload
-      for now rather than actually calling the API — mirrors step 14's
-      "prove the plumbing works before the real command" pattern. No
-      backend changes.
+    - **21a [Done, 2026-08-29 — verified live by the architect session
+      after the worker handoff, see breakdown below] (terminal shell +
+      slot state machine, no live submission yet)**: new
+      `public/terminal.html` with the input line, hint bar, dropdown,
+      and slot-position tracking wired for the `ship` command's five
+      slot types above, plus up-arrow history. Submitting a complete
+      line `console.log`s the assembled payload for now rather than
+      actually calling the API — mirrors step 14's "prove the plumbing
+      works before the real command" pattern. No backend changes.
 
-      **Done**: `public/terminal.html` built — input line, hint bar,
-      filtering dropdown, and a state machine keyed on committed-token
-      count for all five slots (`ship` literal, `<commissary-meat>`,
-      `<restaurant>`, `<total-qty>`, one-or-more `<name:qty>` pairs).
-      Up-arrow/down-arrow history via `localStorage`
-      (`terminal_command_history`, last 25), falling back to dropdown
-      navigation when a dropdown is open. Enter on a complete valid line
-      assembles the payload and `console.log`s it (plus an on-page "Last
-      logged payload" panel) — does not call the API, per the step's own
-      boundary. `business_date` defaults to today (not one of the five
-      named slots — flagged, not silently assumed, see changelog).
-      Line-name resolution (slot 5) looks up the destination
-      restaurant's real active meats via the existing
+      **Built by the worker**: input line, hint bar, filtering dropdown,
+      and a state machine keyed on committed-token count for all five
+      slots (`ship` literal, `<commissary-meat>`, `<restaurant>`,
+      `<total-qty>`, one-or-more `<name:qty>` pairs). Up/down-arrow
+      history via `localStorage` (`terminal_command_history`, last 25),
+      falling back to dropdown navigation when a dropdown is open. Enter
+      on a complete valid line assembles the payload and `console.log`s
+      it (plus an on-page "Last logged payload" panel) — does not call
+      the API, per the step's own boundary. `business_date` defaults to
+      today (not one of the five named slots — flagged, not silently
+      assumed, see changelog). Line-name resolution (slot 5) looks up
+      the destination restaurant's real active meats via the existing
       `GET /api/stock-receipts/meats?restaurant_id=` — ordinary lookup,
       not the preset-prefill 21b is scoped to add. "Terminal" nav link
-      added to all 8 existing pages. No backend changes.
+      added to all 8 existing pages.
+
+      **Added directly by the architect session, same day, before
+      21b**: a persistent slot guide above the hint bar
+      (`renderSlotGuide`/`computeSlotStatus` in `terminal.html`) — the
+      project owner found the original hint-bar-only design hard to
+      follow once past a slot, since the hint disappears as soon as the
+      cursor moves on. The guide shows all five slots at once: filled
+      ones in green with their resolved value, the active one
+      highlighted, upcoming ones dimmed, and the first bad token flagged
+      red in place (e.g. `commissary-meat: "badmeat"?`) rather than
+      silently letting later slots look reachable. Reuses
+      `resolveExact`/`validateLinePair` exactly as `validateCommitted`
+      does, so it can't disagree with what the hint bar or Enter would
+      say about the same token. This wasn't in the original step 21
+      design (which only specified a hint bar + filtering dropdown) —
+      noted here as a same-day addition, not retroactively written into
+      the design section above.
 
       **Not done**: nothing scoped to 21a is missing — 21b's real
       submission + preset-prefill remain untouched, as intended.
 
-      **Untested**: no browser click-through (no headless browser in
-      any sandbox used so far, same standing gap every prior frontend
-      step in this project has carried) and no live-server HTTP check
-      (this handoff's zip has no `node_modules` and this sandbox has no
-      network access, so `npm install` / booting a real server wasn't
-      possible). What WAS verified: `node --check` on the extracted
-      inline script (syntax clean), a mirrored-logic trace test (11
-      assertions covering slot detection, space-containing-name token
-      resolution, partial filtering, a full valid line assembling
-      byte-for-byte into `commissary.js`'s real payload shape, and
-      rejection of an unknown restaurant/malformed pair/non-positive
-      qty/foreign destination-meat — all 11 passed), and the full
-      backend suite re-run clean (**11/11 files, 154/154 assertions, 0
-      regressions**). See this session's `changelog.md` entry for the
-      full breakdown.
+      **Verified live, 2026-08-29 (architect session, after the worker
+      handoff)**: worker's diff pulled from `main` and independently
+      checked rather than trusted from the transcript alone. `node
+      --check` on the extracted inline script (clean, both before and
+      after the slot-guide addition). Full backend suite re-run fresh
+      from a clean clone: **11/11 files, 154/154 assertions, 0
+      regressions** (twice — once at the worker's handoff point, once
+      again after the slot-guide patch). Payload assembly read
+      side-by-side against `commissary.js`'s real
+      `POST /api/commissary/shipments` handler and confirmed to match
+      the expected shape field-for-field, not just against the docs'
+      description of it. Booted the real server against freshly-seeded
+      data and hit `/api/commissary/meats`, `/api/restaurants`, and
+      `/api/stock-receipts/meats?restaurant_id=` — all endpoints
+      `terminal.html` depends on return real, usable data, and
+      `GET /terminal.html` itself serves 200 with the new markup
+      present. The slot state machine and the new slot guide were both
+      exercised with a Node `vm`-context simulation (a real script
+      execution with proper `let`/`const` scoping, not hand-copied
+      logic) driving `updateStateMachine()` through the full happy path
+      and several error paths (unknown commissary meat, unknown
+      restaurant, negative quantity, unknown destination meat) —
+      confirmed the guide correctly freezes at the first bad token
+      instead of showing later slots as reachable.
 
-      **Handoff mechanics**: this sandbox has no `.git` directory at all
-      (no repo present in the zip, not just missing push credentials)
-      and no network access — full file handoff, not a push. New file:
-      `public/terminal.html`. Changed files: `public/index.html`,
-      `public/daily-audit.html`, `public/stock-receipts.html`,
-      `public/commissary.html`, `public/commissary-shipments.html`,
-      `public/sales.html`, `public/settings.html`, `public/history.html`
-      (each gained one `<a href="terminal.html">Terminal</a>` nav line),
-      plus this file and `changelog.md`. The project owner (or the next
-      session with git access) should `git add` all of the above and
-      commit — suggested message:
-      `feat(step21a): terminal shell + ship command slot state machine`.
-    - **21b (real submission + preset-prefill)**: wires the completed
-      `ship` line to the actual `POST /api/commissary/shipments` call,
-      and wires slot 5's prefill to `commissary_shipment_presets` for
-      the chosen meat+restaurant pair. Depends on 21a existing.
+      **Still genuinely untested**: no actual browser click-through with
+      a mouse/keyboard (no headless browser available in any sandbox
+      used so far — a real, standing gap, not a formality). The `vm`
+      simulation above exercises the same code paths a real browser
+      would but isn't a substitute for someone actually clicking through
+      it once.
+    - **21b [Done, 2026-08-29 — built and verified live by the architect
+      session, same day as 21a's verification] (real submission +
+      preset-prefill)**: wires the completed `ship` line to the actual
+      `POST /api/commissary/shipments` call, and wires slot 5's prefill
+      to `commissary_shipment_presets` for the chosen meat+restaurant
+      pair.
+
+      **Real submission**: `handleSubmit` now `fetch`es
+      `POST /api/commissary/shipments` with the assembled payload,
+      disabling the input while the request is in flight (prevents a
+      stray keystroke firing a duplicate write against a live path).
+      Three outcomes handled distinctly: network failure (input
+      re-enabled, line preserved, explicit "was NOT sent" wording so the
+      auditor never wonders if it went through); server-side rejection —
+      HTTP non-2xx, e.g. an inactive/foreign meat_id (the real
+      `{error: "..."}` message surfaced verbatim in the hint bar and
+      status line, line preserved for a fix-and-resubmit, matching what
+      the GUI form would do for the same bad input); and success (the
+      real server response — `{ok, id, ...shipment, lines}` — shown in
+      the renamed "Last saved shipment" panel, history updated, input
+      cleared). The page's own copy and the "Last logged payload" panel
+      (now "Last saved shipment") were updated to drop every 21a-boundary
+      reference, since Enter is now a real write, not a preview.
+
+      **Preset-prefill**: new `loadShipmentPresets(commissaryMeatId,
+      restaurantId)` fetches `GET /api/commissary/shipment-presets` once
+      both slot 1 and slot 2 resolve (tracked via a
+      `lastPresetPairKey`, mirroring the existing `lastRestaurantId`
+      pattern), merging every active preset's lines for that pair into
+      one `meat_id -> default_quantity` map (first preset wins on a
+      conflict — pure autofill, so a collision doesn't need stronger
+      handling; the auditor can always overwrite the number). Slot 4's
+      dropdown now shows preset-covered meats first, each already
+      carrying its default quantity in the token (e.g. `bagnet:10`
+      instead of a bare `bagnet:`), with a `(preset default N)` note in
+      the sub-text and a one-line hint-bar mention of how many lines
+      came from a preset. A meat with no matching preset line behaves
+      exactly as it did in 21a — bare `name:` token, no default.
+
+      **Verified live** (real server + real database, not mirrored
+      logic): booted the app against freshly-seeded data, created a real
+      preset via `POST /api/commissary/shipment-presets` (Jowl→FC,
+      Bagnet default 10 + Sisig default 6), then drove the actual
+      extracted `terminal.html` script through a Node `vm` context with
+      a *real* `fetch` implementation (raw `http` requests against the
+      live server, not a stub) — confirmed: (1) `shipmentPresetDefaults`
+      populates correctly once both slots resolve; (2) the slot-4
+      dropdown surfaces `bagnet:10`/`sisig:6` first, correctly tagged
+      `hasDefault: true`, with the hint bar reporting "2 lines prefilled
+      from a saved preset for this pair"; (3) a full valid line
+      (`ship jowl fc 20 bagnet:10 sisig:6`) submitted via the real
+      `handleSubmit()` actually created a `commissary_shipments` row +
+      2 `commissary_shipment_lines` rows + 2 `stock_receipts` rows in
+      the live database, returned the real server response, cleared the
+      input, and updated history; (4) a submission referencing a
+      foreign `meat_id` was correctly rejected by the server with the
+      real error message surfaced in the UI, and — critically — the
+      typed line was preserved rather than wiped on failure. Full
+      backend suite re-run clean after these changes: **11/11 files,
+      154/154 assertions, 0 regressions** (still frontend-only). Test
+      database cleaned up after.
+
+      **Still genuinely untested**: same standing gap as 21a — no real
+      mouse/keyboard browser click-through. Everything above was driven
+      programmatically through the real code paths against a real
+      server, which is strong verification, but isn't the same as
+      someone actually typing it.
+
+      **Deferred, not forgotten**: the project owner proposed an
+      AutoCAD-style layout — command bar docked bottom-center instead
+      of top-of-page, with history reached both via up-arrow (already
+      built) and a togglable slide-in sidebar for browsing further back,
+      rather than the current always-visible history panel. Decided:
+      non-modal (page content stays visible above the docked bar,
+      unlike AutoCAD's more immersive feel), and the sidebar and the
+      slot guide/dropdown don't compete for space since they sit on
+      different axes (sidebar at the screen edge, guide/dropdown
+      anchored to the input). Explicitly scheduled *after* logic/backend
+      work is settled, not before — this note exists so it isn't
+      silently dropped, not as a signal to start it next.
 
 22. **[Draft proposal, under active discussion — not committed] Merge
     Landing's In-House/Wastage/Other into one read-only "Allocations"
