@@ -58,7 +58,7 @@
     }
     #command-panel .cmd-row:last-child { border-bottom: none; }
     #command-panel button.run-btn { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
-    #command-panel .cmd-result { font-size: 0.78rem; color: #666; margin-top: 0.5rem; }
+    #command-panel .cmd-result { font-size: 0.78rem; color: #666; margin-top: 0.5rem; white-space: pre-wrap; }
     #command-panel .cmd-empty { color: #999; font-style: italic; }
   `;
   document.head.appendChild(style);
