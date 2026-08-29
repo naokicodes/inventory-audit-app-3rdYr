@@ -60,6 +60,11 @@
 
   <h2>Output lines</h2>
   <p class="hint">The destination restaurant's own meat items and how much of each this shipment contains.</p>
+  <div class="add-form" id="preset-bar" style="display: none;">
+    <label>Load preset <select id="preset-select"></select></label>
+    <button id="load-preset-btn" type="button">Load preset</button>
+    <span class="hint">Autofills the lines below - you can still add, remove, or edit anything before saving.</span>
+  </div>
   <table class="lines-table">
     <thead>
       <tr><th>Destination meat</th><th>Quantity</th><th></th></tr>
@@ -86,8 +91,12 @@
     const linesBody = document.getElementById('lines-body');
     const lineSumHint = document.getElementById('line-sum-hint');
     const addStatus = document.getElementById('add-status');
+    const presetBar = document.getElementById('preset-bar');
+    const presetSelect = document.getElementById('preset-select');
+    const loadPresetBtn = document.getElementById('load-preset-btn');
 
     let destinationMeats = []; // active meats for whichever restaurant is currently selected
+    let currentPresets = []; // presets for the currently selected (commissary meat, restaurant) pair
 
     newDate.value = new Date().toISOString().slice(0, 10);
     actorInput.value = localStorage.getItem('inventory_actor') || '';
@@ -145,6 +154,48 @@
           <div class="context-card"><div class="label">Unit</div><div class="qty">${row.unit}</div></div>
         </div>
       `;
+    }
+
+    // "Quick formulas" - pure autofill for the lines below, never
+    // authoritative. Only shown once both a commissary meat and a
+    // destination restaurant are picked, and only if presets exist for
+    // that exact pair.
+    async function loadPresets() {
+      const commissaryMeatId = newCommissaryMeat.value;
+      const restaurantId = newRestaurant.value;
+      if (!commissaryMeatId || !restaurantId) {
+        currentPresets = [];
+        presetBar.style.display = 'none';
+        return;
+      }
+      const res = await fetch(`/api/commissary/shipment-presets?commissary_meat_id=${commissaryMeatId}&restaurant_id=${restaurantId}`);
+      currentPresets = await res.json();
+      if (currentPresets.length === 0) {
+        presetBar.style.display = 'none';
+        return;
+      }
+      presetSelect.innerHTML = currentPresets.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      presetBar.style.display = 'flex';
+    }
+
+    // Loading a preset replaces the current output lines with the
+    // preset's meat/quantity pairs, but the auditor can still add,
+    // remove, or edit every line before saving - same as if they'd typed
+    // it from scratch. This never validates against or locks to the
+    // preset it came from.
+    function loadSelectedPreset() {
+      const preset = currentPresets.find(p => p.id === Number(presetSelect.value));
+      if (!preset) return;
+      linesBody.innerHTML = '';
+      lineCount = 0;
+      preset.lines.forEach(l => {
+        addLine();
+        const rows = linesBody.querySelectorAll('tr');
+        const row = rows[rows.length - 1];
+        row.querySelector('.line-meat').value = l.meat_id;
+        row.querySelector('.line-qty').value = l.default_quantity;
+      });
+      updateLineSumHint();
     }
 
     function lineRowHtml(index) {
@@ -212,9 +263,10 @@
 
     document.getElementById('add-line').addEventListener('click', addLine);
     newTotalQty.addEventListener('input', updateLineSumHint);
-    newCommissaryMeat.addEventListener('change', loadContext);
+    newCommissaryMeat.addEventListener('change', () => { loadContext(); loadPresets(); });
     newDate.addEventListener('change', loadContext);
-    newRestaurant.addEventListener('change', loadDestinationMeats);
+    newRestaurant.addEventListener('change', () => { loadDestinationMeats(); loadPresets(); });
+    loadPresetBtn.addEventListener('click', loadSelectedPreset);
 
     document.getElementById('save-shipment').addEventListener('click', async () => {
       const commissary_meat_id = Number(newCommissaryMeat.value);
