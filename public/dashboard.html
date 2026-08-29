@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem; text-align: right; }
+    th, td:first-child { text-align: left; }
+    th { background: #f0f0f0; }
+    .controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; margin-bottom: 1rem; }
+    .controls label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .controls input, .controls select { padding: 0.3rem; }
+    .restaurant-toggles { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .restaurant-toggles label { flex-direction: row; align-items: center; gap: 0.3rem; font-size: 0.85rem; }
+    .hint { color: #888; font-size: 0.8rem; }
+    .no-data { color: #bbb; }
+    .grand-total-col { font-weight: bold; background: #fafafa; }
+    tfoot td { font-weight: bold; background: #f0f0f0; }
+  </style>
+</head>
+<body style="max-width: 1200px;">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="commissary-shipments.html">Shipments</a>
+    <a href="sales.html">Sales</a>
+    <a href="terminal.html">Terminal</a>
+    <a href="allocations.html">Allocations</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+
+  <h1>Dashboard</h1>
+  <p class="hint">
+    Total stock of every Commissary meat, across Commissary itself plus
+    whichever restaurants you pick - so management can see "do we need
+    to order more of this" without a spreadsheet. Restaurant columns
+    reverse-convert a restaurant's own portioned stock back to a
+    Commissary-meat-equivalent using the Conversion Standards set up in
+    Settings - a meat with no standard for a restaurant simply isn't
+    counted under that restaurant's column for that row, same as it
+    isn't tracked as coming from Commissary at all.
+  </p>
+
+  <div class="controls">
+    <label>Date <input type="date" id="rollup-date"></label>
+    <label>
+      Restaurants
+      <span class="restaurant-toggles" id="restaurant-toggles">Loading...</span>
+    </label>
+  </div>
+
+  <div id="rollup-table">Loading...</div>
+
+  <script>
+    const dateInput = document.getElementById('rollup-date');
+    const togglesEl = document.getElementById('restaurant-toggles');
+    const tableEl = document.getElementById('rollup-table');
+
+    let allRestaurants = [];
+    let selectedRestaurantIds = new Set();
+
+    dateInput.value = new Date().toISOString().slice(0, 10);
+
+    function fmt(n) {
+      if (n === null || n === undefined) return '-';
+      return Number(n).toFixed(2);
+    }
+
+    async function loadRestaurants() {
+      const res = await fetch('/api/restaurants');
+      allRestaurants = await res.json();
+      // All active restaurants selected by default - a real all-Commissary
+      // rollup wants everything visible on first load, not an empty table.
+      selectedRestaurantIds = new Set(allRestaurants.map(r => r.id));
+      togglesEl.innerHTML = allRestaurants.map(r => `
+        <label>
+          <input type="checkbox" class="restaurant-toggle" value="${r.id}" checked>
+          ${r.name}
+        </label>
+      `).join('');
+      togglesEl.querySelectorAll('.restaurant-toggle').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) selectedRestaurantIds.add(Number(cb.value));
+          else selectedRestaurantIds.delete(Number(cb.value));
+          loadRollup();
+        });
+      });
+    }
+
+    function renderTable(data) {
+      const restaurants = data.restaurants;
+      const headerCols = restaurants.map(r => `<th>${r.name}</th>`).join('');
+
+      const bodyRows = data.rows.map(row => {
+        const commissaryCell = row.commissary_has_data
+          ? fmt(row.commissary_balance)
+          : `<span class="no-data">-</span>`;
+        const restaurantCells = restaurants.map(r => {
+          const cell = row.by_restaurant[r.id];
+          if (!cell || cell.standardCount === 0) return `<td><span class="no-data">n/a</span></td>`;
+          return `<td>${cell.hasData ? fmt(cell.total) : '<span class="no-data">-</span>'}</td>`;
+        }).join('');
+        const rowClass = row.row_has_any_data ? '' : ' class="no-data"';
+        return `
+          <tr${rowClass}>
+            <td>${row.code} - ${row.name} <span class="hint">(${row.unit})</span></td>
+            <td>${commissaryCell}</td>
+            ${restaurantCells}
+            <td class="grand-total-col">${fmt(row.grand_total)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tableEl.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Commissary meat</th>
+              <th>Commissary</th>
+              ${headerCols}
+              <th>Grand total</th>
+            </tr>
+          </thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+        <p class="hint">"n/a" means no Conversion Standard exists linking that restaurant's stock back to this Commissary meat - set one up in Settings if this pairing should be tracked. "-" means a standard exists but there's no data yet for that meat/date.</p>
+      `;
+    }
+
+    async function loadRollup() {
+      const date = dateInput.value;
+      if (!date) return;
+      tableEl.innerHTML = 'Loading...';
+      const params = new URLSearchParams({ date });
+      if (selectedRestaurantIds.size > 0) {
+        params.set('restaurant_ids', [...selectedRestaurantIds].join(','));
+      } else {
+        params.set('restaurant_ids', '0'); // no restaurant selected - ask for an id that can't match, so the backend returns zero columns rather than defaulting to "all"
+      }
+      const res = await fetch(`/api/dashboard/stock-rollup?${params.toString()}`);
+      const data = await res.json();
+      renderTable(data);
+    }
+
+    dateInput.addEventListener('change', loadRollup);
+
+    (async function init() {
+      await loadRestaurants();
+      await loadRollup();
+    })();
+  </script>
+</body>
+</html>
