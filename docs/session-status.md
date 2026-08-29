@@ -618,14 +618,59 @@ of sizing them correctly, not a separate concern.
     page, like Stock Receipts. Not the Command Panel widget. See step 21
     below for how the Command Panel itself is evolving instead.
 
-    **`commissary_meat_map`'s fate — RESOLVED 2026-08-29**: leave it
-    alone, don't touch it in step 20. It becomes vestigial once
-    `commissary_shipment_lines` exists — the auditor picks the
-    destination meat live in the shipment form, no pre-declared mapping
-    consulted. Not deleted (other code may still reference it), not
-    repurposed, not schema-changed. If a coder session finds it still
-    matters for something not accounted for here, flag it back rather
-    than deciding unilaterally.
+    **`commissary_meat_map`'s fate — RESOLVED 2026-08-29, then FULLY
+    RETIRED 2026-08-29 (later same day, next architecture session)**:
+    originally "leave it alone, vestigial but untouched" (below) — that
+    stance is now superseded. On review, the project owner identified a
+    cleaner resolution than partial retirement: once Commissary always
+    names the destination restaurant at shipment time (a required field
+    on `POST /api/commissary/shipments`), there is no remaining
+    legitimate scenario where a human manually types "this is a
+    COMMISSARY receipt" into the restaurant Stock Receipts form — that
+    manual path only ever existed *before* Shipments could do it
+    properly. This includes the "Unallocated → assign later" feature
+    (`stockReceipts.js`'s `PATCH` assignment flow, `commissary_meat_map`
+    lookup in 3 places: initial `POST`, `PATCH`-assign, `PATCH`-edit) —
+    not just the simpler duplicate case. Even the "what if Commissary
+    forgets to log a shipment" edge case argues for full retirement, not
+    a partial keep: the correct fix for a missed shipment is a
+    *retroactive Shipment entry* (dated appropriately), which updates
+    both Commissary's own usage record and the destination's stock
+    together — a manually backfilled `COMMISSARY` stock_receipts row
+    would update only the restaurant's side, recreating exactly the
+    untracked mismatch this whole redesign exists to eliminate.
+
+    **Decision**: the manual Stock Receipts form should only ever mean
+    `DIRECT` (an outside-supplier purchase). `COMMISSARY`-sourced
+    `stock_receipts` rows should only ever be written as a side effect
+    of a real Shipment (`POST /api/commissary/shipments`'s per-line
+    write, already built in 20c) — never typed by a human directly.
+
+    **Not yet built — this is a design decision, not a completed
+    step.** What a coder session should do once picked up: remove the
+    `commissary_meat_map` lookup/rejection logic from all three call
+    sites in `server/routes/stockReceipts.js` (initial `POST` with
+    `source=COMMISSARY`+restaurant+meat; `PATCH` assignment of a
+    previously-Unallocated row; `PATCH` edit of an already-allocated
+    row's source to `COMMISSARY`) — restaurant-scoped manual entry
+    should simply no longer accept `source=COMMISSARY` at all, only
+    `DIRECT`; remove the whole "Unallocated" receipt concept alongside
+    it, since it only ever existed to support this now-retired manual
+    path; remove `commissary_meat_map`'s admin CRUD from
+    `server/routes/settings.js` and its "Commissary Mappings" section
+    from `public/settings.html`; update `stockReceipts.test.js` and
+    `settings.test.js` to match (several existing tests assert the
+    *old* behavior and will need rewriting, not just deleting); leave
+    the `commissary_meat_map` **table itself** in `schema.sql` untouched
+    (don't `DROP TABLE` — no destructive schema changes, matches this
+    project's existing caution about schema.sql edits) even though
+    nothing will read or write it anymore. Update
+    `commissary-and-stock-receipts.md` and `data-model.md`'s
+    `commissary_meat_map` sections to describe this as retired, not
+    active. Full suite must stay green throughout — this touches
+    validation logic multiple existing tests depend on, exactly the
+    kind of change that needs the regression-catching discipline rule
+    19 describes, not a quick unverified edit.
 
     **Split into three sequential sub-steps for handoff — too large for
     one session, per rule 16's step-sizing philosophy**:
