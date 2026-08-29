@@ -1215,9 +1215,10 @@ are visible before anyone starts designing in isolation.
 **Priority, made explicit 2026-08-29**: item 1 was the one auditing-
 service gap (real day-to-day recording need), items 2-5 are app-level
 (dashboard, cleanup, future-proofing, a refinement) — secondary.
-**Items 1 and 5 are done.** Item 2 (dashboard) is now fully unblocked -
-the conversion-ratio table it needed to reverse-convert through now
-exists. Nothing else on this list is currently urgent.
+**Items 1, 2, and 5 are done.** Remaining: item 3 (multi-Commissary
+generalization, direction resolved, not built) and item 4 (cleanup
+pass, never designed, an investigation task). Neither is currently
+urgent.
 
 1. **[Done, 2026-08-29] Allocations item-to-item conversion type.**
    Built as `POST /api/allocations/conversion` + a "Converts to" field
@@ -1233,7 +1234,7 @@ exists. Nothing else on this list is currently urgent.
    to" item + quantity, not a from/to location) — don't conflate it
    with the existing transfer type in the UI or the data model.
 
-2. **Management dashboard — cross-location stock rollup.** Upper
+2. **[Done, 2026-08-29] Management dashboard — cross-location stock rollup.** Upper
    management currently does this by hand in a spreadsheet, described
    as painful. Envisioned shape: rows = Commissary meat items (the root
    meats), columns = each location (Commissary, Silingan/A, FC, Likod —
@@ -1241,7 +1242,9 @@ exists. Nothing else on this list is currently urgent.
    some locations' stock isn't a 1:1 match to a root meat (FC's Bagnet
    isn't literally "some kg of Jowl" without a conversion ratio) — the
    rollup needs to reverse-convert portioned items back to their
-   raw-meat-equivalent to total correctly.
+   raw-meat-equivalent to total correctly. Built as
+   `GET /api/dashboard/stock-rollup` + `public/dashboard.html` — see
+   `changelog.md`'s entry for the full build/verification detail.
 
 3. **RESOLVED 2026-08-29, correcting an earlier mis-model** — yield
    stays Commissary-only, but the fix is to stop treating Commissary as

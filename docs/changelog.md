@@ -11,9 +11,23 @@ worth remembering if they happen again.
 
 ---
 
-## 2026-08-29 (later still) — Item 5: Conversion Standards (per-pairing ratio, live comparison on Shipment form)
+## 2026-08-29 (later still) — Item 2: Management Dashboard (cross-location stock rollup)
+
+New `GET /api/dashboard/stock-rollup?date=&restaurant_ids=` (`server/routes/dashboard.js`) — rows = every active Commissary meat, columns = Commissary's own balance plus one reverse-converted total per selected restaurant, plus a grand total. Reverse-conversion reuses item 5's `commissary_conversion_standards` directly: for each restaurant meat with a standard pointing back to a given Commissary meat, `balance / ratio_per_unit` gives the implied Commissary-meat-equivalent, summed across every matching meat (a Commissary meat can legitimately feed several of a restaurant's own meats - e.g. Jowl feeding both Bagnet and Sisig - and both correctly count).
+
+"Current balance" prefers a real physical actual count over the calculated ending, same reasoning used everywhere else in this app. A meat/date with no data at all contributes 0 to sums but is flagged per-cell (`hasData`) so the frontend can show "-" instead of a misleading zero.
+
+New page `public/dashboard.html` - a date picker, toggleable restaurant checkboxes (all active restaurants selected by default), and the rollup table. "n/a" in a cell means no Conversion Standard exists for that pairing (nothing to reverse-convert); "-" means a standard exists but there's no data yet for that meat/date - deliberately different signals, not conflated.
+
+Nav link added to all eleven pages. Along the way, found and fixed a genuine pre-existing gap unrelated to this feature: `settings.html`'s own nav never had an Allocations link either - fixed both in the same edit rather than leaving it.
+
+8 new tests (`dashboard.test.js`), full suite 209/209, 0 regressions. Verified live end-to-end with a real scenario: seeded real Commissary and FC opening stock plus two real standards, confirmed the grand total (60) matches the hand-computed expectation exactly, confirmed the zero-restaurants-selected edge case the frontend relies on returns cleanly.
+
+
 
 New `commissary_conversion_standards` table, one row per `(commissary_meat_id, restaurant_id, meat_id)` — ratio-per-unit-of-input, e.g. "Jowl → FC's Bagnet: 0.3 units per kg." Deliberately separate from `commissary_shipment_presets` (the mix is a demand decision, can have several; the rate is a fact, exactly one per pairing) — see `session-status.md`'s item 5 entry for the full reasoning, settled through real discussion with the project owner, not assumed.
+
+## 2026-08-29 (later still) — Item 5: Conversion Standards (per-pairing ratio, live comparison on Shipment form)
 
 Backend: `GET`/`POST`/`PUT /api/commissary/conversion-standards`, same validation shape as the existing preset routes. No new activity_log wiring - settings data, same treatment as presets.
 
