@@ -22,6 +22,16 @@ function getYieldLogRow(id) {
   return db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(id);
 }
 
+function getStockReceiptRow(id) {
+  return db.prepare('SELECT * FROM stock_receipts WHERE id = ?').get(id);
+}
+
+function getShipmentWithLines(shipmentId) {
+  const shipment = db.prepare('SELECT * FROM commissary_shipments WHERE id = ?').get(shipmentId);
+  const lines = db.prepare('SELECT * FROM commissary_shipment_lines WHERE shipment_id = ?').all(shipmentId);
+  return { ...shipment, lines };
+}
+
 // GET /api/commissary/meats
 // Active commissary meats, for the yield-entry form's dropdown. Global
 // list, independent of any restaurant's own meats table.
@@ -91,6 +101,121 @@ router.get('/commissary/daily-audit', (req, res) => {
   const commissaryMeatId = req.query.commissary_meat_id ? Number(req.query.commissary_meat_id) : null;
   const rows = computeCommissaryDailyAudit(db, date, commissaryMeatId);
   res.json(rows);
+});
+
+// POST /api/commissary/shipments
+// Step 20c (session-status.md): logs one outbound batch from the
+// Commissary to a destination restaurant, with its named-portion
+// breakdown - one commissary_shipments row + N commissary_shipment_lines
+// rows, in one transaction. See commissary-and-stock-receipts.md /
+// data-model.md's step-20 draft for the shape.
+//
+// Body: {
+//   commissary_meat_id, restaurant_id, business_date, total_quantity,
+//   notes?, actor?,
+//   lines: [ { meat_id, quantity }, ... ]   // meat_id = destination
+//     restaurant's OWN meat row (e.g. FC's "Bagnet"), not a commissary meat
+// }
+//
+// Each line ALSO writes a normal stock_receipts row for the destination
+// restaurant (source='COMMISSARY', commissary_meat_id set) - this reuses
+// the existing, already-tested destination-side mechanics unchanged (same
+// table/columns POST /api/stock-receipts already writes for a normal
+// COMMISSARY receipt). That stock_receipts write gets its own
+// activity_log CREATE row in the same transaction, per rule 9 - the
+// commissary_shipments/commissary_shipment_lines rows themselves are NOT
+// activity_log-scoped (rule 9 names only stock_receipts and
+// commissary_yield_log; commissary_shipment_lines is a new table, same
+// treatment as commissary_stock_receipts got in step 20a).
+//
+// commissary_meat_map is NOT consulted here - per session-status.md's
+// "commissary_meat_map's fate" resolution, the auditor picks the
+// destination meat live in this form; the mapping table is vestigial
+// once this route exists (not touched, not deleted - rule 3/7, that's a
+// separate future decision).
+//
+// No reconciliation is enforced between total_quantity and the sum of
+// line quantities - different units on each side (e.g. kg of a raw
+// commissary meat vs. portion-units of a named output) make a strict
+// equality check not generally meaningful. Purely informational if a
+// caller wants to compute it; not computed or returned here.
+router.post('/commissary/shipments', (req, res) => {
+  const { commissary_meat_id, restaurant_id, business_date, total_quantity, notes, actor, lines } = req.body;
+
+  if (!commissary_meat_id || !restaurant_id || !business_date
+      || total_quantity === undefined || total_quantity === null || total_quantity === '') {
+    return res.status(400).json({ error: 'commissary_meat_id, restaurant_id, business_date, and total_quantity are required' });
+  }
+  if (!Array.isArray(lines) || lines.length === 0) {
+    return res.status(400).json({ error: 'At least one output line is required' });
+  }
+  for (const line of lines) {
+    if (!line || !line.meat_id || line.quantity === undefined || line.quantity === null || line.quantity === '') {
+      return res.status(400).json({ error: 'Each line requires meat_id and quantity' });
+    }
+  }
+
+  const commissaryMeat = db.prepare('SELECT id FROM commissary_meats WHERE id = ? AND active = 1').get(commissary_meat_id);
+  if (!commissaryMeat) {
+    return res.status(400).json({ error: 'Unknown or inactive commissary_meat_id' });
+  }
+  const restaurant = db.prepare('SELECT id FROM restaurants WHERE id = ? AND active = 1').get(restaurant_id);
+  if (!restaurant) {
+    return res.status(400).json({ error: 'Unknown or inactive restaurant_id' });
+  }
+
+  // Every line's meat_id must be one of THIS restaurant's own active meats
+  // - checked up front, before the transaction starts, so a bad line fails
+  // the whole request cleanly rather than partway through the writes.
+  for (const line of lines) {
+    const meat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(line.meat_id, restaurant_id);
+    if (!meat) {
+      return res.status(400).json({ error: `meat_id ${line.meat_id} is not an active meat belonging to restaurant_id ${restaurant_id}` });
+    }
+  }
+
+  try {
+    const shipmentId = withTransaction(db, () => {
+      const shipmentResult = db.prepare(`
+        INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(commissary_meat_id, restaurant_id, business_date, Number(total_quantity), notes || null, actor || null);
+
+      const newShipmentId = shipmentResult.lastInsertRowid;
+
+      for (const line of lines) {
+        db.prepare(`
+          INSERT INTO commissary_shipment_lines (shipment_id, meat_id, quantity)
+          VALUES (?, ?, ?)
+        `).run(newShipmentId, line.meat_id, Number(line.quantity));
+
+        // Reuses the exact same stock_receipts shape as a normal
+        // COMMISSARY receipt (POST /api/stock-receipts) - destination-side
+        // mechanics are unchanged, not reinvented here.
+        const receiptResult = db.prepare(`
+          INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id, notes, created_by)
+          VALUES (?, ?, ?, ?, 'COMMISSARY', ?, ?, ?)
+        `).run(restaurant_id, line.meat_id, business_date, Number(line.quantity), commissary_meat_id, notes || null, actor || null);
+
+        const after = getStockReceiptRow(receiptResult.lastInsertRowid);
+        logActivity(db, {
+          actor: actor || null,
+          entityType: 'stock_receipts',
+          entityId: receiptResult.lastInsertRowid,
+          action: 'CREATE',
+          before: null,
+          after,
+          source: 'MANUAL'
+        });
+      }
+
+      return newShipmentId;
+    });
+
+    res.json({ ok: true, id: shipmentId, ...getShipmentWithLines(shipmentId) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save shipment: ' + err.message });
+  }
 });
 
 // POST /api/commissary/yield-log
