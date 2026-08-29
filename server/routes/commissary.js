@@ -13,6 +13,7 @@ const {
   computeYieldRow,
   listCommissaryBalances
 } = require('../engines/commissaryYieldEngine.js');
+const { computeCommissaryDailyAudit } = require('../engines/commissaryAuditEngine.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
 
 const router = express.Router();
@@ -66,6 +67,30 @@ router.get('/commissary/yield-log', (req, res) => {
 // verification note.
 router.get('/commissary/balances', (req, res) => {
   res.json(listCommissaryBalances(db));
+});
+
+// GET /api/commissary/daily-audit?date=2026-08-25&commissary_meat_id=5
+// Step 20b (session-status.md): Commissary's own audit engine exposed as a
+// read route, mirroring GET /api/daily-audit's job for restaurants but
+// with Commissary's two-inflow/shipment-usage shape (see
+// commissaryAuditEngine.js). `date` is required. `commissary_meat_id` is
+// an optional filter for a single meat/date lookup - same optional-filter
+// convention GET /api/commissary/yield-log above already uses. Always
+// returns an ARRAY, whether filtered to one commissary meat or listing
+// every active one for the date - a consistent shape either way, rather
+// than a single-object response when an id is given. Flagged for the
+// architect conversation as a shape choice, not an obviously-only-correct
+// one: session-status.md left "one meat/date at a time, or a mixed-grid
+// -style list" as an open call.
+router.get('/commissary/daily-audit', (req, res) => {
+  const date = req.query.date;
+  if (!date) {
+    return res.status(400).json({ error: 'date is required' });
+  }
+
+  const commissaryMeatId = req.query.commissary_meat_id ? Number(req.query.commissary_meat_id) : null;
+  const rows = computeCommissaryDailyAudit(db, date, commissaryMeatId);
+  res.json(rows);
 });
 
 // POST /api/commissary/yield-log
