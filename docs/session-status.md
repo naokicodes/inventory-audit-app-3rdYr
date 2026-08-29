@@ -1,4 +1,16 @@
-# Session Status — read this first after token reset
+git add docs/session-status.md
+git commit -m "docs: architect-handoff pointer for fresh design conversations + fix stale step-21 reference
+
+Added a distinct pointer (separate from rule 18's coder-worker loop)
+for a fresh conversation resuming architecture discussion specifically:
+where the open questions live (steps 21/22 below, self-contained),
+and the broader project context (3 outlets + Commissary as root,
+settings-driven flexibility direction) that's been established across
+many turns of conversation this session and shouldn't need re-deriving.
+
+Also fixed step 21's stale forward-reference to a shipment route that
+now actually exists (POST /api/commissary/shipments, step 20c)."
+git push# Session Status — read this first after token reset
 
 Last updated: 2026-08-29 (post step-20c, confirmed pushed and
 independently verified live).
@@ -11,6 +23,26 @@ prior sessions, also read rules 18 and 19 in `rules-for-claude-code.md`**
 architect conversation, and the current worker network-access reality
 (rule 18) and testing scope (rule 19), which this file assumes you
 already know.
+
+**If you're specifically a fresh *architecture* conversation** (the
+project owner talking through design, not dispatching a scoped coder
+task) — rules 18/19 cover the coding loop, but the open design
+questions live in this file's numbered roadmap below, not in chat
+history that won't be there. Steps 21 and 22 are mid-discussion, not
+finished designs — read both entries in full before saying anything
+about them; each is self-contained (grounded in real code/data checks,
+not just claims) and states its own open question plainly. Broader
+context worth knowing before jumping in: this app covers Commissary
+plus three restaurant outlets (Restaurant A / "Silingan", FC /
+"Restaurant B", and "Likod" — not yet onboarded, no workbook for it
+exists yet); Commissary is treated as the architectural root ("just
+another kitchen, one that serves other kitchens" — the project owner's
+own framing) that the restaurants build onto, not the other way
+around; and the stated direction for admin/config-level features is
+toward settings-driven flexibility (the auditor's daily screens stay
+dead-simple per `daily-workflow.md`, but the admin side should let the
+project owner define new things — conversions, categories, presets —
+without a developer, a theme running through steps 20-22 alike).
 
 ## Where things stand: steps 1–20c done, everything confirmed pushed to
 `main` and verified — no local-only or uncommitted work anywhere as of
@@ -738,8 +770,10 @@ of sizing them correctly, not a separate concern.
     on the static side" — project owner's framing) — not a general
     command line for every screen on day one. **Design constraint, not
     yet built**: the terminal must call the *same* backend endpoints the
-    GUI forms do (e.g. the same shipment-logging route step 20 will
-    add), so it's a second input surface on one data path, never a
+    GUI forms do — as of step 20c, that means the real
+    `POST /api/commissary/shipments` route (`server/routes/commissary.js`),
+    not a hypothetical future one — so it's a second input surface on
+    one data path, never a
     parallel system that could drift out of sync with what the forms
     write. Command syntax, autocomplete, and history are all
     undesigned — this is a placeholder for the idea, not a spec.
