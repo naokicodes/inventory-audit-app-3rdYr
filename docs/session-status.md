@@ -152,11 +152,10 @@ use `source: 'MANUAL'` correctly (human-triggered write, not a
   instead of `/api/daily-audit` and renders meats + BATCH_PREPPED dishes
   as rows in one table. Meat rows: unchanged editable fields/save flow
   (still posts to the untouched `POST /api/daily-audit`). Dish rows:
-  **display-only** (Prepped, Sold, Portion Beginning/Ending calc,
-  Portion Actual, status) — there is still no write path for
-  `prepped`/`portion_ending_actual` anywhere in the app, so editing dish
-  rows is explicitly deferred to its own future step, not silently
-  assumed in-scope here. User-facing label is "Over/Short"; `variance`
+  were **display-only** at the time this entry was first written —
+  **that gap is closed as of 2026-08-29**, see the dedicated changelog
+  entry for the `POST /api/daily-audit/portions` write path. User-facing
+  label is "Over/Short"; `variance`
   stays the internal/code term, per the roadmap's vocabulary note.
   `GET /api/daily-audit/mixed` gained a small, doc-anticipated addition
   (`dailyAudit.js`'s own step-10 comment flagged this as step 11's job):
@@ -1216,6 +1215,19 @@ Five items the project owner raised in one batch, thinking ahead past
 everything built so far. None of these are designed yet — this section
 exists so they aren't lost, and so the real connections between them
 are visible before anyone starts designing in isolation.
+
+**Item 6, added 2026-08-29 (not raised by the project owner — surfaced
+while building the Portion Actual write path)**: step 18's over-sold
+check (`GET /api/commands/oversold-check`) deliberately used same-day
+`sold > prepped` instead of the fuller running portion balance
+(`portionBeginning + prepped - sold`), specifically *because*
+`portion_ending_actual` had no write path and the fuller check would
+have been dead code. That write path now exists (see the 2026-08-29
+"Portion Actual write path" changelog entry) — the interpretation
+choice is no longer forced, just still the current behavior. Worth a
+real revisit; not changed as a side effect of building the write path
+itself, since that's a distinct decision from "does the capability
+exist."
 
 **Priority, made explicit 2026-08-29**: item 1 was the one auditing-
 service gap (real day-to-day recording need), items 2-5 are app-level

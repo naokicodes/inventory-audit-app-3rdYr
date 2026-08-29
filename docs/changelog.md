@@ -11,6 +11,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 (later still) — Portion Actual write path for BATCH_PREPPED dishes
+
+Closed a real gap open since step 11: BATCH_PREPPED dish rows on Landing have been display-only the whole time - there was never a write path for `prepped`/`portion_ending_actual`, so portion variance could never move past "missing actual count" for any Batch-Prepped dish.
+
+New `POST /api/daily-audit/portions` in `server/routes/dailyAudit.js` - same real SQLite upsert pattern (`ON CONFLICT ... DO UPDATE`) `ending_actual` already uses, against `prepped`/`portion_ending_actual`'s own `UNIQUE(restaurant_id, dish_id, business_date)` constraints. A manual write always wins over a SYSTEM row from step 15's "Sync batch stock" command - confirmed by reading commands.js directly, not assumed: sync-batch-stock's own query explicitly skips dishes that already have a `prepped` row, so a manual entry arriving after a sync-generated one is the auditor correcting an inferred default, which should take precedence.
+
+Frontend: `daily-audit.html`'s dish rows are now editable for Prepped/Portion Actual, with live recalculation of Ending(calc)/Variance/Status mirroring `computeDishAudit` exactly - same pattern step 13 already built for meat rows. Save button now posts to both `/api/daily-audit` (meat rows) and the new `/api/daily-audit/portions` (dish rows) in one save action.
+
+13 new tests in `dailyAudit.test.js` (was scoped to step 12 only, extended), including one that exercises the write path end-to-end through the real `computeDishAudit` function, not just checking rows landed in the table - confirms day two's portion beginning correctly derives from day one's actual count, not just that the INSERT succeeded. Full suite 185/185, 0 regressions.
+
+Verified live end-to-end: real dish, real save, day one correctly shows `MISSING_BEGINNING_STOCK` with no prior actual, day two correctly shows `portionBeginning: 18` derived from day one's real saved actual count.
+
 ## 2026-08-29 (later still) — Item 4: Cleanup pass - retired commissary_meat_map's remaining code paths
 
 Found the first real thing to clean up: the "full retirement of commissary_meat_map" decided several turns back (session-status.md's step-20 entry) was designed but never actually implemented - the manual COMMISSARY-source path in `stockReceipts.js`, the whole "Unallocated" receipt concept, and the admin CRUD/UI in `settings.js`/`settings.html` were all still live.
