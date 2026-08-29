@@ -42,10 +42,13 @@
     <label>Quantity <input type="number" step="0.01" id="new-qty" placeholder="0"></label>
     <label id="new-from-label" style="display:none;">From <select id="new-from"></select></label>
     <label id="new-to-label" style="display:none;">To <select id="new-to"></select></label>
+    <label id="new-converts-to-meat-label" style="display:none;">Converts to <select id="new-converts-to-meat"></select></label>
+    <label id="new-converts-to-qty-label" style="display:none;">Converted qty <input type="number" step="0.01" id="new-converts-to-qty" placeholder="0"></label>
     <label>Notes <input type="text" id="new-notes" placeholder="optional"></label>
     <button id="add-allocation">Add Entry</button>
   </div>
   <p id="transfer-hint" class="hint" style="display:none;">This type needs both a from and a to location - manage the list of locations in Settings.</p>
+  <p id="conversion-hint" class="hint" style="display:none;">This converts stock of the "Meat" field above into a different item - "Quantity" above is how much leaves that item, "Converted qty" is how much the other item gains. They don't need to match 1:1.</p>
   <div id="add-status" class="status-message"></div>
 
   <div class="filters">
@@ -68,6 +71,11 @@
     const newFromLabel = document.getElementById('new-from-label');
     const newTo = document.getElementById('new-to');
     const newToLabel = document.getElementById('new-to-label');
+    const newConvertsToMeat = document.getElementById('new-converts-to-meat');
+    const newConvertsToMeatLabel = document.getElementById('new-converts-to-meat-label');
+    const newConvertsToQty = document.getElementById('new-converts-to-qty');
+    const newConvertsToQtyLabel = document.getElementById('new-converts-to-qty-label');
+    const conversionHint = document.getElementById('conversion-hint');
     const transferHint = document.getElementById('transfer-hint');
     const newNotes = document.getElementById('new-notes');
     const addStatus = document.getElementById('add-status');
@@ -124,6 +132,7 @@
       const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${restaurantId}`);
       currentMeats = await res.json();
       newMeat.innerHTML = currentMeats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
+      updateTypeUI();
     }
 
     async function loadMeatsForFilter() {
@@ -144,6 +153,19 @@
       newFromLabel.style.display = needsLocations ? '' : 'none';
       newToLabel.style.display = needsLocations ? '' : 'none';
       transferHint.style.display = needsLocations ? '' : 'none';
+
+      const needsConversion = !!(type && type.requires_conversion_target);
+      newConvertsToMeatLabel.style.display = needsConversion ? '' : 'none';
+      newConvertsToQtyLabel.style.display = needsConversion ? '' : 'none';
+      conversionHint.style.display = needsConversion ? '' : 'none';
+      // Reuses the same restaurant's meat list already loaded for the
+      // "Meat" (from) dropdown - a conversion target is always another
+      // meat at the same restaurant, never cross-restaurant.
+      if (needsConversion) {
+        newConvertsToMeat.innerHTML = currentMeats
+          .filter(m => String(m.id) !== String(newMeat.value))
+          .map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
+      }
     }
 
     function renderRow(r) {
@@ -207,7 +229,47 @@
       }
 
       const type = adjustmentTypes.find(t => String(t.id) === String(adjustment_type_id));
-      const payload = { restaurant_id, meat_id, business_date, adjustment_type_id, quantity, notes: notes || null };
+      const notesOrNull = notes || null;
+
+      if (type && type.requires_conversion_target) {
+        const to_meat_id = Number(newConvertsToMeat.value);
+        const to_quantity = newConvertsToQty.value;
+        if (!to_meat_id || to_quantity === '') {
+          addStatus.textContent = `"${type.name}" requires both a "Converts to" item and a converted quantity.`;
+          addStatus.className = 'status-message error';
+          return;
+        }
+
+        addStatus.textContent = 'Saving...';
+        addStatus.className = 'status-message';
+        try {
+          const res = await fetch('/api/allocations/conversion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              restaurant_id, business_date,
+              from_meat_id: meat_id, from_quantity: quantity,
+              to_meat_id, to_quantity,
+              notes: notesOrNull
+            })
+          });
+          const result = await res.json();
+          if (!result.ok) throw new Error(result.error || 'Unknown error');
+
+          addStatus.textContent = 'Conversion recorded.';
+          addStatus.className = 'status-message success';
+          newQty.value = '';
+          newConvertsToQty.value = '';
+          newNotes.value = '';
+          await loadAllocations();
+        } catch (err) {
+          addStatus.textContent = `Error: ${err.message}`;
+          addStatus.className = 'status-message error';
+        }
+        return;
+      }
+
+      const payload = { restaurant_id, meat_id, business_date, adjustment_type_id, quantity, notes: notesOrNull };
 
       if (type && type.requires_transfer_locations) {
         const from_location_id = Number(newFrom.value);
@@ -246,6 +308,7 @@
 
     newRestaurant.addEventListener('change', loadMeatsForNewForm);
     newType.addEventListener('change', updateTypeUI);
+    newMeat.addEventListener('change', updateTypeUI);
 
     [filterRestaurant, filterDate, filterType].forEach(el => el.addEventListener('change', loadAllocations));
     filterRestaurant.addEventListener('change', loadMeatsForFilter);
