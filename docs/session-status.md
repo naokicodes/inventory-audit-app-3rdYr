@@ -1,46 +1,36 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-20c write route + page — **NOT YET
-pushed to `main`**, see the note below; step 20b and everything before it
-is still confirmed on `main`).
+Last updated: 2026-08-29 (post step-20c, confirmed pushed and
+independently verified live).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
 so always start here. **If you're a fresh conversation with no memory of
-prior sessions, also read rule 18 in `rules-for-claude-code.md`** — it
-describes exactly how work moves between coder workers and the
-architect conversation (pull from `main` → review/resolve flagged
-decisions → hand off one fresh repo + one next prompt), which this file
-assumes you already know.
+prior sessions, also read rules 18 and 19 in `rules-for-claude-code.md`**
+— they describe exactly how work moves between coder workers and the
+architect conversation, and the current worker network-access reality
+(rule 18) and testing scope (rule 19), which this file assumes you
+already know.
 
-## Where things stand: steps 1–20c done, step 20c NOT YET on `main` —
-see "20c hand-off" note immediately below before doing anything else.
+## Where things stand: steps 1–20c done, everything confirmed pushed to
+`main` and verified — no local-only or uncommitted work anywhere as of
+2026-08-29.
 
-**20c hand-off (2026-08-29)**: step 20c (shipment logging: write route +
-page) is functionally complete — see its roadmap entry further down for
-the full done/verified breakdown — but this session had no GitHub/npm
-network access (same zip-fallback situation steps 12–19 hit; 403s on both
-`git clone` and `npm install`, confirmed, not just assumed), so **the
-changed/new files below exist only in this session's working copy, not
-on `main`**. This is NOT a rule-17 WIP hand-off — the step itself isn't
-partial or broken, just unpushed. Whoever has git access next should pull
-these in as a normal, complete commit (no `wip:` prefix needed) before
-starting step 21/22 or anything else:
-- Modified: `server/routes/commissary.js` (new `POST
-  /api/commissary/shipments`), `public/index.html`,
-  `public/daily-audit.html`, `public/stock-receipts.html`,
-  `public/commissary.html`, `public/sales.html`, `public/settings.html`,
-  `public/history.html` (all seven: one new `<a>` added to the nav block),
-  `docs/changelog.md`, `docs/session-status.md` (this file).
-- New: `server/routes/commissary.test.js`, `public/commissary-shipments.html`.
-- Once pulled: run the full test suite fresh (`node <each>.test.js` per
-  file, this repo's convention — see `docs/tech-stack.md`) to confirm
-  11/11 files green before trusting this session's own re-run number: 
-  **11/11 files, 138/138 assertions, 0 regressions**, and — since this
-  session couldn't — do the live-server verification step 20b's session
-  did (`npm install`, seed, boot, `POST` a real shipment, confirm via
-  `GET /api/commissary/daily-audit` and a direct `stock_receipts` read)
-  before considering 20c fully closed out.
+**20c's hand-off is fully closed out.** The step-20c coder session had
+no network access (403s on `git clone`/`npm install`, same zip-fallback
+situation steps 12–19 hit) and could only hand back files + git
+commands for the project owner to apply manually — that happened, it's
+pushed (`f9b61cf`/`8fd71c3`/`b4d0411`), and the architect conversation
+independently re-verified it afterward rather than trusting the commit
+messages alone: pulled fresh, re-ran the full suite (**11/11 files,
+138/138 assertions, confirmed clean**, matching the coder session's own
+number), then did the live-server check that session couldn't — booted
+a real server, `POST`'d a real shipment (Jowl → FC's Bagnet + Sisig),
+confirmed usage moved 0→9 via `GET /api/commissary/daily-audit`,
+confirmed both destination `stock_receipts` rows landed with the
+correct `source`/`commissary_meat_id`, confirmed `activity_log` entries
+use `source: 'MANUAL'` correctly (human-triggered write, not a
+`SYSTEM` background job like `sync-batch-stock`'s). No gaps found.
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -320,23 +310,27 @@ local-only or uncommitted work remains anywhere. The two decisions worker
 1 flagged from step 20a (no activity-log wiring on
 `commissary_stock_receipts`; preset scoping to one
 `(commissary_meat_id, restaurant_id)` pair) were both reviewed and
-confirmed correct — see the step-20 entry below for detail. Two more
-decisions flagged from step 20b (the missing commissary-adjustments layer;
-the GET route's array-always response shape) are noted in its list entry
-below, not yet reviewed by the architect conversation.
+confirmed correct — see the step-20 entry below for detail. **Two more
+decisions flagged from step 20b were also reviewed and confirmed
+correct** (no `commissary_adjustments` table exists yet, so
+`expectedEnding` always equals `endingCalculated` for now — correct,
+that's new scope, not something to infer; the GET route's
+always-an-array shape genuinely mirrors the existing
+`/commissary/yield-log` convention, not an arbitrary choice) — see the
+step-20b entry below for detail.
 
-**Step 20c is done (see its roadmap entry below for the full breakdown)
-but not yet on `main`** — see the hand-off note at the top of this file.
-**Next up, once 20c is pulled and reviewed: step 21 or 22** (both still
-drafts under discussion, not committed designs) — or the
+**Step 20c is confirmed on `main` and independently verified live** —
+see the top of this file and its roadmap entry below for the full
+breakdown. **Next up: step 21 or 22** (both still drafts under
+discussion, not committed designs) — or the
 `commissary_shipment_presets` piece step 20c explicitly deferred, if the
 project owner wants that picked up before 21/22. Distribution follows
 rule 18: pull from `main` directly, review, resolve any flags, write the
 *single next* worker prompt, hand off a fresh repo — not a batch of
 prompts for several steps at once. If you're a fresh session with no
-memory of how this worked in practice, rule 18 in
-`rules-for-claude-code.md` is the complete description; this paragraph is
-just the current pointer into that flow.
+memory of how this worked in practice, rules 18 and 19 in
+`rules-for-claude-code.md` are the complete description; this paragraph
+is just the current pointer into that flow.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -643,9 +637,9 @@ of sizing them correctly, not a separate concern.
       **10/10 files green, 121/121 assertions, 0 regressions.** Repo was
       reachable via `git clone` this session (no zip fallback needed);
       pushed straight to `main` per rule 18.
-    - **20c [Done, 2026-08-29 — NOT YET pushed to `main`, see hand-off
-      note at the top of this file] (shipment logging: write route +
-      page)**: new `POST /api/commissary/shipments` in
+    - **20c [Done, 2026-08-29 — pushed to `main` and independently
+      verified live by the architect conversation] (shipment logging:
+      write route + page)**: new `POST /api/commissary/shipments` in
       `server/routes/commissary.js` — one `commissary_shipments` row + N
       `commissary_shipment_lines` rows in one transaction, each line ALSO
       writing a normal `stock_receipts` row for the destination
@@ -713,11 +707,19 @@ of sizing them correctly, not a separate concern.
       from 0 to 9 after a two-line shipment and the destination's
       `stock_receipts` landed correctly — real production code, just
       without an HTTP layer. Full suite re-run: **11/11 files green,
-      138/138 assertions, 0 regressions** (was 121). A true live-HTTP
-      smoke test (like step 20b's session did) and a browser
-      click-through of the new page are both still owed — see the
-      hand-off note at the top of this file for exactly what the next
-      session with git/network access should do first.
+      138/138 assertions, 0 regressions** (was 121). **The live-HTTP
+      smoke test this session couldn't do was completed afterward by
+      the architect conversation**: booted a real server, `POST`'d a
+      real two-line shipment (Jowl → FC's Bagnet + Sisig), confirmed
+      usage moved 0→9 via `GET /api/commissary/daily-audit`, confirmed
+      both destination `stock_receipts` rows landed with the correct
+      `source`/`commissary_meat_id`, confirmed `activity_log` uses
+      `source: 'MANUAL'` correctly for this human-triggered write (not
+      `SYSTEM`, which is reserved for background jobs like
+      `sync-batch-stock`'s). Only a browser click-through of the new
+      page's actual UI remains unverified — same open item every
+      frontend step in this project has carried, no headless browser
+      available in any sandbox used so far.
 
     **Scope relative to step 19**: still doesn't block Restaurant B
     onboarding. FC's Bagnet/Sisig/Sinigang/DNG/etc. get onboarded as

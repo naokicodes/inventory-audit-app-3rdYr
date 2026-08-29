@@ -173,8 +173,38 @@ standing constraints, not suggestions — they exist to keep a solo,
       Pre-generating several steps' worth of prompts risks a later one
       being built on a wrong assumption about what an earlier one
       actually produced — one hop at a time avoids that entirely.
+    - **Worker network/git access is currently uneven, not a fixed
+      given.** As of 2026-08-29: only one coder worker has live network
+      + `git` access; the rest don't yet (a locked feature on the
+      project owner's end), expected to unlock incrementally as more
+      tasks complete — roughly around the 10-task mark per worker, not
+      all at once. Until a given worker has it, expect and accept the
+      pattern already established: mirrored-logic tests (same style as
+      `commands.test.js`/`stockReceipts.test.js`) plus a hand-run
+      script that exercises the *real* engine/route code against a real
+      in-memory DB, honestly labeled as a substitute for the live-HTTP
+      check, not a claim that the check happened. A worker without
+      network should NOT try to build its own zip-packaging or
+      git-command sequence unless the project owner explicitly asks for
+      it in that session — that duplicates the architect's own job
+      under this rule and is real overhead for no benefit; just hand
+      back whatever files exist and flag the gap plainly. When a worker
+      *does* have network, it should push directly and skip all of
+      that, per the rest of this rule.
     - This flow is itself provisional, same spirit as rule 17 — revisit
       if it causes friction, but it's the default until it does.
+
+19. **Re-run the full test suite after code changes, not after
+    doc-only edits.** Added 2026-08-29, after a session burned a full
+    11-file suite run purely because `changelog.md`/`session-status.md`
+    changed — markdown can't break a JS test, so that run had zero
+    chance of catching anything. This isn't permission to skip
+    verification — the baseline-before-starting run and the
+    after-code-change run have both caught real problems in this
+    project (the step-15/16 cross-test interaction bug was found
+    exactly this way) and stay mandatory. The cut is narrower than it
+    sounds: if the only thing that changed since the last full-suite
+    run is `.md` files, don't re-run it again just for that.
 
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.

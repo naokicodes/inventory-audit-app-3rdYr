@@ -11,6 +11,45 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Process: rules 18/19 refined, step 20c independently verified + pushed
+Two follow-ups after reviewing the step-20c coder session's transcript.
+
+**Rules 18/19 refined in `rules-for-claude-code.md`**:
+- Rule 19 (new): re-run the full test suite after code changes, not
+  after doc-only edits. The step-20c session ran the entire 11-file
+  suite a third time purely because `changelog.md`/`session-status.md`
+  had changed — zero chance of catching anything, markdown can't break
+  a JS test. The baseline-before and after-code-change runs stay
+  mandatory (they've caught real problems before — the step-15/16
+  cross-test interaction bug was found exactly this way); only the
+  pure-docs-edit re-run is cut.
+- Rule 18 extended with the current worker network/git reality: only
+  one coder worker has live network + `git` access as of 2026-08-29;
+  the rest don't yet (locked on the project owner's end), expected to
+  unlock incrementally around the 10-task mark per worker. Until then,
+  the mirrored-logic-tests-plus-hand-run-verification-script pattern
+  (established across steps 12–20c) is the expected norm, not an
+  exception to apologize for — and a worker without network shouldn't
+  build its own zip/git-command packaging unless explicitly asked, since
+  that duplicates the architect's own job under this rule.
+
+**Step 20c independently verified and confirmed pushed**: the
+step-20c coder session had no network and could only hand back files +
+git commands for manual push (see its own changelog entry above). The
+project owner pushed them; the architect conversation then re-verified
+rather than trusting the commit messages — pulled fresh, re-ran the
+full suite (11/11 files, 138/138 assertions, matching the coder
+session's own number), then did the live-HTTP check that session
+couldn't: booted a real server, `POST`'d a real two-line shipment
+(Jowl → FC's Bagnet + Sisig), confirmed usage moved 0→9 via `GET
+/api/commissary/daily-audit`, confirmed both destination
+`stock_receipts` rows landed with the correct `source`/
+`commissary_meat_id`, confirmed `activity_log` correctly uses
+`source: 'MANUAL'` for this human-triggered write. No gaps found —
+`session-status.md`'s "20c hand-off" block (which described files
+existing only in a working copy, not on `main`) is now stale and
+rewritten to reflect the confirmed-pushed, confirmed-verified state.
+
 ## 2026-08-29 — Step 20c: Shipment logging (write route + dedicated page)
 **Environment note, flagged up front**: this session worked from the
 uploaded zip fallback, not a `git clone` — `github.com` returned a 403
