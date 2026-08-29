@@ -44,6 +44,7 @@
     <button data-section="recipes">Recipes</button>
     <button data-section="adjustment-types">Adjustment Types</button>
     <button data-section="locations">Locations</button>
+    <button data-section="shipment-presets">Shipment Presets</button>
   </div>
 
   <section id="section-meats" class="section-panel active">
@@ -108,6 +109,30 @@
       <button id="add-location">Add Location</button>
     </div>
     <div id="locations-table">Loading...</div>
+  </section>
+
+  <section id="section-shipment-presets" class="section-panel">
+    <h2>Shipment Presets</h2>
+    <small class="hint">"Quick formulas" for the <a href="commissary-shipments.html">Shipments</a> page's Load-preset dropdown - a named, reusable set of destination-meat quantities for one (commissary meat, restaurant) pair. Presets are autofill only; the Shipments form never enforces or validates against them.</small>
+    <div class="add-form">
+      <label>Commissary meat <select id="preset-commissary-meat"></select></label>
+    </div>
+
+    <h3>Existing presets for this meat + restaurant (above)</h3>
+    <div id="shipment-presets-table">Pick a commissary meat above to see this.</div>
+
+    <h3>New preset</h3>
+    <div class="add-form">
+      <label>Name <input id="new-preset-name" placeholder="e.g. Standard Jowl split"></label>
+    </div>
+    <table class="lines-table" style="border-collapse: collapse; width: 100%; font-size: 0.9rem;">
+      <thead><tr><th>Destination meat</th><th>Default quantity</th><th></th></tr></thead>
+      <tbody id="new-preset-lines-body"></tbody>
+    </table>
+    <button id="new-preset-add-line" type="button">+ Add line</button>
+    <br><br>
+    <button id="add-shipment-preset">Add Preset</button>
+    <div id="preset-status" class="status-message"></div>
   </section>
 
   <script>
@@ -424,13 +449,170 @@
       loadLocations();
     });
 
+    // ---------- SHIPMENT PRESETS ----------
+    // Closes out the preset-authoring admin UI deferred by step 20c (see
+    // session-status.md's step-20c entry). No new backend routes - GET/POST/
+    // PUT /api/commissary/shipment-presets already exist and already work,
+    // consumed today only by commissary-shipments.html's "Load preset"
+    // control. This section is the missing creation surface.
+    //
+    // Scoped by the page-level restaurant selector (same as Meats/Dishes/
+    // Recipes above) plus a commissary-meat dropdown local to this section -
+    // together they're the (commissary_meat_id, restaurant_id) pair every
+    // preset belongs to. Existing presets' lines are shown read-only here;
+    // editing an existing preset's lines isn't built (deliberately smallest-
+    // reasonable scope) - PUT already supports it as a follow-up if needed.
+    const presetCommissaryMeatSelect = document.getElementById('preset-commissary-meat');
+    const presetsTableDiv = document.getElementById('shipment-presets-table');
+    const newPresetName = document.getElementById('new-preset-name');
+    const newPresetLinesBody = document.getElementById('new-preset-lines-body');
+    const presetStatus = document.getElementById('preset-status');
+
+    let presetDestinationMeats = []; // active meats for currentRestaurantId, for the new-preset line dropdowns
+
+    async function loadPresetCommissaryMeats() {
+      const res = await fetch('/api/commissary/meats');
+      const meats = await res.json();
+      presetCommissaryMeatSelect.innerHTML = meats.map(m => `<option value="${m.id}">${m.code} - ${m.name}</option>`).join('')
+        || '<option value="">No commissary meats seeded yet</option>';
+    }
+
+    async function loadPresetDestinationMeats() {
+      if (!currentRestaurantId) { presetDestinationMeats = []; return; }
+      const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${currentRestaurantId}`);
+      presetDestinationMeats = await res.json();
+    }
+
+    function presetLineRowHtml() {
+      const options = presetDestinationMeats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
+      return `
+        <tr>
+          <td><select class="new-preset-line-meat">${options || '<option value="">Pick a restaurant above first</option>'}</select></td>
+          <td><input type="number" step="0.01" class="new-preset-line-qty" placeholder="0"></td>
+          <td><button type="button" class="remove-preset-line-btn">Remove</button></td>
+        </tr>
+      `;
+    }
+
+    function addPresetLineRow() {
+      newPresetLinesBody.insertAdjacentHTML('beforeend', presetLineRowHtml());
+      attachPresetLineHandlers();
+    }
+
+    function attachPresetLineHandlers() {
+      newPresetLinesBody.querySelectorAll('.remove-preset-line-btn').forEach(btn => {
+        btn.onclick = () => {
+          if (newPresetLinesBody.querySelectorAll('tr').length <= 1) return; // keep at least one line
+          btn.closest('tr').remove();
+        };
+      });
+    }
+
+    function resetNewPresetLines() {
+      newPresetLinesBody.innerHTML = '';
+      addPresetLineRow();
+    }
+
+    async function loadShipmentPresets() {
+      const commissaryMeatId = presetCommissaryMeatSelect.value;
+      if (!commissaryMeatId || !currentRestaurantId) {
+        presetsTableDiv.innerHTML = 'Pick a commissary meat above to see this.';
+        return;
+      }
+      const res = await fetch(`/api/commissary/shipment-presets?commissary_meat_id=${commissaryMeatId}&restaurant_id=${currentRestaurantId}`);
+      const presets = await res.json();
+      if (presets.length === 0) {
+        presetsTableDiv.innerHTML = '<p class="hint">No presets yet for this meat + restaurant.</p>';
+        return;
+      }
+      presetsTableDiv.innerHTML = `
+        <table>
+          <thead><tr><th>Name</th><th>Lines</th><th>Active</th></tr></thead>
+          <tbody>${presets.map(p => `
+            <tr>
+              <td><input value="${p.name}" data-field="name" data-id="${p.id}" class="preset-edit"></td>
+              <td>${p.lines.map(l => {
+                const meat = presetDestinationMeats.find(m => m.id === l.meat_id);
+                return `${meat ? meat.name : 'meat #' + l.meat_id}: ${l.default_quantity}`;
+              }).join(', ')}</td>
+              <td><input type="checkbox" ${p.active ? 'checked' : ''} data-field="active" data-id="${p.id}" class="preset-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.preset-edit').forEach(el => el.addEventListener('change', savePresetRow));
+    }
+
+    async function savePresetRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      const result = await fetch(`/api/commissary/shipment-presets/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          active: get('active').checked
+        })
+      }).then(r => r.json());
+      if (!result.ok) { alert(result.error); loadShipmentPresets(); }
+    }
+
+    document.getElementById('new-preset-add-line').addEventListener('click', addPresetLineRow);
+
+    document.getElementById('add-shipment-preset').addEventListener('click', async () => {
+      const commissary_meat_id = Number(presetCommissaryMeatSelect.value);
+      const restaurant_id = Number(currentRestaurantId);
+      const name = newPresetName.value.trim();
+      const lines = [...newPresetLinesBody.querySelectorAll('tr')].map(tr => ({
+        meat_id: Number(tr.querySelector('.new-preset-line-meat').value),
+        default_quantity: tr.querySelector('.new-preset-line-qty').value
+      }));
+
+      if (!commissary_meat_id || !restaurant_id || !name) {
+        presetStatus.textContent = 'Commissary meat, restaurant (top of page), and name are required.';
+        presetStatus.className = 'status-message error';
+        return;
+      }
+      if (lines.length === 0 || lines.some(l => !l.meat_id || l.default_quantity === '')) {
+        presetStatus.textContent = 'Every line needs a destination meat and a default quantity.';
+        presetStatus.className = 'status-message error';
+        return;
+      }
+
+      presetStatus.textContent = 'Saving...';
+      presetStatus.className = 'status-message';
+      try {
+        const res = await fetch('/api/commissary/shipment-presets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commissary_meat_id, restaurant_id, name, lines })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+        presetStatus.textContent = `Preset "${result.name}" saved.`;
+        presetStatus.className = 'status-message success';
+        newPresetName.value = '';
+        resetNewPresetLines();
+        loadShipmentPresets();
+      } catch (err) {
+        presetStatus.textContent = 'Error: ' + err.message;
+        presetStatus.className = 'status-message error';
+      }
+    });
+
+    presetCommissaryMeatSelect.addEventListener('change', loadShipmentPresets);
+
     restaurantSelect.addEventListener('change', () => {
       currentRestaurantId = restaurantSelect.value;
       loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
+      loadPresetDestinationMeats().then(() => { resetNewPresetLines(); loadShipmentPresets(); });
     });
 
     loadRestaurants().then(() => {
       loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
+      loadPresetCommissaryMeats();
+      loadPresetDestinationMeats().then(() => { resetNewPresetLines(); loadShipmentPresets(); });
     });
   </script>
   <script src="command-panel.js"></script>

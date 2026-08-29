@@ -11,17 +11,15 @@ worth remembering if they happen again.
 
 ---
 
-## 2026-08-29 (later still) — Portion Actual write path for BATCH_PREPPED dishes
+## 2026-08-30 — Preset-authoring admin UI (closes out step 20c's last deferred piece)
 
-Closed a real gap open since step 11: BATCH_PREPPED dish rows on Landing have been display-only the whole time - there was never a write path for `prepped`/`portion_ending_actual`, so portion variance could never move past "missing actual count" for any Batch-Prepped dish.
+Built the small piece explicitly deferred out of 20c: a browser form for *creating* `commissary_shipment_presets`, not just consuming them on the Shipments form. No backend changes — `GET`/`POST`/`PUT /api/commissary/shipment-presets` already existed and already worked (built in the presets follow-up session); there was just no UI in front of `POST`/`PUT`.
 
-New `POST /api/daily-audit/portions` in `server/routes/dailyAudit.js` - same real SQLite upsert pattern (`ON CONFLICT ... DO UPDATE`) `ending_actual` already uses, against `prepped`/`portion_ending_actual`'s own `UNIQUE(restaurant_id, dish_id, business_date)` constraints. A manual write always wins over a SYSTEM row from step 15's "Sync batch stock" command - confirmed by reading commands.js directly, not assumed: sync-batch-stock's own query explicitly skips dishes that already have a `prepped` row, so a manual entry arriving after a sync-generated one is the auditor correcting an inferred default, which should take precedence.
+Added a "Shipment Presets" tab to `settings.html`, scoped by the page's existing restaurant selector plus a commissary-meat dropdown local to the new section — together the (commissary_meat_id, restaurant_id) pair every preset belongs to. Shows existing presets for that pair with inline-editable name/active (same convention as every other settings tab), a read-only lines summary, and an add-form with dynamic destination-meat/quantity line rows mirroring `commissary-shipments.html`'s own line UI. Editing an existing preset's *lines* isn't built — `PUT` already supports it as a follow-up if it's ever needed; scoped out here to keep this the smallest reasonable admin UI, per the step's own framing.
 
-Frontend: `daily-audit.html`'s dish rows are now editable for Prepped/Portion Actual, with live recalculation of Ending(calc)/Variance/Status mirroring `computeDishAudit` exactly - same pattern step 13 already built for meat rows. Save button now posts to both `/api/daily-audit` (meat rows) and the new `/api/daily-audit/portions` (dish rows) in one save action.
+No new tests — no new backend logic, matched the step's own expectation. Verified live against a real booted server (migrated + seeded from the real spreadsheet data): created a preset via the exact `POST` payload the new form sends, listed it back via the exact `GET` the section's table uses, edited name/active via the exact `PUT` the inline-edit path uses, and confirmed the lines were left untouched by the edit. Confirmed `settings.html` still serves (200) with all new element IDs present. Full suite re-run: 12/12 files green, 0 regressions (frontend-only change, so no count shift expected or found).
 
-13 new tests in `dailyAudit.test.js` (was scoped to step 12 only, extended), including one that exercises the write path end-to-end through the real `computeDishAudit` function, not just checking rows landed in the table - confirms day two's portion beginning correctly derives from day one's actual count, not just that the INSERT succeeded. Full suite 185/185, 0 regressions.
-
-Verified live end-to-end: real dish, real save, day one correctly shows `MISSING_BEGINNING_STOCK` with no prior actual, day two correctly shows `portionBeginning: 18` derived from day one's real saved actual count.
+---
 
 ## 2026-08-29 (later still) — Item 4: Cleanup pass - retired commissary_meat_map's remaining code paths
 
