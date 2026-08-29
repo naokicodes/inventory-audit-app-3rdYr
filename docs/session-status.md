@@ -505,7 +505,10 @@ of sizing them correctly, not a separate concern.
     FC returns 13 MEAT rows + 1 DISH row with the right shape, Bagnet
     correctly appears as FC's own local stock item (not remapped to
     Commissary), matching step 20's onboarding decision exactly.
-20. **[Draft proposal, under active discussion — not committed] Give
+20. **[Done, 2026-08-29 — core work complete across all of
+    20a/20b/20c plus the presets follow-up; one small piece (a
+    preset-authoring admin UI) still explicitly deferred, see the 20c
+    bullet below] Give
     Commissary its own Landing-style audit, and replace the too-rigid
     `commissary_meat_map` with a real shipment/allocation event.**
     Grounded in three real sources checked 2026-08-29, not guessed:
@@ -711,19 +714,15 @@ of sizing them correctly, not a separate concern.
       total: Y)" hint that never blocks Save, notes. "Shipments" added to
       nav on all seven existing pages + the new page itself.
 
-      **Explicitly deferred, not attempted [Closed out 2026-08-29 — see
-      this session's `changelog.md` entry]**: `commissary_shipment_presets`
-      / `commissary_shipment_preset_lines` (the "quick formulas"
-      autofill) — this step was already the largest of the three
-      20a/20b/20c sub-steps per the roadmap's own sizing note; presets
-      weren't attempted, not silently dropped. A future step should read
-      the preset tables (already in `schema.sql` since 20a) and add a
-      "load preset" autofill action to the form — never authoritative,
-      the auditor can still edit every number before saving.
-      **Done**: `GET`/`POST`/`PUT /api/commissary/shipment-presets` in
+      **`commissary_shipment_presets` / `commissary_shipment_preset_lines`
+      (the "quick formulas" autofill) — closed out 2026-08-29, see this
+      session's `changelog.md` entry.** Originally deferred out of 20c
+      (already the largest of the three 20a/20b/20c sub-steps) as a
+      follow-up, not silently dropped — then built in a dedicated
+      follow-up session. **Done**: `GET`/`POST`/`PUT /api/commissary/shipment-presets` in
       `commissary.js`, and the "Load preset" control on
       `commissary-shipments.html`. **Still explicitly deferred as its
-      own follow-up**: a preset-*authoring* admin UI (a settings page
+      own (smaller) follow-up**: a preset-*authoring* admin UI (a settings page
       or section to create new presets through the browser, not just
       consume existing ones) — presets can be created via the API
       today (see the new tests and the live curl verification in this
