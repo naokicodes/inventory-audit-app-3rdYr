@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Commissary Shipments - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem; text-align: left; }
+    th { background: #f0f0f0; }
+    .add-form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin-bottom: 0.5rem; }
+    .add-form label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .add-form input, .add-form select { padding: 0.3rem; }
+    .hint { color: #888; font-size: 0.8rem; }
+    .actor-bar { margin-bottom: 1rem; font-size: 0.85rem; }
+    .actor-bar input { padding: 0.25rem; width: 12rem; }
+    .context-cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .context-card { border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem 0.9rem; min-width: 7.5rem; }
+    .context-card .label { color: #888; font-size: 0.75rem; }
+    .context-card .qty { font-size: 1.2rem; font-weight: bold; }
+    .lines-table { margin: 0.5rem 0; }
+    .lines-table th, .lines-table td { padding: 0.3rem 0.4rem; }
+    .lines-table select, .lines-table input { padding: 0.25rem; width: 100%; box-sizing: border-box; }
+    .remove-line-btn { font-size: 0.75rem; padding: 0.1rem 0.4rem; }
+    .line-sum-hint { font-size: 0.8rem; color: #555; margin: 0.3rem 0 1rem; }
+  </style>
+</head>
+<body style="max-width: 1100px;">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="commissary-shipments.html">Shipments</a>
+    <a href="sales.html">Sales</a>
+    <a href="settings.html">Settings</a>
+    <a href="history.html">History</a>
+  </nav>
+
+  <h1>Commissary Shipments</h1>
+  <p class="hint">Log an outbound batch from the Commissary to a restaurant, broken into the named portions that restaurant actually receives (e.g. Jowl &rarr; Bagnet/Sisig/Sinigang). Each line writes a normal Stock Receipts row for the destination automatically - nothing else to do on that end.</p>
+
+  <div class="actor-bar">
+    <label>Your name (for the activity log) <input type="text" id="actor-name" placeholder="e.g. Dan"></label>
+  </div>
+
+  <div class="add-form">
+    <label>Date <input type="date" id="new-date"></label>
+    <label>Source (commissary meat) <select id="new-commissary-meat"></select></label>
+    <label>Total quantity <input type="number" step="0.01" id="new-total-qty" placeholder="0"></label>
+  </div>
+
+  <h2>Today so far for this meat</h2>
+  <p class="hint">Read-only context from the Commissary daily audit - so you're not typing blind.</p>
+  <div id="context-cards">Pick a date and a commissary meat above to see this.</div>
+
+  <div class="add-form">
+    <label>Destination restaurant <select id="new-restaurant"></select></label>
+  </div>
+
+  <h2>Output lines</h2>
+  <p class="hint">The destination restaurant's own meat items and how much of each this shipment contains.</p>
+  <table class="lines-table">
+    <thead>
+      <tr><th>Destination meat</th><th>Quantity</th><th></th></tr>
+    </thead>
+    <tbody id="lines-body"></tbody>
+  </table>
+  <button id="add-line">+ Add line</button>
+  <p class="line-sum-hint" id="line-sum-hint"></p>
+
+  <div class="add-form">
+    <label>Notes <input type="text" id="new-notes" placeholder="optional"></label>
+  </div>
+  <button id="save-shipment">Log Shipment</button>
+  <div id="add-status" class="status-message"></div>
+
+  <script>
+    const actorInput = document.getElementById('actor-name');
+    const newDate = document.getElementById('new-date');
+    const newCommissaryMeat = document.getElementById('new-commissary-meat');
+    const newTotalQty = document.getElementById('new-total-qty');
+    const newRestaurant = document.getElementById('new-restaurant');
+    const newNotes = document.getElementById('new-notes');
+    const contextCards = document.getElementById('context-cards');
+    const linesBody = document.getElementById('lines-body');
+    const lineSumHint = document.getElementById('line-sum-hint');
+    const addStatus = document.getElementById('add-status');
+
+    let destinationMeats = []; // active meats for whichever restaurant is currently selected
+
+    newDate.value = new Date().toISOString().slice(0, 10);
+    actorInput.value = localStorage.getItem('inventory_actor') || '';
+    actorInput.addEventListener('change', () => localStorage.setItem('inventory_actor', actorInput.value.trim()));
+
+    function actor() { return actorInput.value.trim() || null; }
+
+    function fmt(n) {
+      return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
+    }
+
+    async function loadCommissaryMeats() {
+      const res = await fetch('/api/commissary/meats');
+      const meats = await res.json();
+      newCommissaryMeat.innerHTML = meats.map(m => `<option value="${m.id}">${m.code} - ${m.name} (${m.unit})</option>`).join('')
+        || '<option value="">No commissary meats seeded yet</option>';
+    }
+
+    async function loadRestaurants() {
+      const res = await fetch('/api/restaurants');
+      const restaurants = await res.json();
+      newRestaurant.innerHTML = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+    }
+
+    async function loadDestinationMeats() {
+      const restaurantId = newRestaurant.value;
+      if (!restaurantId) { destinationMeats = []; renderLines(); return; }
+      const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${restaurantId}`);
+      destinationMeats = await res.json();
+      renderLines(); // refresh every line's dropdown options for the new restaurant
+    }
+
+    // Read-only context: pulls this meat's beginning/stockIn/backedUp/usage-
+    // so-far for the selected date via step 20b's GET /api/commissary/daily-audit,
+    // so the auditor isn't typing a shipment blind.
+    async function loadContext() {
+      const commissaryMeatId = newCommissaryMeat.value;
+      const date = newDate.value;
+      if (!commissaryMeatId || !date) {
+        contextCards.innerHTML = 'Pick a date and a commissary meat above to see this.';
+        return;
+      }
+      contextCards.innerHTML = 'Loading...';
+      const res = await fetch(`/api/commissary/daily-audit?date=${date}&commissary_meat_id=${commissaryMeatId}`);
+      const rows = await res.json();
+      const row = rows[0];
+      if (!row) { contextCards.innerHTML = '<p class="hint">No data for this meat/date.</p>'; return; }
+
+      contextCards.innerHTML = `
+        <div class="context-cards">
+          <div class="context-card"><div class="label">Beginning</div><div class="qty">${fmt(row.beginning)}</div></div>
+          <div class="context-card"><div class="label">Stock In</div><div class="qty">${fmt(row.stockIn)}</div></div>
+          <div class="context-card"><div class="label">Backed Up</div><div class="qty">${fmt(row.backedUp)}</div></div>
+          <div class="context-card"><div class="label">Shipped out so far</div><div class="qty">${fmt(row.usage)}</div></div>
+          <div class="context-card"><div class="label">Unit</div><div class="qty">${row.unit}</div></div>
+        </div>
+      `;
+    }
+
+    function lineRowHtml(index) {
+      const options = destinationMeats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
+      return `
+        <tr data-index="${index}">
+          <td><select class="line-meat">${options || '<option value="">Pick a destination restaurant first</option>'}</select></td>
+          <td><input type="number" step="0.01" class="line-qty" placeholder="0"></td>
+          <td><button class="remove-line-btn" type="button">Remove</button></td>
+        </tr>
+      `;
+    }
+
+    let lineCount = 0;
+    function addLine() {
+      lineCount++;
+      linesBody.insertAdjacentHTML('beforeend', lineRowHtml(lineCount));
+      attachLineHandlers();
+      updateLineSumHint();
+    }
+
+    function renderLines() {
+      // Re-render every existing row so its meat dropdown reflects the
+      // currently selected destination restaurant, preserving any quantity
+      // already typed in.
+      const existing = [...linesBody.querySelectorAll('tr')].map(tr => ({
+        qty: tr.querySelector('.line-qty').value
+      }));
+      linesBody.innerHTML = '';
+      lineCount = 0;
+      if (existing.length === 0) {
+        addLine();
+      } else {
+        existing.forEach(e => {
+          addLine();
+          const rows = linesBody.querySelectorAll('tr');
+          rows[rows.length - 1].querySelector('.line-qty').value = e.qty;
+        });
+      }
+    }
+
+    function attachLineHandlers() {
+      linesBody.querySelectorAll('.remove-line-btn').forEach(btn => {
+        btn.onclick = () => {
+          if (linesBody.querySelectorAll('tr').length <= 1) return; // always keep at least one line
+          btn.closest('tr').remove();
+          updateLineSumHint();
+        };
+      });
+      linesBody.querySelectorAll('.line-qty').forEach(input => {
+        input.oninput = updateLineSumHint;
+      });
+    }
+
+    // Informational only, per step 20c's spec - never enforced or blocking
+    // save. Different units on each side (kg of a raw commissary meat vs.
+    // portion-units of a named output) make a strict equality check not
+    // generally meaningful.
+    function updateLineSumHint() {
+      const qtys = [...linesBody.querySelectorAll('.line-qty')].map(i => Number(i.value) || 0);
+      const sum = qtys.reduce((a, b) => a + b, 0);
+      const total = Number(newTotalQty.value) || 0;
+      lineSumHint.textContent = `Lines total: ${sum.toFixed(2)} (shipment total: ${total.toFixed(2)}) - informational only, units may legitimately differ.`;
+    }
+
+    document.getElementById('add-line').addEventListener('click', addLine);
+    newTotalQty.addEventListener('input', updateLineSumHint);
+    newCommissaryMeat.addEventListener('change', loadContext);
+    newDate.addEventListener('change', loadContext);
+    newRestaurant.addEventListener('change', loadDestinationMeats);
+
+    document.getElementById('save-shipment').addEventListener('click', async () => {
+      const commissary_meat_id = Number(newCommissaryMeat.value);
+      const restaurant_id = Number(newRestaurant.value);
+      const business_date = newDate.value;
+      const total_quantity = newTotalQty.value;
+      const notes = newNotes.value.trim();
+
+      const lines = [...linesBody.querySelectorAll('tr')].map(tr => ({
+        meat_id: Number(tr.querySelector('.line-meat').value),
+        quantity: tr.querySelector('.line-qty').value
+      }));
+
+      if (!commissary_meat_id || !restaurant_id || !business_date || total_quantity === '') {
+        addStatus.textContent = 'Date, source commissary meat, destination restaurant, and total quantity are required.';
+        addStatus.className = 'status-message error';
+        return;
+      }
+      if (lines.length === 0 || lines.some(l => !l.meat_id || l.quantity === '')) {
+        addStatus.textContent = 'Every output line needs a destination meat and a quantity.';
+        addStatus.className = 'status-message error';
+        return;
+      }
+
+      addStatus.textContent = 'Saving...';
+      addStatus.className = 'status-message';
+
+      try {
+        const res = await fetch('/api/commissary/shipments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commissary_meat_id, restaurant_id, business_date, total_quantity, notes: notes || null, actor: actor(), lines })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+
+        addStatus.textContent = `Shipment logged - ${lines.length} destination receipt(s) created.`;
+        addStatus.className = 'status-message success';
+        newTotalQty.value = '';
+        newNotes.value = '';
+        renderLines();
+        updateLineSumHint();
+        await loadContext(); // "shipped out so far" should now include this shipment
+      } catch (err) {
+        addStatus.textContent = 'Error: ' + err.message;
+        addStatus.className = 'status-message error';
+      }
+    });
+
+    Promise.all([loadCommissaryMeats(), loadRestaurants()]).then(() => {
+      loadContext();
+      loadDestinationMeats();
+    });
+  </script>
+  <script src="command-panel.js"></script>
+  <script src="commands/sync-batch-stock.js"></script>
+  <script src="commands/oversold-check.js"></script>
+</body>
+</html>
