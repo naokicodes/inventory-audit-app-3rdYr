@@ -11,6 +11,16 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 (later still) — Item 4: Cleanup pass - retired commissary_meat_map's remaining code paths
+
+Found the first real thing to clean up: the "full retirement of commissary_meat_map" decided several turns back (session-status.md's step-20 entry) was designed but never actually implemented - the manual COMMISSARY-source path in `stockReceipts.js`, the whole "Unallocated" receipt concept, and the admin CRUD/UI in `settings.js`/`settings.html` were all still live.
+
+Implemented as designed: `POST`/`PATCH /api/stock-receipts` now accept `DIRECT` only - a manual `source: COMMISSARY` entry is rejected with a message pointing to the Shipments page, since that's the only place a `COMMISSARY`-sourced row gets created now. Removed the whole Unallocated concept (restaurant_id/meat_id left NULL pending later assignment) along with it - it only ever existed to support the retired manual path. `commissary_meat_map`'s admin CRUD routes and its "Commissary Mapping" tab on Settings are gone. The `commissary_meat_map` table itself, and its `CHECK` constraint still technically permitting the old NULL/NULL/COMMISSARY shape, are both untouched - no destructive schema changes.
+
+Found and fixed a genuine test-suite problem while at it, not just app code: `stockReceipts.test.js`'s 17 tests were all mirrored-logic tests of the *old* behavior, duplicated inline - they still passed after the retirement because they were testing stale copied logic that no longer matched the real route, which would have been actively misleading. Rewritten to match reality (11 tests now). `settings.test.js` turned out to be dedicated entirely to the retired routes with nothing else to test - deleted outright rather than left as an empty shell.
+
+Full suite: 178/178 (down from 209 - 31 fewer tests for genuinely retired functionality, not a coverage loss). Verified live: `DIRECT` still works, manual `COMMISSARY` and the old Unallocated shape are both correctly rejected, `settings.html` no longer references the removed feature, and - the real regression risk this change carried - `POST /api/commissary/shipments` still works end-to-end, confirming it never actually depended on any of the retired code (it always wrote `stock_receipts` directly).
+
 ## 2026-08-29 (later still) — Item 2: Management Dashboard (cross-location stock rollup)
 
 New `GET /api/dashboard/stock-rollup?date=&restaurant_ids=` (`server/routes/dashboard.js`) — rows = every active Commissary meat, columns = Commissary's own balance plus one reverse-converted total per selected restaurant, plus a grand total. Reverse-conversion reuses item 5's `commissary_conversion_standards` directly: for each restaurant meat with a standard pointing back to a given Commissary meat, `balance / ratio_per_unit` gives the implied Commissary-meat-equivalent, summed across every matching meat (a Commissary meat can legitimately feed several of a restaurant's own meats - e.g. Jowl feeding both Bagnet and Sisig - and both correctly count).
@@ -23,11 +33,9 @@ Nav link added to all eleven pages. Along the way, found and fixed a genuine pre
 
 8 new tests (`dashboard.test.js`), full suite 209/209, 0 regressions. Verified live end-to-end with a real scenario: seeded real Commissary and FC opening stock plus two real standards, confirmed the grand total (60) matches the hand-computed expectation exactly, confirmed the zero-restaurants-selected edge case the frontend relies on returns cleanly.
 
-
+## 2026-08-29 (later still) — Item 5: Conversion Standards (per-pairing ratio, live comparison on Shipment form)
 
 New `commissary_conversion_standards` table, one row per `(commissary_meat_id, restaurant_id, meat_id)` — ratio-per-unit-of-input, e.g. "Jowl → FC's Bagnet: 0.3 units per kg." Deliberately separate from `commissary_shipment_presets` (the mix is a demand decision, can have several; the rate is a fact, exactly one per pairing) — see `session-status.md`'s item 5 entry for the full reasoning, settled through real discussion with the project owner, not assumed.
-
-## 2026-08-29 (later still) — Item 5: Conversion Standards (per-pairing ratio, live comparison on Shipment form)
 
 Backend: `GET`/`POST`/`PUT /api/commissary/conversion-standards`, same validation shape as the existing preset routes. No new activity_log wiring - settings data, same treatment as presets.
 

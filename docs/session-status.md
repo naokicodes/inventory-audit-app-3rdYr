@@ -103,9 +103,12 @@ use `source: 'MANUAL'` correctly (human-triggered write, not a
   real data. `server/routes/history.js` + `public/history.html` exist and
   are mounted.
 - **Step 8** (Commissary meat mapping admin screen): done, committed.
-  `settings.html` has a "Commissary Mapping" tab; `settings.js` has
-  `GET`/`POST`/`DELETE /api/settings/commissary-mappings`; covered by
-  `server/routes/settings.test.js`.
+  **Retired 2026-08-29** (item 4 cleanup pass) - see step 20's
+  "commissary_meat_map's fate" entry below. `settings.html`'s
+  "Commissary Mapping" tab, `settings.js`'s
+  `GET`/`POST`/`DELETE /api/settings/commissary-mappings`, and
+  `server/routes/settings.test.js` (which tested only this) are all
+  gone. The `commissary_meat_map` table itself is untouched.
 - **Step 9** (Unallocated-receipts support): done, committed. Rebuilt
   from `docs/data-model.md` section 5 and
   `docs/commissary-and-stock-receipts.md` Part 2 after an earlier attempt
@@ -658,9 +661,11 @@ of sizing them correctly, not a separate concern.
     it, since it only ever existed to support this now-retired manual
     path; remove `commissary_meat_map`'s admin CRUD from
     `server/routes/settings.js` and its "Commissary Mappings" section
-    from `public/settings.html`; update `stockReceipts.test.js` and
-    `settings.test.js` to match (several existing tests assert the
-    *old* behavior and will need rewriting, not just deleting); leave
+    from `public/settings.html`; update `stockReceipts.test.js` to
+    match (several existing tests assert the *old* behavior and need
+    rewriting, not just deleting) - `settings.test.js` turned out to be
+    dedicated entirely to the retired routes with nothing else to
+    salvage, so it's deleted outright rather than rewritten; leave
     the `commissary_meat_map` **table itself** in `schema.sql` untouched
     (don't `DROP TABLE` — no destructive schema changes, matches this
     project's existing caution about schema.sql edits) even though
@@ -1215,10 +1220,10 @@ are visible before anyone starts designing in isolation.
 **Priority, made explicit 2026-08-29**: item 1 was the one auditing-
 service gap (real day-to-day recording need), items 2-5 are app-level
 (dashboard, cleanup, future-proofing, a refinement) — secondary.
-**Items 1, 2, and 5 are done.** Remaining: item 3 (multi-Commissary
-generalization, direction resolved, not built) and item 4 (cleanup
-pass, never designed, an investigation task). Neither is currently
-urgent.
+**Items 1, 2, and 5 are done. Item 4 has one real find fixed, not a
+full audit** — see its entry below. Only item 3 (multi-Commissary
+generalization, direction resolved, not built) remains genuinely
+untouched. Nothing here is currently urgent.
 
 1. **[Done, 2026-08-29] Allocations item-to-item conversion type.**
    Built as `POST /api/allocations/conversion` + a "Converts to" field
@@ -1265,13 +1270,18 @@ urgent.
    special-cased once. Not designed yet, but the direction is settled;
    don't reopen "should restaurants get their own yield table."
 
-4. **A dedicated cleanup pass is owed.** Several design pivots this
-   project (Landing's three adjustment boxes → Allocations,
-   `commissary_meat_map` being retired, likely others not yet audited
-   for) probably left dead code, stale UI, or orphaned routes behind —
-   the same category of issue the stray-git-text bug and the
-   `commissary_meat_map` UI both turned out to be, just not
-   systematically hunted for yet. Worth its own step, ideally before
+4. **[Partially done, 2026-08-29] A dedicated cleanup pass is owed.**
+   First real find and fix: `commissary_meat_map`'s "full retirement"
+   (step 20's entry above) had been designed but never actually
+   implemented - the manual `COMMISSARY`-source path, the Unallocated
+   concept, and the admin CRUD/UI were all still live code. Retired for
+   real this time - see `changelog.md`'s item-4 entry for the full
+   detail, including a genuine test-suite problem caught along the way
+   (`stockReceipts.test.js` was still passing by testing a stale
+   duplicated copy of the old logic, not the real route). Left open:
+   this was one specific, already-known gap, not a systematic audit of
+   the whole codebase - other dead code, stale UI, or orphaned routes
+   may still exist, not yet hunted for. Still worth doing before
    Restaurant C onboarding so nothing stale gets copied into a fresh
    restaurant's setup.
 
