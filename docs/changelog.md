@@ -11,6 +11,119 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 16: Sales backend (manual entry, backend + tests only)
+New route file `server/routes/sales.js`, mounted in `server/index.js`:
+- `GET /api/sales?restaurant_id=&year=&month=` — one row per active dish
+  (both `DIRECT` and `BATCH_PREPPED` — sales matters for both, per
+  `data-model.md`'s usage/portion formulas), each with a `days` map
+  covering every day of the month, keyed by full ISO date. Empty cells
+  are `null`; filled cells are `{ quantity, source }`. If more than one
+  row exists for a day (only possible for `LOYVERSE`), quantities are
+  summed into one cell.
+- `PATCH /api/sales` — upserts (or, with `quantity: null`, clears) the
+  `MANUAL` row for one `(restaurant_id, dish_id, business_date)` cell.
+  Validates the dish belongs to the restaurant and is active, rejects
+  negative quantities.
+
+**Schema change**: added a partial unique index,
+`idx_sales_manual_unique`, on `(restaurant_id, dish_id, business_date)
+WHERE source = 'MANUAL'` — makes the grid's single-cell upsert safe
+without constraining a future `LOYVERSE` sync, which may legitimately
+post several raw transaction rows per dish per day. Plain
+`CREATE-IF-NOT-EXISTS`, no migration helper needed (new index on a
+feature with no prior `MANUAL` rows possible before this step, not a
+constraint loosened on existing data).
+
+**Two doc conflicts resolved this session, not built around silently**:
+1. `data-model.md`'s `sales` section said "Populated by the Loyverse
+   sync, not manual entry" — stale, written before the roadmap decided
+   (steps 16-17) that manual entry is the interim path while Loyverse
+   sync stays a later phase (rule 14). Updated to describe both sources
+   coexisting by design, `MANUAL` upsert-safe via the new index.
+2. `scope.md`'s deferred-activity-logging list didn't mention `sales`
+   at all — an oversight, since manual sales editing wasn't decided as
+   in-scope when that list was written. Added `sales` to the list
+   explicitly rather than silently deciding either way; step 16 does
+   NOT log to `activity_log`, matching `ending_actual`/`adjustments`/
+   `portion_ending_actual`'s existing deferral. Worth a real decision
+   later, once there's a second table with the same open question, not
+   decided under this step's own time budget.
+
+**Interaction bug caught and fixed**: step 15's `commands.test.js` had a
+test seeding two `MANUAL` sales rows for the same day (to test summing)
+— valid before this step's new unique index, a real constraint
+violation after it. Fixed by switching that one test to `LOYVERSE`
+rows, matching the design going forward (same-day multiple rows only
+ever happens for `LOYVERSE` now). Full suite was 8/8 green before this
+fix and 9/9 green after — the regression was caught by re-running the
+whole suite, not assumed away.
+
+New test file `server/routes/sales.test.js`, 13/13 passing, mirroring
+the two routes' exact logic (mirrored-logic style, same as
+`commands.test.js`): create, upsert-replace (not duplicate), clear via
+null, negative-quantity rejection, cross-restaurant dish rejection,
+inactive-dish rejection, the partial unique index itself (both that it
+rejects a second MANUAL row and that it allows multiple LOYVERSE rows),
+and the GET matrix's shape/scoping (full month present, empty cells
+null, MANUAL cell shape, LOYVERSE summing, no cross-restaurant leak, no
+cross-month leak).
+
+**Verified live**, not just mirrored-logic tests: seeded via a real
+booted server, `PATCH`'d a cell (create), `PATCH`'d again (confirmed
+single row with the new value, not two rows), `PATCH`'d with
+`quantity: null` (confirmed the row was deleted), and confirmed a
+negative quantity is rejected with a 400 — all via real HTTP against
+the real route, then confirmed by direct DB read. Full suite re-run
+after: 9/9 files, 0 failures.
+
+## 2026-08-29 — Step 15: "Sync batch stock" command
+First real command wired into the step-14 panel scaffold. New backend
+route `POST /api/commands/sync-batch-stock` (`server/routes/commands.js`,
+mounted in `server/index.js`): for every `(restaurant_id, dish_id,
+business_date)` combo with `sales` rows against a `BATCH_PREPPED` dish
+and no `prepped` row yet for that combo, inserts one `prepped` row with
+`portions_produced = SUM(sales.quantity)`, `created_by =
+'SYSTEM:sync-batch-stock'`. Global, not scoped to a restaurant/date -
+the floating panel is reachable from every page with no shared date
+context to draw from, and re-running it is always safe: already-synced
+or already-manually-entered combos are skipped, never overwritten.
+
+New frontend file `public/commands/sync-batch-stock.js` (kept separate
+from `command-panel.js` itself, one file per command going forward),
+included right after `command-panel.js` on all six pages, registers
+itself and calls the new route.
+
+**Decision made this session, not deferred**: the roadmap's own step-15
+text says to log a SYSTEM `activity_log` entry, but `scope.md` had an
+existing, dated (2026-08-27) decision explicitly deferring
+activity-log extension to `prepped`. Resolved as a narrow exception
+rather than either silently overriding the deferral or blocking on it:
+this ONE write path (the sync command, which is also the only write
+path into `prepped` at all right now - there's still no manual edit UI
+for it) logs to `activity_log`; general `prepped` CRUD/soft-delete
+logging remains deferred, unchanged. Written into both `scope.md` and
+`data-model.md` section 11 in this same session, per the standing rule
+that a doc decision gets written in by whoever makes it, not deferred
+to a future coder session.
+
+New test file `server/routes/commands.test.js`, 7/7 passing, mirroring
+the route's exact query/write logic against a real in-memory DB (same
+approach as `stockReceipts.test.js`): basic sync, multi-row summing,
+DIRECT dishes never touched, existing manual entries never overwritten,
+idempotency on a second run, the activity_log row's shape, and
+restaurant isolation for the same dish_id/date.
+
+**Verified live**, not just via the mirrored-logic tests: seeded two
+real `sales` rows (15 + 3) for a real seeded `BATCH_PREPPED` dish,
+booted the actual Express server, `POST`'d the real endpoint over HTTP,
+and confirmed by direct DB read that `prepped.portions_produced = 18`,
+a matching `activity_log` row (`CREATE`/`SYSTEM`, correct `after` JSON)
+was written, and a second `POST` correctly returned `synced: 0`. Full
+suite re-run afterward: 8/8 files, 91/91 tests, 0 failures. No browser
+click-through of the panel button itself was possible (same sandbox
+limitation as steps 13-14) - the backend contract is verified live, the
+UI click is not.
+
 ## 2026-08-29 — Step 14: Command panel scaffold
 New file `public/command-panel.js` + a one-line `<script>` include added
 before `</body>` on all six existing pages (`index.html`,

@@ -65,9 +65,20 @@ areas, not part of the daily entry screens.
   typing) — interesting later, not now.
 - Any inventory category beyond meat.
 - Extending soft-delete + activity logging to `ending_actual`,
-  `adjustments`, `prepped`, and `portion_ending_actual` — deliberately
+  `adjustments`, `sales`, `prepped`, and `portion_ending_actual` — deliberately
   scoped out of the 2026-08-27 change to keep it reviewable; a real next
-  step, not forgotten.
+  step, not forgotten. `sales` added to this list 2026-08-29 when step
+  16 introduced its first real manual-edit path (`PATCH /api/sales`) —
+  same open question as the others, worth revisiting once there's a
+  second editable table with this need, not decided under step 16's own
+  time budget. **Narrow exception added 2026-08-29 for step 15**:
+  the "Sync batch stock" command's own writes to `prepped` (and only
+  those — it's the sole write path into that table right now, there's no
+  manual edit UI for it yet) log a `CREATE`/`SYSTEM` row to
+  `activity_log`, since a system-inferred number is exactly the case
+  that most needs a trail of where it came from. This does not reopen
+  soft-delete or general audit logging for `prepped` — that's still
+  deferred until a real edit UI exists for it.
 - A second/third commissary, or commissary-to-commissary transfers — the
   current design assumes one commissary serving all restaurants.
 

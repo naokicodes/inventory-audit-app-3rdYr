@@ -6,7 +6,9 @@ deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
 so always start here.
 
-## Where things stand: steps 1–14 done (12–14 pending commit — see below).
+## Where things stand: steps 1–16 done. Steps 1–15 committed and pushed
+to `main`; step 16 committed locally this session, not yet pushed (see
+below).
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -184,14 +186,60 @@ so always start here.
   - **Known gap carried forward**: no live browser click-through of the
     actual injected UI (button placement, panel open/close, Run click) —
     same bucket as step 13's open item.
+- **Step 15** ("Sync batch stock" command): done. New backend route
+  `POST /api/commands/sync-batch-stock` (`server/routes/commands.js`) +
+  new frontend file `public/commands/sync-batch-stock.js`, registered
+  against the step-14 panel on all six pages. Copies `sales` into
+  `prepped` for `BATCH_PREPPED` dish/date/restaurant combos with no
+  `prepped` row yet, summing multiple sales rows per combo; always safe
+  to re-run (existing rows, manual or synced, are never overwritten).
+  See `changelog.md`'s step-15 entry for full detail, including a scope
+  decision made this session: a narrow, documented exception lets this
+  one SYSTEM write path log to `activity_log` for `prepped`, despite
+  `scope.md`'s standing deferral of that pattern — written into
+  `scope.md` and `data-model.md` section 11 directly, not left implicit.
+  - **Verified**: 7/7 new tests in `commands.test.js` (mirrored-logic
+    style, same approach as `stockReceipts.test.js`), full suite re-run
+    at 8/8 files green, AND a live end-to-end check — real seeded sales
+    rows, real booted server, real `POST`, confirmed by direct DB read
+    that `prepped` and `activity_log` both got the right rows, and a
+    second `POST` correctly synced 0. Not verified: clicking the actual
+    "Sync batch stock" button in a real browser — same sandbox
+    limitation as steps 13–14's open item.
+- **Step 16** (Sales backend): done. New route `server/routes/sales.js`,
+  mounted in `server/index.js`: `GET /api/sales` returns a month's
+  matrix (one row per active dish, a `days` map for every day of the
+  month), `PATCH /api/sales` upserts or clears one cell's `MANUAL` row.
+  New schema addition: a partial unique index scoping "one row per
+  cell" to `MANUAL` only, so a future `LOYVERSE` sync isn't constrained.
+  See `changelog.md`'s step-16 entry for full detail, including two doc
+  conflicts resolved this session (a stale `data-model.md` line, and
+  `sales` missing from `scope.md`'s deferred-logging list) and an
+  interaction bug the full-suite re-run caught and fixed (step 15's own
+  test had assumed something step 16's new index now forbids).
+  - **Verified**: 13/13 new tests in `sales.test.js` (mirrored-logic
+    style), full suite re-run at 9/9 files green, AND a live end-to-end
+    check against a real booted server — create, upsert-replace (single
+    row confirmed, not a duplicate), clear via `quantity: null`, and
+    negative-quantity rejection, each confirmed by direct DB read after
+    the real HTTP call. Not verified: the step-17 grid UI doesn't exist
+    yet (this step is backend + tests only, per its own scope), so
+    there's nothing to click-test yet.
 
-**Next up is step 15** ("First real command: Sync batch stock") — see
-the roadmap below. Steps 10–11 are committed and pushed. Steps 12–14 are
-done in code but their commit status depends on whether steps 12–13 were
-actually pushed as the user reported at the end of the prior session —
-this session couldn't independently verify that (no git/network access
-here either), so whoever has git access should confirm 12–13 landed
-before committing 14 on top, in order.
+**Next up is step 17** (Sales frontend) — see the roadmap below. Steps
+10–14 are committed and pushed to `main`, independently verified
+(2026-08-29): cloned fresh, confirmed the actual commits are present
+(`7b0c541`/`2ff3032`/`5b31717` for 10–11, `97a5e74`/`98e2c0a`/`0ba4dd1`
+for 12, `e16fd64` for 13, `866da77` for 14), ran the full suite from a
+clean install (green), and live-smoke-tested the opening-stock write
+path (step 12) against a real booted server. The step-12/13/14 "commit
+status unverified" caveat from the prior session is resolved — no need
+to re-check it. **Steps 15 and 16 are done and committed in this
+session's local clone only** — no push credentials available here (same
+limitation noted for steps 10-11 originally). Whoever has git access
+should pull these commits into the real local clone and push before
+starting step 17, or step 17 will be built against a `main` that's two
+steps behind what this doc describes.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -279,13 +327,15 @@ of sizing them correctly, not a separate concern.
     above for detail, including the New-Stock/Usage scope note.
 14. **[Done] Command panel scaffold.** See "Where things stand" above
     for detail, including the rule-10 scope note.
-15. **[Not started] First real command: "Sync batch stock."** Copies
-    sales into `prepped` for BATCH_PREPPED dishes with no manual entry
-    yet, logged as a SYSTEM `activity_log` entry. Exercises the step-14
-    scaffold with a real, useful command before Sales needs it.
-16. **[Not started] Sales backend.** CRUD for manual sales entry shaped
-    for a monthly grid — `GET` a month's matrix for a restaurant/dish
-    set, `PATCH` a single day's cell. Backend + tests only.
+15. **[Done] First real command: "Sync batch stock."** See the
+    2026-08-29 changelog entry for full detail, including a scope
+    decision made this session (narrow `activity_log` exception for
+    `prepped`, written into `scope.md` and `data-model.md` section 11).
+16. **[Done] Sales backend.** See the 2026-08-29 changelog entry for
+    full detail, including two doc conflicts resolved this session (the
+    stale "Loyverse only" line in `data-model.md`, and `sales` missing
+    from `scope.md`'s deferred-activity-logging list) and an interaction
+    bug the full-suite re-run caught between this step and step 15.
 17. **[Not started] Sales frontend.** The monthly grid UI (rows =
     dishes, columns = Day 1..last day) on top of step 16, editable with
     a confirm prompt on manual override.

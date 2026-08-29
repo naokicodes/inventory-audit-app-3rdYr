@@ -167,7 +167,15 @@ Unchanged.
 | created_at | timestamp | |
 
 ### sales
-Populated by the Loyverse sync, not manual entry — see `loyverse-sync.md`.
+Two sources, distinguished by the `source` column: `LOYVERSE` (future
+sync, not built yet — see `loyverse-sync.md` and rule 14) and `MANUAL`
+(built as of step 16, since Loyverse sync is explicitly a later phase —
+this is the interim path, not a stopgap to be removed once sync lands;
+both sources coexist by design). One `MANUAL` row per
+`(restaurant_id, dish_id, business_date)` — a partial unique index
+enforces this (see `schema.sql`), so the Sales grid is upsert-safe
+without touching how `LOYVERSE` rows behave, since a POS sync may
+legitimately post several raw transaction rows per dish per day.
 | column | type | notes |
 |---|---|---|
 | id | integer, PK | |
@@ -429,8 +437,13 @@ confirmed sums `Outbound_Log` "regardless of destination."
 Every write to `stock_receipts` or `commissary_yield_log` writes a matching
 row here in the same transaction. Deletes on those two tables are soft
 (`deleted_at`), never physical. This pattern is scoped to these two tables
-for now — extending it to `ending_actual`/`adjustments`/`prepped`/
-`portion_ending_actual` is real follow-up work, not bundled into this change.
+for now — extending it to `ending_actual`/`adjustments`/`portion_ending_actual`
+is real follow-up work, not bundled into this change. **`prepped` is a
+narrow exception as of step 15 (2026-08-29, see `scope.md`)**: its sole
+write path today is the "Sync batch stock" command, which logs a
+`CREATE`/`SYSTEM` row here in the same transaction as the `prepped` insert
+— not a general extension of soft-delete/audit logging to that table,
+just a trail for the one system-generated write path that exists.
 
 An unallocated-receipt assignment (section 5) is logged as a normal `UPDATE`
 row here — no special-casing needed, since it goes through the same
