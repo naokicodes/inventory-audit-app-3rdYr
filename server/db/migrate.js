@@ -156,3 +156,39 @@ function migrateLocationsActiveColumn(db) {
 }
 
 module.exports.migrateLocationsActiveColumn = migrateLocationsActiveColumn;
+
+// Adds requires_conversion_target (adjustment_types) and
+// linked_adjustment_id (adjustments) - new columns for the Portion
+// Conversion allocation type, item 1 of the 2026-08-29 "Future
+// considerations" list. Same ALTER TABLE ADD COLUMN pattern as
+// migrateLocationsActiveColumn above - both are new nullable/defaulted
+// columns, not a constraint change, so no table rebuild is needed.
+function migrateConversionColumns(db) {
+  const results = { ran: false };
+
+  const atExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'adjustment_types'`
+  ).get();
+  if (atExists) {
+    const atColumns = db.prepare(`PRAGMA table_info(adjustment_types)`).all();
+    if (!atColumns.some(c => c.name === 'requires_conversion_target')) {
+      db.exec(`ALTER TABLE adjustment_types ADD COLUMN requires_conversion_target INTEGER NOT NULL DEFAULT 0`);
+      results.ran = true;
+    }
+  }
+
+  const aExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'adjustments'`
+  ).get();
+  if (aExists) {
+    const aColumns = db.prepare(`PRAGMA table_info(adjustments)`).all();
+    if (!aColumns.some(c => c.name === 'linked_adjustment_id')) {
+      db.exec(`ALTER TABLE adjustments ADD COLUMN linked_adjustment_id INTEGER REFERENCES adjustments(id)`);
+      results.ran = true;
+    }
+  }
+
+  return results;
+}
+
+module.exports.migrateConversionColumns = migrateConversionColumns;

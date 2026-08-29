@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS adjustment_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,
   requires_transfer_locations INTEGER NOT NULL DEFAULT 0,
+  requires_conversion_target INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1
 );
 
@@ -205,13 +206,15 @@ CREATE TABLE IF NOT EXISTS adjustments (
   adjustment_type_id INTEGER NOT NULL,
   from_location_id INTEGER,
   to_location_id INTEGER,
+  linked_adjustment_id INTEGER,
   notes TEXT,
   created_by TEXT,
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (meat_id) REFERENCES meats(id),
   FOREIGN KEY (adjustment_type_id) REFERENCES adjustment_types(id),
   FOREIGN KEY (from_location_id) REFERENCES locations(id),
-  FOREIGN KEY (to_location_id) REFERENCES locations(id)
+  FOREIGN KEY (to_location_id) REFERENCES locations(id),
+  FOREIGN KEY (linked_adjustment_id) REFERENCES adjustments(id)
 );
 
 -- 10. Commissary tables (see docs/commissary-and-stock-receipts.md)
@@ -405,10 +408,11 @@ CREATE TABLE IF NOT EXISTS activity_log (
 
 -- Seed a reasonable starting set of adjustment types (admin can add more
 -- via the UI later - this is just a sensible default, not a fixed list).
-INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations) VALUES
-  ('Wastage', 0),
-  ('Staff Meal / In-House', 0),
-  ('Allocation / Transfer', 1),
-  ('Spoilage', 0),
-  ('Damaged', 0),
-  ('Other / Uncategorized', 0);
+INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requires_conversion_target) VALUES
+  ('Wastage', 0, 0),
+  ('Staff Meal / In-House', 0, 0),
+  ('Allocation / Transfer', 1, 0),
+  ('Spoilage', 0, 0),
+  ('Damaged', 0, 0),
+  ('Other / Uncategorized', 0, 0),
+  ('Portion Conversion', 0, 1);

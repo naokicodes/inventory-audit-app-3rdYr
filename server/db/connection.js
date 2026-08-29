@@ -11,7 +11,7 @@
 const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
-const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn } = require('./migrate.js');
+const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns } = require('./migrate.js');
 
 const DB_PATH = path.join(__dirname, 'inventory.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
@@ -34,6 +34,12 @@ migrateStockReceiptsNullableDestination(db);
 // locations.active for anyone with a pre-existing local locations table
 // from before step 22 gave it an admin UI. See server/db/migrate.js.
 migrateLocationsActiveColumn(db);
+
+// Item 1 of the 2026-08-29 "Future considerations" list (Portion
+// Conversion allocations) - adds requires_conversion_target and
+// linked_adjustment_id for anyone with a pre-existing local database
+// from before this feature. See server/db/migrate.js.
+migrateConversionColumns(db);
 
 // Run schema.sql on every startup. All statements use "CREATE TABLE IF
 // NOT EXISTS" and "INSERT OR IGNORE", so this is safe to re-run every

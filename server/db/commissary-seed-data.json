@@ -1,19 +1,103 @@
 {
   "_note": "Full 14-row Meats sheet from Commi_Audit_Master.xlsx (M15 is blank in the sheet, skipped). Re-read directly from the xlsx and cross-checked against Commissary_Stock's own cached balances (M03=14.8, M05=16.3, M08=13.4) - see docs/changelog.md and server/engines/commissaryYieldEngine.test.js.",
   "commissary_meats": [
-    { "code": "M01", "name": "Whole Chicken", "unit": "unit", "allowed_leeway_pct": 0.0, "cost_per_unit": 155.0 },
-    { "code": "M02", "name": "Whole Chicken Raw", "unit": "unit", "allowed_leeway_pct": 0.0, "cost_per_unit": 155.0 },
-    { "code": "M03", "name": "Belly Slab", "unit": "kg", "allowed_leeway_pct": 0.25, "cost_per_unit": null },
-    { "code": "M04", "name": "Belly Slab Raw", "unit": "kg", "allowed_leeway_pct": 0.25, "cost_per_unit": null },
-    { "code": "M05", "name": "JOWL", "unit": "kg", "allowed_leeway_pct": 0.20, "cost_per_unit": 188.0 },
-    { "code": "M06", "name": "JOWL Raw", "unit": "kg", "allowed_leeway_pct": 0.20, "cost_per_unit": 188.0 },
-    { "code": "M07", "name": "PATA", "unit": "unit", "allowed_leeway_pct": 0.10, "cost_per_unit": 195.0 },
-    { "code": "M08", "name": "Shortplate", "unit": "kg", "allowed_leeway_pct": 0.20, "cost_per_unit": 600.0 },
-    { "code": "M09", "name": "Pork Steak", "unit": "unit", "allowed_leeway_pct": 0.10, "cost_per_unit": null },
-    { "code": "M10", "name": "French Cut", "unit": "unit", "allowed_leeway_pct": 0.10, "cost_per_unit": null },
-    { "code": "M11", "name": "Pompano", "unit": "unit", "allowed_leeway_pct": 0.10, "cost_per_unit": null },
-    { "code": "M12", "name": "Salmon Belly", "unit": "unit", "allowed_leeway_pct": 0.10, "cost_per_unit": null },
-    { "code": "M13", "name": "Ground Beef", "unit": "kg", "allowed_leeway_pct": 0.10, "cost_per_unit": null },
-    { "code": "M14", "name": "Miscuts", "unit": "kg", "allowed_leeway_pct": 0.0, "cost_per_unit": null }
+    {
+      "code": "M01",
+      "name": "Whole Chicken",
+      "unit": "unit",
+      "allowed_leeway_pct": 0.0,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M02",
+      "name": "Whole Chicken Raw",
+      "unit": "unit",
+      "allowed_leeway_pct": 0.0,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M03",
+      "name": "Belly Slab",
+      "unit": "kg",
+      "allowed_leeway_pct": 0.25,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M04",
+      "name": "Belly Slab Raw",
+      "unit": "kg",
+      "allowed_leeway_pct": 0.25,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M05",
+      "name": "JOWL",
+      "unit": "kg",
+      "allowed_leeway_pct": 0.2,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M06",
+      "name": "JOWL Raw",
+      "unit": "kg",
+      "allowed_leeway_pct": 0.2,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M07",
+      "name": "PATA",
+      "unit": "unit",
+      "allowed_leeway_pct": 0.1,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M08",
+      "name": "Shortplate",
+      "unit": "kg",
+      "allowed_leeway_pct": 0.2,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M09",
+      "name": "Pork Steak",
+      "unit": "unit",
+      "allowed_leeway_pct": 0.1,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M10",
+      "name": "French Cut",
+      "unit": "unit",
+      "allowed_leeway_pct": 0.1,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M11",
+      "name": "Pompano",
+      "unit": "unit",
+      "allowed_leeway_pct": 0.1,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M12",
+      "name": "Salmon Belly",
+      "unit": "unit",
+      "allowed_leeway_pct": 0.1,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M13",
+      "name": "Ground Beef",
+      "unit": "kg",
+      "allowed_leeway_pct": 0.1,
+      "cost_per_unit": null
+    },
+    {
+      "code": "M14",
+      "name": "Miscuts",
+      "unit": "kg",
+      "allowed_leeway_pct": 0.0,
+      "cost_per_unit": null
+    }
   ]
 }
