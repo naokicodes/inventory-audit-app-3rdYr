@@ -218,6 +218,163 @@ router.post('/commissary/shipments', (req, res) => {
   }
 });
 
+// ---------- SHIPMENT PRESETS ("quick formulas") ----------
+// Closes out step 20's commissary_shipment_presets piece, explicitly
+// deferred by 20c (see session-status.md's step-20c entry). Tables
+// already existed since step 20a. Settings-managed, occasional-use data
+// (like meats/dishes/commissary-mappings in settings.js) rather than a
+// daily transactional log - but scoped to commissary_shipments'
+// neighborhood, so it lives here rather than in settings.js.
+//
+// Pure autofill: loading a preset on the shipment form never locks or
+// validates against it (see commissary-shipments.html). Not in rule 9's
+// activity_log scope - same treatment commissary_shipment_lines and
+// commissary_stock_receipts already got.
+
+function getPresetWithLines(presetId) {
+  const preset = db.prepare('SELECT * FROM commissary_shipment_presets WHERE id = ?').get(presetId);
+  if (!preset) return null;
+  const lines = db.prepare('SELECT * FROM commissary_shipment_preset_lines WHERE preset_id = ?').all(presetId);
+  return { ...preset, lines };
+}
+
+// GET /api/commissary/shipment-presets?commissary_meat_id=&restaurant_id=
+// Active presets (+ their lines) for one (commissary_meat_id,
+// restaurant_id) pair - the shipment form's "Load preset" dropdown only
+// makes sense once both are picked, so both are required here.
+router.get('/commissary/shipment-presets', (req, res) => {
+  const commissaryMeatId = Number(req.query.commissary_meat_id);
+  const restaurantId = Number(req.query.restaurant_id);
+  if (!commissaryMeatId || !restaurantId) {
+    return res.status(400).json({ error: 'commissary_meat_id and restaurant_id are required' });
+  }
+
+  const presetIds = db.prepare(`
+    SELECT id FROM commissary_shipment_presets
+    WHERE commissary_meat_id = ? AND restaurant_id = ? AND active = 1
+    ORDER BY name
+  `).all(commissaryMeatId, restaurantId);
+
+  res.json(presetIds.map(({ id }) => getPresetWithLines(id)));
+});
+
+// POST /api/commissary/shipment-presets
+// Body: { commissary_meat_id, restaurant_id, name, lines: [{ meat_id, default_quantity }, ...] }
+// Admin creation of a new preset. Same up-front validation shape as
+// POST /api/commissary/shipments (active commissary meat, active
+// restaurant, every line's meat belongs to that restaurant and is
+// active) so a preset can never point at something the shipment form
+// itself wouldn't allow.
+router.post('/commissary/shipment-presets', (req, res) => {
+  const { commissary_meat_id, restaurant_id, name, lines } = req.body;
+
+  if (!commissary_meat_id || !restaurant_id || !name) {
+    return res.status(400).json({ error: 'commissary_meat_id, restaurant_id, and name are required' });
+  }
+  if (!Array.isArray(lines) || lines.length === 0) {
+    return res.status(400).json({ error: 'At least one preset line is required' });
+  }
+  for (const line of lines) {
+    if (!line || !line.meat_id || line.default_quantity === undefined || line.default_quantity === null || line.default_quantity === '') {
+      return res.status(400).json({ error: 'Each line requires meat_id and default_quantity' });
+    }
+  }
+
+  const commissaryMeat = db.prepare('SELECT id FROM commissary_meats WHERE id = ? AND active = 1').get(commissary_meat_id);
+  if (!commissaryMeat) {
+    return res.status(400).json({ error: 'Unknown or inactive commissary_meat_id' });
+  }
+  const restaurant = db.prepare('SELECT id FROM restaurants WHERE id = ? AND active = 1').get(restaurant_id);
+  if (!restaurant) {
+    return res.status(400).json({ error: 'Unknown or inactive restaurant_id' });
+  }
+  for (const line of lines) {
+    const meat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(line.meat_id, restaurant_id);
+    if (!meat) {
+      return res.status(400).json({ error: `meat_id ${line.meat_id} is not an active meat belonging to restaurant_id ${restaurant_id}` });
+    }
+  }
+
+  try {
+    const presetId = withTransaction(db, () => {
+      const result = db.prepare(`
+        INSERT INTO commissary_shipment_presets (commissary_meat_id, restaurant_id, name)
+        VALUES (?, ?, ?)
+      `).run(commissary_meat_id, restaurant_id, name);
+
+      const newPresetId = result.lastInsertRowid;
+      for (const line of lines) {
+        db.prepare(`
+          INSERT INTO commissary_shipment_preset_lines (preset_id, meat_id, default_quantity)
+          VALUES (?, ?, ?)
+        `).run(newPresetId, line.meat_id, Number(line.default_quantity));
+      }
+      return newPresetId;
+    });
+
+    res.json({ ok: true, id: presetId, ...getPresetWithLines(presetId) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save preset: ' + err.message });
+  }
+});
+
+// PUT /api/commissary/shipment-presets/:id
+// Body: { name?, active?, lines? }
+// Admin edit. commissary_meat_id/restaurant_id are not editable here - a
+// different pair is a different preset (delete/deactivate + re-create),
+// same reasoning as yield-log's "meat isn't editable" rule. `lines`, if
+// given, fully replaces the existing set (delete-then-reinsert, same
+// transaction) - there's no per-line active flag in the schema to
+// version against, and this is settings data, not an audited log.
+// Omitting `lines` leaves the existing lines untouched (e.g. a
+// deactivate-only call).
+router.put('/commissary/shipment-presets/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const { name, active, lines } = req.body;
+
+  const existing = db.prepare('SELECT * FROM commissary_shipment_presets WHERE id = ?').get(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'Preset not found' });
+  }
+
+  if (lines !== undefined) {
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return res.status(400).json({ error: 'At least one preset line is required' });
+    }
+    for (const line of lines) {
+      if (!line || !line.meat_id || line.default_quantity === undefined || line.default_quantity === null || line.default_quantity === '') {
+        return res.status(400).json({ error: 'Each line requires meat_id and default_quantity' });
+      }
+      const meat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(line.meat_id, existing.restaurant_id);
+      if (!meat) {
+        return res.status(400).json({ error: `meat_id ${line.meat_id} is not an active meat belonging to restaurant_id ${existing.restaurant_id}` });
+      }
+    }
+  }
+
+  try {
+    withTransaction(db, () => {
+      db.prepare(`
+        UPDATE commissary_shipment_presets SET name = ?, active = ? WHERE id = ?
+      `).run(name !== undefined ? name : existing.name, active !== undefined ? (active ? 1 : 0) : existing.active, id);
+
+      if (lines !== undefined) {
+        db.prepare('DELETE FROM commissary_shipment_preset_lines WHERE preset_id = ?').run(id);
+        for (const line of lines) {
+          db.prepare(`
+            INSERT INTO commissary_shipment_preset_lines (preset_id, meat_id, default_quantity)
+            VALUES (?, ?, ?)
+          `).run(id, line.meat_id, Number(line.default_quantity));
+        }
+      }
+    });
+
+    res.json({ ok: true, ...getPresetWithLines(id) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update preset: ' + err.message });
+  }
+});
+
 // POST /api/commissary/yield-log
 // Body: { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes, actor }
 router.post('/commissary/yield-log', (req, res) => {

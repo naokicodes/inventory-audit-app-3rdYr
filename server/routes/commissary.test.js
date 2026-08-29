@@ -237,5 +237,211 @@ test('a failed line (inactive meat) rolls back the whole transaction - no partia
   assert.strictEqual(db.prepare(`SELECT COUNT(*) as c FROM stock_receipts`).get().c, beforeReceipts);
 });
 
+// ---- shipment presets ("quick formulas") tests ----
+// Mirrors GET/POST/PUT /api/commissary/shipment-presets - closes out
+// step 20's deferred piece. Same mirrored-logic approach as the
+// shipment tests above.
+
+function getPresetWithLines(presetId) {
+  const preset = db.prepare('SELECT * FROM commissary_shipment_presets WHERE id = ?').get(presetId);
+  if (!preset) return null;
+  const lines = db.prepare('SELECT * FROM commissary_shipment_preset_lines WHERE preset_id = ?').all(presetId);
+  return { ...preset, lines };
+}
+
+function listPresetsForPair(commissary_meat_id, restaurant_id) {
+  if (!commissary_meat_id || !restaurant_id) {
+    return { status: 400, error: 'commissary_meat_id and restaurant_id are required' };
+  }
+  const ids = db.prepare(`
+    SELECT id FROM commissary_shipment_presets
+    WHERE commissary_meat_id = ? AND restaurant_id = ? AND active = 1
+    ORDER BY name
+  `).all(commissary_meat_id, restaurant_id);
+  return { status: 200, presets: ids.map(({ id }) => getPresetWithLines(id)) };
+}
+
+// Mirrors POST /api/commissary/shipment-presets
+function createPreset({ commissary_meat_id, restaurant_id, name, lines }) {
+  if (!commissary_meat_id || !restaurant_id || !name) {
+    return { status: 400, error: 'commissary_meat_id, restaurant_id, and name are required' };
+  }
+  if (!Array.isArray(lines) || lines.length === 0) {
+    return { status: 400, error: 'At least one preset line is required' };
+  }
+  for (const line of lines) {
+    if (!line || !line.meat_id || line.default_quantity === undefined || line.default_quantity === null || line.default_quantity === '') {
+      return { status: 400, error: 'Each line requires meat_id and default_quantity' };
+    }
+  }
+  const commissaryMeat = db.prepare('SELECT id FROM commissary_meats WHERE id = ? AND active = 1').get(commissary_meat_id);
+  if (!commissaryMeat) return { status: 400, error: 'Unknown or inactive commissary_meat_id' };
+  const restaurant = db.prepare('SELECT id FROM restaurants WHERE id = ? AND active = 1').get(restaurant_id);
+  if (!restaurant) return { status: 400, error: 'Unknown or inactive restaurant_id' };
+  for (const line of lines) {
+    const meat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(line.meat_id, restaurant_id);
+    if (!meat) return { status: 400, error: `meat_id ${line.meat_id} is not an active meat belonging to restaurant_id ${restaurant_id}` };
+  }
+
+  const presetId = withTransaction(db, () => {
+    const result = db.prepare(`
+      INSERT INTO commissary_shipment_presets (commissary_meat_id, restaurant_id, name)
+      VALUES (?, ?, ?)
+    `).run(commissary_meat_id, restaurant_id, name);
+    const newPresetId = result.lastInsertRowid;
+    for (const line of lines) {
+      db.prepare(`
+        INSERT INTO commissary_shipment_preset_lines (preset_id, meat_id, default_quantity)
+        VALUES (?, ?, ?)
+      `).run(newPresetId, line.meat_id, Number(line.default_quantity));
+    }
+    return newPresetId;
+  });
+
+  return { status: 200, id: presetId };
+}
+
+// Mirrors PUT /api/commissary/shipment-presets/:id
+function updatePreset(id, { name, active, lines }) {
+  const existing = db.prepare('SELECT * FROM commissary_shipment_presets WHERE id = ?').get(id);
+  if (!existing) return { status: 404, error: 'Preset not found' };
+
+  if (lines !== undefined) {
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return { status: 400, error: 'At least one preset line is required' };
+    }
+    for (const line of lines) {
+      if (!line || !line.meat_id || line.default_quantity === undefined || line.default_quantity === null || line.default_quantity === '') {
+        return { status: 400, error: 'Each line requires meat_id and default_quantity' };
+      }
+      const meat = db.prepare('SELECT id FROM meats WHERE id = ? AND restaurant_id = ? AND active = 1').get(line.meat_id, existing.restaurant_id);
+      if (!meat) return { status: 400, error: `meat_id ${line.meat_id} is not an active meat belonging to restaurant_id ${existing.restaurant_id}` };
+    }
+  }
+
+  withTransaction(db, () => {
+    db.prepare(`UPDATE commissary_shipment_presets SET name = ?, active = ? WHERE id = ?`)
+      .run(name !== undefined ? name : existing.name, active !== undefined ? (active ? 1 : 0) : existing.active, id);
+    if (lines !== undefined) {
+      db.prepare('DELETE FROM commissary_shipment_preset_lines WHERE preset_id = ?').run(id);
+      for (const line of lines) {
+        db.prepare(`
+          INSERT INTO commissary_shipment_preset_lines (preset_id, meat_id, default_quantity)
+          VALUES (?, ?, ?)
+        `).run(id, line.meat_id, Number(line.default_quantity));
+      }
+    }
+  });
+
+  return { status: 200 };
+}
+
+test('preset list requires both commissary_meat_id and restaurant_id', () => {
+  const r = listPresetsForPair(null, 1);
+  assert.strictEqual(r.status, 400);
+});
+
+test('preset list for a pair with no presets returns an empty array', () => {
+  const r = listPresetsForPair(1, 1);
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.presets, []);
+});
+
+test('creating a preset with missing name is rejected', () => {
+  const r = createPreset({ commissary_meat_id: 1, restaurant_id: 1, lines: [{ meat_id: 1, default_quantity: 3 }] });
+  assert.strictEqual(r.status, 400);
+});
+
+test('creating a preset with no lines is rejected', () => {
+  const r = createPreset({ commissary_meat_id: 1, restaurant_id: 1, name: 'Standard split', lines: [] });
+  assert.strictEqual(r.status, 400);
+});
+
+test('creating a preset for an inactive commissary meat is rejected', () => {
+  const r = createPreset({ commissary_meat_id: 2, restaurant_id: 1, name: 'Bad', lines: [{ meat_id: 1, default_quantity: 3 }] });
+  assert.strictEqual(r.status, 400);
+});
+
+test('creating a preset with a line meat from a different restaurant is rejected', () => {
+  const r = createPreset({ commissary_meat_id: 1, restaurant_id: 1, name: 'Bad', lines: [{ meat_id: 4, default_quantity: 3 }] });
+  assert.strictEqual(r.status, 400);
+});
+
+let presetId;
+test('a valid preset with two lines is created', () => {
+  const r = createPreset({
+    commissary_meat_id: 1, restaurant_id: 1, name: 'Standard Jowl split',
+    lines: [{ meat_id: 1, default_quantity: 4 }, { meat_id: 2, default_quantity: 5 }]
+  });
+  assert.strictEqual(r.status, 200);
+  presetId = r.id;
+});
+
+test('the preset and both lines were written, and active defaults to 1', () => {
+  const preset = getPresetWithLines(presetId);
+  assert.strictEqual(preset.commissary_meat_id, 1);
+  assert.strictEqual(preset.restaurant_id, 1);
+  assert.strictEqual(preset.active, 1);
+  assert.strictEqual(preset.lines.length, 2);
+});
+
+test('the list route now returns this preset for its exact (commissary_meat_id, restaurant_id) pair', () => {
+  const r = listPresetsForPair(1, 1);
+  assert.strictEqual(r.presets.length, 1);
+  assert.strictEqual(r.presets[0].id, presetId);
+});
+
+test('the list route returns nothing for a different pair', () => {
+  const r = listPresetsForPair(1, 2);
+  assert.strictEqual(r.presets.length, 0);
+});
+
+test('editing a nonexistent preset is rejected', () => {
+  const r = updatePreset(999, { name: 'x' });
+  assert.strictEqual(r.status, 404);
+});
+
+test('editing just the name leaves lines untouched', () => {
+  const r = updatePreset(presetId, { name: 'Renamed split' });
+  assert.strictEqual(r.status, 200);
+  const preset = getPresetWithLines(presetId);
+  assert.strictEqual(preset.name, 'Renamed split');
+  assert.strictEqual(preset.lines.length, 2);
+});
+
+test('editing lines fully replaces the old set', () => {
+  const r = updatePreset(presetId, { lines: [{ meat_id: 1, default_quantity: 7 }] });
+  assert.strictEqual(r.status, 200);
+  const preset = getPresetWithLines(presetId);
+  assert.strictEqual(preset.lines.length, 1);
+  assert.strictEqual(preset.lines[0].default_quantity, 7);
+});
+
+test('editing lines with an inactive meat is rejected and leaves the old lines intact', () => {
+  const before = getPresetWithLines(presetId).lines.length;
+  const r = updatePreset(presetId, { lines: [{ meat_id: 3, default_quantity: 1 }] });
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual(getPresetWithLines(presetId).lines.length, before);
+});
+
+test('deactivating a preset (active: false) removes it from the pair listing', () => {
+  const r = updatePreset(presetId, { active: false });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(getPresetWithLines(presetId).active, 0);
+  const list = listPresetsForPair(1, 1);
+  assert.strictEqual(list.presets.length, 0);
+});
+
+test('deactivated presets are excluded from the pair listing but a NEW active preset for the same pair still shows', () => {
+  const r2 = createPreset({
+    commissary_meat_id: 1, restaurant_id: 1, name: 'Second formula',
+    lines: [{ meat_id: 2, default_quantity: 2 }]
+  });
+  assert.strictEqual(r2.status, 200);
+  const list = listPresetsForPair(1, 1);
+  assert.strictEqual(list.presets.length, 1);
+  assert.strictEqual(list.presets[0].id, r2.id);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
