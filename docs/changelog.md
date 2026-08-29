@@ -11,6 +11,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 (later still) — Item 5: Conversion Standards (per-pairing ratio, live comparison on Shipment form)
+
+New `commissary_conversion_standards` table, one row per `(commissary_meat_id, restaurant_id, meat_id)` — ratio-per-unit-of-input, e.g. "Jowl → FC's Bagnet: 0.3 units per kg." Deliberately separate from `commissary_shipment_presets` (the mix is a demand decision, can have several; the rate is a fact, exactly one per pairing) — see `session-status.md`'s item 5 entry for the full reasoning, settled through real discussion with the project owner, not assumed.
+
+Backend: `GET`/`POST`/`PUT /api/commissary/conversion-standards`, same validation shape as the existing preset routes. No new activity_log wiring - settings data, same treatment as presets.
+
+Frontend: `commissary-shipments.html` now computes an implied-input total live as the auditor types each line - `quantity / ratio_per_unit`, summed across every line with a known standard, compared against the shipment's `total_quantity`. Lines with no standard don't contribute (raw type, unchanged from step 20). Falls back to the old naive raw-quantity sum when no line has any standard at all.
+
+Caught one real test bug before calling this done (not a production bug): an early test tried creating a standard against a restaurant fixture that was deliberately inactive, so the create silently failed and a later assert got an undefined id - fixed by using an already-known-good standard instead of assuming a create would succeed.
+
+29 new tests (47/47 in `commissary.test.js`), full suite 201/201, 0 regressions. Verified live end-to-end: real standard created via HTTP, fetched back in the exact shape the frontend expects, and the frontend's exact arithmetic replicated against that real response (3 units at 0.3 units/kg → 10kg implied, confirmed).
+
 ## 2026-08-29 (later still) — Portion Conversion allocations (item 1, Future considerations)
 
 Converts stock of one item into a different item, same restaurant/date — e.g. FC's Sinigang becoming Dinuguan. New `POST /api/allocations/conversion`, a new `Portion Conversion` adjustment type, and a `linked_adjustment_id` column tying the two written rows together. Distinct from the existing `Allocation / Transfer` type, which moves the same item between locations.

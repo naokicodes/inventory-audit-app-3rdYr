@@ -1215,9 +1215,9 @@ are visible before anyone starts designing in isolation.
 **Priority, made explicit 2026-08-29**: item 1 was the one auditing-
 service gap (real day-to-day recording need), items 2-5 are app-level
 (dashboard, cleanup, future-proofing, a refinement) — secondary.
-**Item 1 is done. Item 5's design is now settled** (through real
-discussion, not assumed) and ready to build whenever picked up — see
-its entry below. Nothing else on this list is currently urgent.
+**Items 1 and 5 are done.** Item 2 (dashboard) is now fully unblocked -
+the conversion-ratio table it needed to reverse-convert through now
+exists. Nothing else on this list is currently urgent.
 
 1. **[Done, 2026-08-29] Allocations item-to-item conversion type.**
    Built as `POST /api/allocations/conversion` + a "Converts to" field
@@ -1272,7 +1272,7 @@ its entry below. Nothing else on this list is currently urgent.
    Restaurant C onboarding so nothing stale gets copied into a fresh
    restaurant's setup.
 
-5. **[Design settled 2026-08-29, not yet built] Three tables, each
+5. **[Done, 2026-08-29] Three tables, each
    doing one job — not one reused table, and not a single blanket
    dynamic-entry policy.** Originally framed as "step 20's dynamic-
    no-formula call vs. the dashboard needing ratios to total against" —
@@ -1300,9 +1300,9 @@ its entry below. Nothing else on this list is currently urgent.
      **ratio-per-unit-of-input**, not a percentage-of-shipment or a
      typical-batch-size shape — this matches the project owner's own
      real auditing standard from their contractors directly, not
-     assumed, and is also the simplest to implement. Table name not
-     yet chosen (a real "not yet built" gap, unlike the rest of this
-     item).
+     assumed, and is also the simplest to implement. Built as
+     `commissary_conversion_standards` — see `changelog.md`'s entry
+     for the full build/verification detail.
 
    - **No explicit raw-vs-portioned classifier column anywhere.** A
      `(commissary_meat, restaurant, meat)` pairing with a Standard row
