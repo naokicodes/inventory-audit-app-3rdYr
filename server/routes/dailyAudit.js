@@ -172,4 +172,60 @@ router.post('/daily-audit', (req, res) => {
   res.json({ ok: true, saved });
 });
 
+// POST /api/daily-audit/portions
+// Body: { restaurant_id, business_date, rows: [{ dish_id, prepped, portion_actual }] }
+//
+// The write path for BATCH_PREPPED dish rows that's been missing since
+// step 11 (session-status.md) - dish rows on Landing have been
+// display-only until now. Same "only write fields actually provided"
+// convention as POST /api/daily-audit, and the same real SQLite upsert
+// pattern (ON CONFLICT ... DO UPDATE) against prepped/
+// portion_ending_actual's own UNIQUE(restaurant_id, dish_id,
+// business_date) constraints - not a separate exists-check, the schema
+// itself guarantees one row per dish/date.
+//
+// A manual write here always wins over whatever's already in `prepped`
+// for that dish/date - including a SYSTEM row from step 15's "Sync
+// batch stock" command (created_by = 'SYSTEM:sync-batch-stock'). That's
+// intentional, not an oversight: sync-batch-stock only ever fills gaps
+// where no entry exists yet (its own query explicitly excludes dishes
+// that already have a prepped row - see commands.js), so a manual entry
+// arriving after a sync-generated one is the auditor correcting an
+// inferred default with the real physical number, which should always
+// take precedence.
+//
+// Neither table has a notes/remarks column (unlike ending_actual) -
+// not inventing one here, matches the schema exactly as it exists.
+router.post('/daily-audit/portions', (req, res) => {
+  const { restaurant_id, business_date, rows } = req.body;
+  if (!restaurant_id || !business_date || !Array.isArray(rows)) {
+    return res.status(400).json({ error: 'restaurant_id, business_date, and rows[] are required' });
+  }
+
+  const upsertPrepped = db.prepare(`
+    INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET portions_produced = excluded.portions_produced
+  `);
+
+  const upsertPortionActual = db.prepare(`
+    INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET portions_counted = excluded.portions_counted
+  `);
+
+  let saved = 0;
+  for (const row of rows) {
+    if (row.prepped !== null && row.prepped !== undefined && row.prepped !== '') {
+      upsertPrepped.run(restaurant_id, row.dish_id, business_date, Number(row.prepped));
+    }
+    if (row.portion_actual !== null && row.portion_actual !== undefined && row.portion_actual !== '') {
+      upsertPortionActual.run(restaurant_id, row.dish_id, business_date, Number(row.portion_actual));
+    }
+    saved++;
+  }
+
+  res.json({ ok: true, saved });
+});
+
 module.exports = router;
