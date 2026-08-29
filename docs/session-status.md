@@ -1,16 +1,4 @@
-git add docs/session-status.md
-git commit -m "docs: architect-handoff pointer for fresh design conversations + fix stale step-21 reference
-
-Added a distinct pointer (separate from rule 18's coder-worker loop)
-for a fresh conversation resuming architecture discussion specifically:
-where the open questions live (steps 21/22 below, self-contained),
-and the broader project context (3 outlets + Commissary as root,
-settings-driven flexibility direction) that's been established across
-many turns of conversation this session and shouldn't need re-deriving.
-
-Also fixed step 21's stale forward-reference to a shipment route that
-now actually exists (POST /api/commissary/shipments, step 20c)."
-git push# Session Status — read this first after token reset
+# Session Status — read this first after token reset
 
 Last updated: 2026-08-29 (post step-20 full close-out, including the
 `commissary_shipment_presets` piece — confirmed pushed and verified
