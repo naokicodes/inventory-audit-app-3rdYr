@@ -99,6 +99,7 @@
 
     let destinationMeats = []; // active meats for whichever restaurant is currently selected
     let currentPresets = []; // presets for the currently selected (commissary meat, restaurant) pair
+    let currentStandards = []; // conversion standards for the same pair - item 5, session-status.md
 
     newDate.value = new Date().toISOString().slice(0, 10);
     actorInput.value = localStorage.getItem('inventory_actor') || '';
@@ -180,6 +181,24 @@
       presetBar.style.display = 'flex';
     }
 
+    // Item 5 (session-status.md's "Future considerations"): conversion
+    // standards for this exact pair, used to compute an IMPLIED INPUT
+    // for the line-sum hint below - a real ratio-per-unit-of-input, not
+    // a demand-mix preset. A meat with no standard here is raw/dynamic
+    // (no classifier column - a pairing having a standard IS the
+    // classifier) and simply doesn't contribute to the implied sum.
+    async function loadStandards() {
+      const commissaryMeatId = newCommissaryMeat.value;
+      const restaurantId = newRestaurant.value;
+      if (!commissaryMeatId || !restaurantId) {
+        currentStandards = [];
+        return;
+      }
+      const res = await fetch(`/api/commissary/conversion-standards?commissary_meat_id=${commissaryMeatId}&restaurant_id=${restaurantId}`);
+      currentStandards = await res.json();
+      updateLineSumHint();
+    }
+
     // Loading a preset replaces the current output lines with the
     // preset's meat/quantity pairs, but the auditor can still add,
     // remove, or edit every line before saving - same as if they'd typed
@@ -250,24 +269,58 @@
       linesBody.querySelectorAll('.line-qty').forEach(input => {
         input.oninput = updateLineSumHint;
       });
+      linesBody.querySelectorAll('.line-meat').forEach(select => {
+        select.onchange = updateLineSumHint;
+      });
     }
 
-    // Informational only, per step 20c's spec - never enforced or blocking
-    // save. Different units on each side (kg of a raw commissary meat vs.
-    // portion-units of a named output) make a strict equality check not
-    // generally meaningful.
+    // Informational only, never enforced or blocking save - same
+    // philosophy as every other Actual-vs-Calculated comparison in this
+    // app. Two modes: if any line's meat has a real conversion standard
+    // for this pair, compute the IMPLIED INPUT (line quantity / ratio,
+    // same units as the shipment total - a real comparison). Lines with
+    // no standard don't contribute to that sum, counted separately so
+    // it's clear they're excluded, not zero. If NO line has a standard
+    // at all, falls back to the old naive raw quantity sum (different
+    // units on each side, explicitly caveated) - this is the "raw type
+    // stays fully dynamic, no standard exists" case from item 5.
     function updateLineSumHint() {
-      const qtys = [...linesBody.querySelectorAll('.line-qty')].map(i => Number(i.value) || 0);
-      const sum = qtys.reduce((a, b) => a + b, 0);
+      const lineEls = [...linesBody.querySelectorAll('tr')];
       const total = Number(newTotalQty.value) || 0;
-      lineSumHint.textContent = `Lines total: ${sum.toFixed(2)} (shipment total: ${total.toFixed(2)}) - informational only, units may legitimately differ.`;
+
+      let impliedSum = 0;
+      let matchedCount = 0;
+      let unmatchedCount = 0;
+      let rawSum = 0;
+
+      lineEls.forEach(tr => {
+        const meatId = Number(tr.querySelector('.line-meat').value) || null;
+        const qty = Number(tr.querySelector('.line-qty').value) || 0;
+        rawSum += qty;
+        const standard = currentStandards.find(s => s.meat_id === meatId);
+        if (standard && qty > 0) {
+          impliedSum += qty / standard.ratio_per_unit;
+          matchedCount++;
+        } else if (qty > 0) {
+          unmatchedCount++;
+        }
+      });
+
+      if (matchedCount > 0) {
+        const excludedNote = unmatchedCount > 0
+          ? ` (${unmatchedCount} line${unmatchedCount === 1 ? '' : 's'} with no standard not counted)`
+          : '';
+        lineSumHint.textContent = `Implied input from standards: ~${impliedSum.toFixed(2)} (shipment total: ${total.toFixed(2)})${excludedNote} - informational only, never blocking.`;
+      } else {
+        lineSumHint.textContent = `Lines total: ${rawSum.toFixed(2)} (shipment total: ${total.toFixed(2)}) - informational only, units may legitimately differ.`;
+      }
     }
 
     document.getElementById('add-line').addEventListener('click', addLine);
     newTotalQty.addEventListener('input', updateLineSumHint);
-    newCommissaryMeat.addEventListener('change', () => { loadContext(); loadPresets(); });
+    newCommissaryMeat.addEventListener('change', () => { loadContext(); loadPresets(); loadStandards(); });
     newDate.addEventListener('change', loadContext);
-    newRestaurant.addEventListener('change', () => { loadDestinationMeats(); loadPresets(); });
+    newRestaurant.addEventListener('change', () => { loadDestinationMeats(); loadPresets(); loadStandards(); });
     loadPresetBtn.addEventListener('click', loadSelectedPreset);
 
     document.getElementById('save-shipment').addEventListener('click', async () => {
