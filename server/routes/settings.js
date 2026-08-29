@@ -184,4 +184,93 @@ router.delete('/settings/commissary-mappings/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- ADJUSTMENT TYPES ----------
+// Step 22 (session-status.md): minimal admin CRUD for adjustment_types,
+// built alongside the new Allocations page since one of the six real
+// types ("Allocation / Transfer") needs a way to exist beyond hand-
+// editing schema.sql's seed rows. Global list - not restaurant-scoped
+// (adjustment_types has no restaurant_id column). Same pattern as
+// Meats/Dishes above (name + a flag + active, edit-in-place). Not wired
+// into activity_log - config data, not a daily transactional log, same
+// reasoning as Commissary Mapping above.
+
+router.get('/settings/adjustment-types', (req, res) => {
+  const rows = db.prepare(
+    `SELECT id, name, requires_transfer_locations, active FROM adjustment_types ORDER BY name`
+  ).all();
+  res.json(rows);
+});
+
+router.post('/settings/adjustment-types', (req, res) => {
+  const { name, requires_transfer_locations } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  try {
+    const result = db.prepare(
+      `INSERT INTO adjustment_types (name, requires_transfer_locations) VALUES (?, ?)`
+    ).run(name.trim(), requires_transfer_locations ? 1 : 0);
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That adjustment type name already exists.' : err.message });
+  }
+});
+
+router.put('/settings/adjustment-types/:id', (req, res) => {
+  const { name, requires_transfer_locations, active } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  try {
+    db.prepare(
+      `UPDATE adjustment_types SET name = ?, requires_transfer_locations = ?, active = ? WHERE id = ?`
+    ).run(name.trim(), requires_transfer_locations ? 1 : 0, active ? 1 : 0, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That adjustment type name already exists.' : err.message });
+  }
+});
+
+// ---------- LOCATIONS ----------
+// Step 22: minimal admin CRUD for locations, the from/to picklist for
+// any adjustment type with requires_transfer_locations = 1. Global list
+// spanning every restaurant plus shared/central locations
+// (restaurant_id = null, e.g. the commissary) - deliberately not
+// filtered by whichever restaurant is selected elsewhere on the
+// Settings page, since a transfer can span two different restaurants
+// and the picklist needs to offer all of them. Not wired into
+// activity_log - same reasoning as Commissary Mapping/Adjustment Types.
+
+router.get('/settings/locations', (req, res) => {
+  const rows = db.prepare(`
+    SELECT l.id, l.name, l.restaurant_id, r.name as restaurant_name, l.is_restaurant_level, l.active
+    FROM locations l
+    LEFT JOIN restaurants r ON r.id = l.restaurant_id
+    ORDER BY r.name IS NULL DESC, r.name, l.name
+  `).all();
+  res.json(rows);
+});
+
+router.post('/settings/locations', (req, res) => {
+  const { name, restaurant_id, is_restaurant_level } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  const result = db.prepare(
+    `INSERT INTO locations (name, restaurant_id, is_restaurant_level) VALUES (?, ?, ?)`
+  ).run(name.trim(), restaurant_id || null, is_restaurant_level ? 1 : 0);
+  res.json({ ok: true, id: result.lastInsertRowid });
+});
+
+router.put('/settings/locations/:id', (req, res) => {
+  const { name, restaurant_id, is_restaurant_level, active } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.prepare(
+    `UPDATE locations SET name = ?, restaurant_id = ?, is_restaurant_level = ?, active = ? WHERE id = ?`
+  ).run(name.trim(), restaurant_id || null, is_restaurant_level ? 1 : 0, active ? 1 : 0, req.params.id);
+  res.json({ ok: true });
+});
+
 module.exports = router;

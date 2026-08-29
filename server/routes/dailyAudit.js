@@ -13,33 +13,27 @@ router.get('/restaurants', (req, res) => {
   res.json(restaurants);
 });
 
-// Shared by both GET routes below: looks up the existing in_house/wastage/
-// other adjustment amounts and the ending_actual remarks for one meat/date,
-// so a meat row can show what's already been typed for it (not just the
-// calculated columns). Kept as one helper so the two routes can't drift
-// out of sync on how this decoration works.
+// Shared by both GET routes below: looks up the existing ending_actual
+// remarks for one meat/date, so a meat row can show what's already been
+// typed for it (not just the calculated columns). Kept as a helper so
+// the two routes can't drift out of sync.
+//
+// Step 22 (session-status.md): used to also look up in_house/wastage/
+// other adjustment amounts for the three input boxes Landing had - those
+// are gone now. Landing shows one read-only `adjustments` cell instead,
+// already computed by computeMeatAudit (SUM(quantity) FROM adjustments -
+// see auditEngine.js) and returned as part of the audit object below, no
+// separate lookup needed. Entering an adjustment now happens on the
+// dedicated Allocations page (server/routes/allocations.js) instead of
+// here.
 function getMeatInputDecoration(restaurantId, date) {
-  const adjTypes = db.prepare(`SELECT id, name FROM adjustment_types WHERE active = 1`).all();
-  const inHouseTypeId = adjTypes.find(t => t.name === 'Staff Meal / In-House')?.id;
-  const wastageTypeId = adjTypes.find(t => t.name === 'Wastage')?.id;
-  const otherTypeId = adjTypes.find(t => t.name === 'Other / Uncategorized')?.id;
-
-  const getExistingAdjustment = db.prepare(
-    `SELECT quantity FROM adjustments WHERE restaurant_id = ? AND meat_id = ? AND business_date = ? AND adjustment_type_id = ?`
-  );
   const getRemarks = db.prepare(
     `SELECT notes FROM ending_actual WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
   );
 
   return (meatId) => {
-    const inHouse = inHouseTypeId ? getExistingAdjustment.get(restaurantId, meatId, date, inHouseTypeId) : null;
-    const wastage = wastageTypeId ? getExistingAdjustment.get(restaurantId, meatId, date, wastageTypeId) : null;
-    const other = otherTypeId ? getExistingAdjustment.get(restaurantId, meatId, date, otherTypeId) : null;
     const remarksRow = getRemarks.get(restaurantId, meatId, date);
     return {
-      in_house: inHouse ? inHouse.quantity : null,
-      wastage: wastage ? wastage.quantity : null,
-      other: other ? other.quantity : null,
       remarks: remarksRow ? remarksRow.notes : ''
     };
   };
@@ -77,9 +71,9 @@ router.get('/daily-audit', (req, res) => {
       // this screen. See docs/commissary-and-stock-receipts.md Part 2.
       new_stock: audit.newStock,
       usage: audit.usage,
-      in_house: inputs.in_house,
-      wastage: inputs.wastage,
-      other: inputs.other,
+      // Step 22: adjustments is now a single read-only sum (entered on
+      // the Allocations page), not three separate editable boxes.
+      adjustments: audit.adjustments,
       ending_calculated: audit.endingCalculated,
       ending_actual: audit.actual,
       variance: audit.variance,
@@ -95,10 +89,14 @@ router.get('/daily-audit', (req, res) => {
 // GET /api/daily-audit/mixed?restaurant_id=1&date=2026-08-25
 // Step 11 (session-status.md): backs the Landing mixed grid - meats and
 // BATCH_PREPPED dishes together in one array, each row tagged `type`
-// ('MEAT' or 'DISH'). MEAT rows are now decorated with the same
-// in_house/wastage/other/remarks lookup GET /api/daily-audit uses, via
-// the shared helper above - the Landing UI keeps editing meat rows in
-// place, so it needs to see what's already been typed, same as before.
+// ('MEAT' or 'DISH'). MEAT rows are decorated with the remarks lookup
+// GET /api/daily-audit uses, via the shared helper above - the Landing
+// UI keeps editing meat rows in place (opening_stock/ending_actual/
+// remarks), so it needs to see what's already been typed, same as
+// before. `adjustments` doesn't need separate decoration - it's already
+// part of the raw computeMixedDailyAudit/computeMeatAudit spread below
+// (step 22, session-status.md), a single read-only sum fed by the
+// Allocations page instead of Landing's old three input boxes.
 // DISH rows carry only what computeDishAudit already returns (prepped,
 // sold, portion beginning/ending/actual, status) - read-only for this
 // step, per session-status.md; there's no write path for prepped/
@@ -121,11 +119,15 @@ router.get('/daily-audit/mixed', (req, res) => {
 });
 
 // POST /api/daily-audit
-// Body: { restaurant_id, business_date, rows: [{ meat_id, in_house, wastage, other, ending_actual, remarks, opening_stock }] }
+// Body: { restaurant_id, business_date, rows: [{ meat_id, ending_actual, remarks, opening_stock }] }
 // Routes each field to its correct table. Only writes fields that were
 // actually provided (not null/empty) - leaves everything else untouched.
 // Note: new_stock is no longer accepted here - it's entered on the Stock
 // Receipts page now (see docs/commissary-and-stock-receipts.md Part 2).
+// Step 22 (session-status.md): in_house/wastage/other are no longer
+// accepted here either - adjustments are now entered on the dedicated
+// Allocations page (server/routes/allocations.js) instead of Landing's
+// old three hardcoded per-type boxes.
 //
 // opening_stock (step 12, session-status.md): a one-time value, only
 // meaningful the first time a meat has no computable beginning stock
@@ -145,11 +147,6 @@ router.post('/daily-audit', (req, res) => {
     return res.status(400).json({ error: 'restaurant_id, business_date, and rows[] are required' });
   }
 
-  const adjTypes = db.prepare(`SELECT id, name FROM adjustment_types WHERE active = 1`).all();
-  const inHouseTypeId = adjTypes.find(t => t.name === 'Staff Meal / In-House')?.id;
-  const wastageTypeId = adjTypes.find(t => t.name === 'Wastage')?.id;
-  const otherTypeId = adjTypes.find(t => t.name === 'Other / Uncategorized')?.id;
-
   const insertOpeningStock = db.prepare(`
     INSERT OR IGNORE INTO opening_stock (restaurant_id, meat_id, business_date, quantity)
     VALUES (?, ?, ?, ?)
@@ -160,20 +157,6 @@ router.post('/daily-audit', (req, res) => {
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(restaurant_id, meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes
   `);
-  const deleteAdjustment = db.prepare(
-    `DELETE FROM adjustments WHERE restaurant_id = ? AND meat_id = ? AND business_date = ? AND adjustment_type_id = ?`
-  );
-  const insertAdjustment = db.prepare(`
-    INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
-  function upsertAdjustment(meatId, typeId, value) {
-    deleteAdjustment.run(restaurant_id, meatId, business_date, typeId);
-    if (value !== null && value !== undefined && value !== '' && Number(value) !== 0) {
-      insertAdjustment.run(restaurant_id, meatId, business_date, Number(value), typeId);
-    }
-  }
 
   let saved = 0;
   for (const row of rows) {
@@ -183,9 +166,6 @@ router.post('/daily-audit', (req, res) => {
     if (row.ending_actual !== null && row.ending_actual !== undefined && row.ending_actual !== '') {
       upsertEndingActual.run(restaurant_id, row.meat_id, business_date, Number(row.ending_actual), row.remarks || null);
     }
-    if (inHouseTypeId) upsertAdjustment(row.meat_id, inHouseTypeId, row.in_house);
-    if (wastageTypeId) upsertAdjustment(row.meat_id, wastageTypeId, row.wastage);
-    if (otherTypeId) upsertAdjustment(row.meat_id, otherTypeId, row.other);
     saved++;
   }
 

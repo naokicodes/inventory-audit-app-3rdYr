@@ -41,6 +41,8 @@
     <button data-section="dishes">Dishes</button>
     <button data-section="recipes">Recipes</button>
     <button data-section="commissary-mapping">Commissary Mapping</button>
+    <button data-section="adjustment-types">Adjustment Types</button>
+    <button data-section="locations">Locations</button>
   </div>
 
   <section id="section-meats" class="section-panel active">
@@ -93,6 +95,29 @@
       <button id="add-mapping">Add Mapping</button>
     </div>
     <div id="commissary-mapping-table">Loading...</div>
+  </section>
+
+  <section id="section-adjustment-types" class="section-panel">
+    <h2>Adjustment Types</h2>
+    <small class="hint">The types offered on the <a href="allocations.html">Allocations</a> page (wastage, staff meals, transfers, etc). Global list, not per-restaurant. "Requires transfer locations" shows From/To location pickers on the Allocations entry form for that type.</small>
+    <div class="add-form">
+      <label>Name <input id="adjtype-name" placeholder="e.g. Spoilage"></label>
+      <label>Requires transfer locations <input id="adjtype-requires-locations" type="checkbox"></label>
+      <button id="add-adjtype">Add Type</button>
+    </div>
+    <div id="adjustment-types-table">Loading...</div>
+  </section>
+
+  <section id="section-locations" class="section-panel">
+    <h2>Locations</h2>
+    <small class="hint">The From/To picklist for any adjustment type that requires transfer locations. Spans every restaurant plus shared/central locations (e.g. the commissary) - leave Restaurant blank for a shared location.</small>
+    <div class="add-form">
+      <label>Name <input id="location-name" placeholder="e.g. Walk-in Freezer"></label>
+      <label>Restaurant <select id="location-restaurant"><option value="">Shared / Central</option></select></label>
+      <label>Restaurant-level <input id="location-is-restaurant-level" type="checkbox" checked></label>
+      <button id="add-location">Add Location</button>
+    </div>
+    <div id="locations-table">Loading...</div>
   </section>
 
   <script>
@@ -338,6 +363,124 @@
       const result = await res.json();
       if (!result.ok) return alert(result.error);
       loadCommissaryMappings();
+    });
+
+    // ---------- ADJUSTMENT TYPES ----------
+    // Global list, not restaurant-scoped - loaded once, not tied to
+    // currentRestaurantId or the restaurant selector's change listener.
+    async function loadAdjustmentTypes() {
+      const res = await fetch('/api/settings/adjustment-types');
+      const types = await res.json();
+      document.getElementById('adjustment-types-table').innerHTML = `
+        <table>
+          <thead><tr><th>Name</th><th>Requires Transfer Locations</th><th>Active</th></tr></thead>
+          <tbody>${types.map(t => `
+            <tr>
+              <td><input value="${t.name}" data-field="name" data-id="${t.id}" class="adjtype-edit"></td>
+              <td><input type="checkbox" ${t.requires_transfer_locations ? 'checked' : ''} data-field="requires_transfer_locations" data-id="${t.id}" class="adjtype-edit"></td>
+              <td><input type="checkbox" ${t.active ? 'checked' : ''} data-field="active" data-id="${t.id}" class="adjtype-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.adjtype-edit').forEach(el => el.addEventListener('change', saveAdjustmentTypeRow));
+    }
+
+    async function saveAdjustmentTypeRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      const result = await fetch(`/api/settings/adjustment-types/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          requires_transfer_locations: get('requires_transfer_locations').checked,
+          active: get('active').checked
+        })
+      }).then(r => r.json());
+      if (!result.ok) { alert(result.error); loadAdjustmentTypes(); }
+    }
+
+    document.getElementById('add-adjtype').addEventListener('click', async () => {
+      const name = document.getElementById('adjtype-name').value.trim();
+      const requires_transfer_locations = document.getElementById('adjtype-requires-locations').checked;
+      if (!name) return alert('Name is required.');
+      const res = await fetch('/api/settings/adjustment-types', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, requires_transfer_locations })
+      });
+      const result = await res.json();
+      if (!result.ok) return alert(result.error);
+      document.getElementById('adjtype-name').value = '';
+      document.getElementById('adjtype-requires-locations').checked = false;
+      loadAdjustmentTypes();
+    });
+
+    // ---------- LOCATIONS ----------
+    // Also global - restaurant_id here is per-row (which restaurant this
+    // location belongs to, or blank for shared/central), not filtered by
+    // the page's restaurant selector.
+    async function loadLocationRestaurantDropdown() {
+      const res = await fetch('/api/restaurants');
+      const rs = await res.json();
+      document.getElementById('location-restaurant').innerHTML =
+        '<option value="">Shared / Central</option>' + rs.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+    }
+
+    async function loadLocations() {
+      const res = await fetch('/api/settings/locations');
+      const locs = await res.json();
+      document.getElementById('locations-table').innerHTML = `
+        <table>
+          <thead><tr><th>Name</th><th>Restaurant</th><th>Restaurant-level</th><th>Active</th></tr></thead>
+          <tbody>${locs.map(l => `
+            <tr>
+              <td><input value="${l.name}" data-field="name" data-id="${l.id}" class="location-edit"></td>
+              <td>${l.restaurant_name || '<span class="hint">Shared/Central</span>'}</td>
+              <td><input type="checkbox" ${l.is_restaurant_level ? 'checked' : ''} data-field="is_restaurant_level" data-id="${l.id}" class="location-edit" data-restaurant-id="${l.restaurant_id ?? ''}"></td>
+              <td><input type="checkbox" ${l.active ? 'checked' : ''} data-field="active" data-id="${l.id}" class="location-edit" data-restaurant-id="${l.restaurant_id ?? ''}"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.location-edit').forEach(el => el.addEventListener('change', saveLocationRow));
+    }
+
+    async function saveLocationRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      // restaurant_id isn't editable inline here (would need its own
+      // dropdown per row) - preserved from whichever checkbox's data
+      // attribute carries it, same value on every editable cell in the row.
+      const restaurantId = e.target.dataset.restaurantId || null;
+      const result = await fetch(`/api/settings/locations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          restaurant_id: restaurantId || null,
+          is_restaurant_level: get('is_restaurant_level').checked,
+          active: get('active').checked
+        })
+      }).then(r => r.json());
+      if (!result.ok) { alert(result.error); loadLocations(); }
+    }
+
+    document.getElementById('add-location').addEventListener('click', async () => {
+      const name = document.getElementById('location-name').value.trim();
+      const restaurant_id = document.getElementById('location-restaurant').value || null;
+      const is_restaurant_level = document.getElementById('location-is-restaurant-level').checked;
+      if (!name) return alert('Name is required.');
+      const res = await fetch('/api/settings/locations', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, restaurant_id, is_restaurant_level })
+      });
+      const result = await res.json();
+      if (!result.ok) return alert(result.error);
+      document.getElementById('location-name').value = '';
+      loadLocations();
     });
 
     restaurantSelect.addEventListener('change', () => {

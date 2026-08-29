@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS locations (
   restaurant_id INTEGER,           -- nullable: null = shared/central (e.g. commissary)
   name TEXT NOT NULL,
   is_restaurant_level INTEGER NOT NULL DEFAULT 1,
+  active INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
 );
 

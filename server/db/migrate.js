@@ -116,3 +116,43 @@ function migrateStockReceiptsNullableDestination(db) {
 }
 
 module.exports = { migrateStockReceiptsNullableDestination };
+
+// ----------------------------------------------------------------------
+// Step 22 (session-status.md): locations.active
+//
+// Why this exists: locations was added back in step 9's era of
+// data-model.md but has stayed unused (zero rows, no admin UI) until
+// step 22 gives it one. schema.sql's "CREATE TABLE IF NOT EXISTS" can
+// add brand-new tables safely but can't add a column to a table that
+// already exists locally without it. Unlike the stock_receipts
+// migration above (which had to loosen a NOT NULL constraint via a
+// full rebuild-and-rename), adding a plain nullable-with-default column
+// is a simple ALTER TABLE ADD COLUMN - no rebuild needed.
+//
+// Must run BEFORE schema.sql - see connection.js.
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ ran: boolean }}
+ */
+function migrateLocationsActiveColumn(db) {
+  const tableExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'locations'`
+  ).get();
+  if (!tableExists) {
+    // Fresh install - schema.sql creates it with the active column
+    // already present. Nothing to migrate.
+    return { ran: false };
+  }
+
+  const columns = db.prepare(`PRAGMA table_info(locations)`).all();
+  const hasActive = columns.some(c => c.name === 'active');
+  if (hasActive) {
+    return { ran: false };
+  }
+
+  db.exec(`ALTER TABLE locations ADD COLUMN active INTEGER NOT NULL DEFAULT 1`);
+  return { ran: true };
+}
+
+module.exports.migrateLocationsActiveColumn = migrateLocationsActiveColumn;

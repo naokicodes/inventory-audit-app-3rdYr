@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Allocations - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem; text-align: left; }
+    th { background: #f0f0f0; }
+    .add-form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin-bottom: 0.5rem; }
+    .add-form label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .add-form input, .add-form select { padding: 0.3rem; }
+    .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin: 1.5rem 0 1rem; }
+    .filters label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .filters select, .filters input { padding: 0.3rem; }
+    .hint { color: #888; font-size: 0.8rem; }
+  </style>
+</head>
+<body style="max-width: 1100px;">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="commissary-shipments.html">Shipments</a>
+    <a href="sales.html">Sales</a>
+    <a href="terminal.html">Terminal</a>
+    <a href="allocations.html">Allocations</a>
+    <a href="settings.html">Settings</a>
+    <a href="history.html">History</a>
+  </nav>
+
+  <h1>Allocations</h1>
+  <p class="hint">One log for every non-sale reduction (or transfer) to a restaurant's meat stock - wastage, staff meals, spoilage, damaged goods, and location-to-location transfers. Landing's Adjustments cell is a read-only sum of this log. Each entry here is its own row - two wastage entries the same day both count, rather than one overwriting the other.</p>
+
+  <div class="add-form">
+    <label>Date <input type="date" id="new-date"></label>
+    <label>Restaurant <select id="new-restaurant"></select></label>
+    <label>Meat <select id="new-meat"></select></label>
+    <label>Type <select id="new-type"></select></label>
+    <label>Quantity <input type="number" step="0.01" id="new-qty" placeholder="0"></label>
+    <label id="new-from-label" style="display:none;">From <select id="new-from"></select></label>
+    <label id="new-to-label" style="display:none;">To <select id="new-to"></select></label>
+    <label>Notes <input type="text" id="new-notes" placeholder="optional"></label>
+    <button id="add-allocation">Add Entry</button>
+  </div>
+  <p id="transfer-hint" class="hint" style="display:none;">This type needs both a from and a to location - manage the list of locations in Settings.</p>
+  <div id="add-status" class="status-message"></div>
+
+  <div class="filters">
+    <label>Restaurant <select id="filter-restaurant"><option value="">All</option></select></label>
+    <label>Meat <select id="filter-meat"><option value="">All</option></select></label>
+    <label>Date <input type="date" id="filter-date"></label>
+    <label>Type <select id="filter-type"><option value="">All</option></select></label>
+    <button id="clear-filters">Clear filters</button>
+  </div>
+
+  <div id="allocations-table">Loading...</div>
+
+  <script>
+    const newDate = document.getElementById('new-date');
+    const newRestaurant = document.getElementById('new-restaurant');
+    const newMeat = document.getElementById('new-meat');
+    const newType = document.getElementById('new-type');
+    const newQty = document.getElementById('new-qty');
+    const newFrom = document.getElementById('new-from');
+    const newFromLabel = document.getElementById('new-from-label');
+    const newTo = document.getElementById('new-to');
+    const newToLabel = document.getElementById('new-to-label');
+    const transferHint = document.getElementById('transfer-hint');
+    const newNotes = document.getElementById('new-notes');
+    const addStatus = document.getElementById('add-status');
+
+    const filterRestaurant = document.getElementById('filter-restaurant');
+    const filterMeat = document.getElementById('filter-meat');
+    const filterDate = document.getElementById('filter-date');
+    const filterType = document.getElementById('filter-type');
+
+    let restaurants = [];
+    let adjustmentTypes = []; // active only, for both dropdowns
+    let locations = [];       // active only, for from/to dropdowns
+    let currentMeats = [];    // meats for whichever restaurant is selected in the add form
+
+    newDate.value = new Date().toISOString().slice(0, 10);
+
+    function fmt(n) {
+      return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
+    }
+
+    async function loadRestaurants() {
+      const res = await fetch('/api/restaurants');
+      restaurants = await res.json();
+      const opts = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+      newRestaurant.innerHTML = opts;
+      filterRestaurant.innerHTML = '<option value="">All</option>' + opts;
+    }
+
+    // GET /api/settings/adjustment-types returns every type (including
+    // inactive, for the Settings admin table) - filtered to active=1 here,
+    // same pattern this app already uses for meats/restaurants elsewhere.
+    async function loadAdjustmentTypes() {
+      const res = await fetch('/api/settings/adjustment-types');
+      const all = await res.json();
+      adjustmentTypes = all.filter(t => t.active);
+      const opts = adjustmentTypes.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+      newType.innerHTML = opts;
+      filterType.innerHTML = '<option value="">All</option>' + all.map(t => `<option value="${t.id}">${t.name}${t.active ? '' : ' (inactive)'}</option>`).join('');
+      updateTypeUI();
+    }
+
+    async function loadLocations() {
+      const res = await fetch('/api/settings/locations');
+      const all = await res.json();
+      locations = all.filter(l => l.active);
+      const opts = locations.map(l => `<option value="${l.id}">${l.name}${l.restaurant_name ? ' (' + l.restaurant_name + ')' : ' (Shared/Central)'}</option>`).join('');
+      newFrom.innerHTML = opts;
+      newTo.innerHTML = opts;
+    }
+
+    async function loadMeatsForNewForm() {
+      const restaurantId = newRestaurant.value;
+      if (!restaurantId) { newMeat.innerHTML = ''; currentMeats = []; return; }
+      const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${restaurantId}`);
+      currentMeats = await res.json();
+      newMeat.innerHTML = currentMeats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
+    }
+
+    async function loadMeatsForFilter() {
+      const restaurantId = filterRestaurant.value;
+      if (!restaurantId) { filterMeat.innerHTML = '<option value="">All</option>'; return; }
+      const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${restaurantId}`);
+      const meats = await res.json();
+      filterMeat.innerHTML = '<option value="">All</option>' + meats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
+    }
+
+    // Shows/hides the From/To dropdowns based on the selected type's
+    // requires_transfer_locations flag - mirrors the server's own check in
+    // allocations.js, but this is convenience only, not validation; the
+    // server re-checks regardless of what this UI does.
+    function updateTypeUI() {
+      const type = adjustmentTypes.find(t => String(t.id) === String(newType.value));
+      const needsLocations = !!(type && type.requires_transfer_locations);
+      newFromLabel.style.display = needsLocations ? '' : 'none';
+      newToLabel.style.display = needsLocations ? '' : 'none';
+      transferHint.style.display = needsLocations ? '' : 'none';
+    }
+
+    function renderRow(r) {
+      const transferCell = r.requires_transfer_locations
+        ? `${r.from_location_name || '-'} &rarr; ${r.to_location_name || '-'}`
+        : '<span class="hint">n/a</span>';
+      return `
+        <tr>
+          <td>${r.business_date}</td>
+          <td>${r.restaurant_name}</td>
+          <td>${r.meat_code} - ${r.meat_name} <span class="hint">(${r.unit})</span></td>
+          <td>${r.adjustment_type_name}</td>
+          <td>${fmt(r.quantity)}</td>
+          <td>${transferCell}</td>
+          <td>${r.notes || ''}</td>
+        </tr>
+      `;
+    }
+
+    async function loadAllocations() {
+      const params = new URLSearchParams();
+      if (filterRestaurant.value) params.set('restaurant_id', filterRestaurant.value);
+      if (filterMeat.value) params.set('meat_id', filterMeat.value);
+      if (filterDate.value) params.set('business_date', filterDate.value);
+      if (filterType.value) params.set('adjustment_type_id', filterType.value);
+
+      document.getElementById('allocations-table').innerHTML = 'Loading...';
+      const res = await fetch(`/api/allocations?${params.toString()}`);
+      const rows = await res.json();
+
+      if (rows.length === 0) {
+        document.getElementById('allocations-table').innerHTML = '<p class="hint">No allocations match these filters yet.</p>';
+        return;
+      }
+
+      document.getElementById('allocations-table').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Restaurant</th><th>Meat</th><th>Type</th>
+              <th>Qty</th><th>Transfer</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>${rows.map(renderRow).join('')}</tbody>
+        </table>
+      `;
+    }
+
+    document.getElementById('add-allocation').addEventListener('click', async () => {
+      const restaurant_id = Number(newRestaurant.value);
+      const meat_id = Number(newMeat.value);
+      const business_date = newDate.value;
+      const adjustment_type_id = Number(newType.value);
+      const quantity = newQty.value;
+      const notes = newNotes.value.trim();
+
+      if (!restaurant_id || !meat_id || !business_date || !adjustment_type_id || quantity === '') {
+        addStatus.textContent = 'Date, restaurant, meat, type, and quantity are required.';
+        addStatus.className = 'status-message error';
+        return;
+      }
+
+      const type = adjustmentTypes.find(t => String(t.id) === String(adjustment_type_id));
+      const payload = { restaurant_id, meat_id, business_date, adjustment_type_id, quantity, notes: notes || null };
+
+      if (type && type.requires_transfer_locations) {
+        const from_location_id = Number(newFrom.value);
+        const to_location_id = Number(newTo.value);
+        if (!from_location_id || !to_location_id) {
+          addStatus.textContent = `"${type.name}" requires both a from and a to location.`;
+          addStatus.className = 'status-message error';
+          return;
+        }
+        payload.from_location_id = from_location_id;
+        payload.to_location_id = to_location_id;
+      }
+
+      addStatus.textContent = 'Saving...';
+      addStatus.className = 'status-message';
+
+      try {
+        const res = await fetch('/api/allocations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+
+        addStatus.textContent = 'Entry added.';
+        addStatus.className = 'status-message success';
+        newQty.value = '';
+        newNotes.value = '';
+        await loadAllocations();
+      } catch (err) {
+        addStatus.textContent = 'Error: ' + err.message;
+        addStatus.className = 'status-message error';
+      }
+    });
+
+    newRestaurant.addEventListener('change', loadMeatsForNewForm);
+    newType.addEventListener('change', updateTypeUI);
+
+    [filterRestaurant, filterDate, filterType].forEach(el => el.addEventListener('change', loadAllocations));
+    filterRestaurant.addEventListener('change', loadMeatsForFilter);
+    filterMeat.addEventListener('change', loadAllocations);
+    document.getElementById('clear-filters').addEventListener('click', () => {
+      filterRestaurant.value = ''; filterMeat.innerHTML = '<option value="">All</option>';
+      filterDate.value = ''; filterType.value = '';
+      loadAllocations();
+    });
+
+    Promise.all([loadRestaurants(), loadAdjustmentTypes(), loadLocations()]).then(() => {
+      loadMeatsForNewForm();
+      loadAllocations();
+    });
+  </script>
+  <script src="command-panel.js"></script>
+  <script src="commands/sync-batch-stock.js"></script>
+  <script src="commands/oversold-check.js"></script>
+</body>
+</html>

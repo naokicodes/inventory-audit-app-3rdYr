@@ -11,7 +11,7 @@
 const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
-const { migrateStockReceiptsNullableDestination } = require('./migrate.js');
+const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn } = require('./migrate.js');
 
 const DB_PATH = path.join(__dirname, 'inventory.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
@@ -29,6 +29,11 @@ db.exec('PRAGMA foreign_keys = ON');    // enforce FK constraints once tables ex
 // constraint on a table that's already there. No-ops for a fresh install
 // or an already-migrated database. See server/db/migrate.js.
 migrateStockReceiptsNullableDestination(db);
+
+// Step 22 (2026-08-29): same reasoning, smaller migration - adds
+// locations.active for anyone with a pre-existing local locations table
+// from before step 22 gave it an admin UI. See server/db/migrate.js.
+migrateLocationsActiveColumn(db);
 
 // Run schema.sql on every startup. All statements use "CREATE TABLE IF
 // NOT EXISTS" and "INSERT OR IGNORE", so this is safe to re-run every
