@@ -174,23 +174,47 @@ standing constraints, not suggestions — they exist to keep a solo,
       being built on a wrong assumption about what an earlier one
       actually produced — one hop at a time avoids that entirely.
     - **Worker network/git access is currently uneven, not a fixed
-      given.** As of 2026-08-29: only one coder worker has live network
-      + `git` access; the rest don't yet (a locked feature on the
-      project owner's end), expected to unlock incrementally as more
-      tasks complete — roughly around the 10-task mark per worker, not
-      all at once. Until a given worker has it, expect and accept the
-      pattern already established: mirrored-logic tests (same style as
-      `commands.test.js`/`stockReceipts.test.js`) plus a hand-run
-      script that exercises the *real* engine/route code against a real
-      in-memory DB, honestly labeled as a substitute for the live-HTTP
-      check, not a claim that the check happened. A worker without
-      network should NOT try to build its own zip-packaging or
-      git-command sequence unless the project owner explicitly asks for
-      it in that session — that duplicates the architect's own job
-      under this rule and is real overhead for no benefit; just hand
-      back whatever files exist and flag the gap plainly. When a worker
-      *does* have network, it should push directly and skip all of
-      that, per the rest of this rule.
+      given — and "has network" doesn't always mean "can push."** As of
+      2026-08-29: some coder workers have live network + `git` clone
+      access but no push credentials configured (read-only — `git
+      clone`/`git fetch` work, `git push` fails with a credential
+      error); others have no network at all; it's expected to even out
+      incrementally as more tasks complete, roughly around the 10-task
+      mark per worker, not all at once. Until a given worker can
+      actually push, expect and accept the pattern already established:
+      mirrored-logic tests (same style as
+      `commands.test.js`/`stockReceipts.test.js`) plus, when a live
+      server is possible, real HTTP verification against it — honestly
+      labeled either way, never a claim that verification happened when
+      it didn't.
+    - **When push isn't possible for any reason, the deliverable is
+      always the same standard handoff — individual changed/new files,
+      a list of their repo-relative locations, and the exact `git add`
+      / `git commit` commands (with real commit messages already
+      written) for the project owner to run themselves.** Not a git
+      bundle, not a patch file, not any other git mechanism, even
+      though those are technically valid — consistency in what the
+      project owner has to actually do with the output matters more
+      than technical elegance, and this is the format every architect
+      hand-off in this project has used. A worker that discovers push
+      won't work should stop trying alternate git tooling and produce
+      this instead — that applies whether the worker has read-only
+      network access or none at all. Don't build a zip-packaging system
+      or any other alternative unless the project owner explicitly asks
+      for it in that session; just hand back whatever files exist in
+      the standard format and flag the gap plainly.
+    - **Never paste `git` commands (or any shell commands) into the
+      content of a file being handed off — always run them in a
+      terminal, separately from the file's own text.** This actually
+      happened once (2026-08-29): a copy-pasteable command block meant
+      to be run in a terminal got pasted into `session-status.md`'s own
+      content instead, then committed as part of the doc, corrupting
+      its first several lines until a later worker caught it. When
+      applying a file+commands hand-off, the file content and the
+      commands are two separate things — never combine them.
+    - When a worker *does* have both network and push access,
+      it should push directly and skip all of the above, per the rest
+      of this rule.
     - This flow is itself provisional, same spirit as rule 17 — revisit
       if it causes friction, but it's the default until it does.
 
