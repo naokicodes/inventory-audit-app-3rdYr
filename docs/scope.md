@@ -105,13 +105,17 @@ areas, not part of the daily entry screens.
   typing) — interesting later, not now.
 - Any inventory category beyond meat.
 - Extending soft-delete + activity logging to `ending_actual`,
-  `adjustments`, `sales`, `prepped`, and `portion_ending_actual` — deliberately
-  scoped out of the 2026-08-27 change to keep it reviewable; a real next
-  step, not forgotten. `sales` added to this list 2026-08-29 when step
-  16 introduced its first real manual-edit path (`PATCH /api/sales`) —
-  same open question as the others, worth revisiting once there's a
-  second editable table with this need, not decided under step 16's own
-  time budget. **Narrow exception added 2026-08-29 for step 15**:
+  `adjustments`, `sales`, `prepped`, `commissary_stock_receipts`, and
+  `portion_ending_actual` — deliberately scoped out of the 2026-08-27
+  change to keep it reviewable; a real next step, not forgotten.
+  `sales` added to this list 2026-08-29 when step 16 introduced its
+  first real manual-edit path (`PATCH /api/sales`) — same open
+  question as the others, worth revisiting once there's a second
+  editable table with this need, not decided under step 16's own time
+  budget. `commissary_stock_receipts` added 2026-08-29 when step 20a
+  flagged it rather than assuming either way — **same call as
+  `sales`**, not logged for now. **Narrow exception added 2026-08-29
+  for step 15**:
   the "Sync batch stock" command's own writes to `prepped` (and only
   those — it's the sole write path into that table right now, there's no
   manual edit UI for it yet) log a `CREATE`/`SYSTEM` row to
