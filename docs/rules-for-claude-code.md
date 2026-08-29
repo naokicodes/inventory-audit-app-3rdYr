@@ -137,6 +137,45 @@ standing constraints, not suggestions — they exist to keep a solo,
       substitute for rule 16 — the goal is still to size steps so this
       rule rarely gets used.
 
+18. **Distribution flow between the architect conversation and coder
+    workers: worker → architect → worker, one hop at a time — never a
+    batch of pre-written future prompts.** Adopted 2026-08-29, because
+    the architect conversation resets between token budgets and won't
+    remember any of this — these rules are what carries it forward, not
+    the chat history. If you're picking this up fresh with no memory of
+    a prior conversation, this is how the project actually runs:
+    - A coder worker finishes a step, commits, and **pushes to `main`
+      on GitHub** (`https://github.com/naokicodes/inventory-audit-app-3rdYr`)
+      — not a zip handed back, not a WIP left un-pushed, unless rule 17
+      applies and it's honestly labeled `wip:`.
+    - The architect conversation **pulls directly** (`git fetch`/`git
+      pull` — GitHub is reachable from the sandbox) rather than asking
+      the project owner to upload files. Uploading is the fallback only
+      if network access is ever actually broken, not the default.
+    - The architect reviews what landed: checks any decisions the
+      worker flagged rather than deciding alone (this is the payoff of
+      rule 3 and rule 7 — a worker that stops and flags instead of
+      guessing is doing exactly what's asked, and the architect's job
+      is to actually resolve those flags, not just acknowledge them),
+      confirms tests/verification actually happened rather than taking
+      a commit message's word for it, and writes any new decisions into
+      the docs directly (same standing practice as everywhere else in
+      this file).
+    - The architect then packages a **fresh, ready-to-unzip repo**
+      (`node_modules`/`.db` files stripped, matching `.gitignore`) for
+      the *next* worker — not a batch of prompts for steps N, N+1, N+2
+      written in advance. Only the immediately-next step's prompt gets
+      written, after the pull and review above, using the template
+      shape already established in this project's chat history (read
+      `docs/rules-for-claude-code.md`, then `session-status.md`; state
+      plan before coding; verify live, not just mirrored-logic; update
+      `changelog.md` + `session-status.md`; flag rather than assume).
+      Pre-generating several steps' worth of prompts risks a later one
+      being built on a wrong assumption about what an earlier one
+      actually produced — one hop at a time avoids that entirely.
+    - This flow is itself provisional, same spirit as rule 17 — revisit
+      if it causes friction, but it's the default until it does.
+
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.
 - Suggesting a hosted database or cloud deployment.

@@ -1,14 +1,18 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-20a completion).
+Last updated: 2026-08-29 (post step-20a, all confirmed pushed to `main`).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
-so always start here.
+so always start here. **If you're a fresh conversation with no memory of
+prior sessions, also read rule 18 in `rules-for-claude-code.md`** — it
+describes exactly how work moves between coder workers and the
+architect conversation (pull from `main` → review/resolve flagged
+decisions → hand off one fresh repo + one next prompt), which this file
+assumes you already know.
 
-## Where things stand: steps 1–19 done. Steps 1–14 committed and pushed
-to `main`; steps 15–18 committed locally this session, not yet pushed
-(see below).
+## Where things stand: steps 1–20a done, everything pushed to `main` —
+no local-only or uncommitted work anywhere as of 2026-08-29.
 
 - **Steps 1–6**: done, committed, unchanged in a while (schema, audit
   engine, commissary yield engine, Stock Receipts page, Commissary page,
@@ -280,37 +284,23 @@ to `main`; steps 15–18 committed locally this session, not yet pushed
     right shape (13 MEAT rows including Bagnet as FC's own stock item,
     1 DISH row for the Batch-Prepped Chicken Skewers).
 
-Step 20 is split into 20a/20b/20c (see its entry below). **20a (schema
-only) is done** as of 2026-08-29 — six new Commissary tables + one
-preset-lines child table added to `schema.sql`, verified, not yet
-committed to git (uploaded-zip session, no `.git` present). **20b
-(Commissary audit engine + read routes) is next.** Steps 21-22, and the
-rest of step 20 beyond 20a, remain **draft proposals under active
-discussion, not committed or built** — see their entries below for the
-current state of that conversation (Commissary extend-not-migrate and
-its own dedicated shipment page are resolved; the Command terminal page
-and the Landing Allocations merge are still open).
+**Everything through step 20a is on real `main`, pulled and confirmed
+2026-08-29** — steps 10 through 19, all the architecture-discussion docs
+commits (steps 20-22's ongoing design conversation), and step 20a's
+schema addition. No local-only or uncommitted work remains anywhere.
+The two decisions worker 1 flagged from step 20a (no activity-log wiring
+on `commissary_stock_receipts`; preset scoping to one
+`(commissary_meat_id, restaurant_id)` pair) were both reviewed and
+confirmed correct — see the step-20 entry below for detail.
 
-Steps 10–14 are committed and pushed to `main`, independently verified
-(2026-08-29): cloned fresh, confirmed the actual commits are present
-(`7b0c541`/`2ff3032`/`5b31717` for 10–11, `97a5e74`/`98e2c0a`/`0ba4dd1`
-for 12, `e16fd64` for 13, `866da77` for 14), ran the full suite from a
-clean install (green), and live-smoke-tested the opening-stock write
-path (step 12) against a real booted server. The step-12/13/14 "commit
-status unverified" caveat from the prior session is resolved — no need
-to re-check it. **Steps 15 through 19, plus the architecture-discussion
-docs commits for steps 20-22, are done and committed in this session's
-local clone only** — no push credentials available here (same
-limitation noted for steps 10-11 originally). Whoever has git access
-should pull these commits into the real local clone and push before
-handing anything to the standby workers, or they'll be working against
-a `main` that's badly behind what this doc describes. **Step 20a's
-schema change (this session, 2026-08-29) is not committed anywhere** —
-unlike the steps-15-19 session, this session had no `.git` at all (an
-uploaded zip only), so there's nothing to commit to here; whoever has
-git access should apply the `schema.sql` change fresh (it's small and
-additive — see `changelog.md`'s step-20a entry for the exact diff
-description) and commit it before starting 20b.
+**Next up: step 20b** (Commissary audit engine + read routes) — see its
+entry below. Distribution follows rule 18 now: pull from `main`
+directly, review, resolve any flags, write the *single next* worker
+prompt, hand off a fresh repo — not a batch of prompts for several
+steps at once. If you're a fresh session with no memory of how this
+worked in practice, rule 18 in `rules-for-claude-code.md` is the
+complete description; this paragraph is just the current pointer into
+that flow.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -561,6 +551,14 @@ of sizing them correctly, not a separate concern.
       `.git` present, same limitation as steps 12-19's sessions; whoever
       has git access should commit this as-is (it's a complete, tested,
       non-WIP change) before starting 20b.
+      **Both flagged decisions resolved 2026-08-29**: (1) confirmed
+      correct — `commissary_stock_receipts` added to `scope.md`'s
+      deferred-logging list, same treatment as `sales` got in step 16.
+      (2) confirmed correct — the preset scoping matches Remake V3's
+      real layout exactly (one sub-table per destination kitchen, each
+      with several named output lines for that meat→kitchen
+      combination). No schema change needed either way, just wasn't
+      written down explicitly before — now it is.
     - **20b (Commissary audit engine + read routes) — NEXT**: a
       `computeCommissaryMeatAudit`-shaped function mirroring
       `computeMeatAudit`'s beginning/usage/ending/variance shape, but
