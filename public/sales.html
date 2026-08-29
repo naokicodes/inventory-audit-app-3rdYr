@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sales - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Wider than the shared 700px body - this grid has up to 31 day
+       columns plus a dish-name column, so it needs the room. */
+    body { max-width: 1200px; }
+    .grid-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; font-size: 0.85rem; }
+    th, td { border: 1px solid #ddd; padding: 0.3rem; text-align: center; }
+    th { background: #f0f0f0; }
+    td.dish-name, th.dish-name { text-align: left; position: sticky; left: 0; background: #fff; min-width: 10rem; }
+    th.dish-name { background: #f0f0f0; }
+    input[type="number"] { width: 3.5rem; padding: 0.2rem; text-align: right; border: 1px solid #ccc; }
+    input.manual-source { background: #fff; }
+    input.loyverse-source { background: #f5faff; } /* not reachable yet - Loyverse sync isn't built (rule 14) - styled defensively for when it is */
+    .type-badge { font-size: 0.7em; color: #999; }
+    .cell-saving { opacity: 0.5; }
+    .cell-error { background: #fee !important; }
+    .status-message.error { color: crimson; }
+    .status-message.ok { color: green; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="sales.html">Sales</a>
+    <a href="settings.html">Settings</a>
+    <a href="history.html">History</a>
+  </nav>
+
+  <h1>Sales</h1>
+  <p style="color:#666; font-size: 0.85rem;">
+    Manual sales entry, one cell per dish per day. This is the interim
+    path while the Loyverse sync (a later phase) isn't built yet - see
+    <code>docs/data-model.md</code>. Overwriting an already-filled cell
+    asks for confirmation first.
+  </p>
+
+  <div class="controls">
+    <label>
+      Restaurant
+      <select id="restaurant"></select>
+    </label>
+    <label>
+      Month
+      <input type="month" id="month-input">
+    </label>
+  </div>
+
+  <div id="grid-container" class="grid-scroll">Loading...</div>
+
+  <span id="status" class="status-message"></span>
+
+  <script>
+    const restaurantSelect = document.getElementById('restaurant');
+    const monthInput = document.getElementById('month-input');
+    const gridContainer = document.getElementById('grid-container');
+    const statusEl = document.getElementById('status');
+
+    // Default to the current month, matching daily-audit.html's
+    // default-to-today pattern for its date input.
+    monthInput.value = new Date().toISOString().slice(0, 7);
+
+    async function loadRestaurants() {
+      const res = await fetch('/api/restaurants');
+      const restaurants = await res.json();
+      restaurantSelect.innerHTML = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+    }
+
+    function setStatus(msg, kind) {
+      statusEl.textContent = msg;
+      statusEl.className = `status-message ${kind || ''}`;
+    }
+
+    function dishLabel(d) {
+      return `${d.dish_code} - ${d.name} <span class="type-badge">(${d.prep_type === 'BATCH_PREPPED' ? 'batch' : 'direct'})</span>`;
+    }
+
+    // Renders the grid from a GET /api/sales response. Each cell's
+    // input carries data-dish-id/data-date/data-original (the currently
+    // saved quantity, '' if the cell was empty) so a later edit can
+    // compare against what was actually saved, not just what's
+    // currently typed - needed for the "was this cell already filled"
+    // confirm-prompt check below.
+    function renderGrid(data) {
+      const dateKeys = Object.keys(data.dishes[0]?.days || {});
+      // Fallback: build date keys directly if there are zero dishes yet,
+      // so the header still renders correctly with no data rows.
+      const days = dateKeys.length ? dateKeys : Array.from(
+        { length: data.days_in_month },
+        (_, i) => `${data.year}-${String(data.month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
+      );
+
+      const headerCells = days.map(d => `<th>${Number(d.slice(-2))}</th>`).join('');
+
+      const rows = data.dishes.map(dish => {
+        const cells = days.map(date => {
+          const cell = dish.days[date];
+          const value = cell ? cell.quantity : '';
+          const source = cell ? cell.source : 'MANUAL';
+          const sourceClass = source === 'MANUAL' ? 'manual-source' : 'loyverse-source';
+          const title = cell ? `${date} - ${source}` : date;
+          return `<td><input type="number" step="0.01" min="0" class="${sourceClass}"
+            data-dish-id="${dish.dish_id}" data-date="${date}"
+            data-original="${value}" value="${value}" title="${title}"></td>`;
+        }).join('');
+        return `<tr><td class="dish-name">${dishLabel(dish)}</td>${cells}</tr>`;
+      }).join('');
+
+      gridContainer.innerHTML = `
+        <table>
+          <thead><tr><th class="dish-name">Dish</th>${headerCells}</tr></thead>
+          <tbody>${rows || `<tr><td class="dish-name" colspan="${days.length + 1}">No active dishes for this restaurant.</td></tr>`}</tbody>
+        </table>
+      `;
+
+      gridContainer.querySelectorAll('input[data-dish-id]').forEach(input => {
+        input.addEventListener('change', onCellChange);
+      });
+    }
+
+    async function loadGrid() {
+      const restaurantId = restaurantSelect.value;
+      const [year, month] = monthInput.value.split('-').map(Number);
+      if (!restaurantId || !year || !month) return;
+
+      gridContainer.innerHTML = 'Loading...';
+      setStatus('', '');
+      try {
+        const res = await fetch(`/api/sales?restaurant_id=${restaurantId}&year=${year}&month=${month}`);
+        if (!res.ok) throw new Error((await res.json()).error || 'Failed to load');
+        const data = await res.json();
+        renderGrid(data);
+      } catch (err) {
+        gridContainer.innerHTML = '';
+        setStatus(`Error loading grid: ${err.message}`, 'error');
+      }
+    }
+
+    // A cell "override" is any edit to a cell that already had a saved
+    // value (data-original is non-empty) - whether the new value is a
+    // different number or blank (clearing it). A brand-new entry into a
+    // previously-empty cell never prompts. Cancelling reverts the input
+    // to its last-saved value, not just the pre-edit DOM value, so a
+    // rejected override can't leave the input showing something never
+    // actually saved.
+    async function onCellChange(e) {
+      const input = e.target;
+      const original = input.dataset.original;
+      const typed = input.value;
+
+      const isOverride = original !== '' && typed !== original;
+      if (isOverride) {
+        const dateLabel = input.dataset.date;
+        const from = original;
+        const to = typed === '' ? '(cleared)' : typed;
+        const confirmed = confirm(`Overwrite ${dateLabel}'s sales entry?\n\nCurrent: ${from}\nNew: ${to}`);
+        if (!confirmed) {
+          input.value = original;
+          return;
+        }
+      }
+
+      const quantity = typed === '' ? null : Number(typed);
+      input.classList.add('cell-saving');
+      input.classList.remove('cell-error');
+      try {
+        const res = await fetch('/api/sales', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            restaurant_id: Number(restaurantSelect.value),
+            dish_id: Number(input.dataset.dishId),
+            business_date: input.dataset.date,
+            quantity
+          })
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || 'Save failed');
+        input.dataset.original = quantity === null ? '' : String(quantity);
+        setStatus('Saved.', 'ok');
+      } catch (err) {
+        input.classList.add('cell-error');
+        input.value = original;
+        setStatus(`Save failed: ${err.message}`, 'error');
+      } finally {
+        input.classList.remove('cell-saving');
+      }
+    }
+
+    restaurantSelect.addEventListener('change', loadGrid);
+    monthInput.addEventListener('change', loadGrid);
+
+    (async function init() {
+      await loadRestaurants();
+      await loadGrid();
+    })();
+  </script>
+  <script src="command-panel.js"></script>
+  <script src="commands/sync-batch-stock.js"></script>
+  <script src="commands/oversold-check.js"></script>
+</body>
+</html>
