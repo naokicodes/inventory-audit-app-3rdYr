@@ -1269,6 +1269,13 @@ untouched. Nothing here is currently urgent.
    `restaurant_id` already scopes restaurant data), not something
    special-cased once. Not designed yet, but the direction is settled;
    don't reopen "should restaurants get their own yield table."
+   **Confirmed non-blocking, 2026-08-29**: nothing currently planned
+   depends on this, including Restaurant C (Likod) onboarding — Likod
+   is co-located with Commissary too, so it'll use the exact same
+   single-Commissary model Restaurant A already does. Safe to leave
+   purely as a documented future idea indefinitely; only matters if a
+   genuinely new, physically separate site ever needs its own
+   on-site processing.
 
 4. **[Partially done, 2026-08-29] A dedicated cleanup pass is owed.**
    First real find and fix: `commissary_meat_map`'s "full retirement"
