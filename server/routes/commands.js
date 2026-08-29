@@ -17,11 +17,16 @@ const router = express.Router();
 // running portion balance (portionBeginning + prepped - sold) that
 // computeDishAudit computes - see the interpretation note in
 // docs/session-status.md's step 18 entry for why: portionBeginning
-// depends on portion_ending_actual, which has no write path anywhere in
-// the app yet (step 11), so it's null for virtually every dish/date
-// right now and a check built on it would be dead code today. This
-// version is meaningful immediately and can be widened later once a
-// portion-count entry UI exists.
+// depended on portion_ending_actual, which had no write path anywhere
+// in the app at the time (step 11), so it was null for virtually every
+// dish/date and a check built on it would have been dead code then.
+// UPDATE 2026-08-29: that write path now exists
+// (POST /api/daily-audit/portions) - this interpretation choice is no
+// longer forced by a missing capability, just still the current
+// behavior. Worth a real revisit (should this check use the fuller
+// running balance now that it can?), not done here - flagging it
+// rather than changing this route's behavior as a side effect of an
+// unrelated task.
 //
 // Read-only - never writes anything, matching "surface as a WARNING,
 // not a hard block." Global, same reasoning as sync-batch-stock: the
