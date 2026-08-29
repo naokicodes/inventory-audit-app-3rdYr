@@ -42,7 +42,6 @@
     <button data-section="meats" class="active">Meats</button>
     <button data-section="dishes">Dishes</button>
     <button data-section="recipes">Recipes</button>
-    <button data-section="commissary-mapping">Commissary Mapping</button>
     <button data-section="adjustment-types">Adjustment Types</button>
     <button data-section="locations">Locations</button>
   </div>
@@ -86,17 +85,6 @@
       <button id="add-recipe">Add Ingredient Line</button>
     </div>
     <div id="recipes-table">Loading...</div>
-  </section>
-
-  <section id="section-commissary-mapping" class="section-panel">
-    <h2>Commissary Mapping</h2>
-    <small class="hint">Maps a commissary meat (the centrally-received/processed item) to this restaurant's own meat item. Required before this restaurant can receive commissary stock for that meat. No edit for v1 - a wrong mapping is delete + re-add.</small>
-    <div class="add-form">
-      <label>Commissary Meat <select id="mapping-commissary-meat"></select></label>
-      <label>This Restaurant's Meat <select id="mapping-meat"></select></label>
-      <button id="add-mapping">Add Mapping</button>
-    </div>
-    <div id="commissary-mapping-table">Loading...</div>
   </section>
 
   <section id="section-adjustment-types" class="section-panel">
@@ -199,7 +187,7 @@
       document.getElementById('meat-code').value = '';
       document.getElementById('meat-name').value = '';
       document.getElementById('meat-cost').value = '';
-      loadMeats(); loadRecipeDropdowns(); loadCommissaryMappingDropdowns();
+      loadMeats(); loadRecipeDropdowns();
     });
 
     // ---------- DISHES ----------
@@ -316,55 +304,6 @@
       });
       document.getElementById('recipe-qty').value = '';
       loadRecipes();
-    });
-
-    // ---------- COMMISSARY MAPPING ----------
-    async function loadCommissaryMappingDropdowns() {
-      const [commissaryMeatsRes, meatsRes] = await Promise.all([
-        fetch('/api/commissary/meats'),
-        fetch(`/api/settings/meats?restaurant_id=${currentRestaurantId}`)
-      ]);
-      const commissaryMeats = await commissaryMeatsRes.json();
-      const meats = await meatsRes.json();
-      document.getElementById('mapping-commissary-meat').innerHTML =
-        commissaryMeats.map(cm => `<option value="${cm.id}">${cm.code} - ${cm.name}</option>`).join('');
-      document.getElementById('mapping-meat').innerHTML =
-        meats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('');
-    }
-
-    async function loadCommissaryMappings() {
-      const res = await fetch(`/api/settings/commissary-mappings?restaurant_id=${currentRestaurantId}`);
-      const rows = await res.json();
-      document.getElementById('commissary-mapping-table').innerHTML = `
-        <table>
-          <thead><tr><th>Commissary Meat</th><th>This Restaurant's Meat</th><th></th></tr></thead>
-          <tbody>${rows.map(r => `
-            <tr>
-              <td>${r.commissary_meat_code} - ${r.commissary_meat_name}</td>
-              <td>${r.meat_code} - ${r.meat_name}</td>
-              <td><button data-id="${r.id}" class="mapping-delete">Remove</button></td>
-            </tr>
-          `).join('')}</tbody>
-        </table>
-      `;
-      document.querySelectorAll('.mapping-delete').forEach(el => el.addEventListener('click', async (e) => {
-        if (!confirm('Remove this mapping? (A wrong mapping is delete + re-add, no edit.)')) return;
-        await fetch(`/api/settings/commissary-mappings/${e.target.dataset.id}`, { method: 'DELETE' });
-        loadCommissaryMappings();
-      }));
-    }
-
-    document.getElementById('add-mapping').addEventListener('click', async () => {
-      const commissary_meat_id = document.getElementById('mapping-commissary-meat').value;
-      const meat_id = document.getElementById('mapping-meat').value;
-      if (!commissary_meat_id || !meat_id) return alert('Both a commissary meat and a restaurant meat are required.');
-      const res = await fetch('/api/settings/commissary-mappings', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurant_id: currentRestaurantId, commissary_meat_id, meat_id })
-      });
-      const result = await res.json();
-      if (!result.ok) return alert(result.error);
-      loadCommissaryMappings();
     });
 
     // ---------- ADJUSTMENT TYPES ----------
@@ -488,12 +427,10 @@
     restaurantSelect.addEventListener('change', () => {
       currentRestaurantId = restaurantSelect.value;
       loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
-      loadCommissaryMappingDropdowns(); loadCommissaryMappings();
     });
 
     loadRestaurants().then(() => {
       loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
-      loadCommissaryMappingDropdowns(); loadCommissaryMappings();
     });
   </script>
   <script src="command-panel.js"></script>
