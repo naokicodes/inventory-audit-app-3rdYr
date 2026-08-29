@@ -1,6 +1,6 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-14 completion).
+Last updated: 2026-08-29 (post step-20a completion).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -280,14 +280,16 @@ to `main`; steps 15–18 committed locally this session, not yet pushed
     right shape (13 MEAT rows including Bagnet as FC's own stock item,
     1 DISH row for the Batch-Prepped Chicken Skewers).
 
-Steps 20-22 remain **draft proposals under active discussion, not
-committed or built** — see their entries below for the current state of
-that conversation (Commissary extend-not-migrate and its own dedicated
-shipment page are resolved; the Command terminal page and the Landing
-Allocations merge are still open). **Next up, once architecture
-discussion wraps**: either continue steps 20-22 into real schema/code,
-or hand the 7 standby workers something else — project owner's call,
-not decided here.
+Step 20 is split into 20a/20b/20c (see its entry below). **20a (schema
+only) is done** as of 2026-08-29 — six new Commissary tables + one
+preset-lines child table added to `schema.sql`, verified, not yet
+committed to git (uploaded-zip session, no `.git` present). **20b
+(Commissary audit engine + read routes) is next.** Steps 21-22, and the
+rest of step 20 beyond 20a, remain **draft proposals under active
+discussion, not committed or built** — see their entries below for the
+current state of that conversation (Commissary extend-not-migrate and
+its own dedicated shipment page are resolved; the Command terminal page
+and the Landing Allocations merge are still open).
 
 Steps 10–14 are committed and pushed to `main`, independently verified
 (2026-08-29): cloned fresh, confirmed the actual commits are present
@@ -302,7 +304,13 @@ local clone only** — no push credentials available here (same
 limitation noted for steps 10-11 originally). Whoever has git access
 should pull these commits into the real local clone and push before
 handing anything to the standby workers, or they'll be working against
-a `main` that's badly behind what this doc describes.
+a `main` that's badly behind what this doc describes. **Step 20a's
+schema change (this session, 2026-08-29) is not committed anywhere** —
+unlike the steps-15-19 session, this session had no `.git` at all (an
+uploaded zip only), so there's nothing to commit to here; whoever has
+git access should apply the `schema.sql` change fresh (it's small and
+additive — see `changelog.md`'s step-20a entry for the exact diff
+description) and commit it before starting 20b.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -533,18 +541,34 @@ of sizing them correctly, not a separate concern.
 
     **Split into three sequential sub-steps for handoff — too large for
     one session, per rule 16's step-sizing philosophy**:
-    - **20a (schema only)**: add the six new tables above to
-      `schema.sql`. No engine, no routes, no UI. Testable in isolation —
-      schema creates cleanly, FKs resolve, a fresh `seed.js` run still
-      works unchanged.
-    - **20b (Commissary audit engine + read routes)**: a
+    - **20a [Done, 2026-08-29] (schema only)**: added the six new tables
+      (+ one preset-lines child table = 7 total) to `schema.sql`. No
+      engine, no routes, no UI. Verified: schema creates cleanly in an
+      in-memory DB, all FKs resolve, `commissary_meat_map` confirmed
+      untouched, a fresh `seed.js` run (twice, confirming idempotency)
+      works unchanged, and the full existing test suite re-run at 9/9
+      files green (110/110 assertions, 0 regressions) — expected, since
+      nothing existing references these new tables yet. Two decisions
+      flagged for the architect conversation rather than assumed
+      unilaterally, see `changelog.md`'s step-20a entry: (1)
+      `commissary_stock_receipts` deliberately has no `deleted_at`/
+      activity-log wiring, since rule 9 scopes that pattern to
+      `stock_receipts`/`commissary_yield_log` only; (2)
+      `commissary_shipment_presets` was scoped to one
+      `(commissary_meat_id, restaurant_id)` pair, inferred from Remake
+      V3's layout — the draft below never states this explicitly. Not
+      committed to git this session — worked from an uploaded zip, no
+      `.git` present, same limitation as steps 12-19's sessions; whoever
+      has git access should commit this as-is (it's a complete, tested,
+      non-WIP change) before starting 20b.
+    - **20b (Commissary audit engine + read routes) — NEXT**: a
       `computeCommissaryMeatAudit`-shaped function mirroring
       `computeMeatAudit`'s beginning/usage/ending/variance shape, but
       with Stock In and Backed Up as two separate inflows and usage
       summed across all destination shipments for that meat/date
       (`commissary_shipments.total_quantity`, not sales×recipe). A GET
-      route exposing it, mirroring `dailyAudit.js`'s pattern. Depends on
-      20a existing.
+      route exposing it, mirroring `dailyAudit.js`'s pattern. 20a's
+      tables now exist and are ready to build on.
     - **20c (shipment logging: write route + page)**: `POST` route
       creating one `commissary_shipments` row + N
       `commissary_shipment_lines` rows in one transaction, each line

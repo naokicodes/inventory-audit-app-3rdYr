@@ -258,6 +258,121 @@ CREATE TABLE IF NOT EXISTS commissary_yield_log (
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id)
 );
 
+-- Step 20a (2026-08-29, schema only - see docs/session-status.md step 20):
+-- Commissary's own Landing-style audit tables. No engine/routes/UI yet -
+-- these tables aren't referenced anywhere else in the app as of this
+-- commit. commissary_meat_map above is deliberately left untouched (see
+-- step 20's "commissary_meat_map's fate" note in session-status.md) - it
+-- becomes vestigial once commissary_shipment_lines exists, but isn't
+-- deleted, repurposed, or schema-changed here.
+
+-- commissary_ending_actual: mirrors ending_actual - the real physical
+-- count at the commissary, one per commissary meat per day.
+CREATE TABLE IF NOT EXISTS commissary_ending_actual (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,
+  business_date TEXT NOT NULL,    -- ISO format YYYY-MM-DD
+  quantity REAL NOT NULL,
+  notes TEXT,
+  photo_path TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  UNIQUE (commissary_meat_id, business_date)
+);
+
+-- commissary_opening_stock: mirrors opening_stock (step 12's pattern) -
+-- one-time first-ever beginning value per commissary meat. Every day
+-- after derives from the prior day's commissary_ending_actual.
+CREATE TABLE IF NOT EXISTS commissary_opening_stock (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,
+  business_date TEXT NOT NULL,    -- the first date this app tracks this meat
+  quantity REAL NOT NULL,
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  UNIQUE (commissary_meat_id)
+);
+
+-- commissary_stock_receipts: raw meat arriving at Commissary from an
+-- outside supplier ("Stock In"). Distinct from stock_receipts, which is
+-- restaurant-facing - this is Commissary receiving, not a restaurant
+-- receiving. NOT soft-deleted / not activity_log-scoped here: rule 9 in
+-- rules-for-claude-code.md names only stock_receipts and
+-- commissary_yield_log for that pattern and explicitly warns against
+-- silently extending it to other tables - flagged for the architect
+-- conversation rather than assumed.
+CREATE TABLE IF NOT EXISTS commissary_stock_receipts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,
+  business_date TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  notes TEXT,
+  photo_path TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id)
+);
+
+-- commissary_shipments: one row per outbound batch from Commissary to a
+-- destination restaurant. total_quantity feeds the top table's matching
+-- "[Kitchen]-Out" column (Remake V3) and thus Commissary's own usage.
+CREATE TABLE IF NOT EXISTS commissary_shipments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,
+  restaurant_id INTEGER NOT NULL,   -- destination
+  business_date TEXT NOT NULL,
+  total_quantity REAL NOT NULL,
+  notes TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
+);
+
+-- commissary_shipment_lines: the named-portion breakdown of a shipment
+-- (e.g. Jowl -> Bagnet/Sisig/Sinigang/Dinuguan for FC). meat_id is the
+-- DESTINATION restaurant's own meat row, not a commissary meat. No
+-- enforced reconciliation against the parent shipment's total_quantity -
+-- informational only (different units on each side; see step 20's
+-- reasoning in session-status.md). Each line writing a normal
+-- stock_receipts row for the destination is step 20c's job (write
+-- route), not this schema step.
+CREATE TABLE IF NOT EXISTS commissary_shipment_lines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shipment_id INTEGER NOT NULL,
+  meat_id INTEGER NOT NULL,         -- destination restaurant's own meat
+  quantity REAL NOT NULL,
+  FOREIGN KEY (shipment_id) REFERENCES commissary_shipments(id),
+  FOREIGN KEY (meat_id) REFERENCES meats(id)
+);
+
+-- commissary_shipment_presets: settings-managed "quick formulas" for the
+-- shipment entry form - pure autofill, never authoritative (the auditor
+-- can always change every number before saving). Scoped to one
+-- (commissary_meat_id, restaurant_id) pair, inferred from Remake V3's
+-- "one sub-table per destination kitchen" layout - the draft in
+-- session-status.md didn't state this explicitly, flagged for review.
+CREATE TABLE IF NOT EXISTS commissary_shipment_presets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,
+  restaurant_id INTEGER NOT NULL,   -- destination this preset targets
+  name TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
+);
+
+-- commissary_shipment_preset_lines: the preset's own named-portion
+-- breakdown, mirroring commissary_shipment_lines' shape.
+CREATE TABLE IF NOT EXISTS commissary_shipment_preset_lines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  preset_id INTEGER NOT NULL,
+  meat_id INTEGER NOT NULL,
+  default_quantity REAL NOT NULL,
+  FOREIGN KEY (preset_id) REFERENCES commissary_shipment_presets(id),
+  FOREIGN KEY (meat_id) REFERENCES meats(id)
+);
+
 -- Loyverse name resolution (see docs/loyverse-sync.md) - created now since
 -- it's simple and referenced by the sync doc, even though sync itself is
 -- a later phase. Empty until that phase, no harm in having it exist.

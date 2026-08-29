@@ -11,6 +11,72 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 20a: Commissary schema (six new tables + one child)
+`server/db/schema.sql` only — no engine, routes, or UI, per step 20a's
+own scope. Worked from an uploaded zip (no `.git` in the sandbox, no
+network for `git clone`/`npm install`), same limitation noted on several
+recent sessions.
+
+Added, appended to the end of section 10 (after `commissary_yield_log`,
+before the Loyverse block) — `commissary_meat_map` left completely
+untouched, not even reordered around, per step 20's "commissary_meat_map's
+fate" note:
+
+- `commissary_ending_actual` — mirrors `ending_actual`.
+- `commissary_opening_stock` — mirrors `opening_stock` (step 12's pattern).
+- `commissary_stock_receipts` — Commissary's own "Stock In" from an
+  outside supplier, distinct from the restaurant-facing `stock_receipts`.
+  **Decision flagged for the architect conversation, not assumed**: no
+  soft-delete/`activity_log` wiring on this table (schema-level: no
+  `deleted_at` column) — rule 9 in `rules-for-claude-code.md` names only
+  `stock_receipts` and `commissary_yield_log` for that pattern and warns
+  against silently extending it; step 20's draft didn't say this table
+  "mirrors `stock_receipts`," just that it's analogous in purpose.
+- `commissary_shipments` — one row per outbound batch to a destination
+  restaurant, matching the draft's `(id, commissary_meat_id,
+  restaurant_id, business_date, total_quantity, notes, ...)` skeleton
+  plus `created_by`/`created_at` for consistency with every other input
+  table in the schema.
+- `commissary_shipment_lines` — the named-portion breakdown per shipment;
+  `meat_id` is the *destination* restaurant's own meat row. No
+  reconciliation constraint against the parent's `total_quantity` (matches
+  the draft: informational only, different units on each side).
+- `commissary_shipment_presets` + `commissary_shipment_preset_lines` (the
+  "+preset lines child table") — settings-managed autofill for the future
+  shipment form. **Flagged, not fully resolved by the docs**: scoped each
+  preset to one `(commissary_meat_id, restaurant_id)` pair, inferred from
+  Remake V3's "one sub-table per destination kitchen" layout — the step
+  20 draft never states this explicitly, worth a second look.
+
+**Verified**:
+- Schema loads cleanly in an in-memory `DatabaseSync`, same style the
+  existing test files already use — all 7 new tables present, FKs
+  resolve correctly (`commissary_ending_actual`/`commissary_opening_stock`/
+  `commissary_stock_receipts` → `commissary_meats`;
+  `commissary_shipments`/`commissary_shipment_presets` →
+  `commissary_meats` + `restaurants`; `commissary_shipment_lines`/
+  `commissary_shipment_preset_lines` → their parent + `meats`).
+  `commissary_meat_map` confirmed still present, unmodified.
+- `node server/db/seed.js` run fresh against a deleted `inventory.db`:
+  succeeded unchanged (11/39/23 for Restaurant A, 13/34/35 for FC, 14
+  commissary meats), then run a second time confirming idempotency (0
+  inserted across the board) — same pattern used to verify step 19.
+- Full existing test suite re-run, each file individually (this repo's
+  `node:test`/`node:sqlite` incompatibility means every `.test.js` is a
+  standalone script, not a `node --test` run — see the auditEngine.test.js
+  header comment and the 2026-08-25-adjacent changelog entry on this):
+  all 9 files green, 110/110 assertions passing, 0 failures, no
+  regressions. This step touches no code any existing test exercises, so
+  this was expected, not just hoped for.
+
+Not done (deliberately, per step 20a's own scope): no
+`computeCommissaryMeatAudit`-shaped engine function (step 20b), no
+shipment-logging write route or page (step 20c), no admin CRUD for
+presets. `commissary_meat_map` is now vestigial-in-waiting but not
+touched, deleted, or repurposed.
+
+---
+
 ## 2026-08-29 — Step 19: Restaurant B (FC) onboarding
 New `server/db/seed-data-B.json`, extracted directly from
 `FC_MasterAudit.xlsx` via `openpyxl` (not hand-typed, not guessed):
