@@ -776,24 +776,89 @@ of sizing them correctly, not a separate concern.
     additive on top, not a prerequisite. Sequencing is the project
     owner's call.
 
-21. **[Draft proposal, under active discussion — not committed] A
-    second, bigger Command surface: a dedicated console/terminal page,
-    separate from the step-14 floating widget.** Requested 2026-08-29.
-    The floating panel (steps 14/15/18) stays exactly as it is — quick,
-    single-click, "any tab" micro-actions. This is a *different*,
-    full-page surface for people who'd rather type than click through
-    forms, aimed specifically at Commissary's shipment logging first
-    (Commissary is "more dynamic" than the restaurants, which are "more
-    on the static side" — project owner's framing) — not a general
-    command line for every screen on day one. **Design constraint, not
-    yet built**: the terminal must call the *same* backend endpoints the
-    GUI forms do — as of step 20c, that means the real
-    `POST /api/commissary/shipments` route (`server/routes/commissary.js`),
-    not a hypothetical future one — so it's a second input surface on
-    one data path, never a
-    parallel system that could drift out of sync with what the forms
-    write. Command syntax, autocomplete, and history are all
-    undesigned — this is a placeholder for the idea, not a spec.
+21. **[Design resolved 2026-08-29, not yet built] A second, bigger
+    Command surface: a dedicated console/terminal page, separate from
+    the step-14 floating widget.** Requested 2026-08-29. The floating
+    panel (steps 14/15/18) stays exactly as it is — quick, single-click,
+    "any tab" micro-actions. This is a *different*, full-page surface
+    for people who'd rather type than click through forms, aimed
+    specifically at Commissary's shipment logging first (Commissary is
+    "more dynamic" than the restaurants, which are "more on the static
+    side" — project owner's framing) — not a general command line for
+    every screen on day one.
+
+    **Standing constraint, unchanged**: the terminal must call the
+    *same* backend endpoint the GUI form does — the real
+    `POST /api/commissary/shipments` route (`server/routes/commissary.js`)
+    added in step 20c — so it's a second input surface on one data path,
+    never a parallel system that could drift out of sync with what the
+    form writes. No new backend route is expected for this step; if a
+    session finds it genuinely needs one, flag it rather than adding it
+    unilaterally.
+
+    **Command style — RESOLVED 2026-08-29**: Discord-slash-command style,
+    not strict CLI-flag syntax and not a separate multi-screen wizard.
+    One input line; a hint bar above it and a filtering dropdown update
+    live as the user types, based on which "slot" the cursor is
+    currently in. This is a small state machine keyed on token position,
+    not a natural-language parser — no grammar/synonym handling needed.
+
+    **Slot sequence for the `ship` command** (the only command this step
+    builds):
+    1. `ship` — literal keyword, typing it opens the command.
+    2. `<commissary-meat>` — dropdown of active commissary meats (Jowl,
+       Whole Chicken, ...), filtered as the user types.
+    3. `<restaurant>` — dropdown of destination restaurants (FC,
+       Silingan, Likod once onboarded), filtered as the user types.
+    4. `<total-qty>` — free-numeric entry, no dropdown.
+    5. One or more `<line-name>:<qty>` pairs — **prefilled from
+       `commissary_shipment_presets`** for the
+       `(commissary_meat_id, restaurant_id)` pair already chosen in
+       slots 2–3 (e.g. once Jowl+FC are picked, the hint bar already
+       shows `bagnet:_ sisig:_ sinigang:_ dng:_` as fillable slots
+       instead of the user having to know or type the names). The
+       auditor can still add a line name the preset doesn't have, or
+       drop one it does — presets are autofill, never enforced, same
+       principle as the GUI form.
+    6. Enter submits the finished line to
+       `POST /api/commissary/shipments`, exactly the payload shape the
+       GUI form already sends. A malformed or unmatched token at any
+       slot keeps the hint bar showing that slot's expected type/options
+       rather than silently guessing — the user corrects that token and
+       continues, they don't restart the line.
+
+    **Scope for v1 — RESOLVED 2026-08-29**: `ship` only. The existing
+    step-15/18 floating-panel commands (sync-batch-stock, oversold-check)
+    are **not** ported into the terminal — the floating panel already
+    serves those well as single-click actions, and folding them in now
+    would mean a second, differently-shaped slot sequence per command
+    for no real UX gain. Revisit only if real usage shows people
+    actually want more command coverage here.
+
+    **History — RESOLVED 2026-08-29**: in scope for v1, not deferred.
+    Up-arrow recalls recent submitted commands (in-memory or
+    localStorage, no backend storage) — cheap enough that there's no
+    reason to split it out as its own follow-up.
+
+    **Autocomplete/hint-bar — RESOLVED 2026-08-29**: this is not a
+    separate polish item to defer; it *is* the feature that makes the
+    Discord-style approach work instead of being a bare text box. Ships
+    with the first build, not after.
+
+    **Split into two sequential sub-steps for handoff, same pattern as
+    step 20**:
+    - **21a (terminal shell + slot state machine, no live submission
+      yet)**: new `public/terminal.html` (or similar) with the input
+      line, hint bar, dropdown, and slot-position tracking wired for the
+      `ship` command's five slot types above, plus up-arrow history.
+      Submitting a complete line can `console.log` the assembled payload
+      for now rather than actually calling the API — mirrors step 14's
+      "prove the plumbing works before the real command" pattern. No
+      backend changes.
+    - **21b (real submission + preset-prefill)**: wires the completed
+      `ship` line to the actual `POST /api/commissary/shipments` call,
+      and wires slot 5's prefill to `commissary_shipment_presets` for
+      the chosen meat+restaurant pair. Depends on 21a existing.
 
 22. **[Draft proposal, under active discussion — not committed] Merge
     Landing's In-House/Wastage/Other into one read-only "Allocations"
