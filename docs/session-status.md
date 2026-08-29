@@ -1,23 +1,18 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (step 21a and 21b both Done — the full `ship`
-terminal now performs a real write. 21a's worker handoff was
-independently verified live by the architect session (real server boot,
-fresh full-suite re-run, payload shape checked against the actual route
-code); a persistent slot guide was added on top the same day. 21b (real
-`POST /api/commissary/shipments` submission + preset-prefill from
-`commissary_shipment_presets`) was then built and verified live by the
-architect session directly — real preset created via the API, a
-complete `vm`-driven script run against the real server confirmed a
-successful submission actually writes `commissary_shipments`/
-`commissary_shipment_lines`/`stock_receipts` rows, and a server-side
-rejection is surfaced correctly without losing the typed line. Only a
-real browser click-through remains genuinely open for both 21a and 21b
-— see step 21's entry below for the full breakdown. An AutoCAD-style
-docked-bar layout was discussed and deferred, not built, until logic
-work is settled. Steps 1–20 remain fully done, including the
-`commissary_shipment_presets` piece — confirmed pushed and verified
-live in an earlier session).
+Last updated: 2026-08-29 (step 22 — Landing Allocations merge — Done.
+Built and verified live by the architect session: minimal admin CRUD
+for both `adjustment_types` and `locations` (the latter had zero rows
+and no admin path — flagged and resolved with the project owner before
+building, not assumed), a new append-only Allocations page/route
+replacing Landing's old three-box adjustment entry, and Landing's meat
+row now shows one read-only `Adjustments` cell. A real bug (a dead
+helper referencing an undefined variable in settings.html) was caught
+and fixed before the live verification pass, not shipped. Full backend
+suite: 165/165, 0 regressions, including a new allocations.test.js.
+Only a real browser click-through remains genuinely open. Steps 1–21
+remain fully done — see each step's own entry for its own verification
+detail).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -48,16 +43,13 @@ dead-simple per `daily-workflow.md`, but the admin side should let the
 project owner define new things — conversions, categories, presets —
 without a developer, a theme running through steps 20-22 alike).
 
-## Where things stand: steps 1–21 done (presets closed out 2026-08-29,
-minus its own explicitly-deferred authoring UI — see below), everything
-confirmed pushed to `main` and verified. **Step 21 (both 21a and 21b) is
-Done** — the terminal page performs real shipment writes, verified live
-end-to-end by the architect session against a real server and real
-database, not just mirror-tested. An AutoCAD-style docked-bar layout
-pass was discussed and deliberately deferred (see step 21's entry).
-**Next up is step 22** (Landing Allocations merge — still draft/under
-discussion, see its own entry below) or a fresh step, project owner's
-call.
+## Where things stand: steps 1–22 done, everything confirmed pushed to
+`main` and verified (step 22 verified live by the architect session
+directly, not yet pushed at the time of writing — see its own entry
+below for the exact commit boundary). An AutoCAD-style docked-bar
+layout for the terminal was discussed and deliberately deferred (see
+step 21's entry) — not started. **No step is currently queued next** —
+project owner's call on what comes after step 22.
 
 **Step 20 is now fully closed out, including the
 `commissary_shipment_presets` piece 20c deferred.** New this session:
@@ -1026,44 +1018,132 @@ of sizing them correctly, not a separate concern.
       work is settled, not before — this note exists so it isn't
       silently dropped, not as a signal to start it next.
 
-22. **[Draft proposal, under active discussion — not committed] Merge
-    Landing's In-House/Wastage/Other into one read-only "Allocations"
-    cell, fed by a new dedicated Allocations page.** Requested
-    2026-08-29, framed explicitly as "do to Adjustments what the
-    2026-08-27 change already did to New Stock" — move detailed entry
-    off Landing onto its own page, Landing shows a read-only sum.
+22. **[Done, 2026-08-29 — built and verified live by the architect
+    session] Merge Landing's In-House/Wastage/Other into one read-only
+    "Allocations" cell, fed by a new dedicated Allocations page.**
+    Requested 2026-08-29, framed explicitly as "do to Adjustments what
+    the 2026-08-27 change already did to New Stock" — move detailed
+    entry off Landing onto its own page, Landing shows a read-only sum.
 
-    **Confirmed by reading the actual code, not assumed**: this is
-    smaller than it sounds. `computeMeatAudit` already only ever
-    produces *one* summed `adjustments` number
+    **Confirmed by reading the actual code before building anything**:
+    this was smaller than it sounded. `computeMeatAudit` already only
+    ever produced *one* summed `adjustments` number
     (`SUM(quantity) FROM adjustments WHERE ...`) — Landing's three boxes
-    are a frontend-only illusion. Each one silently writes to one
+    were a frontend-only illusion. Each one silently wrote to one
     specific hardcoded `adjustment_type` row (`Wastage`,
     `Staff Meal / In-House`, `Other / Uncategorized`) via
-    `server/routes/dailyAudit.js`'s delete-then-insert helper. **Bonus
-    finding**: the seeded `adjustment_types` table already has three
-    *more* real categories — `Allocation / Transfer`, `Spoilage`,
-    `Damaged` — with no entry path anywhere in the app today. A proper
-    Allocations page doesn't just simplify Landing, it finishes
-    something the schema already promised.
+    `server/routes/dailyAudit.js`'s delete-then-insert helper. The
+    seeded `adjustment_types` table already had three *more* real
+    categories — `Allocation / Transfer`, `Spoilage`, `Damaged` — with
+    no entry path anywhere in the app; the Allocations page finishes
+    something the schema already promised, not just a Landing
+    simplification.
 
-    **Rough shape (not final)**: Landing's meat row shrinks to one
-    read-only `adjustments` cell (already computed, no engine change
-    needed). A new `public/allocations.html`-equivalent page, parallel
-    to Stock Receipts: restaurant, date, meat, `adjustment_type`
-    (dropdown from the full admin-managed list), quantity, notes, and
-    from/to location fields shown only when the chosen type has
-    `requires_transfer_locations = 1` (already a real column,
-    unused by any UI today). `dailyAudit.js`'s save handler drops the
-    three hardcoded type lookups/writes entirely — the `adjustments`
-    table becomes fully driven by this new page instead.
+    **Open question resolved before building, not assumed**: `locations`
+    (needed for the `Allocation / Transfer` type's from/to fields) had
+    zero rows and no admin UI at all — confirmed by querying it directly,
+    not assumed from the schema. Flagged back to the project owner rather
+    than picking a default unilaterally; decided: build minimal admin
+    CRUD for both `adjustment_types` and `locations` now (new Settings
+    tabs, name + a couple flags each), not deferred and not shipped with
+    dead-end empty dropdowns.
 
-    **Open question, not yet resolved**: whether the existing
-    `adjustment_types` admin CRUD (referenced in `daily-workflow.md` as
-    "admin-managed," but with no actual settings-screen UI found in the
-    repo) gets built alongside this, or stays a gap for later — the six
-    real rows exist only via seed data today, nothing lets the project
-    owner add a seventh without editing a JSON file by hand.
+    **Behavior change, deliberate, not incidental**: the old Landing
+    boxes were a delete-then-insert singleton per (restaurant, meat,
+    date, type) — at most one Wastage row per day, overwritten on every
+    save. The new Allocations page is append-only, one row per entry,
+    matching how `computeMeatAudit` already sums *every* row for that
+    meat/date regardless of type. Two separate Wastage events the same
+    day now both count instead of the second silently overwriting the
+    first — verified live (see below), not just asserted.
+
+    **What shipped**:
+    - `schema.sql`/`migrate.js`/`connection.js`: `locations.active`
+      added (a plain `ALTER TABLE ADD COLUMN`, not the rebuild-and-rename
+      step 9's nullable-constraint change needed — a new column with a
+      default doesn't require that).
+    - `server/routes/settings.js`: full CRUD for Adjustment Types
+      (`GET`/`POST`/`PUT /api/settings/adjustment-types`) and Locations
+      (`GET`/`POST`/`PUT /api/settings/locations`), same pattern as the
+      existing Meats/Dishes sections. Both are global lists, not
+      restaurant-scoped — `adjustment_types` has no `restaurant_id`
+      column at all, and `locations`' picklist needs to span every
+      restaurant plus shared/central locations (e.g. the commissary) for
+      a transfer to make sense.
+    - New `server/routes/allocations.js`: `GET`/`POST /api/allocations`.
+      Append-only per the behavior-change note above — no `PUT`/`DELETE`
+      yet, matching `adjustments`' existing spot on `scope.md`'s
+      deferred-activity-logging list (same treatment `sales`/
+      `commissary_stock_receipts` already got). Validates active
+      restaurant/meat/type, and — the one genuinely tricky bit — requires
+      both `from_location_id`/`to_location_id` when the chosen type's
+      `requires_transfer_locations = 1`, and *rejects* them (not silent
+      ignore) when the type doesn't use them, on the theory that a client
+      sending transfer fields for a plain Wastage entry is a bug worth
+      surfacing. Reuses existing `GET /api/restaurants` and
+      `GET /api/stock-receipts/meats?restaurant_id=` for its dropdowns
+      rather than duplicating them.
+    - `server/routes/dailyAudit.js`: `getMeatInputDecoration` no longer
+      looks up in_house/wastage/other — just `remarks` now.
+      `GET /api/daily-audit` explicitly adds `adjustments: audit.adjustments`
+      to its response (it existed on the engine's return value all along,
+      just was never surfaced). `GET /api/daily-audit/mixed` didn't need
+      a code change for this — `adjustments` was already flowing through
+      via `computeMixedDailyAudit`'s object spread, only the stale comment
+      needed updating. `POST /api/daily-audit` no longer accepts or writes
+      `in_house`/`wastage`/`other` at all — confirmed live that a stale
+      client still sending those old field names doesn't error (Express
+      silently ignores unrecognized body fields) and doesn't corrupt the
+      `adjustments` sum.
+    - `public/daily-audit.html`: three input boxes → one read-only
+      `Adjustments` cell, carried as a fixed `data-adjustments` attribute
+      (same pattern as the existing `data-new-stock`/`data-usage`) rather
+      than three live inputs; step 13's live-recalculation now reads that
+      fixed value instead of summing three fields client-side. Dish rows'
+      three `-` placeholder cells collapsed to one.
+    - New `public/allocations.html`: entry form (date, restaurant, meat,
+      type, quantity, notes, from/to shown only when the type requires
+      it) + a filterable list below, mirroring `stock-receipts.html`'s
+      structure.
+    - `public/settings.html`: new "Adjustment Types" and "Locations"
+      tabs, each with an add-form and an inline-editable table.
+    - "Allocations" nav link added to all 9 other pages.
+
+    **Verified live** (real server, real database, not mirrored logic
+    alone): booted the app against freshly-seeded data. Created two
+    Locations via the real API (a restaurant-level one, a shared/central
+    one — confirmed the `null restaurant_id` case sorts first per the
+    route's `ORDER BY r.name IS NULL DESC`). Submitted two separate
+    Wastage entries for the same meat/date (2.5, then 1.0) — confirmed
+    both persisted as distinct rows, not one overwriting the other.
+    Submitted an `Allocation / Transfer` entry without locations — got
+    the exact expected rejection. Submitted one with valid locations —
+    succeeded, with the from/to names correctly resolved in the list
+    response. Confirmed `GET /api/daily-audit` and `GET /api/daily-audit/mixed`
+    both return `adjustments: 4` (2.5 + 1.0 + 0.5, the exact sum of all
+    three entries) for that meat/date — the number that will render in
+    Landing's new read-only cell. Confirmed `daily-audit.html` serves
+    the new `data-adjustments` markup and the `Adjustments` header, with
+    zero leftover references to `.in_house`/`.wastage`/`.other` anywhere
+    in the file. Every inline `<script>` block across all 10 pages in
+    the app was syntax-checked as a full sweep (`node --check`), not
+    just the files touched this session. Full backend suite re-run
+    clean throughout, including a brand-new `allocations.test.js` (11
+    tests, mirrored-logic pattern matching this project's established
+    convention): **12/12 files, 165/165 assertions, 0 regressions.**
+
+    **A real bug was caught mid-build, not shipped**: `settings.html`'s
+    first draft of the Locations tab included a dead helper function
+    (`restaurantOptsFor`) referencing an undefined variable — would have
+    thrown at runtime the first time the Locations tab rendered. Found
+    and removed before the live verification pass above, not after.
+
+    **Still genuinely untested**: same standing gap as every prior
+    frontend step in this project — no real mouse/keyboard browser
+    click-through. Everything above was driven via real HTTP requests
+    against a real running server, which is strong verification, but
+    isn't the same as someone actually clicking through the three new/
+    changed pages once.
 
 ## Things NOT to re-litigate (already decided, stable)
 
