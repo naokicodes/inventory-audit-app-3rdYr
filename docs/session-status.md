@@ -12,8 +12,9 @@ Also fixed step 21's stale forward-reference to a shipment route that
 now actually exists (POST /api/commissary/shipments, step 20c)."
 git push# Session Status — read this first after token reset
 
-Last updated: 2026-08-29 (post step-20c, confirmed pushed and
-independently verified live).
+Last updated: 2026-08-29 (post step-20 full close-out, including the
+`commissary_shipment_presets` piece — confirmed pushed and verified
+live).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -44,9 +45,24 @@ dead-simple per `daily-workflow.md`, but the admin side should let the
 project owner define new things — conversions, categories, presets —
 without a developer, a theme running through steps 20-22 alike).
 
-## Where things stand: steps 1–20c done, everything confirmed pushed to
-`main` and verified — no local-only or uncommitted work anywhere as of
-2026-08-29.
+## Where things stand: steps 1–20 done (presets closed out 2026-08-29,
+minus its own explicitly-deferred authoring UI — see below), everything
+confirmed pushed to `main` and verified — no local-only or uncommitted
+work anywhere as of 2026-08-29.
+
+**Step 20 is now fully closed out, including the
+`commissary_shipment_presets` piece 20c deferred.** New this session:
+`GET`/`POST`/`PUT /api/commissary/shipment-presets` in
+`server/routes/commissary.js`, and a "Load preset" autofill control on
+`public/commissary-shipments.html`. Verified live this session (network
++ git access were available, no zip fallback needed) — booted a real
+server, exercised create/list/edit/deactivate/reject-bad-line over
+real HTTP, confirmed the page serves and the preset JSON shape matches
+what the frontend reads. Full suite: **11/11 files, 154/154 assertions,
+0 regressions** (was 138). Pushed to `main`. See this session's
+`changelog.md` entry for the full breakdown, including what's still
+explicitly deferred (a preset-*authoring* admin UI — presets can be
+created via the API today, just not yet through a browser form).
 
 **20c's hand-off is fully closed out.** The step-20c coder session had
 no network access (403s on `git clone`/`npm install`, same zip-fallback
@@ -351,18 +367,19 @@ always-an-array shape genuinely mirrors the existing
 `/commissary/yield-log` convention, not an arbitrary choice) — see the
 step-20b entry below for detail.
 
-**Step 20c is confirmed on `main` and independently verified live** —
-see the top of this file and its roadmap entry below for the full
-breakdown. **Next up: step 21 or 22** (both still drafts under
-discussion, not committed designs) — or the
-`commissary_shipment_presets` piece step 20c explicitly deferred, if the
-project owner wants that picked up before 21/22. Distribution follows
-rule 18: pull from `main` directly, review, resolve any flags, write the
-*single next* worker prompt, hand off a fresh repo — not a batch of
-prompts for several steps at once. If you're a fresh session with no
-memory of how this worked in practice, rules 18 and 19 in
-`rules-for-claude-code.md` are the complete description; this paragraph
-is just the current pointer into that flow.
+**Step 20 is fully closed out** (including the `commissary_shipment_presets`
+piece 20c deferred, closed 2026-08-29) — see the top of this file and
+its roadmap entry below for the full breakdown. Still explicitly
+deferred as its own follow-up: a preset-*authoring* admin UI (see the
+20c roadmap entry). **Next up: step 21 or 22** (both still drafts under
+discussion, not committed designs) — or the preset-authoring UI
+follow-up, if the project owner wants that picked up before 21/22.
+Distribution follows rule 18: pull from `main` directly, review, resolve
+any flags, write the *single next* worker prompt, hand off a fresh repo
+— not a batch of prompts for several steps at once. If you're a fresh
+session with no memory of how this worked in practice, rules 18 and 19
+in `rules-for-claude-code.md` are the complete description; this
+paragraph is just the current pointer into that flow.
 
 ## WIP hand-offs are now allowed (experimental — see rule 17)
 
@@ -706,7 +723,8 @@ of sizing them correctly, not a separate concern.
       total: Y)" hint that never blocks Save, notes. "Shipments" added to
       nav on all seven existing pages + the new page itself.
 
-      **Explicitly deferred, not attempted**: `commissary_shipment_presets`
+      **Explicitly deferred, not attempted [Closed out 2026-08-29 — see
+      this session's `changelog.md` entry]**: `commissary_shipment_presets`
       / `commissary_shipment_preset_lines` (the "quick formulas"
       autofill) — this step was already the largest of the three
       20a/20b/20c sub-steps per the roadmap's own sizing note; presets
@@ -714,6 +732,18 @@ of sizing them correctly, not a separate concern.
       the preset tables (already in `schema.sql` since 20a) and add a
       "load preset" autofill action to the form — never authoritative,
       the auditor can still edit every number before saving.
+      **Done**: `GET`/`POST`/`PUT /api/commissary/shipment-presets` in
+      `commissary.js`, and the "Load preset" control on
+      `commissary-shipments.html`. **Still explicitly deferred as its
+      own follow-up**: a preset-*authoring* admin UI (a settings page
+      or section to create new presets through the browser, not just
+      consume existing ones) — presets can be created via the API
+      today (see the new tests and the live curl verification in this
+      session's changelog entry), but there's no in-app form for it
+      yet. Smallest reasonable shape for that follow-up is likely a
+      small section on `settings.html`, since presets are
+      settings-managed data — the CRUD routes it would need already
+      exist.
 
       **Verified**: new `server/routes/commissary.test.js`, 17/17
       assertions, mirrored-logic style (same convention as

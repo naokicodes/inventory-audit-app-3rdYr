@@ -11,6 +11,66 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-29 — Step 20: commissary_shipment_presets closed out ("quick formulas")
+Closes the piece 20c explicitly deferred (see 20c's own entry below).
+Confirmed before starting: 20c genuinely on `main` (fresh `git clone`,
+not zip) — `POST /api/commissary/shipments` and
+`public/commissary-shipments.html` both present, baseline suite 11/11
+files / 138/138 assertions green.
+
+**Backend** (`server/routes/commissary.js`): three new routes —
+`GET /api/commissary/shipment-presets?commissary_meat_id=&restaurant_id=`
+(active presets + lines for one pair), `POST /api/commissary/shipment-presets`
+(create preset + lines, one transaction, same up-front validation
+shape as the shipments route), `PUT /api/commissary/shipment-presets/:id`
+(edit name/active, full lines replace — no per-line active flag in the
+schema, and this is settings data, not an audited log, so
+delete-then-reinsert is fine). No `activity_log` wiring — matches the
+existing treatment of `commissary_shipment_lines`/
+`commissary_stock_receipts`, not in rule 9's scope. Placed in
+`commissary.js` rather than `settings.js`: scoped to the
+`commissary_shipments` neighborhood specifically, not the core
+meats/dishes/recipes admin surface `settings.js` owns.
+
+**Frontend** (`public/commissary-shipments.html`): once both a
+commissary meat and destination restaurant are picked, a "Load preset"
+control appears if any active presets exist for that exact pair.
+Loading one autofills the output lines (meat + quantity) — never
+locks them; the auditor can still add, remove, or edit every line
+before saving, same as typing from scratch. No validation ties a save
+to the preset it came from, per the step's own instruction.
+
+**Explicitly deferred, not attempted**: a preset-*authoring* admin UI
+(a settings page or section to create new presets through the
+browser). Presets can be created today via the API (see the live curl
+verification below and the new tests), but there's no in-app form for
+it yet. This follows the task's own stated fallback for oversized
+scope — bundling a third UI surface (use-a-preset on the shipment form
++ author-a-preset admin screen, on top of the backend) risked exactly
+the kind of oversized step rule 16 exists to prevent. A future step
+should build that admin screen (smallest reasonable shape: likely a
+small section on `settings.html`, since presets are settings-managed
+data — the CRUD routes it needs already exist).
+
+**Verified**: 16 new assertions in `commissary.test.js` (33/33 in that
+file), mirrored-logic style matching the existing shipment tests. Full
+suite re-run: **11/11 files, 154/154 assertions, 0 regressions** (was
+138). **Verified LIVE this session** — network + git access were
+available (`git clone` worked directly, no zip fallback needed):
+booted a real server, exercised create/list/edit/deactivate over real
+HTTP, confirmed the wrong-restaurant-meat rejection, confirmed a
+deactivated preset drops out of the pair listing while a fresh preset
+for the same pair still shows, confirmed the new page serves (HTTP
+200) and the preset list endpoint's JSON shape matches exactly what
+the frontend JS reads (`p.id`, `p.name`, `p.lines[].meat_id`,
+`p.lines[].default_quantity`). **Not verified**: an actual browser
+click-through of the "Load preset" button — same sandbox limitation
+as every other frontend step in this project's history (no
+puppeteer/playwright, download host not in the network allowlist).
+Pushed straight to `main` per rule 18.
+
+---
+
 ## 2026-08-29 — Process: rules 18/19 refined, step 20c independently verified + pushed
 Two follow-ups after reviewing the step-20c coder session's transcript.
 
