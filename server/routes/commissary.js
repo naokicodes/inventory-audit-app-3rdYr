@@ -371,11 +371,15 @@ router.put('/commissary/shipment-presets/:id', (req, res) => {
 // decision (the mix, can have several valid answers), a standard is a
 // rate fact (the conversion efficiency, exactly one per pairing).
 //
-// Both params required, same reasoning as shipment-presets: the
-// shipment form only wants this once both are picked. Returns every
-// active standard for that pair (rarely more than a handful of output
-// meats per commissary meat), so the form can compute implied input as
-// the auditor types each line, without a request per line.
+// Step 23b (2026-08-31): the table itself is now keyed by meat_type_id,
+// not commissary_meat_id (see data-model.md section 10b), but this GET's
+// PUBLIC contract is deliberately unchanged - callers (the Shipment form)
+// still only know which specific commissary_meat they're shipping, not
+// its meat_type. Resolved internally: look up that meat's meat_type_id,
+// then join standards through it. An untagged commissary meat (no
+// meat_type_id) has no possible standards - returns [], same as an
+// unknown commissary_meat_id always did, not an error (raw/dynamic
+// meats are unaffected, per design).
 router.get('/commissary/conversion-standards', (req, res) => {
   const commissaryMeatId = Number(req.query.commissary_meat_id);
   const restaurantId = Number(req.query.restaurant_id);
@@ -383,37 +387,50 @@ router.get('/commissary/conversion-standards', (req, res) => {
     return res.status(400).json({ error: 'commissary_meat_id and restaurant_id are required' });
   }
 
+  const commissaryMeat = db.prepare('SELECT meat_type_id FROM commissary_meats WHERE id = ?').get(commissaryMeatId);
+  if (!commissaryMeat || commissaryMeat.meat_type_id === null) {
+    return res.json([]);
+  }
+
   const rows = db.prepare(`
-    SELECT cs.id, cs.commissary_meat_id, cs.restaurant_id, cs.meat_id,
+    SELECT cs.id, cs.meat_type_id, cs.restaurant_id, cs.meat_id,
            m.meat_code, m.name as meat_name, cs.ratio_per_unit, cs.notes, cs.active
     FROM commissary_conversion_standards cs
     JOIN meats m ON m.id = cs.meat_id
-    WHERE cs.commissary_meat_id = ? AND cs.restaurant_id = ? AND cs.active = 1
+    WHERE cs.meat_type_id = ? AND cs.restaurant_id = ? AND cs.active = 1
     ORDER BY m.meat_code
-  `).all(commissaryMeatId, restaurantId);
+  `).all(commissaryMeat.meat_type_id, restaurantId);
 
   res.json(rows);
 });
 
 // POST /api/commissary/conversion-standards
-// Body: { commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes? }
-// Admin creation of one standard. Same up-front validation shape as
-// shipment-presets. UNIQUE(commissary_meat_id, restaurant_id, meat_id)
-// in the schema is the real guarantee of "exactly one per pairing" -
-// this check is just a clearer error message before hitting it.
+// Body: { meat_type_id, restaurant_id, meat_id, ratio_per_unit, notes? }
+// Admin creation of one standard. Step 23b (2026-08-31): keyed by
+// meat_type_id now, not commissary_meat_id - a Standard applies to
+// everything tagged with that type, across every commissary, not one
+// specific commissary's catalog row. Same up-front validation shape as
+// shipment-presets. UNIQUE(meat_type_id, restaurant_id, meat_id) in the
+// schema is the real guarantee of "exactly one per pairing" - this check
+// is just a clearer error message before hitting it.
+//
+// KNOWN GAP, flagged not fixed here (23c's job): settings.html's "Create
+// Standard" admin form still posts commissary_meat_id - it will fail this
+// route's validation until 23c adds a meat-type-aware picker. GET (above)
+// and PUT (below) are unaffected since their own contracts didn't change.
 router.post('/commissary/conversion-standards', (req, res) => {
-  const { commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes } = req.body;
+  const { meat_type_id, restaurant_id, meat_id, ratio_per_unit, notes } = req.body;
 
-  if (!commissary_meat_id || !restaurant_id || !meat_id
+  if (!meat_type_id || !restaurant_id || !meat_id
       || ratio_per_unit === undefined || ratio_per_unit === null || ratio_per_unit === '') {
-    return res.status(400).json({ error: 'commissary_meat_id, restaurant_id, meat_id, and ratio_per_unit are required' });
+    return res.status(400).json({ error: 'meat_type_id, restaurant_id, meat_id, and ratio_per_unit are required' });
   }
   if (Number(ratio_per_unit) <= 0) {
     return res.status(400).json({ error: 'ratio_per_unit must be positive' });
   }
 
-  const commissaryMeat = db.prepare('SELECT id FROM commissary_meats WHERE id = ? AND active = 1').get(commissary_meat_id);
-  if (!commissaryMeat) return res.status(400).json({ error: 'Unknown or inactive commissary_meat_id' });
+  const meatType = db.prepare('SELECT id FROM meat_types WHERE id = ? AND active = 1').get(meat_type_id);
+  if (!meatType) return res.status(400).json({ error: 'Unknown or inactive meat_type_id' });
 
   const restaurant = db.prepare('SELECT id FROM restaurants WHERE id = ? AND active = 1').get(restaurant_id);
   if (!restaurant) return res.status(400).json({ error: 'Unknown or inactive restaurant_id' });
@@ -423,26 +440,27 @@ router.post('/commissary/conversion-standards', (req, res) => {
 
   const existing = db.prepare(`
     SELECT id FROM commissary_conversion_standards
-    WHERE commissary_meat_id = ? AND restaurant_id = ? AND meat_id = ?
-  `).get(commissary_meat_id, restaurant_id, meat_id);
+    WHERE meat_type_id = ? AND restaurant_id = ? AND meat_id = ?
+  `).get(meat_type_id, restaurant_id, meat_id);
   if (existing) {
     return res.status(400).json({ error: 'A standard for this exact pairing already exists - edit it instead of creating another' });
   }
 
   const result = db.prepare(`
-    INSERT INTO commissary_conversion_standards (commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes)
+    INSERT INTO commissary_conversion_standards (meat_type_id, restaurant_id, meat_id, ratio_per_unit, notes)
     VALUES (?, ?, ?, ?, ?)
-  `).run(commissary_meat_id, restaurant_id, meat_id, Number(ratio_per_unit), notes || null);
+  `).run(meat_type_id, restaurant_id, meat_id, Number(ratio_per_unit), notes || null);
 
   res.json({ ok: true, id: result.lastInsertRowid });
 });
 
 // PUT /api/commissary/conversion-standards/:id
 // Body: { ratio_per_unit?, notes?, active? }
-// commissary_meat_id/restaurant_id/meat_id are not editable here - a
+// meat_type_id/restaurant_id/meat_id are not editable here - a
 // different pairing is a different standard (deactivate + create a
 // new one), same reasoning shipment-presets already uses for its own
-// non-editable identifying fields.
+// non-editable identifying fields. Unaffected by step 23b's rekey -
+// this route never touched the key fields either way.
 router.put('/commissary/conversion-standards/:id', (req, res) => {
   const id = Number(req.params.id);
   const { ratio_per_unit, notes, active } = req.body;

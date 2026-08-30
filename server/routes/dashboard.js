@@ -48,7 +48,7 @@ router.get('/dashboard/stock-rollup', (req, res) => {
     ? restaurant_ids.split(',').map(Number).map(id => db.prepare('SELECT id, name FROM restaurants WHERE id = ? AND active = 1').get(id)).filter(Boolean)
     : db.prepare('SELECT id, name FROM restaurants WHERE active = 1 ORDER BY name').all();
 
-  const commissaryMeats = db.prepare('SELECT id, code, name, unit FROM commissary_meats WHERE active = 1 ORDER BY code').all();
+  const commissaryMeats = db.prepare('SELECT id, code, name, unit, meat_type_id FROM commissary_meats WHERE active = 1 ORDER BY code').all();
 
   const rows = commissaryMeats.map(cm => {
     const commissaryAudit = computeCommissaryMeatAudit(db, cm.id, date);
@@ -59,11 +59,21 @@ router.get('/dashboard/stock-rollup', (req, res) => {
     let grandTotal = commissaryBalance || 0;
     let anyRestaurantHasData = false;
 
+    // Step 23b (2026-08-31): commissary_conversion_standards is now keyed by
+    // meat_type_id, not commissary_meat_id - resolve via cm's own tag. An
+    // untagged commissary meat has no possible standards (raw/dynamic
+    // meats are unaffected, per data-model.md section 10b), same as
+    // before this rekey. NOTE: this is the minimal fix to keep this row's
+    // OWN rollup correct against the new schema - it does not yet do the
+    // fuller cross-commissary grouping (combining, say, Commissary A's and
+    // Commissary B's same-meat_type rows into one line) that session-
+    // status.md's 23b item 6 describes; that grouping restructure is still
+    // open, deliberately not decided here.
     for (const restaurant of restaurants) {
-      const standards = db.prepare(`
+      const standards = cm.meat_type_id === null ? [] : db.prepare(`
         SELECT meat_id, ratio_per_unit FROM commissary_conversion_standards
-        WHERE commissary_meat_id = ? AND restaurant_id = ? AND active = 1
-      `).all(cm.id, restaurant.id);
+        WHERE meat_type_id = ? AND restaurant_id = ? AND active = 1
+      `).all(cm.meat_type_id, restaurant.id);
 
       let restaurantTotal = 0;
       let restaurantHasData = false;

@@ -37,12 +37,15 @@ db.prepare(`INSERT INTO restaurants (id, name, code, active) VALUES (2, 'Closed 
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (1, 1, 'M01', 'Bagnet', 'unit')`).run();
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (2, 1, 'M02', 'Sisig', 'unit')`).run();
 db.prepare(`INSERT INTO commissaries (id, code, name) VALUES (1, 'COM-A', 'Commissary A')`).run();
-db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (1, 1, 'CM01', 'Jowl', 'kg', 0.2)`).run();
+db.prepare(`INSERT INTO meat_types (id, name) VALUES (1, 'Jowl')`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, meat_type_id) VALUES (1, 1, 'CM01', 'Jowl', 'kg', 0.2, 1)`).run();
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, active) VALUES (2, 1, 'CM02', 'Retired Meat', 'kg', 0.2, 0)`).run();
 
-// Standards: Jowl -> Bagnet at 0.3 units/kg, Jowl -> Sisig at 0.25 units/kg
-db.prepare(`INSERT INTO commissary_conversion_standards (commissary_meat_id, restaurant_id, meat_id, ratio_per_unit) VALUES (1, 1, 1, 0.3)`).run();
-db.prepare(`INSERT INTO commissary_conversion_standards (commissary_meat_id, restaurant_id, meat_id, ratio_per_unit) VALUES (1, 1, 2, 0.25)`).run();
+// Standards: Jowl -> Bagnet at 0.3 units/kg, Jowl -> Sisig at 0.25 units/kg.
+// Keyed by meat_type_id (step 23b) - commissary meat id=1 (Jowl) is tagged
+// with meat_type_id=1 above.
+db.prepare(`INSERT INTO commissary_conversion_standards (meat_type_id, restaurant_id, meat_id, ratio_per_unit) VALUES (1, 1, 1, 0.3)`).run();
+db.prepare(`INSERT INTO commissary_conversion_standards (meat_type_id, restaurant_id, meat_id, ratio_per_unit) VALUES (1, 1, 2, 0.25)`).run();
 
 // Mirrors dashboard.js's currentBalance()
 function currentBalance(auditResult) {
@@ -59,7 +62,7 @@ function stockRollup(date, restaurantIds) {
     ? restaurantIds.map(id => db.prepare('SELECT id, name FROM restaurants WHERE id = ? AND active = 1').get(id)).filter(Boolean)
     : db.prepare('SELECT id, name FROM restaurants WHERE active = 1 ORDER BY name').all();
 
-  const commissaryMeats = db.prepare('SELECT id, code, name, unit FROM commissary_meats WHERE active = 1 ORDER BY code').all();
+  const commissaryMeats = db.prepare('SELECT id, code, name, unit, meat_type_id FROM commissary_meats WHERE active = 1 ORDER BY code').all();
 
   const rows = commissaryMeats.map(cm => {
     const commissaryAudit = computeCommissaryMeatAudit(db, cm.id, date);
@@ -71,10 +74,10 @@ function stockRollup(date, restaurantIds) {
     let anyRestaurantHasData = false;
 
     for (const restaurant of restaurants) {
-      const standards = db.prepare(`
+      const standards = cm.meat_type_id === null ? [] : db.prepare(`
         SELECT meat_id, ratio_per_unit FROM commissary_conversion_standards
-        WHERE commissary_meat_id = ? AND restaurant_id = ? AND active = 1
-      `).all(cm.id, restaurant.id);
+        WHERE meat_type_id = ? AND restaurant_id = ? AND active = 1
+      `).all(cm.meat_type_id, restaurant.id);
 
       let restaurantTotal = 0;
       let restaurantHasData = false;
