@@ -46,6 +46,7 @@
     <button data-section="adjustment-types">Adjustment Types</button>
     <button data-section="locations">Locations</button>
     <button data-section="shipment-presets">Shipment Presets</button>
+    <button data-section="conversion-standards">Conversion Standards</button>
   </div>
 
   <section id="section-restaurants" class="section-panel active">
@@ -145,6 +146,26 @@
     <br><br>
     <button id="add-shipment-preset">Add Preset</button>
     <div id="preset-status" class="status-message"></div>
+  </section>
+
+  <section id="section-conversion-standards" class="section-panel">
+    <h2>Conversion Standards</h2>
+    <small class="hint">The conversion-efficiency rate for one (commissary meat, restaurant meat) pair - e.g. "Jowl &rarr; FC's Bagnet: 0.3 units per kg." Used by the <a href="commissary-shipments.html">Shipments</a> form to compute an implied-input hint as lines are typed. Not the same as a Shipment Preset (that's a demand mix, can have several); a Standard is a rate fact, exactly one per pairing.</small>
+    <div class="add-form">
+      <label>Commissary meat <select id="cs-commissary-meat"></select></label>
+    </div>
+
+    <h3>Existing standards for this meat + restaurant (above)</h3>
+    <div id="conversion-standards-table">Pick a commissary meat above to see this.</div>
+
+    <h3>New standard</h3>
+    <div class="add-form">
+      <label>Destination meat <select id="cs-new-meat"></select></label>
+      <label>Ratio per unit <input id="cs-new-ratio" type="number" step="0.0001" placeholder="e.g. 0.3"></label>
+      <label>Notes <input id="cs-new-notes" placeholder="optional"></label>
+      <button id="add-conversion-standard">Add Standard</button>
+    </div>
+    <div id="cs-status" class="status-message"></div>
   </section>
 
   <script>
@@ -672,10 +693,131 @@
 
     presetCommissaryMeatSelect.addEventListener('change', loadShipmentPresets);
 
+    // ---------- CONVERSION STANDARDS ----------
+    // Round 2 findings item 3: backend CRUD (GET/POST/PUT
+    // /api/commissary/conversion-standards) already existed and already
+    // worked, consumed today only read-only by commissary-shipments.html's
+    // implied-input hint. This section is the missing creation/edit
+    // surface - no new backend routes, same shape as the Shipment
+    // Presets section above (commissary-meat dropdown local to this
+    // section + the page-level restaurant selector together identify the
+    // (commissary_meat_id, restaurant_id) pair).
+    //
+    // commissary_meat_id/restaurant_id/meat_id aren't editable once
+    // created (same reasoning as presets' non-editable identifying
+    // fields) - a different pairing is a different standard, per the
+    // route's own comment. Only ratio_per_unit/notes/active are edited
+    // inline; a new meat pairing goes through the New Standard form
+    // below, same "add a row, don't repurpose an old one" pattern.
+    const csCommissaryMeatSelect = document.getElementById('cs-commissary-meat');
+    const csTableDiv = document.getElementById('conversion-standards-table');
+    const csNewMeatSelect = document.getElementById('cs-new-meat');
+    const csNewRatio = document.getElementById('cs-new-ratio');
+    const csNewNotes = document.getElementById('cs-new-notes');
+    const csStatus = document.getElementById('cs-status');
+
+    let csDestinationMeats = []; // active meats for currentRestaurantId, for the new-standard meat dropdown
+
+    async function loadCsCommissaryMeats() {
+      const res = await fetch('/api/commissary/meats');
+      const meats = await res.json();
+      csCommissaryMeatSelect.innerHTML = meats.map(m => `<option value="${m.id}">${m.code} - ${m.name}</option>`).join('')
+        || '<option value="">No commissary meats seeded yet</option>';
+    }
+
+    async function loadCsDestinationMeats() {
+      if (!currentRestaurantId) { csDestinationMeats = []; return; }
+      const res = await fetch(`/api/stock-receipts/meats?restaurant_id=${currentRestaurantId}`);
+      csDestinationMeats = await res.json();
+      csNewMeatSelect.innerHTML = csDestinationMeats.map(m => `<option value="${m.id}">${m.meat_code} - ${m.name}</option>`).join('')
+        || '<option value="">Pick a restaurant above first</option>';
+    }
+
+    async function loadConversionStandards() {
+      const commissaryMeatId = csCommissaryMeatSelect.value;
+      if (!commissaryMeatId || !currentRestaurantId) {
+        csTableDiv.innerHTML = 'Pick a commissary meat above to see this.';
+        return;
+      }
+      const res = await fetch(`/api/commissary/conversion-standards?commissary_meat_id=${commissaryMeatId}&restaurant_id=${currentRestaurantId}`);
+      const standards = await res.json();
+      if (standards.length === 0) {
+        csTableDiv.innerHTML = '<p class="hint">No standards yet for this meat + restaurant.</p>';
+        return;
+      }
+      csTableDiv.innerHTML = `
+        <table>
+          <thead><tr><th>Destination meat</th><th>Ratio per unit</th><th>Notes</th><th>Active</th></tr></thead>
+          <tbody>${standards.map(s => `
+            <tr>
+              <td>${s.meat_code} - ${s.meat_name}</td>
+              <td><input type="number" step="0.0001" value="${s.ratio_per_unit}" data-field="ratio_per_unit" data-id="${s.id}" class="cs-edit" style="width:6rem"></td>
+              <td><input value="${s.notes ?? ''}" data-field="notes" data-id="${s.id}" class="cs-edit"></td>
+              <td><input type="checkbox" ${s.active ? 'checked' : ''} data-field="active" data-id="${s.id}" class="cs-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.cs-edit').forEach(el => el.addEventListener('change', saveConversionStandardRow));
+    }
+
+    async function saveConversionStandardRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      const result = await fetch(`/api/commissary/conversion-standards/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ratio_per_unit: get('ratio_per_unit').value,
+          notes: get('notes').value || null,
+          active: get('active').checked
+        })
+      }).then(r => r.json());
+      if (!result.ok) { alert(result.error); loadConversionStandards(); }
+    }
+
+    document.getElementById('add-conversion-standard').addEventListener('click', async () => {
+      const commissary_meat_id = Number(csCommissaryMeatSelect.value);
+      const restaurant_id = Number(currentRestaurantId);
+      const meat_id = Number(csNewMeatSelect.value);
+      const ratio_per_unit = csNewRatio.value;
+      const notes = csNewNotes.value.trim();
+
+      if (!commissary_meat_id || !restaurant_id || !meat_id || ratio_per_unit === '') {
+        csStatus.textContent = 'Commissary meat, restaurant (top of page), destination meat, and ratio are required.';
+        csStatus.className = 'status-message error';
+        return;
+      }
+
+      csStatus.textContent = 'Saving...';
+      csStatus.className = 'status-message';
+      try {
+        const res = await fetch('/api/commissary/conversion-standards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes: notes || null })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+        csStatus.textContent = 'Standard saved.';
+        csStatus.className = 'status-message success';
+        csNewRatio.value = '';
+        csNewNotes.value = '';
+        loadConversionStandards();
+      } catch (err) {
+        csStatus.textContent = 'Error: ' + err.message;
+        csStatus.className = 'status-message error';
+      }
+    });
+
+    csCommissaryMeatSelect.addEventListener('change', loadConversionStandards);
+
     restaurantSelect.addEventListener('change', () => {
       currentRestaurantId = restaurantSelect.value;
       loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
       loadPresetDestinationMeats().then(() => { resetNewPresetLines(); loadShipmentPresets(); });
+      loadCsDestinationMeats().then(() => loadConversionStandards());
     });
 
     loadRestaurants().then(() => {
@@ -683,6 +825,8 @@
       loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
       loadPresetCommissaryMeats();
       loadPresetDestinationMeats().then(() => { resetNewPresetLines(); loadShipmentPresets(); });
+      loadCsCommissaryMeats();
+      loadCsDestinationMeats().then(() => loadConversionStandards());
     });
   </script>
   <script src="command-panel.js"></script>

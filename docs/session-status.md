@@ -1,6 +1,28 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-30 (Round 2 findings item 1: Restaurant-creation
+Last updated: 2026-08-30 (Round 2 findings numbered-list item 3:
+Conversion Standards admin UI — Done, pending push. Backend already
+existed (`GET`/`POST`/`PUT /api/commissary/conversion-standards` in
+`server/routes/commissary.js`, from the earlier Item 5 work) and no bug
+was found or touched while building against it. Built a new
+"Conversion Standards" tab on `settings.html`, same structural pattern
+as the Shipment Presets section (closest template, same shape: pick a
+commissary meat + restaurant, list/create/edit entries for that pair).
+Full suite 13/13 files green both before and after the code change, 0
+regressions — no new backend tests needed, existing coverage already
+exercises these routes. Verified live against a booted server with a
+freshly reseeded DB: POSTed a new standard, confirmed the
+duplicate-pairing rejection, PUT-edited ratio/notes/active and
+confirmed the change via GET, confirmed `settings.html` serves with
+the new markup. See `changelog.md` for full detail. **Not to be
+confused with the separate, still-unbuilt "item 3 design"**
+(multi-Commissary generalization, described at length further down in
+this file's Round 2 findings section) — this session only did the
+numbered-list item 3 (the Conversion Standards admin UI gap), left the
+design item entirely untouched. This worker had no push credentials —
+standard handoff format used, not yet on `main` as of this writing.
+
+Previously, 2026-08-30 (Round 2 findings item 1: Restaurant-creation
 CRUD — Done, pending push. Built `GET`/`POST`/`PUT
 /api/settings/restaurants` in `server/routes/settings.js` (same CRUD
 shape as Meats/Dishes/Adjustment Types/Locations, no `activity_log`
@@ -1350,10 +1372,20 @@ cover rather than guessing.
    A new commissary item (raw or processed) can't be added through the
    app.
 
-3. **Conversion Standards has no admin UI.** Backend CRUD exists (item
-   5), but there's no Settings page for it — only read-only consumption
-   on the Shipment form. Creating one today requires calling the API
-   directly.
+3. **[Done, 2026-08-30] Conversion Standards has no admin UI.** Backend
+   CRUD existed already (item 5) but there was no Settings page for it —
+   only read-only consumption on the Shipment form; creating one
+   required calling the API directly. Built as a new "Conversion
+   Standards" tab on `settings.html`, same structural pattern as the
+   Shipment Presets section (closest template — pick a commissary meat +
+   restaurant, list/create/edit entries for that pair). No backend
+   changes — built entirely against the existing routes, no bug found.
+   See `changelog.md`'s entry for full build/verification detail,
+   including live confirmation of create, the duplicate-pairing
+   rejection, and edit, against a booted server. This is the
+   numbered-list item 3 here, distinct from the "item 3 design" section
+   above (multi-Commissary generalization) which remains untouched and
+   un-started.
 
 4. **The AutoCAD-style Terminal only exists on its own page.** The
    lightweight floating Command Panel (2 simple commands, step 14) is on

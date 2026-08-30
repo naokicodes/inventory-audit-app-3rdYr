@@ -11,6 +11,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-30 — Round 2 findings item 3 (numbered-list item, not the design item): Conversion Standards admin UI
+
+Closed the gap flagged in Round 2 findings' numbered list, item 3: `GET`/`POST`/`PUT /api/commissary/conversion-standards` already existed and worked (from the earlier "Item 5: Conversion Standards" work), but there was no Settings page for it - only read-only consumption on `commissary-shipments.html`'s implied-input hint. Creating a standard required calling the API directly. (Not to be confused with the separate, still-undiscussed "item 3 design" - multi-Commissary generalization - higher up in `session-status.md`'s Round 2 findings section; that's a different, larger piece of work this session did not touch.)
+
+**No backend changes.** Built entirely against the existing routes in `server/routes/commissary.js` - no bug found while doing so, nothing flagged.
+
+**Frontend**: new "Conversion Standards" tab on `public/settings.html`, same structural pattern as the Shipment Presets section (the closest template, per the same shape: pick a commissary meat + restaurant, list/create/edit entries for that pair) - restaurant comes from the page-level selector already used by every other tab; a local commissary-meat dropdown plus that restaurant together identify the `(commissary_meat_id, restaurant_id)` pair. Existing standards for the pair show in an editable table (ratio/notes/active, PUT on change); a form below adds a new standard (destination meat scoped to the current restaurant via the existing `/api/stock-receipts/meats` endpoint, ratio, optional notes, POST). `commissary_meat_id`/`restaurant_id`/`meat_id` aren't editable in place, matching the route's own "a different pairing is a different standard" comment and the identical non-editable-identifying-fields pattern the Presets section already uses.
+
+**Verified live**: booted the server against a freshly reseeded DB and drove the exact request shapes the new UI sends - POST a new standard (Jowl → FC's Bagnet, ratio 0.3) succeeded; a duplicate-pairing POST correctly hit the existing "already exists" error; PUT edited ratio/notes/active and a follow-up GET reflected the change; confirmed `settings.html` serves with the new markup present. Full suite (`node --test` across all 13 test files) run both before starting and after the code change - 13/13 green both times, 0 regressions - no new backend tests needed since the routes already had coverage from the earlier Conversion Standards work.
+
+This worker had no push credentials (`git push` failed with a credential error, same read-only pattern noted in `rules-for-claude-code.md` rule 18) - standard handoff format used, not yet on `main` as of this writing.
+
 ## 2026-08-30 — Round 2 findings item 1: Restaurant-creation CRUD (backend + Settings UI)
 
 Closed the gap flagged in Round 2 findings item 1: `restaurants` rows only ever came from `seed.js` reading a JSON file - no way to create one through the app, which blocked the stated goal of handing this app to a new branch for genuine self-onboarding. Deliberately kept separate from the Commissary-creation work (item 3's design), same kind of gap but a different step, per that item's own note.
