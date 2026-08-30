@@ -1445,6 +1445,17 @@ fresh architecture session:**
   matching minimal fix to stay correct. See `changelog.md`'s "Step 23b
   sub-piece" entry for full detail.
 
+  **Architect review, 2026-08-31**: reviewed against rule 17 specifically,
+  since this is a previously-working screen now partially broken.
+  **Accepted as-is, not hot-patched** — narrow (Create only; `GET`/`PUT`
+  on the same admin page are unaffected), low-frequency (an admin
+  config screen, not a daily-auditor screen protected under rule 10),
+  and 23c is already the real fix — a standalone patch now would just
+  get discarded once 23c ships its actual meat-type-aware picker.
+  Anyone using Settings → Conversion Standards → Create between now and
+  23c will hit a validation error; use `PUT` (edit an existing row) or
+  wait for 23c.
+
   **Explicitly NOT done this session — still open for a future
   session**: Commissary CRUD, meat-type CRUD, `commissary_meats` CRUD,
   every commissary-scoped engine function taking a `commissary_id` param
