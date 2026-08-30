@@ -437,18 +437,28 @@ CREATE TABLE IF NOT EXISTS commissary_shipment_preset_lines (
 -- (commissary_meat, restaurant, meat) pairing HAVING a row here is
 -- itself the classifier. A pairing with no row is raw/dynamic,
 -- unchanged from step 20's original decision.
+-- Step 23b (2026-08-31): rekeyed from commissary_meat_id to meat_type_id -
+-- see docs/data-model.md section 10b. A commissary meat can only get a
+-- Standard once it's tagged with a meat_type (commissary_meats.meat_type_id,
+-- added in step 23a) - untagged/raw-dynamic meats are unaffected. This is
+-- what lets two different commissaries' independently-cataloged "Jowl" rows
+-- share one Standard instead of needing a duplicate entered per commissary.
+-- NOTE: this table may already exist with the OLD commissary_meat_id shape
+-- in someone's local inventory.db - CREATE TABLE IF NOT EXISTS below cannot
+-- rekey a column on an existing table. server/db/migrate.js handles the
+-- one-time rebuild; it runs before this file, in connection.js.
 CREATE TABLE IF NOT EXISTS commissary_conversion_standards (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  commissary_meat_id INTEGER NOT NULL,
+  meat_type_id INTEGER NOT NULL,
   restaurant_id INTEGER NOT NULL,
   meat_id INTEGER NOT NULL,          -- the destination restaurant's own meat (the output)
-  ratio_per_unit REAL NOT NULL,      -- output units produced per 1 unit of commissary_meat input
+  ratio_per_unit REAL NOT NULL,      -- output units produced per 1 unit of meat_type input
   notes TEXT,
   active INTEGER NOT NULL DEFAULT 1,
-  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  FOREIGN KEY (meat_type_id) REFERENCES meat_types(id),
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (meat_id) REFERENCES meats(id),
-  UNIQUE (commissary_meat_id, restaurant_id, meat_id)
+  UNIQUE (meat_type_id, restaurant_id, meat_id)
 );
 
 -- Loyverse name resolution (see docs/loyverse-sync.md) - created now since

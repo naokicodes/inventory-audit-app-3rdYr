@@ -323,3 +323,136 @@ function migrateCommissaryMultiTenant(db) {
 }
 
 module.exports.migrateCommissaryMultiTenant = migrateCommissaryMultiTenant;
+
+// ----------------------------------------------------------------------
+// Step 23b (2026-08-31): commissary_conversion_standards' own rekey from
+// commissary_meat_id to meat_type_id. See docs/data-model.md section 10b
+// and docs/session-status.md's "Item 3 design" - deliberately deferred out
+// of 23a's migration (migrateCommissaryMultiTenant above) since it needed
+// the route/engine changes that actually consume meat_type_id landing at
+// the same time, not schema alone.
+//
+// Must run AFTER migrateCommissaryMultiTenant (needs commissary_meats to
+// already have a meat_type_id column to tag) and BEFORE schema.sql - see
+// connection.js.
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ ran: boolean, rowsMigrated: number }}
+ */
+function migrateConversionStandardsMeatType(db) {
+  const tableExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'commissary_conversion_standards'`
+  ).get();
+
+  if (!tableExists) {
+    // Fresh install - schema.sql will create it with meat_type_id already
+    // present. Nothing to migrate.
+    return { ran: false, rowsMigrated: 0 };
+  }
+
+  const columns = db.prepare(`PRAGMA table_info(commissary_conversion_standards)`).all();
+  const alreadyMigrated = columns.some(c => c.name === 'meat_type_id');
+  if (alreadyMigrated) {
+    return { ran: false, rowsMigrated: 0 };
+  }
+
+  const rowCountBefore = db.prepare(`SELECT COUNT(*) AS n FROM commissary_conversion_standards`).get().n;
+
+  const fkWasOn = db.prepare(`PRAGMA foreign_keys`).get().foreign_keys === 1;
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  db.exec('BEGIN');
+  try {
+    // meat_types may not exist yet on a database that never ran 23a's
+    // migration in the same startup (shouldn't happen given the call order
+    // in connection.js, but matches this file's existing defensive style).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS meat_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1
+      )
+    `);
+
+    const oldRows = db.prepare(`SELECT * FROM commissary_conversion_standards`).all();
+
+    const findMeatTypeByName = db.prepare(`SELECT id FROM meat_types WHERE name = ?`);
+    const insertMeatType = db.prepare(`INSERT INTO meat_types (name) VALUES (?)`);
+    const getCommissaryMeat = db.prepare(`SELECT id, name FROM commissary_meats WHERE id = ?`);
+    const tagCommissaryMeat = db.prepare(`UPDATE commissary_meats SET meat_type_id = ? WHERE id = ? AND meat_type_id IS NULL`);
+
+    // create/reuse one meat_types row per DISTINCT commissary meat referenced
+    // (not per standard row) - two standards for the same commissary meat
+    // (e.g. Jowl -> Bagnet and Jowl -> Sisig) must resolve to the same type.
+    const meatTypeIdByCommissaryMeatId = new Map();
+    const meatTypeIdForStandard = new Map();
+
+    for (const row of oldRows) {
+      if (!meatTypeIdByCommissaryMeatId.has(row.commissary_meat_id)) {
+        const cm = getCommissaryMeat.get(row.commissary_meat_id);
+        if (!cm) {
+          throw new Error(
+            `commissary_conversion_standards row ${row.id} references missing commissary_meat_id ${row.commissary_meat_id} - aborting rather than guess.`
+          );
+        }
+        const existingType = findMeatTypeByName.get(cm.name);
+        const meatTypeId = existingType
+          ? existingType.id
+          : Number(insertMeatType.run(cm.name).lastInsertRowid);
+        tagCommissaryMeat.run(meatTypeId, cm.id);
+        meatTypeIdByCommissaryMeatId.set(row.commissary_meat_id, meatTypeId);
+      }
+      meatTypeIdForStandard.set(row.id, meatTypeIdByCommissaryMeatId.get(row.commissary_meat_id));
+    }
+
+    db.exec(`
+      CREATE TABLE commissary_conversion_standards__migrated (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        meat_type_id INTEGER NOT NULL,
+        restaurant_id INTEGER NOT NULL,
+        meat_id INTEGER NOT NULL,
+        ratio_per_unit REAL NOT NULL,
+        notes TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (meat_type_id) REFERENCES meat_types(id),
+        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
+        FOREIGN KEY (meat_id) REFERENCES meats(id),
+        UNIQUE (meat_type_id, restaurant_id, meat_id)
+      )
+    `);
+
+    const insertMigrated = db.prepare(`
+      INSERT INTO commissary_conversion_standards__migrated
+        (id, meat_type_id, restaurant_id, meat_id, ratio_per_unit, notes, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const row of oldRows) {
+      insertMigrated.run(
+        row.id, meatTypeIdForStandard.get(row.id), row.restaurant_id, row.meat_id,
+        row.ratio_per_unit, row.notes, row.active
+      );
+    }
+
+    const rowCountAfter = db.prepare(`SELECT COUNT(*) AS n FROM commissary_conversion_standards__migrated`).get().n;
+    if (rowCountAfter !== rowCountBefore) {
+      throw new Error(
+        `Migration row count mismatch: ${rowCountBefore} before, ${rowCountAfter} after - aborting rather than risk data loss.`
+      );
+    }
+
+    db.exec('DROP TABLE commissary_conversion_standards');
+    db.exec('ALTER TABLE commissary_conversion_standards__migrated RENAME TO commissary_conversion_standards');
+
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  } finally {
+    if (fkWasOn) db.exec('PRAGMA foreign_keys = ON');
+  }
+
+  return { ran: true, rowsMigrated: rowCountBefore };
+}
+
+module.exports.migrateConversionStandardsMeatType = migrateConversionStandardsMeatType;
