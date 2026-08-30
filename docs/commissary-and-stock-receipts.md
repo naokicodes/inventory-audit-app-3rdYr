@@ -177,8 +177,22 @@ lock flag or per-meat toggle to build; a meat with no commissary mapping
 just gets `DIRECT` rows entered the same way, in the same table, on the
 same one page.
 
-### Unallocated receipts (resolved 2026-08-28)
-**Previously an open gap, now resolved.** `Outbound_Log`'s Instructions
+### Unallocated receipts (resolved 2026-08-28, RETIRED 2026-08-29)
+**Historical record only — this entire section describes a workflow
+that no longer exists in the app.** Kept below for context on the
+decision, not as current documentation. See
+`session-status.md`'s "commissary_meat_map's fate" entry (step 20) for
+the full retirement reasoning: once `POST /api/commissary/shipments`
+always names the destination restaurant up front, there was no
+remaining legitimate case for a human manually logging a `COMMISSARY`-
+sourced receipt with the destination left unset. **Current reality**:
+`POST /api/stock-receipts` accepts `DIRECT` only; `restaurant_id`/
+`meat_id` are required together, always. A `COMMISSARY`-sourced
+`stock_receipts` row is only ever written automatically, as a side
+effect of a real Shipment. `commissary_meat_map` the table still
+exists (nothing dropped), but nothing reads or writes it anymore.
+
+**Previously an open gap, now resolved [then retired].** `Outbound_Log`'s Instructions
 sheet in the real xlsx allows a shipment with destination "Unallocated" —
 meat that's left the commissary but hasn't been assigned to a specific
 restaurant yet. The original schema had `restaurant_id NOT NULL`, so this
@@ -188,7 +202,7 @@ demonstrably diverged from the sheet's cached numbers because of it (see
 14.8 in the real sheet, entirely due to one un-representable 5kg
 Unallocated row).
 
-**Decision**: `restaurant_id` and `meat_id` on `stock_receipts` are now
+**Decision [superseded]**: `restaurant_id` and `meat_id` on `stock_receipts` are now
 nullable (both null together, only when `source = COMMISSARY`). Workflow:
 
 1. A commissary shipment can be logged via the normal
@@ -209,19 +223,22 @@ nullable (both null together, only when `source = COMMISSARY`). Workflow:
    `activity_log`, using the machinery already built in step 6 — no new
    logging path needed, just a new allowed transition on an existing one.
 
-**Why nullable columns over a placeholder "Unallocated" restaurant row**: a
+**Why nullable columns over a placeholder "Unallocated" restaurant row
+[historical reasoning, decision itself later superseded]**: a
 placeholder row in `restaurants` would show up in restaurant-scoped
 dropdowns, weekly summaries, and reports as if it were a real location,
 which is worse than a receipt that's simply invisible to restaurant-facing
 screens until assigned. Nullable + explicit later-assignment keeps this
 clean.
 
-**UI implication for step 9**: the Stock Receipts entry form
-(`stock-receipts.html`) needs a "leave unassigned" option when Source =
-Commissary (instead of requiring a restaurant to be picked), and the
-receipts list needs a way to filter for/show unassigned rows with an
-"Assign to restaurant" action that calls the PATCH above. Not built yet —
-this doc records the decision; the code is step 9's job.
+**UI implication for step 9 [never fully needed this way — retired
+before any dedicated "unassigned" filter UI was built]**: the Stock
+Receipts entry form (`stock-receipts.html`) needs a "leave unassigned"
+option when Source = Commissary (instead of requiring a restaurant to
+be picked), and the receipts list needs a way to filter for/show
+unassigned rows with an "Assign to restaurant" action that calls the
+PATCH above. Not built as UI, and now never will be — the underlying
+capability itself was retired first.
 
 Tracked as **step 9** in `docs/session-status.md`. See `data-model.md`
 section 5 for the schema-doc side of this same decision.

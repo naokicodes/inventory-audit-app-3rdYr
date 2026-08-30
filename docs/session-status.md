@@ -1245,6 +1245,84 @@ favor of these logic gaps. Sequencing agreed: item 3 first, architected
 properly (ask-before-build, same discipline as every other design
 decision this project has made), then the rest below.
 
+### Item 3 design — RESOLVED 2026-08-30, ready to build, none of it started yet
+
+Settled through real back-and-forth, every fork below was an actual
+question asked and answered, not assumed:
+
+- **Option B: separate `commissaries`, not a unified `restaurants`/
+  `commissaries` table.** A Commissary branch is its own kind of thing,
+  not a `restaurants` row with a type flag. Considered unifying them
+  (matches the project's own "just another kitchen" framing) but
+  rejected — kept separate, deliberately.
+- **Each commissary has its own fully independent meat catalog.** No
+  structural sharing assumed — one commissary might stock all 14
+  current items, another might stock 3 completely different ones, with
+  anywhere from zero to full overlap in what they happen to both carry.
+- **A restaurant can receive shipments from more than one commissary.**
+  Not tied to a single "home" commissary — FC could get Jowl-derived
+  Bagnet from Commissary A one week and Pork-Belly-derived Bagnet from
+  Commissary B another week (illustrative, not a real current plan).
+- **IDs**: plain numeric primary keys + a short human-readable `code`
+  per commissary (e.g. `COM-A`, `COM-B`) for display — same pattern
+  `meats`/`dishes`/`restaurants` already use. Considered and rejected: a
+  single combined identifier encoding commissary+restaurant+meat
+  together (barcode-style) — makes querying harder (string-parsing
+  instead of a foreign key) and couples dimensions that should be able
+  to change independently. The numeric-ID-plus-readable-code pattern
+  gives the same at-a-glance clarity without those downsides.
+- **The real tension found, and how it resolved**: independent catalogs
+  (above) directly conflicted with "Conversion Standards should reflect
+  restaurant expectations, not vary by which commissary supplied it" —
+  if catalogs share nothing structurally, a standard entered for
+  Commissary A's Jowl has no way to also apply to Commissary B's Jowl,
+  even though it's supposed to. **Resolved as option (a) of three
+  offered**: a new, admin-managed **meat-type reference table** —
+  optional, not a structural requirement on the catalog itself, but
+  something a commissary's catalog row can tag itself with (e.g. both
+  commissaries' "Jowl" rows point at the same shared "Jowl" type) purely
+  so a Conversion Standard entered once can apply everywhere that type
+  is supplied from. Rejected: (b) accept duplication, re-enter the same
+  ratio per commissary, and (c) key standards off the restaurant's own
+  meat only with no source dimension at all (loses the ability to say
+  "this ratio is specifically about Jowl," which the live implied-input
+  math on the Shipment form needs).
+- **The meat-type table is a real admin-managed reference table, not
+  loose free text.** Explicit call: more control for admins as the app
+  scales over the coming months outweighs the small extra complexity,
+  especially since this complexity stays entirely on the admin side —
+  the auditor's daily screens are completely unaffected by any of this.
+- **This same meat-type concept is what makes the Dashboard's "total
+  Jowl across everything" correct, not just a Conversion-Standards
+  convenience.** The rollup needs to know that Commissary A's Jowl,
+  Commissary B's Jowl, and FC's Bagnet/Sisig (via their own standards)
+  are all "the same root thing" to total them meaningfully — the
+  meat-type table is the thing that makes that grouping real instead of
+  name-matching strings.
+- **Restaurant-creation UI stays a separate, later step** — not bundled
+  into Commissary-creation despite being the same *kind* of gap. Kept
+  apart deliberately to keep worker-sized tasks small, not because
+  they're unrelated.
+- **Dashboard**: still UI-only for later, not designed in detail now.
+  Two views eventually: the existing combined total, plus a new
+  drill-down that lets you pick one specific commissary or restaurant
+  and see just that location's stock. The rollup's underlying logic
+  already needs to handle "which location contributed how much" (it's
+  literally what the reverse-conversion math produces per restaurant
+  today) — the drill-down view is presenting data the logic layer will
+  already have, not new calculation work.
+
+**Not designed yet, deliberately left for when this actually gets
+built**: exact table names/columns for `commissaries` and the meat-type
+reference table, how `commissary_conversion_standards`'s existing
+`(commissary_meat_id, restaurant_id, meat_id)` uniqueness needs to
+change now that `commissary_meat_id` will need its own `commissary_id`
+scoping, and how the Dashboard rollup's SQL actually groups by
+meat-type across multiple commissaries. Real implementation work, not
+more open questions — the design above should be enough to build from
+without another round of discussion, but flag anything it doesn't
+cover rather than guessing.
+
 1. **No restaurant-creation UI at all.** Checked every route file —
    `restaurants` rows only ever come from `seed.js` reading a JSON file.
    Blocks the stated goal of handing this skeletal app to a new branch

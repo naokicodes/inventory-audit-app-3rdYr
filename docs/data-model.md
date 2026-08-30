@@ -97,12 +97,12 @@ per-restaurant tabs.
 | column | type | notes |
 |---|---|---|
 | id | integer, PK | |
-| restaurant_id | integer, FK, **nullable (2026-08-28)** | **NULL means "shipped from the commissary, not yet assigned to a restaurant"** — the "Unallocated" case from the real xlsx's `Outbound_Log`. Only valid when `source = COMMISSARY`; a `DIRECT` receipt must always have a restaurant, since a direct delivery is by definition addressed to one. See "Unallocated receipts" note below. |
-| meat_id | integer, FK, **nullable (2026-08-28)** | **NULL only when `restaurant_id` is also NULL** (an unallocated row hasn't been assigned to a restaurant yet, so it can't reference that restaurant's own meat item — only `commissary_meat_id` is known at that point). Non-null in every other case. |
+| restaurant_id | integer, FK, nullable at the DB layer | **RETIRED 2026-08-29 (see below) — always required together with `meat_id` in practice.** The DB column stays nullable (no destructive schema change) and its `CHECK` constraint still technically permits the old shape, but the app-level route rejects it — `POST`/`PATCH /api/stock-receipts` require `restaurant_id`+`meat_id` together, always, and `source` must be `DIRECT`. |
+| meat_id | integer, FK, nullable at the DB layer | Same retirement as `restaurant_id` above — required together with it in every real write path today. |
 | business_date | date | |
 | quantity | decimal | |
-| source | text | `DIRECT` or `COMMISSARY` |
-| commissary_meat_id | integer, FK → commissary_meats, nullable | set only when source = COMMISSARY. For an unallocated row this is the ONLY meat reference present. |
+| source | text | `DIRECT` or `COMMISSARY` at the DB `CHECK` level, but the app only ever writes `DIRECT` through this table now. A `COMMISSARY`-sourced row is only ever created automatically, as a side effect of `POST /api/commissary/shipments` — never through this route. |
+| commissary_meat_id | integer, FK → commissary_meats, nullable | Set on the rows `POST /api/commissary/shipments` creates automatically. Never set by a manual write through this table anymore. |
 | notes | text, nullable | |
 | photo_path | text, nullable | |
 | created_by | text | |
@@ -117,13 +117,24 @@ single-row lookup. **A row with `restaurant_id IS NULL` is never counted
 toward any restaurant's `new_stock`** — it isn't attributable to one yet by
 definition.
 
-#### Unallocated receipts (resolved 2026-08-28)
+#### Unallocated receipts (resolved 2026-08-28, RETIRED 2026-08-29)
+**Historical record only — this entire subsection describes a
+workflow that no longer exists in the app.** See
+`session-status.md`'s "commissary_meat_map's fate" entry (step 20) for
+why: once `POST /api/commissary/shipments` always names the
+destination up front, there was no remaining legitimate case for
+manually logging a `COMMISSARY`-sourced receipt with the destination
+left unset. **Current reality**: `POST /api/stock-receipts` accepts
+`DIRECT` only, `restaurant_id`/`meat_id` always required together. See
+the `stock_receipts` table entry above for the corrected column notes.
+Kept below for context on the original decision, not as current spec.
+
 Previously flagged as an open gap: the real xlsx's `Outbound_Log` allows a
 commissary shipment with no restaurant destination yet ("Unallocated"), but
 the original schema had `restaurant_id NOT NULL`, so this case wasn't
 representable.
 
-**Decision**: `restaurant_id` and `meat_id` are now nullable, with the
+**Decision [superseded 2026-08-29]**: `restaurant_id` and `meat_id` are now nullable, with the
 constraint above (both null together, only for `source = COMMISSARY`). An
 unallocated row is created via the normal `POST /api/stock-receipts` flow but
 with restaurant left unset. It is later assigned via
@@ -134,7 +145,7 @@ chosen restaurant, same validation `POST` already applies). Both the create
 and the later assignment go through the existing `activity_log` machinery —
 assignment is logged as an `UPDATE`, same as any other edit.
 
-**Continuity requirement (added 2026-08-28):** the `commissary_meat_map`
+**Continuity requirement (added 2026-08-28, moot since 2026-08-29 — the capability it protected no longer exists):** the `commissary_meat_map`
 lookup used to resolve `meat_id` on assignment must resolve to the *same*
 `commissary_meat_id` already stored on the row being assigned — reject the
 assignment otherwise. Without this check, assignment could silently
@@ -143,12 +154,20 @@ from, undermining the balance/traceability this table exists for. (This
 was flagged by a coding session as an ambiguity the docs didn't resolve;
 confirmed correct and written in here rather than left implicit.)
 
-**Why this approach over a placeholder "Unallocated" row in `restaurants`**:
+**Why this approach over a placeholder "Unallocated" row in `restaurants`
+[historical reasoning only]**:
 a placeholder restaurant would pollute restaurant-scoped reporting (it would
 show up in "restaurants" dropdowns, weekly summaries, etc. as if it were a
 real location) for no benefit over a nullable column. Nullable + explicit
 assignment-later keeps unallocated stock cleanly invisible to
 restaurant-facing screens until it's actually assigned.
+
+**A handful of other scattered references to "unallocated" remain
+elsewhere in this file (sections on activity_log, the audit engine's
+`new_stock` query, etc.) — not individually corrected in this pass,
+same retirement applies to all of them.** Worth a dedicated pass if
+they cause real confusion; not done here given the scope of what's
+already being resolved today.
 
 Tracked as **step 9** in `docs/session-status.md`.
 

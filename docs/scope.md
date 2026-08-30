@@ -123,8 +123,13 @@ areas, not part of the daily entry screens.
   that most needs a trail of where it came from. This does not reopen
   soft-delete or general audit logging for `prepped` — that's still
   deferred until a real edit UI exists for it.
-- A second/third commissary, or commissary-to-commissary transfers — the
-  current design assumes one commissary serving all restaurants.
+- ~~A second/third commissary, or commissary-to-commissary transfers~~ —
+  **un-shelved 2026-08-30**, no longer assumed one-commissary-forever.
+  Design resolved (option B: separate `commissaries`, each with its own
+  independent meat catalog, restaurants can receive from more than one)
+  — see `session-status.md`'s "Round 2 findings" / item 3 for the full
+  design. Not built yet — schema doesn't exist, this line stays until
+  it does.
 
 ## When in doubt
 If a Claude Code suggestion or an implementation detail would expand scope
