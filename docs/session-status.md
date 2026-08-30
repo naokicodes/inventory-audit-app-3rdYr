@@ -1335,16 +1335,65 @@ question asked and answered, not assumed:
   today) — the drill-down view is presenting data the logic layer will
   already have, not new calculation work.
 
-**Not designed yet, deliberately left for when this actually gets
-built**: exact table names/columns for `commissaries` and the meat-type
-reference table, how `commissary_conversion_standards`'s existing
-`(commissary_meat_id, restaurant_id, meat_id)` uniqueness needs to
-change now that `commissary_meat_id` will need its own `commissary_id`
-scoping, and how the Dashboard rollup's SQL actually groups by
-meat-type across multiple commissaries. Real implementation work, not
-more open questions — the design above should be enough to build from
-without another round of discussion, but flag anything it doesn't
-cover rather than guessing.
+**RESOLVED 2026-08-31 — the remaining open question above (`commissary_conversion_standards`'s rekey) and exact table shapes, settled in a
+fresh architecture session:**
+
+- **`commissaries`**: `id`, `code` (unique, e.g. `COM-A`), `name`,
+  `active` — same shape as `restaurants`.
+- **`meat_types`**: `id`, `name`, `active` — admin-managed reference
+  table, no other columns needed yet.
+- **`commissary_meats` gets two new columns**: `commissary_id` (NOT
+  NULL FK → `commissaries`) and `meat_type_id` (nullable FK →
+  `meat_types` — optional at the catalog level, exactly as designed
+  above). Its existing `UNIQUE(code)` becomes `UNIQUE(commissary_id,
+  code)` — codes are only unique within one commissary's own catalog
+  now, not globally.
+- **Every other commissary-scoped table needs zero new columns.**
+  `commissary_yield_log`, `commissary_shipments`,
+  `commissary_stock_receipts`, `commissary_ending_actual`,
+  `commissary_opening_stock`, and `commissary_shipment_presets` all
+  reference `commissary_meat_id` already — they inherit commissary
+  scoping transitively through that FK, for free. Confirmed
+  deliberately, per rule 4 (never store a derivable value
+  redundantly) — don't let a coder add a `commissary_id` column to any
+  of these "for convenience."
+- **`commissary_conversion_standards`'s rekey, resolved**: this is a
+  real column swap, not an added fallback lookup. Drop
+  `commissary_meat_id`, add `meat_type_id` (NOT NULL FK →
+  `meat_types`). New uniqueness: `UNIQUE(meat_type_id, restaurant_id,
+  meat_id)`. Consequence, confirmed as intentional: a commissary meat
+  can only get a Conversion Standard once it's tagged with a
+  `meat_type` — untagged/raw-dynamic meats are unaffected, exactly the
+  "optional at the catalog level, required for a Standard" framing
+  above. The Shipment form's live implied-input math and the
+  Dashboard's cross-commissary rollup both join through this same
+  `meat_type_id`, one join, no special-casing.
+- **Migration, since there's one implicit commissary today**: create
+  one real `commissaries` row for it; every existing `commissary_meats`
+  row gets `commissary_id` set to that row. For every existing
+  `commissary_conversion_standards` row, create (or reuse) a
+  `meat_types` row for its `commissary_meat_id`'s meat, point that
+  `commissary_meat`'s `meat_type_id` at it, and rewrite the standard's
+  key column from `commissary_meat_id` to the new `meat_type_id`. Real
+  `ALTER`/data-migration work, not a `schema.sql` edit alone — matches
+  the standing gotcha that `CREATE TABLE IF NOT EXISTS` can't loosen an
+  existing local `inventory.db`'s constraints.
+
+**Sub-step plan, confirmed — mirrors 20a/20b/20c:**
+- **23a (schema only)**: the tables/columns above + the migration.
+- **23b (engine/routes)**: Commissary CRUD, meat-type CRUD,
+  `commissary_meats` CRUD (this absorbs numbered-list item 2 below —
+  "no commissary-meat-creation UI" — since it can't be built sensibly
+  without a `commissary_id` to create against), every commissary-scoped
+  engine function updated to take a `commissary_id` param instead of
+  assuming a singleton, Shipment-form implied-input math rejoined via
+  `meat_type_id`, Dashboard rollup grouped by `meat_type_id`.
+- **23c (UI)**: Commissary + Meat Type tabs in Settings, commissary-meat
+  creation UI, a commissary selector everywhere a screen currently
+  assumes there's only one (`commissary.html`, `commissary-shipments.html`,
+  Terminal, Dashboard drill-down).
+
+**Next up: 23a.** None of the three sub-steps are started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading
@@ -1490,15 +1539,93 @@ model. Settled through the same real back-and-forth as item 3's design
   separately for real operational use (e.g. staff-meal planning per
   meat).
 
-**Not designed yet, deliberately left for when this actually gets
-built**: exact table/column names for the Commissary-side allocation
-table, how a yield event's "input meat" reference should be structured
-now that it might point at either a genuinely raw meat or a prior
-stage's output (same column either way, or does chaining need its own
-explicit marker?), and how many stages the schema should allow for
-before it's clearly over-engineered for a real 2-stage-max case. Real
-implementation work, not more open questions — flag anything this
-design doesn't cover rather than guessing.
+**RESOLVED 2026-08-31 — the remaining open questions above, settled in
+the same architecture session as item 3's rekey:**
+
+- **A real, previously-unflagged gap found while checking this against
+  actual code**: `commissary-seed-data.json` already has three raw/
+  backed pairs seeded as *separate catalog rows* — `M01 Whole
+  Chicken`/`M02 Whole Chicken Raw`, `M03 Belly Slab`/`M04 Belly Slab
+  Raw`, `M05 JOWL`/`M06 JOWL Raw` — but `commissary_yield_log` has only
+  one `commissary_meat_id` column, and no route or engine function ever
+  references the "Raw" rows. They're vestigial — seeded for a
+  raw-vs-backed split that was never wired up. **Confirmed by the
+  project owner (2026-08-31): this was intentional, not accidental —
+  "not every meat could be backed up" is a real case, these rows were
+  meant to be tracked, the app just never got that far.** This isn't
+  scoped to Shortplate/Chicken alone — it's the same fix, retroactively
+  covering three existing meats.
+- **`commissary_yield_log` gets one new column**: `output_commissary_meat_id`,
+  nullable FK → `commissary_meats`, **defaulting to "same as input"
+  when NULL** — this is what keeps every existing single-row event
+  (e.g. Belly Slab in, Belly Slab out, just lighter from trim loss)
+  working completely unchanged. Only an event that genuinely produces a
+  *different* catalog row (Raw Shortplate → Seared Shortplate, Raw
+  Chicken → Processed Chicken, and now `M02→M01`/`M04→M03`/`M06→M05`)
+  sets it explicitly. No separate "is this chained" marker needed — the
+  column's presence/absence on a given row already tells you which
+  case it is.
+- **The existing `commissary_meat_id` column stays as-is and means
+  "input"** — no rename. `getCommissaryBackedUp`'s credit target
+  changes from always crediting `commissary_meat_id` to crediting
+  `output_commissary_meat_id` when set, `commissary_meat_id` otherwise.
+- **No stage-count cap in the schema.** Chain length is emergent from
+  however many yield-log rows point at each other, not a declared
+  number — a real 2-stage case (Shortplate) doesn't need the schema to
+  know it's 2 stages, and nothing breaks if a future case needs more.
+- **`commissary_adjustments` — new table, parallel to the existing
+  restaurant-scoped `adjustments`, not shared/merged** (matches item
+  3's "option B" precedent of keeping Commissary structurally
+  separate):
+  ```
+  commissary_adjustments
+    id
+    commissary_meat_id               -- source being drawn down
+    business_date
+    kind                              -- 'LOSS' | 'ALLOCATION' — this
+                                       -- column's value IS the
+                                       -- classifier, no separate flag
+    quantity
+    destination_commissary_meat_id    -- NULL for LOSS, required for
+                                       -- ALLOCATION (e.g. Miscuts-Chicken)
+    notes
+    created_by / created_at
+    deleted_at                        -- soft delete, same pattern as
+                                       -- commissary_yield_log
+  ```
+  `destination_commissary_meat_id` self-references `commissary_meats`
+  (both sides are commissary items, never a restaurant's `meats` row).
+- **Miscuts stay separate catalog rows** (Miscuts-Chicken,
+  Miscuts-Jowl, Miscuts-Belly, ...) **tagged via `meat_types`** — same
+  table item 3's schema (23a) introduces, not a new tagging mechanism.
+  An allocation's destination dropdown should be restricted to
+  `meat_type`-compatible siblings of the source (so Processed Chicken
+  can't accidentally allocate into a Jowl-tagged bucket) — a UI/route
+  concern for 24c, not a schema constraint.
+- **Depends on 23a** (needs `meat_types` to exist for Miscuts tagging) —
+  sequenced after it, not before.
+
+**Sub-step plan, confirmed:**
+- **24a (usage-formula fix + schema)**: `getCommissaryUsage` also sums
+  `raw_weight_in` for every yield event where the meat in question is
+  the input side (`commissary_meat_id`) — this part has no schema
+  dependency and fixes the standalone bug on its own. Bundled into the
+  same step: `output_commissary_meat_id` added to
+  `commissary_yield_log`, `commissary_adjustments` created, migration
+  wires `M02→M01`/`M04→M03`/`M06→M05` as legitimate explicit-output
+  pairs going forward (no historical data to backfill — these rows
+  have never been referenced by any real event).
+- **24b (engine/routes)**: crediting logic updated to target
+  `output_commissary_meat_id`, per-meat "next stage" config so the
+  yield form can default the output dropdown, `commissary_adjustments`
+  CRUD + balance effects, Miscuts destination filtering via
+  `meat_type_id`.
+- **24c (UI)**: output-item field on the yield-entry form (defaults to
+  same meat when no next-stage is configured), an Allocate/Write-off
+  action on the commissary balance view.
+
+**Next up, after 23a/23b/23c: 24a.** None of the three sub-steps are
+started.
 
 ## Original five items, raised 2026-08-29
 

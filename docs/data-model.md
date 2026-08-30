@@ -12,6 +12,16 @@ been added — commissary yield tracking and the activity log. See
 `docs/commissary-and-stock-receipts.md` for the full reasoning; this file has
 the resulting schema only.
 
+**2026-08-31 note**: section 10 below predates several tables that now exist
+in the live `schema.sql` (`commissary_shipments`, `commissary_shipment_lines`,
+`commissary_shipment_presets`, `commissary_conversion_standards`) — it was
+never updated as those steps shipped. Not fixed in this pass; flagged so a
+future session doesn't treat section 10 as exhaustive. The schema decisions
+made in this session (multi-Commissary generalization + multi-stage yield/
+allocation) are in new section **10b** below, which *is* current — see
+`session-status.md`'s "Item 3 design" and "Multi-stage yield + Commissary-side
+allocation" entries for the full reasoning behind each call.
+
 **2026-08-28 update (architecture review)**: two items previously listed under
 "Still open" are now resolved decisions — see section 5 (`stock_receipts.
 restaurant_id` is now nullable, to represent commissary shipments not yet
@@ -423,6 +433,82 @@ Pinned down and verified against all real rows in `Commi_Audit_Master.xlsx`'s
 2026-08-28 — see `server/engines/commissaryYieldEngine.js` and its test file.
 This doc previously still listed the formula as open; that was a docs lag,
 not an unresolved formula. Corrected here.
+
+### 10b. Multi-Commissary generalization + multi-stage yield/allocation (resolved 2026-08-31, not yet built)
+
+Full reasoning in `session-status.md`; this is the schema only, kept in sync
+per rule 7 (architect edits this file directly when a real decision is made,
+not deferred to a coder).
+
+**New tables:**
+
+```
+commissaries
+  id            integer, PK
+  code          text, unique      -- e.g. "COM-A"
+  name          text
+  active        boolean
+
+meat_types
+  id            integer, PK
+  name          text
+  active        boolean           -- admin-managed reference table
+
+commissary_adjustments
+  id                              integer, PK
+  commissary_meat_id              integer, FK -> commissary_meats  -- source
+  business_date                   date
+  kind                            text CHECK IN ('LOSS','ALLOCATION')
+  quantity                        decimal
+  destination_commissary_meat_id  integer, FK -> commissary_meats, nullable
+                                   -- NULL for LOSS, required for ALLOCATION
+  notes                           text, nullable
+  created_by                      text
+  created_at                      timestamp
+  deleted_at                      timestamp, nullable  -- soft delete
+```
+
+**Changed tables:**
+
+- `commissary_meats` gains `commissary_id` (NOT NULL, FK → `commissaries`)
+  and `meat_type_id` (nullable, FK → `meat_types`). `UNIQUE(code)` becomes
+  `UNIQUE(commissary_id, code)`.
+- `commissary_conversion_standards` swaps its `commissary_meat_id` column for
+  `meat_type_id` (NOT NULL, FK → `meat_types`). `UNIQUE(commissary_meat_id,
+  restaurant_id, meat_id)` becomes `UNIQUE(meat_type_id, restaurant_id,
+  meat_id)`. A commissary meat can only get a Standard once it's tagged with
+  a `meat_type` — untagged/raw-dynamic meats are unaffected.
+- `commissary_yield_log` gains `output_commissary_meat_id` (nullable, FK →
+  `commissary_meats`). NULL means "same as input" (today's behavior,
+  unchanged — a single meat losing weight to trim). Set explicitly when an
+  event produces a genuinely different catalog row (raw → backed, or one
+  processing stage's output feeding the next). `getCommissaryBackedUp`'s
+  credit target becomes `output_commissary_meat_id` when set, else
+  `commissary_meat_id`. No stage-count cap — chain length is emergent from
+  how many rows point at each other, not a declared schema limit.
+
+**Not new, but newly load-bearing**: `commissary-seed-data.json` already
+seeds three raw/backed pairs (`M01`/`M02` Whole Chicken, `M03`/`M04` Belly
+Slab, `M05`/`M06` JOWL) as separate `commissary_meats` rows that no route or
+engine has ever referenced — confirmed intentional, not dead data (some
+meats genuinely don't get backed up the same day). `output_commissary_meat_id`
+is what finally wires these up (e.g. a yield event with `commissary_meat_id
+= M02` and `output_commissary_meat_id = M01`), no new seed rows required.
+
+**Also required**: `getCommissaryUsage` (`commissaryAuditEngine.js`) must
+also sum `commissary_yield_log.raw_weight_in` for every event where the meat
+in question is the input (`commissary_meat_id`) — today it only counts
+`commissary_shipments`, so a raw/intermediate meat's calculated balance never
+decreases when it's consumed by processing. Confirmed bug, not a new
+feature; a prerequisite for the output-column change to mean anything.
+
+**Migration** (today's single implicit commissary): create one `commissaries`
+row, backfill every `commissary_meats.commissary_id` to it. For every
+existing `commissary_conversion_standards` row, create/reuse a `meat_types`
+row for its meat, point that `commissary_meat`'s `meat_type_id` at it, and
+rewrite the standard's key column. Needs an idempotent migration helper (not
+just a `schema.sql` edit) per the standing `CREATE TABLE IF NOT EXISTS`
+gotcha in `architect-notes-PRIVATE.md`.
 
 ### commissary_balance (calculated, not stored)
 ```
