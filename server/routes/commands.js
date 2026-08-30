@@ -11,51 +11,85 @@ const { withTransaction, logActivity } = require('../db/activityLog.js');
 const router = express.Router();
 
 // GET /api/commands/oversold-check
-// Step 18: BATCH_PREPPED sold quantity should never exceed available
-// prepped portions. Reads "available prepped portions" as SAME-DAY
-// prepped only (sold(dish, date) > prepped(dish, date)), not the fuller
-// running portion balance (portionBeginning + prepped - sold) that
-// computeDishAudit computes - see the interpretation note in
-// docs/session-status.md's step 18 entry for why: portionBeginning
-// depended on portion_ending_actual, which had no write path anywhere
-// in the app at the time (step 11), so it was null for virtually every
-// dish/date and a check built on it would have been dead code then.
-// UPDATE 2026-08-29: that write path now exists
-// (POST /api/daily-audit/portions) - this interpretation choice is no
-// longer forced by a missing capability, just still the current
-// behavior. Worth a real revisit (should this check use the fuller
-// running balance now that it can?), not done here - flagging it
-// rather than changing this route's behavior as a side effect of an
-// unrelated task.
+// Step 18, revisited 2026-08-29 (item 6, session-status.md): BATCH_PREPPED
+// sold quantity should never exceed available prepped portions. Originally
+// read "available prepped portions" as SAME-DAY prepped only
+// (sold(dish, date) > prepped(dish, date)), because the fuller running
+// portion balance (portionBeginning + prepped - sold) that
+// computeDishAudit computes depended on portion_ending_actual, which had
+// no write path anywhere in the app at the time (step 11) - it was null
+// for virtually every dish/date and a check built on it would have been
+// dead code then. That write path exists now
+// (POST /api/daily-audit/portions), so this route uses the fuller
+// running-balance check wherever a beginning count is actually
+// established for a dish/date, falling back to the original same-day
+// check where it isn't (MISSING_BEGINNING_STOCK) - same graceful-
+// degradation pattern used throughout this app, not an all-or-nothing
+// switch. The fuller check matters in practice: a dish batch-prepped once
+// and sold down over several days would falsely flag every zero-prep day
+// under the same-day-only check, since that never accounts for carryover
+// stock from a previous day's prepping.
 //
 // Read-only - never writes anything, matching "surface as a WARNING,
 // not a hard block." Global, same reasoning as sync-batch-stock: the
 // panel is reachable from every page with no shared date context.
 router.get('/commands/oversold-check', (req, res) => {
-  const rows = db.prepare(`
-    SELECT
-      s.restaurant_id AS restaurant_id,
-      r.name AS restaurant_name,
-      s.dish_id AS dish_id,
-      d.dish_code AS dish_code,
-      d.name AS dish_name,
-      s.business_date AS business_date,
-      SUM(s.quantity) AS sold,
-      COALESCE((
-        SELECT SUM(p.portions_produced) FROM prepped p
-        WHERE p.restaurant_id = s.restaurant_id AND p.dish_id = s.dish_id AND p.business_date = s.business_date
-      ), 0) AS prepped
+  const { computeDishAudit } = require('../engines/auditEngine.js');
+
+  const candidates = db.prepare(`
+    SELECT DISTINCT s.restaurant_id, r.name AS restaurant_name, s.dish_id,
+           d.dish_code, d.name AS dish_name, s.business_date
     FROM sales s
     JOIN dishes d ON d.id = s.dish_id
     JOIN restaurants r ON r.id = s.restaurant_id
     WHERE d.prep_type = 'BATCH_PREPPED'
-    GROUP BY s.restaurant_id, s.dish_id, s.business_date
-    HAVING sold > prepped + 0.01
     ORDER BY s.business_date, r.name, d.dish_code
   `).all();
 
-  const withShortfall = rows.map(r => ({ ...r, shortfall: r.sold - r.prepped }));
-  res.json({ ok: true, oversold_count: withShortfall.length, rows: withShortfall });
+  const EPSILON = 0.01;
+  const flagged = [];
+
+  for (const c of candidates) {
+    const audit = computeDishAudit(db, c.restaurant_id, c.dish_id, c.business_date);
+
+    if (audit.portionBeginning !== null) {
+      // Fuller running-balance check, now that a beginning count exists
+      // for this dish/date (POST /api/daily-audit/portions, added
+      // 2026-08-29 - see session-status.md item 6). More correct than
+      // the same-day check: a dish batch-prepped once and sold down
+      // over several days would falsely flag every zero-prep day under
+      // the same-day check, since it never accounts for carryover.
+      if (audit.portionEndingCalculated < -EPSILON) {
+        flagged.push({
+          restaurant_id: c.restaurant_id, restaurant_name: c.restaurant_name,
+          dish_id: c.dish_id, dish_code: c.dish_code, dish_name: c.dish_name,
+          business_date: c.business_date,
+          sold: audit.sold, prepped: audit.prepped,
+          shortfall: -audit.portionEndingCalculated,
+          method: 'running_balance'
+        });
+      }
+    } else {
+      // Fallback: no beginning count established for this dish/date yet
+      // (MISSING_BEGINNING_STOCK) - the running balance can't be
+      // computed, so fall back to the original same-day check. Same
+      // graceful-degradation pattern used throughout this app (prefer
+      // real/fuller data, degrade to something still useful when it
+      // isn't available yet) rather than an all-or-nothing switch.
+      if (audit.sold > audit.prepped + EPSILON) {
+        flagged.push({
+          restaurant_id: c.restaurant_id, restaurant_name: c.restaurant_name,
+          dish_id: c.dish_id, dish_code: c.dish_code, dish_name: c.dish_name,
+          business_date: c.business_date,
+          sold: audit.sold, prepped: audit.prepped,
+          shortfall: audit.sold - audit.prepped,
+          method: 'same_day_fallback'
+        });
+      }
+    }
+  }
+
+  res.json({ ok: true, oversold_count: flagged.length, rows: flagged });
 });
 
 // POST /api/commands/sync-batch-stock

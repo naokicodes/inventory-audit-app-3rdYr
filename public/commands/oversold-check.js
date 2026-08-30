@@ -20,7 +20,7 @@
         return 'No over-sold days found.';
       }
       const lines = data.rows.map(r =>
-        `WARNING: ${r.restaurant_name} - ${r.dish_code} ${r.dish_name} on ${r.business_date}: sold ${r.sold}, prepped ${r.prepped} (short ${r.shortfall.toFixed(2)})`
+        `WARNING: ${r.restaurant_name} - ${r.dish_code} ${r.dish_name} on ${r.business_date}: sold ${r.sold}, prepped ${r.prepped} (short ${r.shortfall.toFixed(2)}, ${r.method === 'running_balance' ? 'incl. carryover' : 'same-day only, no beginning count yet'})`
       );
       return `${data.oversold_count} over-sold day(s):\n${lines.join('\n')}`;
     }

@@ -160,55 +160,59 @@ test('different restaurants with the same dish_id/date are kept separate', () =>
 });
 
 // --- Mirrors GET /api/commands/oversold-check ---
+// Mirrors GET /api/commands/oversold-check (rewritten 2026-08-29, item 6)
 function runOversoldCheck(db) {
-  const rows = db.prepare(`
-    SELECT
-      s.restaurant_id AS restaurant_id,
-      r.name AS restaurant_name,
-      s.dish_id AS dish_id,
-      d.dish_code AS dish_code,
-      d.name AS dish_name,
-      s.business_date AS business_date,
-      SUM(s.quantity) AS sold,
-      COALESCE((
-        SELECT SUM(p.portions_produced) FROM prepped p
-        WHERE p.restaurant_id = s.restaurant_id AND p.dish_id = s.dish_id AND p.business_date = s.business_date
-      ), 0) AS prepped
+  const { computeDishAudit } = require('../engines/auditEngine.js');
+  const candidates = db.prepare(`
+    SELECT DISTINCT s.restaurant_id, r.name AS restaurant_name, s.dish_id,
+           d.dish_code, d.name AS dish_name, s.business_date
     FROM sales s
     JOIN dishes d ON d.id = s.dish_id
     JOIN restaurants r ON r.id = s.restaurant_id
     WHERE d.prep_type = 'BATCH_PREPPED'
-    GROUP BY s.restaurant_id, s.dish_id, s.business_date
-    HAVING sold > prepped + 0.01
     ORDER BY s.business_date, r.name, d.dish_code
   `).all();
-  return rows.map(r => ({ ...r, shortfall: r.sold - r.prepped }));
+
+  const EPSILON = 0.01;
+  const flagged = [];
+  for (const c of candidates) {
+    const audit = computeDishAudit(db, c.restaurant_id, c.dish_id, c.business_date);
+    if (audit.portionBeginning !== null) {
+      if (audit.portionEndingCalculated < -EPSILON) {
+        flagged.push({ ...c, sold: audit.sold, prepped: audit.prepped, shortfall: -audit.portionEndingCalculated, method: 'running_balance' });
+      }
+    } else if (audit.sold > audit.prepped + EPSILON) {
+      flagged.push({ ...c, sold: audit.sold, prepped: audit.prepped, shortfall: audit.sold - audit.prepped, method: 'same_day_fallback' });
+    }
+  }
+  return flagged;
 }
 
-test('a BATCH_PREPPED dish sold more than prepped is flagged', () => {
+test('with no beginning count established, falls back to same-day check - a BATCH_PREPPED dish sold more than prepped is flagged', () => {
   const db = freshDb();
   db.prepare(`INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced) VALUES (1, 1, '2026-08-29', 10)`).run();
   db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-29', 15, 'MANUAL')`).run();
   const flagged = runOversoldCheck(db);
   assert.strictEqual(flagged.length, 1);
   assert.strictEqual(flagged[0].shortfall, 5);
+  assert.strictEqual(flagged[0].method, 'same_day_fallback');
 });
 
-test('sold exactly matching prepped is NOT flagged', () => {
+test('fallback: sold exactly matching prepped is NOT flagged', () => {
   const db = freshDb();
   db.prepare(`INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced) VALUES (1, 1, '2026-08-29', 10)`).run();
   db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-29', 10, 'MANUAL')`).run();
   assert.strictEqual(runOversoldCheck(db).length, 0);
 });
 
-test('sold less than prepped is NOT flagged', () => {
+test('fallback: sold less than prepped is NOT flagged', () => {
   const db = freshDb();
   db.prepare(`INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced) VALUES (1, 1, '2026-08-29', 10)`).run();
   db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-29', 3, 'MANUAL')`).run();
   assert.strictEqual(runOversoldCheck(db).length, 0);
 });
 
-test('sales with no prepped row at all counts as 0 prepped - fully oversold', () => {
+test('fallback: sales with no prepped row at all counts as 0 prepped - fully oversold', () => {
   const db = freshDb();
   db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-29', 4, 'MANUAL')`).run();
   const flagged = runOversoldCheck(db);
@@ -231,6 +235,44 @@ test('oversold-check never writes anything - it is read-only', () => {
   const logRows = db.prepare(`SELECT * FROM activity_log`).all();
   assert.strictEqual(preppedRows.length, 0);
   assert.strictEqual(logRows.length, 0);
+});
+
+// ---- The main motivating case for item 6: carryover across days ----
+
+test('running balance: the same-day check would false-positive on a batch-prepped-once dish sold down over several days - the fuller check correctly does NOT flag it', () => {
+  const db = freshDb();
+  // Day 1: prep 50, sell 10, actual 40. (Day 1 itself has no prior day,
+  // so its own portionBeginning is null - MISSING_BEGINNING_STOCK,
+  // irrelevant to this test, which only checks day 2.)
+  db.prepare(`INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced) VALUES (1, 1, '2026-08-01', 50)`).run();
+  db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-01', 10, 'MANUAL')`).run();
+  db.prepare(`INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted) VALUES (1, 1, '2026-08-01', 40)`).run();
+  // Day 2: prep 0 (carryover only), sell 10. Beginning derives from day
+  // 1's actual (40) - no separate opening-stock table for dishes exists,
+  // per getPortionBeginning's own design. Same-day check (10 > 0) would
+  // flag this; the fuller check should not, since 40 units carried over
+  // from day 1 easily covers it.
+  db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-02', 10, 'MANUAL')`).run();
+
+  const flagged = runOversoldCheck(db);
+  const day2 = flagged.find(f => f.business_date === '2026-08-02');
+  assert.strictEqual(day2, undefined, 'day 2 must NOT be flagged - carryover covers the sale');
+});
+
+test('running balance: genuinely selling more than beginning+prepped covers IS flagged, using the fuller formula', () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced) VALUES (1, 1, '2026-08-01', 5)`).run();
+  db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-01', 3, 'MANUAL')`).run();
+  db.prepare(`INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted) VALUES (1, 1, '2026-08-01', 2)`).run();
+  // Day 2: beginning=2 (from day 1's actual), prep 0, sell 5 - genuinely
+  // oversold by 3, even accounting for carryover.
+  db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-02', 5, 'MANUAL')`).run();
+
+  const flagged = runOversoldCheck(db);
+  const day2 = flagged.find(f => f.business_date === '2026-08-02');
+  assert.ok(day2, 'day 2 must be flagged - genuinely oversold even with carryover');
+  assert.strictEqual(day2.method, 'running_balance');
+  assert.strictEqual(day2.shortfall, 3);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
