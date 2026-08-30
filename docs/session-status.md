@@ -1,25 +1,32 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-30 (Terminal docked-bar layout — Done, pending
-push. Built and verified live: the AutoCAD-style bottom-docked command
-bar + togglable right-edge history sidebar step 21's "Deferred, not
-forgotten" note described, as pure frontend layout work on
-`public/terminal.html`. No backend or slot-state-machine changes. Full
-backend suite re-run clean after: 12/12 files, 178/178 assertions, 0
-regressions — matches baseline exactly, as expected for a
-frontend-only change. See changelog.md for full verification detail
-and the two layout calls flagged (sidebar edge, "Last saved shipment"
-panel placement) that the resolved design note didn't specify. This
-worker had no push credentials — standard handoff format used, not yet
-on `main` as of this writing.
+Last updated: 2026-08-30 (Round 2 findings item 1: Restaurant-creation
+CRUD — Done, pending push. Built `GET`/`POST`/`PUT
+/api/settings/restaurants` in `server/routes/settings.js` (same CRUD
+shape as Meats/Dishes/Adjustment Types/Locations, no `activity_log`
+wiring — config data), a new Restaurants tab on `settings.html`, and a
+fresh `server/routes/settings.test.js` (the old one was deleted in
+item 4's cleanup). Full suite 13/13 files green, 0 regressions.
+Verified live: created/edited/reactivated a restaurant via real HTTP
+against a booted server, confirmed the active/inactive-listing
+distinction against the existing active-only `GET /api/restaurants`,
+and confirmed a brand-new restaurant could immediately take a new meat
+through the existing Meats route — the actual onboarding gap this item
+was tracking is closed end-to-end. Kept deliberately separate from
+item 3's Commissary-creation work, which this session did not touch.
+See changelog.md for full detail. This worker had no push credentials
+— standard handoff format used, not yet on `main` as of this writing.
 
 Also landed on `main` since this session last pulled, by a separate
-worker (not verified or reviewed by this session beyond a clean
-rebase): the Portion Actual write path for BATCH_PREPPED dishes
-(`POST /api/daily-audit/portions`, editable dish rows on
-`daily-audit.html`) — see changelog.md's own 2026-08-29 entry for that
-work's detail and verification. Steps 1–22 remain fully done — see
-each step's own entry for its own verification detail).
+worker (not verified or reviewed by this session beyond a clean pull):
+Round 2 findings item 5 — retired the older, incomplete Commissary
+balance calculation (`getCommissaryBalance`/`listCommissaryBalances`
+gone, `commissary.html` now calls the newer, dated
+`GET /api/commissary/daily-audit` engine instead) — and, before that,
+the Terminal's docked bottom-center command bar + history sidebar
+(step 21's deferred layout). See changelog.md's own entries for both
+work items' detail and verification. Steps 1–22 remain fully done —
+see each step's own entry for its own verification detail).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -1323,10 +1330,20 @@ more open questions — the design above should be enough to build from
 without another round of discussion, but flag anything it doesn't
 cover rather than guessing.
 
-1. **No restaurant-creation UI at all.** Checked every route file —
-   `restaurants` rows only ever come from `seed.js` reading a JSON file.
-   Blocks the stated goal of handing this skeletal app to a new branch
-   for genuine self-onboarding.
+1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
+   route file — `restaurants` rows only ever came from `seed.js` reading
+   a JSON file. Blocked the stated goal of handing this skeletal app to
+   a new branch for genuine self-onboarding. Built as `GET`/`POST`/
+   `PUT /api/settings/restaurants` (same CRUD shape as Meats/Dishes/
+   Adjustment Types/Locations) + a new Restaurants tab on
+   `settings.html` + `server/routes/settings.test.js` (a fresh file —
+   the old one was deleted in item 4's cleanup). See `changelog.md`'s
+   entry for full build/verification detail, including live
+   confirmation that a newly-created restaurant can immediately take a
+   new meat through the existing route — the actual onboarding gap is
+   closed end-to-end, not just that the new route returns 200. Kept
+   separate from item 3's Commissary-creation work as designed, and did
+   not touch it.
 
 2. **No commissary-meat-creation UI either.** Same story —
    `commissary_meats` only ever comes from `commissary-seed-data.json`.

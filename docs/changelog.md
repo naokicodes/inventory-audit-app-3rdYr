@@ -11,6 +11,22 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-30 — Round 2 findings item 1: Restaurant-creation CRUD (backend + Settings UI)
+
+Closed the gap flagged in Round 2 findings item 1: `restaurants` rows only ever came from `seed.js` reading a JSON file - no way to create one through the app, which blocked the stated goal of handing this app to a new branch for genuine self-onboarding. Deliberately kept separate from the Commissary-creation work (item 3's design), same kind of gap but a different step, per that item's own note.
+
+**Backend**: `GET`/`POST`/`PUT /api/settings/restaurants` added to `server/routes/settings.js`, matching the exact CRUD shape already used for Meats/Dishes/Adjustment Types/Locations in that file - read those first rather than inventing a new pattern. GET returns every row (not just active), same as the other settings list routes, so the admin table can list and reactivate. POST requires `name` + `code`, uppercases `code` (matches `meat_code`/`dish_code`), and gives the same friendly "already exists" error on the UNIQUE constraint. PUT edits `name`/`active` only - `code` is set once at creation and isn't part of the edit shape, same as meat/dish codes elsewhere. No `activity_log` wiring: this is settings/config data, not a daily transactional log, same reasoning already given for Adjustment Types/Locations.
+
+**Frontend**: new "Restaurants" tab on `public/settings.html` (now the first tab), same add-form + editable-table pattern as the Locations section. Wired to also refresh the page-level Restaurant selector and the Locations tab's restaurant dropdown after any create/edit, so a newly-created restaurant is immediately usable everywhere else on the page without a reload.
+
+**Tests**: `server/routes/settings.test.js` is a new file - the old one was deleted during item 4's cleanup pass since it only covered the retired commissary-mapping routes. 10 mirrored-logic tests (same in-memory-DB, no-framework style as `dailyAudit.test.js`/`stockReceipts.test.js`): create with/without required fields, duplicate-code rejection, edit name/active, code staying immutable across an edit, and confirming an inactive restaurant still appears in this settings list even though it drops out of the existing active-only `GET /api/restaurants` used elsewhere.
+
+**Verified**: full suite 13/13 files green, 0 regressions against this session's actual pulled baseline (which by the time of this entry also includes item 5's Commissary balance retirement, landed by a separate worker on a completely disjoint set of files - re-ran the full suite after pulling that in too, still 13/13, still 0 regressions). Verified live against a real running server (fresh `seed.js` + `node server/index.js`): created a restaurant via HTTP, confirmed duplicate-code and missing-field rejection, edited name/active, confirmed the inactive row still lists here but drops out of `/api/restaurants`, reactivated it, and - the actual point of this step - confirmed the brand-new restaurant could immediately take a new meat via the existing `POST /api/settings/meats`, proving the onboarding gap is closed end-to-end, not just that the route returns 200.
+
+**Handoff note**: this worker had no `git push` credentials (read-only clone) - see the session's own handoff message for the exact `git add`/`git commit` commands and file list, per rule 18's standard-handoff format.
+
+---
+
 ## 2026-08-30 (later) — Round 2 item 5: retired the older, incomplete Commissary balance calculation
 
 Two disagreeing "what does Commissary currently have" calculations were both live: `commissary.html` calling `GET /api/commissary/balances` → `commissaryYieldEngine.js`'s `getCommissaryBalance`/`listCommissaryBalances` (lifetime backed-in minus shipped-out, no date, no `commissary_stock_receipts`/New Stock concept at all, no physical-count comparison), versus `commissary-shipments.html`/the Dashboard's `GET /api/commissary/daily-audit` → `commissaryAuditEngine.js`'s `computeCommissaryMeatAudit` (a proper Beginning + Stock In + Backed Up − Usage = Ending daily audit, correctly including New Stock, comparable against a real physical count). The newer one was strictly more correct and complete, per Round 2 findings item 5.
