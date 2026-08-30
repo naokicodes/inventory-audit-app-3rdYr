@@ -9,10 +9,7 @@
 
 const express = require('express');
 const db = require('../db/connection.js');
-const {
-  computeYieldRow,
-  listCommissaryBalances
-} = require('../engines/commissaryYieldEngine.js');
+const { computeYieldRow } = require('../engines/commissaryYieldEngine.js');
 const { computeCommissaryDailyAudit } = require('../engines/commissaryAuditEngine.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
 
@@ -69,14 +66,6 @@ router.get('/commissary/yield-log', (req, res) => {
   });
 
   res.json(rows);
-});
-
-// GET /api/commissary/balances
-// Live on-hand balance per active commissary meat (backed-in minus
-// shipped-out). See commissaryYieldEngine.js for the formula and its
-// verification note.
-router.get('/commissary/balances', (req, res) => {
-  res.json(listCommissaryBalances(db));
 });
 
 // GET /api/commissary/daily-audit?date=2026-08-25&commissary_meat_id=5

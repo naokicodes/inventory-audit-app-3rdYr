@@ -20,9 +20,7 @@ const {
   computeExcessLoss,
   computeYieldMetrics,
   computeYieldRow,
-  computeYieldLogForDate,
-  getCommissaryBalance,
-  listCommissaryBalances
+  computeYieldLogForDate
 } = require('./commissaryYieldEngine.js');
 
 let passed = 0;
@@ -156,112 +154,6 @@ test('soft-deleted yield log rows are excluded from computeYieldLogForDate', () 
   assert.strictEqual(results.length, 0);
 });
 
-// --- Part 3: commissary balance (backed-in minus shipped-out) -------------
-// Commi_Audit_Master.xlsx was available this session - these fixtures are
-// the REAL M03 Belly Slab rows from Yield_Log and Outbound_Log, and the
-// balance is cross-checked against Commissary_Stock's own cached numbers
-// (D3=29.7 backed in, E3=14.9 shipped out, F3=14.8 balance), the same way
-// excess_loss was verified in step 3.
-//
-// Outbound_Log also has a 5.0kg "Unallocated" row for M03 on 2026-07-02
-// (shipped but not yet assigned to a restaurant). Before step 9,
-// stock_receipts.restaurant_id was NOT NULL, so this row was
-// unrepresentable and the balance below came out to 19.8 instead of the
-// sheet's real 14.8 - a documented, known gap (see
-// docs/commissary-and-stock-receipts.md Part 2). As of step 9,
-// restaurant_id/meat_id are nullable and getCommissaryBalance is already
-// destination-agnostic (it only filters on commissary_meat_id/source,
-// never restaurant_id - see commissaryYieldEngine.js), so simply adding
-// the real Unallocated row below makes the balance match the sheet
-// exactly, with no engine code changes needed.
-
-// Complete the real Yield_Log dataset for Belly Slab (bellySlabId already
-// has the 2026-07-02 0.0/0.0 row from Part 2 above) - adding the other 2
-// real rows so the backed-in total matches the sheet's D3=29.7 exactly.
-db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes) VALUES (?, ?, ?, ?, ?)')
-  .run(bellySlabId, '2026-07-01', 23.5, 17.7, null);
-db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes) VALUES (?, ?, ?, ?, ?)')
-  .run(bellySlabId, '2026-07-04', 15.0, 12.0, null);
-
-test('getCommissaryBalance: Belly Slab backed-in total matches Commissary_Stock D3 (29.7) exactly', () => {
-  const backedIn = db.prepare(
-    `SELECT COALESCE(SUM(backed_weight_out), 0) AS total FROM commissary_yield_log WHERE commissary_meat_id = ? AND deleted_at IS NULL`
-  ).get(bellySlabId).total;
-  assert.ok(Math.abs(backedIn - 29.7) < EPS, `expected 29.7, got ${backedIn}`);
-});
-
-db.prepare('INSERT INTO restaurants (name, code) VALUES (?, ?)').run('Test Restaurant', 'TR1');
-const restaurantId = db.prepare('SELECT id FROM restaurants WHERE code = ?').get('TR1').id;
-db.prepare('INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (?, ?, ?, ?)')
-  .run(restaurantId, 'RM03', 'Restaurant-side Belly Slab', 'kg');
-const restaurantMeatId = db.prepare('SELECT id FROM meats WHERE restaurant_id = ? AND meat_code = ?')
-  .get(restaurantId, 'RM03').id;
-db.prepare('INSERT INTO commissary_meat_map (commissary_meat_id, restaurant_id, meat_id) VALUES (?, ?, ?)')
-  .run(bellySlabId, restaurantId, restaurantMeatId);
-
-test('getCommissaryBalance: all 4 real Belly Slab shipments (2.2 + 5.7 + 2.0 + 5.0 Unallocated = 14.9) now match Outbound_Log exactly', () => {
-  // Real Outbound_Log rows for M03, all 4 of them:
-  // 07-01 Restaurant B 2.2, 07-02 Restaurant A 5.7, 07-05 Restaurant A 2.0,
-  // and 07-02 destination "Unallocated" 5.0 - representable as of step 9
-  // via restaurant_id = NULL, meat_id = NULL.
-  db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id)
-              VALUES (?, ?, ?, ?, 'COMMISSARY', ?)`)
-    .run(restaurantId, restaurantMeatId, '2026-07-01', 2.2, bellySlabId);
-  db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id)
-              VALUES (?, ?, ?, ?, 'COMMISSARY', ?)`)
-    .run(restaurantId, restaurantMeatId, '2026-07-02', 5.7, bellySlabId);
-  db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id)
-              VALUES (?, ?, ?, ?, 'COMMISSARY', ?)`)
-    .run(restaurantId, restaurantMeatId, '2026-07-05', 2.0, bellySlabId);
-  db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id)
-              VALUES (NULL, NULL, ?, ?, 'COMMISSARY', ?)`)
-    .run('2026-07-02', 5.0, bellySlabId);
-
-  const balance = getCommissaryBalance(db, bellySlabId);
-  // 29.7 - 14.9 = 14.8, matching Commissary_Stock's own cached F3 exactly -
-  // the previously-flagged 19.8-vs-14.8 gap is now closed.
-  assert.ok(Math.abs(balance - 14.8) < EPS, `expected 14.8 (29.7 - 14.9, all 4 Outbound_Log rows now representable), got ${balance}`);
-});
-
-test('getCommissaryBalance: a DIRECT-source receipt on the same meat is not subtracted', () => {
-  const before = getCommissaryBalance(db, bellySlabId);
-  db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source)
-              VALUES (?, ?, ?, ?, 'DIRECT')`)
-    .run(restaurantId, restaurantMeatId, '2026-07-08', 999);
-  const after = getCommissaryBalance(db, bellySlabId);
-  assert.strictEqual(after, before, 'a DIRECT receipt must not affect the commissary balance');
-});
-
-test('getCommissaryBalance: a soft-deleted stock_receipts row is not subtracted', () => {
-  const before = getCommissaryBalance(db, bellySlabId);
-  db.prepare(`INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id, deleted_at)
-              VALUES (?, ?, ?, ?, 'COMMISSARY', ?, ?)`)
-    .run(restaurantId, restaurantMeatId, '2026-07-09', 999, bellySlabId, '2026-07-09T00:00:00Z');
-  const after = getCommissaryBalance(db, bellySlabId);
-  assert.strictEqual(after, before, 'a soft-deleted receipt must not affect the commissary balance');
-});
-
-test('getCommissaryBalance: a meat with backed-in but no shipments yet returns the full backed-in total', () => {
-  // JOWL has one db-backed yield_log row (2026-07-02, 16.0) and no
-  // shipments recorded in this test db - balance should be 16.0.
-  const balance = getCommissaryBalance(db, jowlId);
-  assert.ok(Math.abs(balance - 16.0) < EPS);
-});
-
-test('getCommissaryBalance: a meat with zero activity at all returns 0, not null', () => {
-  db.prepare('INSERT INTO commissary_meats (code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?)')
-    .run('M99', 'Untouched Meat', 'kg', 0.15);
-  const untouchedId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M99').id;
-  assert.strictEqual(getCommissaryBalance(db, untouchedId), 0);
-});
-
-test('listCommissaryBalances: returns one row per active commissary meat, matching individual lookups', () => {
-  const list = listCommissaryBalances(db);
-  const bellyEntry = list.find(r => r.commissary_meat_id === bellySlabId);
-  assert.ok(bellyEntry, 'Belly Slab should appear in the balance list');
-  assert.ok(Math.abs(bellyEntry.balance - getCommissaryBalance(db, bellySlabId)) < EPS);
-  assert.strictEqual(list.length, new Set(list.map(r => r.commissary_meat_id)).size, 'no duplicate meats in the list');
-});
 console.log(`\n${passed} passed, ${failed} failed`);
 
 db.close();

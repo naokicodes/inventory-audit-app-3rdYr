@@ -74,8 +74,7 @@ function getCommissaryStockIn(db, commissaryMeatId, businessDate) {
 /**
  * Backed Up = SUM of commissary_yield_log.backed_weight_out for this
  * commissary meat/date - the existing yield engine's output, unchanged.
- * Excludes soft-deleted yield rows, same as commissaryYieldEngine.js's own
- * getCommissaryBalance.
+ * Excludes soft-deleted yield rows.
  */
 function getCommissaryBackedUp(db, commissaryMeatId, businessDate) {
   const row = db.prepare(

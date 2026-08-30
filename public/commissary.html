@@ -50,7 +50,10 @@
   </div>
 
   <h2>On-hand balance</h2>
-  <p class="hint">Backed-in (from yield log) minus shipped-out (Stock Receipts rows with source = Commissary).</p>
+  <p class="hint">Beginning + Stock In + Backed Up - Shipped Out for the date below, via the same daily audit engine as the Shipments page and Dashboard - a real physical count where one's been entered, otherwise the calculated ending.</p>
+  <div class="filters">
+    <label>Date <input type="date" id="balance-date"></label>
+  </div>
   <div id="balances">Loading...</div>
 
   <h2>Log a yield event</h2>
@@ -84,10 +87,12 @@
 
     const filterMeat = document.getElementById('filter-meat');
     const filterDate = document.getElementById('filter-date');
+    const balanceDate = document.getElementById('balance-date');
 
     let lastRows = []; // most recently loaded yield log rows, for edit lookups
 
     newDate.value = new Date().toISOString().slice(0, 10);
+    balanceDate.value = new Date().toISOString().slice(0, 10);
     actorInput.value = localStorage.getItem('inventory_actor') || '';
     actorInput.addEventListener('change', () => localStorage.setItem('inventory_actor', actorInput.value.trim()));
 
@@ -108,20 +113,38 @@
       filterMeat.innerHTML = '<option value="">All</option>' + opts;
     }
 
+    // Current on-hand, same "prefer actual over calculated" convention the
+    // Dashboard rollup already uses (server/routes/dashboard.js's
+    // currentBalance) - a real physical count if one's been entered for
+    // this date, otherwise the calculated ending. Null (MISSING_BEGINNING_
+    // STOCK) means no beginning stock has ever been established for this
+    // meat yet, not a zero.
+    function currentOnHand(row) {
+      if (row.actual !== null && row.actual !== undefined) return row.actual;
+      if (row.endingCalculated !== null && row.endingCalculated !== undefined) return row.endingCalculated;
+      return null;
+    }
+
     async function loadBalances() {
-      const res = await fetch('/api/commissary/balances');
-      const balances = await res.json();
+      const date = balanceDate.value;
+      if (!date) return;
       const el = document.getElementById('balances');
-      if (balances.length === 0) {
+      el.innerHTML = 'Loading...';
+      const res = await fetch(`/api/commissary/daily-audit?date=${date}`);
+      const rows = await res.json();
+      if (rows.length === 0) {
         el.innerHTML = '<p class="hint">No commissary meats seeded yet - add some in the seed data or Settings.</p>';
         return;
       }
-      el.innerHTML = `<div class="balance-cards">${balances.map(b => `
+      el.innerHTML = `<div class="balance-cards">${rows.map(r => {
+        const onHand = currentOnHand(r);
+        return `
         <div class="balance-card">
-          <div class="code">${b.code} - ${b.name}</div>
-          <div class="qty${b.balance < 0 ? ' negative' : ''}">${fmt(b.balance)} <span class="hint">${b.unit}</span></div>
+          <div class="code">${r.code} - ${r.name}</div>
+          <div class="qty${onHand !== null && onHand < 0 ? ' negative' : ''}">${fmt(onHand)} <span class="hint">${r.unit}</span></div>
         </div>
-      `).join('')}</div>`;
+      `;
+      }).join('')}</div>`;
     }
 
     function renderRow(r) {
@@ -274,6 +297,8 @@
         addStatus.className = 'status-message error';
       }
     });
+
+    balanceDate.addEventListener('change', loadBalances);
 
     [filterMeat, filterDate].forEach(el => el.addEventListener('change', loadYieldLog));
     document.getElementById('clear-filters').addEventListener('click', () => {
