@@ -25,6 +25,18 @@ Built the AutoCAD-style layout the project owner proposed and step 21's session-
 
 ---
 
+## 2026-08-29 (later still) — Item 6: over-sold check now uses the fuller running balance where possible
+
+Revisited the interpretation flagged as stale while building the Portion Actual write path: `GET /api/commands/oversold-check` used a same-day-only formula (`sold > prepped`) specifically because the fuller running balance depended on `portion_ending_actual`, which had no write path. That write path exists now.
+
+New behavior is a hybrid, not a straight swap: uses the fuller running balance (`portionBeginning + prepped - sold < 0`) wherever a beginning count is actually established for a dish/date, falls back to the original same-day check where it isn't (`MISSING_BEGINNING_STOCK`) - same graceful-degradation pattern used everywhere else in this app. The fuller check matters in practice, not just in theory: a dish batch-prepped once and sold down over several days would false-positive on every zero-prep day under the old check, since it never accounted for carryover stock.
+
+Rewrote the route to call `computeDishAudit` directly per candidate rather than maintaining a second, parallel SQL aggregate - single source of truth for both same-day figures and the running balance, no risk of the two drifting apart.
+
+Caught a real problem in the existing tests before adding anything new: `commands.test.js`'s `runOversoldCheck` was a stale mirrored copy of the *old* logic - it happened to still pass numerically because none of its fixtures ever set a beginning count, so every case coincidentally exercised only the fallback branch. Rewrote the mirror to match the real route, and added two new tests exercising the fuller branch directly - the main motivating case (carryover correctly not flagged) and its counterpart (genuine over-selling still correctly flagged even with carryover).
+
+15/15 in `commands.test.js` (was 13), full suite 187/187, 0 regressions. Verified live with the exact real motivating scenario: prep 50/sell 10/actual 40 on day one, sell 10 more on day two with zero new prepping - confirmed day two is correctly NOT flagged, which the old same-day check would have gotten wrong.
+
 ## 2026-08-29 (later still) — Portion Actual write path for BATCH_PREPPED dishes
 
 Closed a real gap open since step 11: BATCH_PREPPED dish rows on Landing have been display-only the whole time - there was never a write path for `prepped`/`portion_ending_actual`, so portion variance could never move past "missing actual count" for any Batch-Prepped dish.

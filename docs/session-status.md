@@ -41,17 +41,18 @@ than anything else here:
   old conversations for context that should already be written down
   here is exactly the waste this file exists to prevent.
 - **Hold the discussion before writing any code — even though the
-  tools to just build something are sitting right there.** Steps 21 and
-  22 are mid-discussion, not finished designs, and "you're an
-  architecture conversation" is not license to resolve their open
-  questions yourself and start coding. Read both entries in full first
-  (each is self-contained, grounded in real code/data checks, not just
-  claims, and states its own open question plainly) — then ask the
-  project owner about the open question, the way earlier architecture
-  turns in this project's history actually worked: several rounds of
-  back-and-forth before anything got built, not one read-through
-  followed by a build. If in doubt, ask one more clarifying question
-  before touching any code, not after.
+  tools to just build something are sitting right there.** As of
+  2026-08-30, item 3 (multi-Commissary generalization — see "Round 2
+  findings" in the Future Considerations section below) is mid-
+  discussion, not a finished design, and "you're an architecture
+  conversation" is not license to resolve its open questions yourself
+  and start coding. Read that section in full first (grounded in real
+  code/data checks, not just claims, and states its own open question
+  plainly) — then ask the project owner about it, the way every prior
+  architecture decision in this project actually worked: several
+  rounds of back-and-forth before anything got built, not one
+  read-through followed by a build. If in doubt, ask one more
+  clarifying question before touching any code, not after.
 
 Broader context worth knowing before jumping in: this app covers
 Commissary plus three restaurant outlets (Restaurant A / "Silingan", FC
@@ -1232,33 +1233,89 @@ of sizing them correctly, not a separate concern.
     isn't the same as someone actually clicking through the three new/
     changed pages once.
 
-## Future considerations (not scheduled, not designed — raised 2026-08-29)
+## Round 2 findings (2026-08-30) — the plate refilled, UI explicitly delayed
 
-Five items the project owner raised in one batch, thinking ahead past
-everything built so far. None of these are designed yet — this section
-exists so they aren't lost, and so the real connections between them
-are visible before anyone starts designing in isolation.
+Surfaced by a direct Settings/architecture audit the project owner asked
+for, not raised speculatively. **Decision made this session: item 3 is
+un-shelved** (was "confirmed non-blocking, safe to leave indefinitely" as
+of 2026-08-29) — the project owner described an actual near-term need
+("create future commi branches"), not a hypothetical one, which changes
+its priority entirely. **UI work is explicitly deferred further** in
+favor of these logic gaps. Sequencing agreed: item 3 first, architected
+properly (ask-before-build, same discipline as every other design
+decision this project has made), then the rest below.
 
-**Item 6, added 2026-08-29 (not raised by the project owner — surfaced
-while building the Portion Actual write path)**: step 18's over-sold
+1. **No restaurant-creation UI at all.** Checked every route file —
+   `restaurants` rows only ever come from `seed.js` reading a JSON file.
+   Blocks the stated goal of handing this skeletal app to a new branch
+   for genuine self-onboarding.
+
+2. **No commissary-meat-creation UI either.** Same story —
+   `commissary_meats` only ever comes from `commissary-seed-data.json`.
+   A new commissary item (raw or processed) can't be added through the
+   app.
+
+3. **Conversion Standards has no admin UI.** Backend CRUD exists (item
+   5), but there's no Settings page for it — only read-only consumption
+   on the Shipment form. Creating one today requires calling the API
+   directly.
+
+4. **The AutoCAD-style Terminal only exists on its own page.** The
+   lightweight floating Command Panel (2 simple commands, step 14) is on
+   every page; the full multi-slot Terminal (steps 21a/21b, the
+   AutoCAD-style layout) is not reachable from anywhere except
+   `terminal.html` itself.
+
+5. **A real, live inconsistency — two disagreeing Commissary balance
+   calculations, both currently shown to a user.** Confirmed by reading
+   the code directly, not suspected:
+   - `commissary.html` (older, steps 6-9) calls
+     `GET /api/commissary/balances` →
+     `commissaryYieldEngine.js`'s `getCommissaryBalance`:
+     `SUM(commissary_yield_log.backed_weight_out) −
+     SUM(stock_receipts.quantity WHERE source='COMMISSARY')`. **Has no
+     concept of `commissary_stock_receipts` (New Stock) at all** —
+     lifetime-cumulative, no date scoping, no physical actual-count
+     comparison.
+   - `commissary-shipments.html`/the Dashboard (newer, step 20b) call
+     `GET /api/commissary/daily-audit` →
+     `commissaryAuditEngine.js`'s `computeCommissaryMeatAudit`: a
+     proper Beginning + Stock In + Backed Up − Usage = Ending daily
+     audit, correctly including New Stock, comparable against a real
+     physical count.
+
+   The newer one is strictly more correct and more complete. The older
+   one was never retired once the newer one was built — same shape as
+   `commissary_meat_map`'s retirement in item 4 (a superseded code path
+   left live), except this one produces genuinely different numbers to
+   a real user today, not just dead UI. **Not fixed yet** — needs its
+   own small step: retire `getCommissaryBalance`/`listCommissaryBalances`
+   and point `commissary.html` at the newer engine instead.
+
+## Original five items, raised 2026-08-29
+
+**[Done, 2026-08-29] Item 6**: step 18's over-sold
 check (`GET /api/commands/oversold-check`) deliberately used same-day
 `sold > prepped` instead of the fuller running portion balance
 (`portionBeginning + prepped - sold`), specifically *because*
 `portion_ending_actual` had no write path and the fuller check would
 have been dead code. That write path now exists (see the 2026-08-29
-"Portion Actual write path" changelog entry) — the interpretation
-choice is no longer forced, just still the current behavior. Worth a
-real revisit; not changed as a side effect of building the write path
-itself, since that's a distinct decision from "does the capability
-exist."
+"Portion Actual write path" changelog entry) — resolved as a hybrid,
+not a straight swap: uses the fuller running balance wherever a
+beginning count is established, falls back to the same-day check
+where it isn't. See `changelog.md`'s item-6 entry for the full detail,
+including a real bug caught in the *existing* tests (the mirrored
+function was stale, coincidentally passing without ever exercising
+the fuller branch) before any new code was even added.
 
-**Priority, made explicit 2026-08-29**: item 1 was the one auditing-
-service gap (real day-to-day recording need), items 2-5 are app-level
-(dashboard, cleanup, future-proofing, a refinement) — secondary.
-**Items 1, 2, and 5 are done. Item 4 has one real find fixed, not a
-full audit** — see its entry below. Only item 3 (multi-Commissary
-generalization, direction resolved, not built) remains genuinely
-untouched. Nothing here is currently urgent.
+**Priority, made explicit 2026-08-29, superseded 2026-08-30**: item 1
+was the one auditing-service gap (real day-to-day recording need),
+items 2-5 were app-level (dashboard, cleanup, future-proofing, a
+refinement) — secondary. **Items 1, 2, and 5 are done. Item 4 has one
+real find fixed, not a full audit. Item 6 is done.** As of 2026-08-30,
+this "nothing urgent" framing no longer holds — see "Round 2 findings"
+above for what's actually next (item 3, architected first, then the
+rest of that list).
 
 1. **[Done, 2026-08-29] Allocations item-to-item conversion type.**
    Built as `POST /api/allocations/conversion` + a "Converts to" field
@@ -1286,7 +1343,8 @@ untouched. Nothing here is currently urgent.
    `GET /api/dashboard/stock-rollup` + `public/dashboard.html` — see
    `changelog.md`'s entry for the full build/verification detail.
 
-3. **RESOLVED 2026-08-29, correcting an earlier mis-model** — yield
+3. **[Un-shelved 2026-08-30, next to be architected] RESOLVED
+   2026-08-29, correcting an earlier mis-model** — yield
    stays Commissary-only, but the fix is to stop treating Commissary as
    a singleton, not to give restaurants their own yield table. The
    original framing above (restaurant-level yield) was wrong: Likod
@@ -1304,13 +1362,14 @@ untouched. Nothing here is currently urgent.
    `restaurant_id` already scopes restaurant data), not something
    special-cased once. Not designed yet, but the direction is settled;
    don't reopen "should restaurants get their own yield table."
-   **Confirmed non-blocking, 2026-08-29**: nothing currently planned
-   depends on this, including Restaurant C (Likod) onboarding — Likod
-   is co-located with Commissary too, so it'll use the exact same
-   single-Commissary model Restaurant A already does. Safe to leave
-   purely as a documented future idea indefinitely; only matters if a
-   genuinely new, physically separate site ever needs its own
-   on-site processing.
+   **Confirmed non-blocking, 2026-08-29** for anything planned *at the
+   time* (including Restaurant C onboarding — Likod is co-located with
+   Commissary too, uses the same single-Commissary model Restaurant A
+   does). **Un-shelved 2026-08-30**: the project owner described an
+   actual near-term need for creating future Commissary branches, not
+   a hypothetical one — this is no longer "safe to leave indefinitely."
+   Next up to be architected properly (ask-before-build), see the
+   "Round 2 findings" section above.
 
 4. **[Partially done, 2026-08-29] A dedicated cleanup pass is owed.**
    First real find and fix: `commissary_meat_map`'s "full retirement"
