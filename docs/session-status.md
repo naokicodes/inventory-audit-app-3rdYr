@@ -1344,14 +1344,14 @@ cover rather than guessing.
    AutoCAD-style layout) is not reachable from anywhere except
    `terminal.html` itself.
 
-5. **A real, live inconsistency — two disagreeing Commissary balance
+5. **[Done, 2026-08-30] A real, live inconsistency — two disagreeing Commissary balance
    calculations, both currently shown to a user.** Confirmed by reading
    the code directly, not suspected:
-   - `commissary.html` (older, steps 6-9) calls
+   - `commissary.html` (older, steps 6-9) called
      `GET /api/commissary/balances` →
      `commissaryYieldEngine.js`'s `getCommissaryBalance`:
      `SUM(commissary_yield_log.backed_weight_out) −
-     SUM(stock_receipts.quantity WHERE source='COMMISSARY')`. **Has no
+     SUM(stock_receipts.quantity WHERE source='COMMISSARY')`. **Had no
      concept of `commissary_stock_receipts` (New Stock) at all** —
      lifetime-cumulative, no date scoping, no physical actual-count
      comparison.
@@ -1362,13 +1362,14 @@ cover rather than guessing.
      audit, correctly including New Stock, comparable against a real
      physical count.
 
-   The newer one is strictly more correct and more complete. The older
-   one was never retired once the newer one was built — same shape as
-   `commissary_meat_map`'s retirement in item 4 (a superseded code path
-   left live), except this one produces genuinely different numbers to
-   a real user today, not just dead UI. **Not fixed yet** — needs its
-   own small step: retire `getCommissaryBalance`/`listCommissaryBalances`
-   and point `commissary.html` at the newer engine instead.
+   The newer one was strictly more correct and more complete. **Retired,
+   2026-08-30**: `getCommissaryBalance`/`listCommissaryBalances` and
+   `GET /api/commissary/balances` are gone; `commissary.html` now calls
+   `GET /api/commissary/daily-audit` with a date field (defaults to
+   today) instead. See `changelog.md`'s entry for full detail, including
+   the no-network verification caveat — a real HTTP click-through against
+   a booted server is still owed next time a session has network/npm
+   access.
 
 ## Original five items, raised 2026-08-29
 

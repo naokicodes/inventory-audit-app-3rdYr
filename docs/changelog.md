@@ -11,7 +11,19 @@ worth remembering if they happen again.
 
 ---
 
-## 2026-08-30 — Terminal: docked bottom-center command bar + history sidebar (step 21's deferred layout)
+## 2026-08-30 (later) — Round 2 item 5: retired the older, incomplete Commissary balance calculation
+
+Two disagreeing "what does Commissary currently have" calculations were both live: `commissary.html` calling `GET /api/commissary/balances` → `commissaryYieldEngine.js`'s `getCommissaryBalance`/`listCommissaryBalances` (lifetime backed-in minus shipped-out, no date, no `commissary_stock_receipts`/New Stock concept at all, no physical-count comparison), versus `commissary-shipments.html`/the Dashboard's `GET /api/commissary/daily-audit` → `commissaryAuditEngine.js`'s `computeCommissaryMeatAudit` (a proper Beginning + Stock In + Backed Up − Usage = Ending daily audit, correctly including New Stock, comparable against a real physical count). The newer one was strictly more correct and complete, per Round 2 findings item 5.
+
+Retired the older path: removed `getCommissaryBalance`/`listCommissaryBalances` (and their now-dead formula/verification doc comment) from `commissaryYieldEngine.js`, removed `GET /api/commissary/balances` from `commissary.js`. `commissary.html`'s "On-hand balance" section now calls `GET /api/commissary/daily-audit` with a new date field (defaults to today, same pattern `commissary-shipments.html`/`dashboard.html` already use) and shows current on-hand via "prefer the real physical count, fall back to calculated ending" - the same convention `dashboard.js`'s `currentBalance` already uses for the same kind of question. Fixed a stale comment in `commissaryAuditEngine.js` that referenced the now-deleted function. `commissary_yield_log`/`commissary_stock_receipts` themselves untouched - read-side retirement only, no schema change.
+
+Rewrote `commissaryYieldEngine.test.js`'s balance section (7 tests plus their now-unused seed fixtures) the same way `stockReceipts.test.js` was rewritten in item 4 - they were mirrored-logic tests of the retired functions and would have kept passing against dead code. Full suite was 187/187 before, 180/180 after (down exactly 7, matching the removed tests), 0 regressions elsewhere.
+
+**Verification note**: no network access this session (`github.com`/`registry.npmjs.org` both blocked), so `express` wasn't installable and no real HTTP server could be booted - same limitation `commissary.test.js`'s own header already documents hitting before. Verified instead by calling `computeCommissaryDailyAudit` directly (the exact function the route calls) against a realistic seeded scenario - beginning 20 + stock in 10 + backed up 12 − usage 8 = 34 calculated, correctly overridden to 33.5 by a real physical count, confirming New Stock is now included and the balance card would show a sensible, physically-grounded number. The old route's absence was confirmed by direct code removal, not by a live 404. A real HTTP click-through against a booted server, and a visual check of the new date field on `commissary.html`, are still owed next time a session has network/npm access.
+
+---
+
+
 
 Built the AutoCAD-style layout the project owner proposed and step 21's session-status.md entry deferred until backend/logic work settled (steps 20/21b and everything since are now done). Pure frontend layout work on `public/terminal.html` - no backend, no changes to the slot state machine (`splitInput`, `updateStateMachine`, `validateCommitted`, `computeSlotStatus`, `tryAssemblePayload`, `handleSubmit`, keyboard handling) or any route.
 
