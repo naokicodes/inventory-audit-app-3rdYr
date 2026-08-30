@@ -144,6 +144,18 @@ standing constraints, not suggestions — they exist to keep a solo,
     remember any of this — these rules are what carries it forward, not
     the chat history. If you're picking this up fresh with no memory of
     a prior conversation, this is how the project actually runs:
+
+    **2026-08-31 addendum**: every "coder worker" session referenced below,
+    for every step done so far (1–22, all of Round 2, item 3's design), has
+    been **free-tier Claude.ai web chat**, not literal Claude Code — confirmed
+    by the project owner directly. Claude Code (the CLI/app, running on the
+    project owner's own local checkout) starts being used at step 23a. See
+    `docs/web-vs-claude-code.md`'s "Push access" section — whether Claude
+    Code sessions can push directly (collapsing most of the file-handoff
+    branch below) is **not yet confirmed**. Until it is, a Claude Code
+    session should attempt `git push` and fall back to the standard
+    file-handoff format on failure, same as any other worker; don't assume
+    push will work just because it's a local checkout.
     - A coder worker finishes a step, commits, and **pushes to `main`
       on GitHub** (`https://github.com/naokicodes/inventory-audit-app-3rdYr`)
       — not a zip handed back, not a WIP left un-pushed, unless rule 17

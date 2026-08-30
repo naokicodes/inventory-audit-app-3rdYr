@@ -6,6 +6,9 @@
 *.sqlite3
 /uploads/
 
+# Claude Code's local project config/state - machine-specific, not shared
+.claude/
+
 # Secrets
 .env
 

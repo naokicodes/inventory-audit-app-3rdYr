@@ -11,6 +11,32 @@ worth remembering if they happen again.
 
 ---
 
+---
+
+## 2026-08-31 (later) — Workflow doc correction: past workers were free-tier web chat, not Claude Code; .gitignore for Claude Code state
+
+Project owner clarified directly: every "coder worker" step done so far (1–22, all of Round 2, item 3's design) was free-tier Claude.ai web chat, per rule 18's file-handoff pattern — not literal Claude Code. `web-vs-claude-code.md` had been written as if Claude Code was already in use; corrected, and rule 18 in `rules-for-claude-code.md` got a matching addendum. Claude Code's push-credential status (whether it can push directly, collapsing most of rule 18's handoff branch) is flagged as **unconfirmed**, not assumed — a session should try `git push` and fall back to the standard handoff format on failure until this is settled one way or the other.
+
+Also added a "Token-efficiency notes" section to `web-vs-claude-code.md`, raised directly by the project owner: `session-status.md` has grown to 1700+ lines mixing current truth with fully-resolved historical narrative, and every session pays to read all of it per the standing instruction. Flagged as a real, worthwhile cleanup (trim to current/active state, move resolved history into `changelog.md` or an archive doc) — not done in this session, deserves its own pass. A "graphify" skill the project owner mentioned isn't visible from this web chat session; flagged as possibly relevant to the same problem, not designed around without knowing what it does.
+
+`.gitignore`: added `.claude/` (Claude Code's local project config/state — machine-specific, shouldn't be committed), alongside the existing `*.db`/`.env` exclusions.
+
+## 2026-08-31 — Architecture session: item 3's rekey resolved, multi-stage yield/allocation fully designed, real seed-data gap found
+
+Pure architecture — no code changed. Two things resolved through real back-and-forth with the project owner:
+
+**Item 3 (multi-Commissary generalization)**: the one open question left from 2026-08-30 — how `commissary_conversion_standards`' uniqueness reworks now that `commissary_meat_id` needs its own `commissary_id` scoping — is resolved as a real column swap: the table's key moves from `commissary_meat_id` to `meat_type_id`. Full table shapes for `commissaries`/`meat_types`, the `commissary_meats` rework, and the migration plan for today's single implicit commissary are in `data-model.md` section 10b. Sub-step plan confirmed: 23a (schema) → 23b (engine/routes) → 23c (UI), same shape as step 20's 20a/20b/20c split. Not started.
+
+**Multi-stage yield + Commissary-side allocation**: both real scenarios (Shortplate's sear→braise chain, Chicken's processed→Miscuts split) resolved into one mechanism — a new nullable `output_commissary_meat_id` column on `commissary_yield_log` (NULL = today's same-row behavior, unchanged; set explicitly for a genuinely different output item), plus a new `commissary_adjustments` table (parallel to the restaurant-scoped `adjustments`, `kind` = `LOSS` or `ALLOCATION`) for redirecting or writing off processed stock. See `data-model.md` section 10b for the exact shapes.
+
+**A real, previously-unflagged find while checking this against actual code**: `commissary-seed-data.json` already seeds three raw/backed pairs as separate catalog rows (`M01`/`M02` Whole Chicken, `M03`/`M04` Belly Slab, `M05`/`M06` JOWL) that no route or engine has ever referenced — `commissary_yield_log` only ever had one `commissary_meat_id` column, so the "Raw" rows were vestigial. Confirmed by the project owner: intentional, not dead data — not every meat gets backed up same-day. `output_commissary_meat_id` finally wires these up; no new seed rows needed, no historical data to migrate since nothing ever referenced them.
+
+Also reconfirmed as a real, still-unfixed bug (flagged 2026-08-30, not yet built): `getCommissaryUsage` never counts a yield event's `raw_weight_in` as an outflow for the input meat — only `commissary_shipments` counts as usage today. Bundled into step 24a as a prerequisite fix, not a separate step, since the output-column change is meaningless without it.
+
+Sequencing: 23a/23b/23c (item 3) first, since multi-stage yield's Miscuts tagging depends on `meat_types` existing. Then 24a (usage-formula fix + schema) → 24b (engine/routes) → 24c (UI). Full reasoning in `session-status.md`'s "Item 3 design" and "Multi-stage yield + Commissary-side allocation" sections.
+
+Doc updates this session: `session-status.md` (both sections above), `data-model.md` (new section 10b + a note flagging that section 10 predates several live tables — not fixed here, just flagged).
+
 ## 2026-08-30 (later) — Architect review of all 4 worker sessions: one real regression found and fixed
 
 Pulled all four workers' pushed work and independently verified each rather than trusting commit messages — full suite run, live checks against a real booted server, and direct code reads.
