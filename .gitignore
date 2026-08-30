@@ -14,6 +14,10 @@
 # graphify's local-only run cost - graphify-out/ itself IS committed
 # (graph.json, GRAPH_REPORT.md are meant to be shared, see web-vs-claude-code.md)
 graphify-out/cost.json
+# per-session usage metadata, not shareable content - changes on nearly every
+# session and would otherwise show as dirty every time. graphify-out/cache/semantic/
+# (the actual extraction results) stays committed - that's the part worth sharing.
+graphify-out/cache/last_query_stamp
 
 # Secrets
 .env
