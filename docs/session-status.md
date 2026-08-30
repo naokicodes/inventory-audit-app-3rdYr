@@ -1,6 +1,14 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-30. All four Round 2 worker tasks are done,
+Last updated: 2026-08-31 (step 23a, schema + migration for the
+multi-Commissary generalization — see its entry under "Item 3 design"
+below, and `changelog.md`'s matching entry, for full detail). **Next up:
+23b.**
+
+Everything below this point, through the end of the 2026-08-30 Round 2
+summary, predates step 23a and is unchanged by it.
+
+Last updated (previous): 2026-08-30. All four Round 2 worker tasks are done,
 pushed, and independently verified by the architect conversation — not
 just claimed in commit messages. Summary:
 - **Round 2 item 5** (retire the older, incomplete Commissary balance
@@ -1380,20 +1388,50 @@ fresh architecture session:**
   existing local `inventory.db`'s constraints.
 
 **Sub-step plan, confirmed — mirrors 20a/20b/20c:**
-- **23a (schema only)**: the tables/columns above + the migration.
+- **23a [Done, 2026-08-31 — first Claude Code (CLI) session on this
+  project] (schema only)**: `commissaries`/`meat_types` tables added;
+  `commissary_meats` gains `commissary_id` (NOT NULL FK) + `meat_type_id`
+  (nullable FK), `UNIQUE(code)` reworked to `UNIQUE(commissary_id, code)`;
+  `server/db/migrate.js`'s new `migrateCommissaryMultiTenant` backfills one
+  real `commissaries` row (`COM-A`) for today's single implicit commissary
+  and rebuilds `commissary_meats` preserving every row, same
+  rebuild-and-rename pattern as the existing stock_receipts migration.
+  **Scope conflict found and resolved before coding, not decided
+  unilaterally**: the original assignment also included rekeying
+  `commissary_conversion_standards` from `commissary_meat_id` to
+  `meat_type_id`, which would have broken `commissary.js`'s existing write
+  route and 2 test files' fixtures — that table's rekey is now explicitly
+  **deferred to 23b** (bundled with the route/engine work that actually
+  consumes `meat_type_id`), not touched in 23a at all, schema or code.
+  `seed.js` and 6 other existing test files' raw `commissary_meats`
+  inserts needed updating for the new NOT NULL `commissary_id` — done as
+  real 23a work, per explicit direction, not deferred. **Verified**: new
+  `server/db/migrate.test.js` (8/8 — fresh-install no-op, already-migrated
+  no-op, correct backfill/data preservation, row count unchanged, new
+  UNIQUE constraint behavior, idempotent re-run), plus a real on-disk
+  `inventory.db` built with the literal pre-23a shape and booted through
+  the real `connection.js` to confirm the migration path end-to-end, not
+  just in-memory. Full suite: **14/14 files, 200/200 assertions, 0
+  regressions** (was 192). See `changelog.md`'s 2026-08-31 "Step 23a"
+  entry for full detail. Pushed to `main` directly (this session had git
+  access, no zip fallback needed).
 - **23b (engine/routes)**: Commissary CRUD, meat-type CRUD,
   `commissary_meats` CRUD (this absorbs numbered-list item 2 below —
   "no commissary-meat-creation UI" — since it can't be built sensibly
   without a `commissary_id` to create against), every commissary-scoped
   engine function updated to take a `commissary_id` param instead of
   assuming a singleton, Shipment-form implied-input math rejoined via
-  `meat_type_id`, Dashboard rollup grouped by `meat_type_id`.
+  `meat_type_id`, Dashboard rollup grouped by `meat_type_id`. **Now also
+  includes `commissary_conversion_standards`' own rekey** (schema swap
+  from `commissary_meat_id` to `meat_type_id` NOT NULL, plus the
+  migration backfilling a `meat_types` row per existing standard) —
+  deferred here from 23a on 2026-08-31, see 23a's entry above for why.
 - **23c (UI)**: Commissary + Meat Type tabs in Settings, commissary-meat
   creation UI, a commissary selector everywhere a screen currently
   assumes there's only one (`commissary.html`, `commissary-shipments.html`,
   Terminal, Dashboard drill-down).
 
-**Next up: 23a.** None of the three sub-steps are started.
+**Next up: 23b.** 23a is done; 23b/23c are not started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading
