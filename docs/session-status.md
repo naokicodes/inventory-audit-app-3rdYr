@@ -1,54 +1,48 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-30 (Round 2 findings numbered-list item 3:
-Conversion Standards admin UI — Done, pending push. Backend already
-existed (`GET`/`POST`/`PUT /api/commissary/conversion-standards` in
-`server/routes/commissary.js`, from the earlier Item 5 work) and no bug
-was found or touched while building against it. Built a new
-"Conversion Standards" tab on `settings.html`, same structural pattern
-as the Shipment Presets section (closest template, same shape: pick a
-commissary meat + restaurant, list/create/edit entries for that pair).
-Full suite 13/13 files green both before and after the code change, 0
-regressions — no new backend tests needed, existing coverage already
-exercises these routes. Verified live against a booted server with a
-freshly reseeded DB: POSTed a new standard, confirmed the
-duplicate-pairing rejection, PUT-edited ratio/notes/active and
-confirmed the change via GET, confirmed `settings.html` serves with
-the new markup. See `changelog.md` for full detail. **Not to be
-confused with the separate, still-unbuilt "item 3 design"**
-(multi-Commissary generalization, described at length further down in
-this file's Round 2 findings section) — this session only did the
-numbered-list item 3 (the Conversion Standards admin UI gap), left the
-design item entirely untouched. This worker had no push credentials —
-standard handoff format used, not yet on `main` as of this writing.
+Last updated: 2026-08-30. All four Round 2 worker tasks are done,
+pushed, and independently verified by the architect conversation — not
+just claimed in commit messages. Summary:
+- **Round 2 item 5** (retire the older, incomplete Commissary balance
+  calculation): done. `getCommissaryBalance`/`listCommissaryBalances`
+  removed from `commissaryYieldEngine.js`; `commissary.html` now calls
+  `GET /api/commissary/daily-audit` instead. Live-verified: the old
+  `/api/commissary/balances` route now correctly 404s, the new one
+  returns sensible numbers.
+- **Round 2 item 1** (Restaurant-creation CRUD): done. New
+  `GET`/`POST`/`PUT /api/settings/restaurants`, a Restaurants tab on
+  `settings.html`, a fresh `settings.test.js`. Live-verified: created a
+  real restaurant ("Likod") via HTTP, confirmed it actually appears via
+  `GET /api/restaurants`.
+- **Round 2 item 3, numbered-list item** (Conversion Standards admin
+  UI — not to be confused with the separate item-3 *design*, multi-
+  Commissary generalization, still untouched): done. New tab on
+  `settings.html`, same structural pattern as Shipment Presets.
+  Live-verified: created/edited a standard via HTTP, confirmed the
+  duplicate-pairing rejection. The parallel-edit conflict flagged when
+  this and the restaurant-creation task were dispatched together (both
+  touch `settings.html`) never actually materialized — both landed
+  cleanly, coexisting tabs.
+- **Item 4 continued** (systematic cleanup pass): four small real
+  fixes — a missing nav link on `dashboard.html`, two stale comments
+  (`daily-audit.html`, `server/index.js`), and a real mirrored-logic
+  gap in `sales.test.js` closed with two new tests.
+- **One real regression found and fixed by the architect review, not
+  by any worker**: item 5's retirement correctly removed the two dead
+  functions but left 6 tests in `commissaryYieldEngine.test.js` still
+  calling them directly — an outright `TypeError`, not a silent stale-
+  mirror pass. Removed the whole test block. See `changelog.md`'s
+  "Architect review of all 4 worker sessions" entry for the full
+  verification detail across all four tasks, not just this one fix.
+- **The worker tasked with docs for the cleanup pass didn't update
+  them** — this file and `changelog.md`'s entries for that item were
+  written after the fact by the architect session, flagged as such in
+  both places rather than silently backfilled.
 
-Previously, 2026-08-30 (Round 2 findings item 1: Restaurant-creation
-CRUD — Done, pending push. Built `GET`/`POST`/`PUT
-/api/settings/restaurants` in `server/routes/settings.js` (same CRUD
-shape as Meats/Dishes/Adjustment Types/Locations, no `activity_log`
-wiring — config data), a new Restaurants tab on `settings.html`, and a
-fresh `server/routes/settings.test.js` (the old one was deleted in
-item 4's cleanup). Full suite 13/13 files green, 0 regressions.
-Verified live: created/edited/reactivated a restaurant via real HTTP
-against a booted server, confirmed the active/inactive-listing
-distinction against the existing active-only `GET /api/restaurants`,
-and confirmed a brand-new restaurant could immediately take a new meat
-through the existing Meats route — the actual onboarding gap this item
-was tracking is closed end-to-end. Kept deliberately separate from
-item 3's Commissary-creation work, which this session did not touch.
-See changelog.md for full detail. This worker had no push credentials
-— standard handoff format used, not yet on `main` as of this writing.
+Full suite after everything above: **192/192, 0 failures.** Steps 1–22
+remain fully done — see each step's own entry below for its own
+verification detail.
 
-Also landed on `main` since this session last pulled, by a separate
-worker (not verified or reviewed by this session beyond a clean pull):
-Round 2 findings item 5 — retired the older, incomplete Commissary
-balance calculation (`getCommissaryBalance`/`listCommissaryBalances`
-gone, `commissary.html` now calls the newer, dated
-`GET /api/commissary/daily-audit` engine instead) — and, before that,
-the Terminal's docked bottom-center command bar + history sidebar
-(step 21's deferred layout). See changelog.md's own entries for both
-work items' detail and verification. Steps 1–22 remain fully done —
-see each step's own entry for its own verification detail).
 This is the authoritative "where we left off" doc. `HANDOFF.md` was
 deleted this session (see `changelog.md`) — it had drifted stale and was
 actively misleading; this file is now the only "where we left off" doc,
@@ -1499,20 +1493,26 @@ rest of that list).
    Next up to be architected properly (ask-before-build), see the
    "Round 2 findings" section above.
 
-4. **[Partially done, 2026-08-29] A dedicated cleanup pass is owed.**
-   First real find and fix: `commissary_meat_map`'s "full retirement"
-   (step 20's entry above) had been designed but never actually
-   implemented - the manual `COMMISSARY`-source path, the Unallocated
-   concept, and the admin CRUD/UI were all still live code. Retired for
-   real this time - see `changelog.md`'s item-4 entry for the full
-   detail, including a genuine test-suite problem caught along the way
-   (`stockReceipts.test.js` was still passing by testing a stale
-   duplicated copy of the old logic, not the real route). Left open:
-   this was one specific, already-known gap, not a systematic audit of
-   the whole codebase - other dead code, stale UI, or orphaned routes
-   may still exist, not yet hunted for. Still worth doing before
-   Restaurant C onboarding so nothing stale gets copied into a fresh
-   restaurant's setup.
+4. **[Substantially done, 2026-08-30] A dedicated cleanup pass is
+   owed.** First real find and fix (2026-08-29): `commissary_meat_map`'s
+   "full retirement" (step 20's entry above) had been designed but
+   never actually implemented - retired for real that session, see
+   `changelog.md`'s item-4 entry, including a genuine test-suite
+   problem caught along the way (`stockReceipts.test.js` was passing
+   against a stale duplicated copy of the old logic). **A systematic
+   sweep followed on 2026-08-30** (not just the one known gap this
+   time): found and fixed a missing nav link (`dashboard.html`), two
+   stale comments (`daily-audit.html`, `server/index.js`), and a real
+   mirrored-logic gap in `sales.test.js` (missing two validation
+   branches the real route has) - see `changelog.md`'s "Item 4
+   continued" entry. The architect's own review of that pass then found
+   one more thing the sweep itself introduced a regression in
+   elsewhere (`commissaryYieldEngine.test.js`, from a different,
+   parallel task's retirement work) - see the "Architect review" entry
+   right above it in the changelog. Not claiming this is now
+   exhaustive - a codebase this size could always have more - but two
+   real passes plus an independent review is a meaningfully stronger
+   claim than "one gap fixed."
 
 5. **[Done, 2026-08-29] Three tables, each
    doing one job — not one reused table, and not a single blanket

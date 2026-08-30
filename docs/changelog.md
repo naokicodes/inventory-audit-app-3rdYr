@@ -11,6 +11,30 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-30 (later) — Architect review of all 4 worker sessions: one real regression found and fixed
+
+Pulled all four workers' pushed work and independently verified each rather than trusting commit messages — full suite run, live checks against a real booted server, and direct code reads.
+
+**Found a real regression**: worker 1's retirement of the older Commissary balance calculation (`getCommissaryBalance`/`listCommissaryBalances`, see the item-5 entry above) correctly removed both functions from `commissaryYieldEngine.js`, but left the 6 tests that directly called them still in `commissaryYieldEngine.test.js` — not a stale mirror silently passing, an outright `TypeError: getCommissaryBalance is not a function` failure. Removed the whole block (the functions' own retirement note already covers the historical reasoning; not duplicated into the test file) and fixed the now-unused import. 15/15 in that file, was failing 6/22 before this fix.
+
+**Everything else checked out clean, no further issues found**:
+- Restaurant-creation CRUD (item 1): live-tested, a real restaurant (`Likod`) created and confirmed appearing via `GET /api/restaurants`.
+- Conversion Standards admin UI (item 3): both new Settings tabs coexist correctly — the parallel-edit conflict flagged when these two tasks were dispatched never actually materialized, both landed cleanly.
+- The 4 cleanup fixes (see the entry above) — each independently re-verified, not just trusted.
+
+Full suite after all fixes: **192/192, 0 failures.** This is now the true, verified state of `main` — not just what the commit messages claimed.
+
+## 2026-08-30 — Item 4 continued: systematic cleanup pass, four small real fixes
+
+A worker session tasked with the rest of item 4's cleanup pass (only `commissary_meat_map`'s retirement had been fixed so far, not a full sweep). Found and fixed four small, genuinely real issues — none large enough to need their own design discussion, all verified individually:
+
+- **`dashboard.html` was missing the History nav link** every other page has. Plain oversight from whichever step first added that page, not caught since.
+- **A stale comment in `daily-audit.html`** still described In-House/Wastage/Other as live-edited fields on the dish/meat rows, even though step 22 replaced that whole mechanism with a read-only Adjustments cell fed by the dedicated Allocations page.
+- **A stale top-of-file comment in `server/index.js`** described the app as toolchain-confirmation-only — leftover from very early in the project, despite 9 route modules being mounted below it by now.
+- **A real mirrored-logic gap in `sales.test.js`**: `patchSales()`'s test helper was missing the two top-level validation branches the real `PATCH /api/sales` route actually has (required-fields check, `business_date` format check) — the same category of risk that bit `stockReceipts.test.js` and `commands.test.js` before (a mirror that's silently narrower than the route it's supposed to represent, still passing, just not proving what it looks like it proves). Added both branches plus two new tests; 15/15 in that file now, was 13.
+
+**This changelog/session-status entry is being written after the fact, by the architect session, not the worker** — the worker's own task said to update these docs and didn't. Flagging that plainly rather than letting it look like it happened at the time. All four fixes were independently re-verified before writing this: `sales.test.js`'s two new validation messages checked character-for-character against the real route (`server/routes/sales.js` lines 43/113/116), and the full suite re-run clean (192/192 — see the note below on the one real regression also found and fixed this pass, unrelated to this worker's own commits).
+
 ## 2026-08-30 — Round 2 findings item 3 (numbered-list item, not the design item): Conversion Standards admin UI
 
 Closed the gap flagged in Round 2 findings' numbered list, item 3: `GET`/`POST`/`PUT /api/commissary/conversion-standards` already existed and worked (from the earlier "Item 5: Conversion Standards" work), but there was no Settings page for it - only read-only consumption on `commissary-shipments.html`'s implied-input hint. Creating a standard required calling the API directly. (Not to be confused with the separate, still-undiscussed "item 3 design" - multi-Commissary generalization - higher up in `session-status.md`'s Round 2 findings section; that's a different, larger piece of work this session did not touch.)
