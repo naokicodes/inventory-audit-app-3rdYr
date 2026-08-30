@@ -6,8 +6,10 @@
 *.sqlite3
 /uploads/
 
-# Claude Code's local project config/state - machine-specific, not shared
-.claude/
+# Claude Code's local-only settings (API keys, personal tool permissions) -
+# NOT the whole .claude/ folder: .claude/skills/ (e.g. graphify's project
+# install) and CLAUDE.md are shared project config and ARE committed.
+.claude/settings.local.json
 
 # graphify's local-only run cost - graphify-out/ itself IS committed
 # (graph.json, GRAPH_REPORT.md are meant to be shared, see web-vs-claude-code.md)

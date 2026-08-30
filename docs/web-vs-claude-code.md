@@ -134,9 +134,19 @@ chat's fresh-sandbox constraint?
   - **`.gitignore` needs one more line**, per graphify's own team-setup
     guidance: `graphify-out/cost.json` (local-only run cost, not shared).
     `graphify-out/` itself (`graph.json`, `GRAPH_REPORT.md`) is meant to
-    be **committed**, unlike `.claude/` — the whole point is that the next
-    session (Claude Code or a teammate) starts with the map already
-    built, not rebuilding it from zero.
+    be **committed** — the whole point is that the next session (Claude
+    Code or a teammate) starts with the map already built, not rebuilding
+    it from zero.
+  - **Correction, 2026-08-31 (same day)**: the `.gitignore` entry above was
+    initially too broad — a blanket `.claude/` ignore, added before
+    `graphify claude install --project` had actually been run. Checked
+    against graphify's own docs: a project-scoped install writes
+    `.claude/skills/graphify/SKILL.md` (+ a `references/` sidecar) and
+    explicitly prints a `git add` hint for it — meant to be **committed**,
+    same as the root `CLAUDE.md` it also writes, not machine-local state.
+    Narrowed to `.claude/settings.local.json` only (the actual
+    machine-local file — API keys, personal tool permissions). `CLAUDE.md`
+    and `.claude/skills/` are shared project config now, not ignored.
   - **A separate `.claudeignore` is worth adding too** (not the same file
     as `.gitignore` — different purpose): `graph.json` and `graphify-out/`
     should be committed to git but *excluded from Claude Code's own

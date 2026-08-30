@@ -15,6 +15,12 @@ worth remembering if they happen again.
 
 ---
 
+---
+
+## 2026-08-31 (yet later) — Correction: .claude/ gitignore was too broad
+
+Caught before it caused a real problem — the project owner asked whether `CLAUDE.md` (written by `graphify claude install --project`) needed its own ignore entry, which prompted a recheck against graphify's actual docs. It doesn't: `CLAUDE.md` and `.claude/skills/graphify/` (the project-scoped skill install) are meant to be **committed** — graphify's own docs print a `git add` hint for them. The earlier `.gitignore` entry (a blanket `.claude/`) would have silently blocked that. Narrowed to `.claude/settings.local.json` only, the actual machine-local file (API keys, personal tool permissions). See `web-vs-claude-code.md`'s graphify section for the corrected note.
+
 ## 2026-08-31 (later still) — graphify adopted for token efficiency, starting step 23a
 
 Confirmed what graphify (github.com/Graphify-Labs/graphify) actually does after the project owner linked it: a local, deterministic code+docs knowledge graph with a first-class Claude Code integration (`graphify hook install` keeps it current on every commit; `graphify claude install [--project] [--strict]` nudges/redirects raw file reads toward graph queries). Directly answers the `session-status.md`-size problem flagged in the prior entry, and pairs with the project owner's `/clear`-after-each-feature discipline specifically because the graph persists on disk (and in git) independent of the conversation being cleared — see `web-vs-claude-code.md`'s expanded token-efficiency section for the full reasoning.
