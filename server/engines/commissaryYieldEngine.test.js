@@ -104,16 +104,19 @@ db.exec(schema);
 // xlsx Meats sheet) and real Yield_Log rows for one real date, 2026-07-02,
 // which has one Pass, one Review, and the zero-weight edge case together -
 // the messiest real day in the sheet.
-db.prepare('INSERT INTO commissary_meats (code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?)')
-  .run('M05', 'JOWL', 'kg', 0.20);
+db.prepare(`INSERT INTO commissaries (code, name) VALUES ('COM-A', 'Commissary A')`).run();
+const commissaryId = db.prepare(`SELECT id FROM commissaries WHERE code = 'COM-A'`).get().id;
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M05', 'JOWL', 'kg', 0.20);
 const jowlId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M05').id;
 
-db.prepare('INSERT INTO commissary_meats (code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?)')
-  .run('M08', 'Shortplate', 'kg', 0.20);
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M08', 'Shortplate', 'kg', 0.20);
 const shortplateId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M08').id;
 
-db.prepare('INSERT INTO commissary_meats (code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?)')
-  .run('M03', 'Belly Slab', 'kg', 0.25);
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M03', 'Belly Slab', 'kg', 0.25);
 const bellySlabId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M03').id;
 
 db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes) VALUES (?, ?, ?, ?, ?)')

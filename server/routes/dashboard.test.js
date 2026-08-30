@@ -36,8 +36,9 @@ db.prepare(`INSERT INTO restaurants (id, name, code) VALUES (1, 'FC', 'FC')`).ru
 db.prepare(`INSERT INTO restaurants (id, name, code, active) VALUES (2, 'Closed Branch', 'CB', 0)`).run();
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (1, 1, 'M01', 'Bagnet', 'unit')`).run();
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (2, 1, 'M02', 'Sisig', 'unit')`).run();
-db.prepare(`INSERT INTO commissary_meats (id, code, name, unit, allowed_leeway_pct) VALUES (1, 'CM01', 'Jowl', 'kg', 0.2)`).run();
-db.prepare(`INSERT INTO commissary_meats (id, code, name, unit, allowed_leeway_pct, active) VALUES (2, 'CM02', 'Retired Meat', 'kg', 0.2, 0)`).run();
+db.prepare(`INSERT INTO commissaries (id, code, name) VALUES (1, 'COM-A', 'Commissary A')`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (1, 1, 'CM01', 'Jowl', 'kg', 0.2)`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, active) VALUES (2, 1, 'CM02', 'Retired Meat', 'kg', 0.2, 0)`).run();
 
 // Standards: Jowl -> Bagnet at 0.3 units/kg, Jowl -> Sisig at 0.25 units/kg
 db.prepare(`INSERT INTO commissary_conversion_standards (commissary_meat_id, restaurant_id, meat_id, ratio_per_unit) VALUES (1, 1, 1, 0.3)`).run();

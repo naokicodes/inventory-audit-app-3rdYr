@@ -64,8 +64,11 @@ function queryHistory(db, { entity_type, actor, date_from, date_to, limit } = {}
 // one actor, then a stock_receipts CREATE + UPDATE by another actor, on
 // different dates, so filters have something real to distinguish.
 
-db.prepare('INSERT INTO commissary_meats (code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?)')
-  .run('M05', 'JOWL', 'kg', 0.20);
+db.prepare(`INSERT INTO commissaries (code, name) VALUES ('COM-A', 'Commissary A')`).run();
+const commissaryId = db.prepare(`SELECT id FROM commissaries WHERE code = 'COM-A'`).get().id;
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M05', 'JOWL', 'kg', 0.20);
 const jowlId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M05').id;
 
 db.prepare('INSERT INTO restaurants (name, code) VALUES (?, ?)').run('Restaurant A', 'RA');

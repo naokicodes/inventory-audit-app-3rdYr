@@ -108,19 +108,27 @@ for (const filename of restaurantSeedFiles) {
   seedRestaurant(data);
 }
 
-// 5. Commissary meats - global list, independent of any restaurant's own
-// meats. Full real 14-row M01-M14 set (M15 blank in the source sheet,
-// skipped) - see docs/changelog.md's step-9 entry for the verification
-// history; the "only 3 hand-verified meats" state this comment used to
-// describe was resolved before step 10 ever landed.
+// 5. Commissary meats - each commissary's own independent catalog (step
+// 23a, 2026-08-31 - see docs/data-model.md section 10b). Today there's
+// still just the one real commissary this app has ever tracked, so it's
+// seeded here rather than from its own JSON file - matches
+// migrate.js's own backfill code/name for anyone whose local database
+// pre-dates this step.
+db.prepare(`INSERT OR IGNORE INTO commissaries (code, name) VALUES ('COM-A', 'Commissary A')`).run();
+const commissaryId = db.prepare(`SELECT id FROM commissaries WHERE code = 'COM-A'`).get().id;
+
+// Full real 14-row M01-M14 set (M15 blank in the source sheet, skipped) -
+// see docs/changelog.md's step-9 entry for the verification history; the
+// "only 3 hand-verified meats" state this comment used to describe was
+// resolved before step 10 ever landed.
 const commissaryDataPath = path.join(__dirname, 'commissary-seed-data.json');
 const commissaryData = JSON.parse(fs.readFileSync(commissaryDataPath, 'utf8'));
 const insertCommissaryMeat = db.prepare(
-  'INSERT OR IGNORE INTO commissary_meats (code, name, unit, allowed_leeway_pct, cost_per_unit) VALUES (?, ?, ?, ?, ?)'
+  'INSERT OR IGNORE INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?)'
 );
 let commissaryMeatsInserted = 0;
 for (const cm of commissaryData.commissary_meats) {
-  const result = insertCommissaryMeat.run(cm.code, cm.name, cm.unit, cm.allowed_leeway_pct, cm.cost_per_unit ?? null);
+  const result = insertCommissaryMeat.run(commissaryId, cm.code, cm.name, cm.unit, cm.allowed_leeway_pct, cm.cost_per_unit ?? null);
   if (result.changes > 0) commissaryMeatsInserted++;
 }
 console.log(`Commissary meats: ${commissaryMeatsInserted} inserted (of ${commissaryData.commissary_meats.length} in file - full real Meats sheet, M01-M14)`);

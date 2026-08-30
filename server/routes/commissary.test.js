@@ -41,8 +41,9 @@ db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES 
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (2, 1, 'M02', 'Sisig', 'kg')`).run();
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit, active) VALUES (3, 1, 'M03', 'Retired Cut', 'kg', 0)`).run();
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (4, 2, 'M01', 'Some Meat', 'kg')`).run();
-db.prepare(`INSERT INTO commissary_meats (id, code, name, unit, allowed_leeway_pct) VALUES (1, 'CM01', 'Jowl', 'kg', 0.2)`).run();
-db.prepare(`INSERT INTO commissary_meats (id, code, name, unit, allowed_leeway_pct, active) VALUES (2, 'CM02', 'Retired Meat', 'kg', 0.2, 0)`).run();
+db.prepare(`INSERT INTO commissaries (id, code, name) VALUES (1, 'COM-A', 'Commissary A')`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (1, 1, 'CM01', 'Jowl', 'kg', 0.2)`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, active) VALUES (2, 1, 'CM02', 'Retired Meat', 'kg', 0.2, 0)`).run();
 
 function getReceiptRow(id) {
   return db.prepare('SELECT * FROM stock_receipts WHERE id = ?').get(id);

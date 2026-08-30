@@ -24,8 +24,11 @@ const db = new DatabaseSync(':memory:');
 db.exec('PRAGMA foreign_keys = ON');
 db.exec(schema);
 
-db.prepare('INSERT INTO commissary_meats (code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?)')
-  .run('M05', 'JOWL', 'kg', 0.20);
+db.prepare(`INSERT INTO commissaries (code, name) VALUES ('COM-A', 'Commissary A')`).run();
+const commissaryId = db.prepare(`SELECT id FROM commissaries WHERE code = 'COM-A'`).get().id;
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M05', 'JOWL', 'kg', 0.20);
 const jowlId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M05').id;
 
 test('withTransaction: a successful CREATE writes both the row and its activity_log entry', () => {
