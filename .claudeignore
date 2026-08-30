@@ -1,0 +1,7 @@
+# graphify's graph is committed to git (see .gitignore) but excluded here -
+# it's meant to be QUERIED (graphify query "...") not read as raw context.
+# Without this, every graphify extract/update re-uploads the whole graph
+# file as context on the next turn, invalidating Claude Code's prompt
+# cache - the exact token cost graphify is supposed to avoid.
+graph.json
+graphify-out/

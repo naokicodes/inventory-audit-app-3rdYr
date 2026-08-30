@@ -106,14 +106,49 @@ chat's fresh-sandbox constraint?
   chat. Flagging this as a real, worthwhile cleanup — not done here since it
   touches a lot of the file and deserves its own pass, not a rider on
   today's architecture session.
-- **A named "graphify" skill was mentioned by the project owner** as
-  potentially relevant to token use — not something visible or usable from
-  this web chat session (no skill by that name is available here). If it's
-  a Claude Code-side skill (e.g. something that compresses or graphs
-  project context instead of reading full docs linearly), it could
-  meaningfully help with the `session-status.md` size problem above — but
-  needs the project owner to describe what it actually does before this doc
-  says anything more specific about it. Flagged, not designed around yet.
+- **`graphify`** (github.com/Graphify-Labs/graphify), raised by the project
+  owner, turns out to be a direct fit for the problem above — confirmed by
+  reading its actual docs, not assumed. It builds a local, deterministic
+  code+docs graph (`graphify-out/graph.json`) that Claude Code queries
+  (`graphify query "..."`) instead of reading files linearly, and it has a
+  first-class Claude Code integration: `graphify hook install` keeps the
+  graph current automatically on every commit/branch switch, and
+  `graphify claude install [--project] [--strict]` writes a `CLAUDE.md`
+  section + a `PreToolUse` hook that nudges (soft) or blocks-and-redirects
+  (`--strict`) a raw file read toward a graph query instead.
+  - **This pairs directly with the project owner's `/clear`-after-each-
+    shipped-feature discipline.** `/clear` resets Claude Code's
+    *conversation*, but the graph is a file on disk (and, per graphify's
+    own recommendation, committed to git) — it doesn't reset with the
+    chat. A freshly-cleared session queries the graph for what changed
+    instead of re-reading `session-status.md`'s full 1700+ lines cold
+    every time. This is the actual fix for the token-efficiency problem
+    flagged above, not a maybe.
+  - **Adopt it for step 23a onward, not retroactively.** Once installed
+    (`uv tool install graphifyy` or `pipx install graphifyy`, then
+    `graphify install` inside the repo), run `/graphify .` once to build
+    the initial graph, `graphify hook install` so it self-updates on
+    every commit, and `graphify claude install --project` (start without
+    `--strict` — nudge, not block, until it's clear the graph is actually
+    reliable for this repo).
+  - **`.gitignore` needs one more line**, per graphify's own team-setup
+    guidance: `graphify-out/cost.json` (local-only run cost, not shared).
+    `graphify-out/` itself (`graph.json`, `GRAPH_REPORT.md`) is meant to
+    be **committed**, unlike `.claude/` — the whole point is that the next
+    session (Claude Code or a teammate) starts with the map already
+    built, not rebuilding it from zero.
+  - **A separate `.claudeignore` is worth adding too** (not the same file
+    as `.gitignore` — different purpose): `graph.json` and `graphify-out/`
+    should be committed to git but *excluded from Claude Code's own
+    context uploads*, per graphify's own troubleshooting note — otherwise
+    every `graphify extract`/`update` invalidates Claude Code's prompt
+    cache by re-uploading the whole graph file as raw context on the next
+    turn, which is exactly the token cost this is supposed to avoid. The
+    graph gets *queried* via the CLI/skill, never read as raw context.
+  - **Still genuinely untested on this specific repo** — the recall/
+    accuracy numbers in graphify's own benchmarks are on other codebases,
+    not this one. Worth treating as "on" but not yet fully trusted for a
+    step or two, same caution as any new tool in the loop.
 
 ## Rough rule of thumb
 

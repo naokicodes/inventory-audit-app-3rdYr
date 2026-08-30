@@ -9,6 +9,10 @@
 # Claude Code's local project config/state - machine-specific, not shared
 .claude/
 
+# graphify's local-only run cost - graphify-out/ itself IS committed
+# (graph.json, GRAPH_REPORT.md are meant to be shared, see web-vs-claude-code.md)
+graphify-out/cost.json
+
 # Secrets
 .env
 

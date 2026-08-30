@@ -13,6 +13,16 @@ worth remembering if they happen again.
 
 ---
 
+---
+
+## 2026-08-31 (later still) — graphify adopted for token efficiency, starting step 23a
+
+Confirmed what graphify (github.com/Graphify-Labs/graphify) actually does after the project owner linked it: a local, deterministic code+docs knowledge graph with a first-class Claude Code integration (`graphify hook install` keeps it current on every commit; `graphify claude install [--project] [--strict]` nudges/redirects raw file reads toward graph queries). Directly answers the `session-status.md`-size problem flagged in the prior entry, and pairs with the project owner's `/clear`-after-each-feature discipline specifically because the graph persists on disk (and in git) independent of the conversation being cleared — see `web-vs-claude-code.md`'s expanded token-efficiency section for the full reasoning.
+
+Adopted starting at step 23a, not retroactively. `.gitignore` gets one more line (`graphify-out/cost.json` — local-only, everything else in `graphify-out/` is meant to be committed). New `.claudeignore` added, separate from `.gitignore` and serving a different purpose: excludes `graph.json`/`graphify-out/` from Claude Code's own context uploads (queried via CLI, never read as raw context) so repeated `graphify extract`/`update` calls don't invalidate Claude Code's prompt cache — per graphify's own troubleshooting notes.
+
+Flagged as genuinely untested on this specific repo — treat as "on" but not yet fully trusted for a step or two.
+
 ## 2026-08-31 (later) — Workflow doc correction: past workers were free-tier web chat, not Claude Code; .gitignore for Claude Code state
 
 Project owner clarified directly: every "coder worker" step done so far (1–22, all of Round 2, item 3's design) was free-tier Claude.ai web chat, per rule 18's file-handoff pattern — not literal Claude Code. `web-vs-claude-code.md` had been written as if Claude Code was already in use; corrected, and rule 18 in `rules-for-claude-code.md` got a matching addendum. Claude Code's push-credential status (whether it can push directly, collapsing most of rule 18's handoff branch) is flagged as **unconfirmed**, not assumed — a session should try `git push` and fall back to the standard handoff format on failure until this is settled one way or the other.
