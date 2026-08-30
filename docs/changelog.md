@@ -11,6 +11,16 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (later) — graphify's first real build, committed
+
+First full `/graphify .` run, read directly from the committed `GRAPH_REPORT.md` rather than trusting the terminal summary alone. 73 files (40 code, 33 docs) → 446 nodes, 673 edges, 27 communities. 94% EXTRACTED / 6% INFERRED (avg confidence 0.83 on inferred edges), 336,934 input tokens to build.
+
+**Known limitation, not fixed**: 70 dangling edges, concentrated in `public/*.html` → `/api/...` references, where the HTML-extraction subagent invented its own endpoint node IDs instead of matching the AST's real `server/routes/*.js` node IDs. Not worth a re-extraction pass — narrow, identifiable failure mode. Standing rule instead: verify against the real route file when a query surfaces an HTML-page-to-API-endpoint edge specifically; trust everything else normally. This is also why `--strict` mode isn't turned on yet (see the earlier token-efficiency entry) — nudge mode lets a session fall back to reading the real file when something looks off, strict wouldn't.
+
+**Worth knowing when reading the graph, not a defect**: the "Graphify Skill Docs" community (44 nodes — the graph's second-largest) is graphify's own reference documentation about itself, indexed alongside the app since it lives under `.claude/skills/graphify/references/`. Several "surprising connections" the report surfaces (e.g. `computeMeatAudit()` "bridging" to Graphify Skill Docs) are `INFERRED` semantic-similarity edges between docs *about persistent context* (`session-status.md`, graphify's own pitch) rather than real code relationships — expected noise from indexing the tool's own docs into the same graph as the app, not a real architectural finding.
+
+Committed: `graphify-out/` (76 files, 1.2M — `graph.html`, `graph.json`, `GRAPH_REPORT.md`, `manifest.json`, semantic cache). `graphify-out/cost.json` correctly excluded per `.gitignore`. `graphify hook install` run — post-commit/post-checkout hooks + the `graph.json` merge driver are now active locally (not tracked in git, that's normal — hooks live in `.git/hooks/`, never committed).
+
 ## 2026-08-31 (Claude Code session) — Step 23a: schema + migration for multi-Commissary generalization
 
 First Claude Code (CLI) session on this project, per rule 18's 2026-08-31 addendum. Built exactly the schema+migration slice of item 3's already-resolved design (`data-model.md` section 10b): new `commissaries`/`meat_types` tables, `commissary_meats` gains `commissary_id` (NOT NULL FK) + `meat_type_id` (nullable FK), `UNIQUE(code)` reworked to `UNIQUE(commissary_id, code)`. No routes, no engine changes, no UI.
