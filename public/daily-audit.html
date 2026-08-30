@@ -149,8 +149,9 @@
     // live always matches what Save+reload would produce for the same
     // inputs. New Stock and Usage are NOT part of this - they're read-only
     // calculated cells on this screen (see intro paragraph), fixed at load
-    // time; only Beginning (when it's the opening-stock cell), In-House,
-    // Wastage, Other, and Ending (actual) are ever live-edited here.
+    // time; Adjustments is also read-only now (step 22 - entered on the
+    // Allocations page instead), so only Beginning (when it's the
+    // opening-stock cell) and Ending (actual) are ever live-edited here.
     const EPSILON = 0.01; // must match auditEngine.js
 
     // '' -> null (field genuinely empty, matches "missing" in the engine).
