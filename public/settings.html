@@ -39,7 +39,8 @@
   <label>Restaurant <select id="restaurant"></select></label>
 
   <div class="tabs">
-    <button data-section="meats" class="active">Meats</button>
+    <button data-section="restaurants" class="active">Restaurants</button>
+    <button data-section="meats">Meats</button>
     <button data-section="dishes">Dishes</button>
     <button data-section="recipes">Recipes</button>
     <button data-section="adjustment-types">Adjustment Types</button>
@@ -47,7 +48,18 @@
     <button data-section="shipment-presets">Shipment Presets</button>
   </div>
 
-  <section id="section-meats" class="section-panel active">
+  <section id="section-restaurants" class="section-panel active">
+    <h2>Restaurants</h2>
+    <small class="hint">Global list, not scoped by the Restaurant selector above. Code is set once at creation and can't be edited in place, same as Meat/Dish codes elsewhere on this page.</small>
+    <div class="add-form">
+      <label>Name <input id="restaurant-name" placeholder="e.g. Restaurant C"></label>
+      <label>Code <input id="restaurant-code" placeholder="e.g. RC"></label>
+      <button id="add-restaurant">Add Restaurant</button>
+    </div>
+    <div id="restaurants-table">Loading...</div>
+  </section>
+
+  <section id="section-meats" class="section-panel">
     <h2>Meats</h2>
     <div class="add-form">
       <label>Code <input id="meat-code" placeholder="M12"></label>
@@ -154,6 +166,63 @@
       restaurantSelect.innerHTML = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
       currentRestaurantId = restaurantSelect.value;
     }
+
+    // ---------- RESTAURANTS ----------
+    // Global list, not scoped by currentRestaurantId - this is the
+    // section that manages currentRestaurantId's own options, so it
+    // reloads the page-level selector (loadRestaurants) after any change.
+    async function loadRestaurantsTable() {
+      const res = await fetch('/api/settings/restaurants');
+      const restaurants = await res.json();
+      document.getElementById('restaurants-table').innerHTML = `
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Active</th></tr></thead>
+          <tbody>${restaurants.map(r => `
+            <tr>
+              <td>${r.code}</td>
+              <td><input value="${r.name}" data-field="name" data-id="${r.id}" class="restaurant-edit"></td>
+              <td><input type="checkbox" ${r.active ? 'checked' : ''} data-field="active" data-id="${r.id}" class="restaurant-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.restaurant-edit').forEach(el => el.addEventListener('change', saveRestaurantRow));
+    }
+
+    async function saveRestaurantRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      const result = await fetch(`/api/settings/restaurants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          active: get('active').checked
+        })
+      }).then(r => r.json());
+      if (!result.ok) { alert(result.error); }
+      loadRestaurantsTable();
+      loadRestaurants();
+      loadLocationRestaurantDropdown();
+    }
+
+    document.getElementById('add-restaurant').addEventListener('click', async () => {
+      const name = document.getElementById('restaurant-name').value.trim();
+      const code = document.getElementById('restaurant-code').value.trim();
+      if (!name || !code) return alert('Name and code are required.');
+      const res = await fetch('/api/settings/restaurants', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, code })
+      });
+      const result = await res.json();
+      if (!result.ok) return alert(result.error);
+      document.getElementById('restaurant-name').value = '';
+      document.getElementById('restaurant-code').value = '';
+      loadRestaurantsTable();
+      loadRestaurants();
+      loadLocationRestaurantDropdown();
+    });
 
     // ---------- MEATS ----------
     async function loadMeats() {
@@ -610,6 +679,7 @@
     });
 
     loadRestaurants().then(() => {
+      loadRestaurantsTable();
       loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
       loadPresetCommissaryMeats();
       loadPresetDestinationMeats().then(() => { resetNewPresetLines(); loadShipmentPresets(); });

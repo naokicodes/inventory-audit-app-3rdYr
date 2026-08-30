@@ -8,6 +8,49 @@ const db = require('../db/connection.js');
 
 const router = express.Router();
 
+// ---------- RESTAURANTS ----------
+// Round 2 findings item 1 (session-status.md): until now, restaurants
+// rows only ever came from seed.js reading a JSON file - no in-app way
+// to create one. Deliberately kept separate from the Commissary-creation
+// work (item 3's design), same kind of gap but a different step. Same
+// shape as Meats below: GET returns every row (not just active) so the
+// admin table can list and reactivate, POST creates, PUT edits name/
+// active only - code is set once at creation and not editable in place,
+// matching how meat_code/dish_code work elsewhere on this page. Not
+// wired into activity_log - config data, not a daily transactional log,
+// same reasoning already given for Adjustment Types/Locations above.
+
+router.get('/settings/restaurants', (req, res) => {
+  const rows = db.prepare(`SELECT id, name, code, active FROM restaurants ORDER BY name`).all();
+  res.json(rows);
+});
+
+router.post('/settings/restaurants', (req, res) => {
+  const { name, code } = req.body;
+  if (!name || !code) {
+    return res.status(400).json({ error: 'name and code are required' });
+  }
+  try {
+    const result = db.prepare(
+      `INSERT INTO restaurants (name, code) VALUES (?, ?)`
+    ).run(name, code.toUpperCase());
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That restaurant code already exists.' : err.message });
+  }
+});
+
+router.put('/settings/restaurants/:id', (req, res) => {
+  const { name, active } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.prepare(
+    `UPDATE restaurants SET name = ?, active = ? WHERE id = ?`
+  ).run(name.trim(), active ? 1 : 0, req.params.id);
+  res.json({ ok: true });
+});
+
 // ---------- MEATS ----------
 
 router.get('/settings/meats', (req, res) => {
