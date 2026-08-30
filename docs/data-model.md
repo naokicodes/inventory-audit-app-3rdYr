@@ -440,21 +440,30 @@ Full reasoning in `session-status.md`; this is the schema only, kept in sync
 per rule 7 (architect edits this file directly when a real decision is made,
 not deferred to a coder).
 
+**Step boundary, resequenced 2026-08-31 (see session-status.md's "Item 3
+design" for why)**: `commissaries`, `meat_types`, and `commissary_meats`'
+new columns below are **23a**. `commissary_conversion_standards`' rekey is
+**23b**, bundled with its route/engine consumers — not schema-only, don't
+build it as part of 23a. `commissary_yield_log`'s `output_commissary_meat_id`
+and `commissary_adjustments` belong to step 24, not 23 at all (see the
+"Multi-stage yield" section of session-status.md) — included below because
+they're part of the same overall design, not because they're 23a/23b work.
+
 **New tables:**
 
 ```
-commissaries
+commissaries                        -- 23a
   id            integer, PK
   code          text, unique      -- e.g. "COM-A"
   name          text
   active        boolean
 
-meat_types
+meat_types                          -- 23a
   id            integer, PK
   name          text
   active        boolean           -- admin-managed reference table
 
-commissary_adjustments
+commissary_adjustments              -- step 24, not 23
   id                              integer, PK
   commissary_meat_id              integer, FK -> commissary_meats  -- source
   business_date                   date
@@ -470,15 +479,21 @@ commissary_adjustments
 
 **Changed tables:**
 
-- `commissary_meats` gains `commissary_id` (NOT NULL, FK → `commissaries`)
-  and `meat_type_id` (nullable, FK → `meat_types`). `UNIQUE(code)` becomes
-  `UNIQUE(commissary_id, code)`.
-- `commissary_conversion_standards` swaps its `commissary_meat_id` column for
-  `meat_type_id` (NOT NULL, FK → `meat_types`). `UNIQUE(commissary_meat_id,
-  restaurant_id, meat_id)` becomes `UNIQUE(meat_type_id, restaurant_id,
-  meat_id)`. A commissary meat can only get a Standard once it's tagged with
-  a `meat_type` — untagged/raw-dynamic meats are unaffected.
-- `commissary_yield_log` gains `output_commissary_meat_id` (nullable, FK →
+- `commissary_meats` (**23a**) gains `commissary_id` (NOT NULL, FK →
+  `commissaries`) and `meat_type_id` (nullable, FK → `meat_types`).
+  `UNIQUE(code)` becomes `UNIQUE(commissary_id, code)`.
+- `commissary_conversion_standards` (**23b**) swaps its `commissary_meat_id`
+  column for `meat_type_id` (NOT NULL, FK → `meat_types`).
+  `UNIQUE(commissary_meat_id, restaurant_id, meat_id)` becomes
+  `UNIQUE(meat_type_id, restaurant_id, meat_id)`. A commissary meat can only
+  get a Standard once it's tagged with a `meat_type` — untagged/raw-dynamic
+  meats are unaffected. Left untouched by 23a on purpose — its only
+  consumers are a live route handler and 6 test files, both squarely 23b's
+  job (a Claude Code session starting 23a flagged this correctly per rule 3
+  rather than making a "minimal mechanical" fix that would have bled into
+  23b's actual route/engine work).
+- `commissary_yield_log` (**step 24**) gains `output_commissary_meat_id`
+  (nullable, FK →
   `commissary_meats`). NULL means "same as input" (today's behavior,
   unchanged — a single meat losing weight to trim). Set explicitly when an
   event produces a genuinely different catalog row (raw → backed, or one
@@ -495,18 +510,19 @@ meats genuinely don't get backed up the same day). `output_commissary_meat_id`
 is what finally wires these up (e.g. a yield event with `commissary_meat_id
 = M02` and `output_commissary_meat_id = M01`), no new seed rows required.
 
-**Also required**: `getCommissaryUsage` (`commissaryAuditEngine.js`) must
-also sum `commissary_yield_log.raw_weight_in` for every event where the meat
-in question is the input (`commissary_meat_id`) — today it only counts
+**Also required (step 24)**: `getCommissaryUsage` (`commissaryAuditEngine.js`)
+must also sum `commissary_yield_log.raw_weight_in` for every event where the
+meat in question is the input (`commissary_meat_id`) — today it only counts
 `commissary_shipments`, so a raw/intermediate meat's calculated balance never
 decreases when it's consumed by processing. Confirmed bug, not a new
 feature; a prerequisite for the output-column change to mean anything.
 
-**Migration** (today's single implicit commissary): create one `commissaries`
-row, backfill every `commissary_meats.commissary_id` to it. For every
-existing `commissary_conversion_standards` row, create/reuse a `meat_types`
-row for its meat, point that `commissary_meat`'s `meat_type_id` at it, and
-rewrite the standard's key column. Needs an idempotent migration helper (not
+**Migration**: 23a's piece is just `commissaries` (one row for today's
+single implicit commissary) + backfilling every `commissary_meats.commissary_id`
+to it. The `commissary_conversion_standards` piece — for every existing row,
+create/reuse a `meat_types` row for its meat, point that `commissary_meat`'s
+`meat_type_id` at it, and rewrite the standard's key column — moves to 23b
+along with the rekey itself. Needs an idempotent migration helper (not
 just a `schema.sql` edit) per the standing `CREATE TABLE IF NOT EXISTS`
 gotcha in `architect-notes-PRIVATE.md`.
 
