@@ -1414,6 +1414,92 @@ cover rather than guessing.
    a booted server is still owed next time a session has network/npm
    access.
 
+### Multi-stage yield + Commissary-side allocation — RESOLVED 2026-08-30, ready to build, none of it started yet
+
+Raised by the project owner working through two real Commissary
+scenarios that didn't fit the existing single-input/single-output yield
+model. Settled through the same real back-and-forth as item 3's design
+— every fork below was an actual question asked and answered:
+
+- **A real, confirmed bug found and must be fixed as a prerequisite,
+  not a nice-to-have**: `getCommissaryUsage`
+  (`commissaryAuditEngine.js`) only ever sums `commissary_shipments` as
+  usage for a commissary meat. It never counts
+  `commissary_yield_log.raw_weight_in` as an outflow for whichever
+  meat was the *input* to a yield event. Concretely: 20kg raw Jowl
+  received, a yield event consumes 15kg of it — the raw item's
+  calculated balance stays at 20kg forever, since nothing ever
+  subtracts the 15kg that got processed. A real physical count would
+  show a permanent, false SHORTAGE variance. This has been silently
+  wrong since step 20b; harmless so far only because nothing yet
+  depended on a raw/intermediate meat's balance being accurate (every
+  existing commissary meat either doesn't get further processed, or
+  ships out directly, so the bug never had a chance to matter until
+  now). **Fix**: `getCommissaryUsage` also sums `raw_weight_in` for
+  every yield event where the meat in question was the input side.
+  Applies uniformly to a genuinely raw meat *and* to an intermediate
+  stage (below) being consumed by a later stage — same mechanism, no
+  special-casing needed.
+
+- **Multi-stage yield chaining, configured per meat, not a new
+  mechanism.** Most commissary meats have zero extra stages; some have
+  one; a few (Shortplate: sear, then braise) have two. No new schema
+  concept — each stage is a completely normal, existing single-input/
+  single-output `commissary_yield_log` entry. The only difference:
+  stage two's `commissary_meat_id` *input* is stage one's own output
+  meat (e.g. "Seared Shortplate," a real catalog row with its own real
+  balance — confirmed this needs to be real, not transient: it's
+  common to sear a full day's new stock but not finish braising all of
+  it the same day, so intermediate stock genuinely sits around and
+  needs an accurate count). Depends entirely on the usage-formula fix
+  above — without it, a chained intermediate stage's balance would be
+  meaningless.
+
+- **The Chicken → Yaki-portions + Miscuts case turned out not to need
+  a new "multi-output yield" concept at all** — it decomposes into two
+  *already-designed* patterns:
+  1. A normal single-stage yield: Raw Chicken → "Processed Chicken,"
+     one output, real trackable inventory, same as any other yield
+     event (cutting/portioning can legitimately be lossless — 0%
+     `allowed_leeway_pct` for these events, no schema change needed;
+     confirmed searing/braising *do* have real loss, cutting doesn't
+     necessarily).
+  2. A **new Commissary-side allocation mechanism** — a parallel table
+     to the existing restaurant-scoped `adjustments`, not a shared or
+     merged one (keeps Commissary and restaurants structurally
+     separate, consistent with item 3's own "option B" decision, not a
+     new precedent). Two distinct kinds of entry, confirmed as
+     genuinely different, not two names for the same thing: **loss**
+     (no trackable destination — pure shrinkage, conceptually the same
+     as a yield event's own leeway loss) and **allocation** (a
+     trackable destination elsewhere, e.g. redirecting part of
+     Processed Chicken's balance to Miscuts-Chicken).
+  Shipping stays completely untouched either way — once "Processed
+  Chicken" exists as inventory, it ships via the exact same
+  Shipments + Conversion Standards mechanism every other commissary
+  meat already uses, regardless of which stage or allocation path
+  produced it.
+
+- **Miscuts are separate catalog rows per meat** (Miscuts-Chicken,
+  Miscuts-Jowl, Miscuts-Belly, etc. — matches the real xlsx's
+  intent, which the app had been treating as one shared `M14` row
+  without actually tagging them; confirmed this needs fixing, not
+  preserving). Tagged via the same meat-type reference table item 3
+  already designed, not a new tagging mechanism — lets reporting roll
+  up "total Miscuts across everything" while keeping each one tracked
+  separately for real operational use (e.g. staff-meal planning per
+  meat).
+
+**Not designed yet, deliberately left for when this actually gets
+built**: exact table/column names for the Commissary-side allocation
+table, how a yield event's "input meat" reference should be structured
+now that it might point at either a genuinely raw meat or a prior
+stage's output (same column either way, or does chaining need its own
+explicit marker?), and how many stages the schema should allow for
+before it's clearly over-engineered for a real 2-stage-max case. Real
+implementation work, not more open questions — flag anything this
+design doesn't cover rather than guessing.
+
 ## Original five items, raised 2026-08-29
 
 **[Done, 2026-08-29] Item 6**: step 18's over-sold
