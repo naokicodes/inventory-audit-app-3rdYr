@@ -11,6 +11,12 @@ worth remembering if they happen again.
 
 ---
 
+---
+
+## 2026-08-31 (final) — .gitattributes: commit it, but flag the merge-driver gotcha
+
+`graphify hook install` wrote `.gitattributes` (`graphify-out/graph.json merge=graphify`) — this gets committed, same category as `.gitignore` itself, not ignored. But the actual merge-driver logic lives in local `.git/config`, which never travels with a clone. Flagged in `web-vs-claude-code.md`'s graphify section: every fresh clone (teammate, new machine, fresh Claude Code checkout) needs `graphify hook install` run once before `graph.json` merges cleanly, or git falls back to normal conflict-marker merging on it.
+
 ## 2026-08-31 (later) — graphify's first real build, committed
 
 First full `/graphify .` run, read directly from the committed `GRAPH_REPORT.md` rather than trusting the terminal summary alone. 73 files (40 code, 33 docs) → 446 nodes, 673 edges, 27 communities. 94% EXTRACTED / 6% INFERRED (avg confidence 0.83 on inferred edges), 336,934 input tokens to build.

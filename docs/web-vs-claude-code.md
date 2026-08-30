@@ -155,6 +155,17 @@ chat's fresh-sandbox constraint?
     cache by re-uploading the whole graph file as raw context on the next
     turn, which is exactly the token cost this is supposed to avoid. The
     graph gets *queried* via the CLI/skill, never read as raw context.
+  - **`.gitattributes`' merge driver needs `graphify hook install` run
+    per-clone, not just once.** `graphify hook install` writes
+    `graphify-out/graph.json merge=graphify` into `.gitattributes`
+    (committed, shared) — but the actual driver logic lives in local
+    `.git/config` (never committed, never travels with a clone). A
+    teammate, a fresh Claude Code checkout, or this project owner on a
+    different machine all need to run `graphify hook install`
+    themselves once before `graph.json` merges cleanly — otherwise git
+    either errors on an unknown driver or silently falls back to
+    normal conflict-marker merging. `.gitattributes` alone doesn't
+    carry this.
   - **Still genuinely untested on this specific repo** — the recall/
     accuracy numbers in graphify's own benchmarks are on other codebases,
     not this one. Worth treating as "on" but not yet fully trusted for a
