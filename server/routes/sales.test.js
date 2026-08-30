@@ -41,6 +41,13 @@ function freshDb() {
 
 // --- Mirrors PATCH /api/sales's core upsert-or-clear logic ---
 function patchSales(db, { restaurant_id, dish_id, business_date, quantity }) {
+  if (!restaurant_id || !dish_id || !business_date) {
+    return { status: 400, body: { error: 'restaurant_id, dish_id, and business_date are required' } };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(business_date)) {
+    return { status: 400, body: { error: 'business_date must be YYYY-MM-DD' } };
+  }
+
   const dish = db.prepare(`SELECT id FROM dishes WHERE id = ? AND restaurant_id = ? AND active = 1`).get(dish_id, restaurant_id);
   if (!dish) return { status: 400, body: { error: 'Unknown dish_id for this restaurant, or dish is inactive' } };
 
@@ -148,6 +155,18 @@ test('the partial unique index allows multiple LOYVERSE rows for the same cell (
   db.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-08-05', 5, 'LOYVERSE')`).run();
   const rows = db.prepare(`SELECT * FROM sales WHERE dish_id = 1 AND business_date = '2026-08-05'`).all();
   assert.strictEqual(rows.length, 2);
+});
+
+test('PATCH with a missing required field is rejected', () => {
+  const db = freshDb();
+  const result = patchSales(db, { dish_id: 1, business_date: '2026-08-05', quantity: 10 });
+  assert.strictEqual(result.status, 400);
+});
+
+test('PATCH with a malformed business_date is rejected', () => {
+  const db = freshDb();
+  const result = patchSales(db, { restaurant_id: 1, dish_id: 1, business_date: '08/05/2026', quantity: 10 });
+  assert.strictEqual(result.status, 400);
 });
 
 test('GET matrix returns every active dish, every day of the month, empty cells as null', () => {
