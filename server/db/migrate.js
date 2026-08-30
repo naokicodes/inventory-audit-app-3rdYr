@@ -192,3 +192,134 @@ function migrateConversionColumns(db) {
 }
 
 module.exports.migrateConversionColumns = migrateConversionColumns;
+
+// ----------------------------------------------------------------------
+// Step 23a (2026-08-31): multi-Commissary generalization, schema only.
+// See docs/data-model.md section 10b and docs/session-status.md's "Item 3
+// design" for the full reasoning - this migration covers only the piece
+// resolved for 23a: commissary_meats gains commissary_id (NOT NULL) and
+// meat_type_id (nullable), with UNIQUE(code) becoming
+// UNIQUE(commissary_id, code). commissary_conversion_standards' own rekey
+// (commissary_meat_id -> meat_type_id) is deliberately deferred to 23b,
+// bundled with the route/engine changes that consume it - not touched
+// here.
+//
+// Why a rebuild is needed (same reasoning as
+// migrateStockReceiptsNullableDestination above): adding a NOT NULL
+// column with no default, and changing a UNIQUE constraint, aren't things
+// a plain ALTER TABLE ADD COLUMN can do - SQLite needs a full
+// create-copy-drop-rename for both. Since commissaries/meat_types are
+// themselves brand-new tables that a pre-23a database won't have yet,
+// this migration creates them itself (matching schema.sql's own
+// definitions exactly) before the commissary_meats rebuild - schema.sql's
+// later CREATE TABLE IF NOT EXISTS for both is then a no-op.
+//
+// Must run BEFORE schema.sql - see connection.js.
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ ran: boolean, commissaryId?: number, rowsMigrated: number }}
+ */
+function migrateCommissaryMultiTenant(db) {
+  const tableExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'commissary_meats'`
+  ).get();
+
+  if (!tableExists) {
+    // Fresh install - schema.sql will create commissary_meats with
+    // commissary_id/meat_type_id already present. Nothing to migrate.
+    return { ran: false, rowsMigrated: 0 };
+  }
+
+  const columns = db.prepare(`PRAGMA table_info(commissary_meats)`).all();
+  const alreadyMigrated = columns.some(c => c.name === 'commissary_id');
+  if (alreadyMigrated) {
+    // Already has the new shape - either migrated previously, or created
+    // fresh by schema.sql on a database that never had the old shape.
+    return { ran: false, rowsMigrated: 0 };
+  }
+
+  const rowCountBefore = db.prepare(`SELECT COUNT(*) AS n FROM commissary_meats`).get().n;
+
+  const fkWasOn = db.prepare(`PRAGMA foreign_keys`).get().foreign_keys === 1;
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  let commissaryId;
+  db.exec('BEGIN');
+  try {
+    // commissaries/meat_types are brand-new tables - a pre-23a database
+    // won't have them yet. Definitions match schema.sql exactly.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS commissaries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1
+      )
+    `);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS meat_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1
+      )
+    `);
+
+    // One real commissary row representing today's single implicit
+    // commissary. INSERT OR IGNORE + SELECT so a re-run (shouldn't happen,
+    // guarded by the alreadyMigrated check above, but matches this file's
+    // existing defensive style) doesn't create a second row.
+    db.prepare(
+      `INSERT OR IGNORE INTO commissaries (code, name) VALUES ('COM-A', 'Commissary A')`
+    ).run();
+    commissaryId = db.prepare(
+      `SELECT id FROM commissaries WHERE code = 'COM-A'`
+    ).get().id;
+
+    db.exec(`
+      CREATE TABLE commissary_meats__migrated (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        commissary_id INTEGER NOT NULL,
+        code TEXT NOT NULL,
+        name TEXT NOT NULL,
+        unit TEXT NOT NULL CHECK (unit IN ('kg', 'unit')),
+        allowed_leeway_pct REAL NOT NULL,
+        cost_per_unit REAL,
+        meat_type_id INTEGER,
+        active INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (commissary_id) REFERENCES commissaries(id),
+        FOREIGN KEY (meat_type_id) REFERENCES meat_types(id),
+        UNIQUE (commissary_id, code)
+      )
+    `);
+
+    db.prepare(`
+      INSERT INTO commissary_meats__migrated
+        (id, commissary_id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active)
+      SELECT
+        id, ?, code, name, unit, allowed_leeway_pct, cost_per_unit, NULL, active
+      FROM commissary_meats
+    `).run(commissaryId);
+
+    const rowCountAfter = db.prepare(`SELECT COUNT(*) AS n FROM commissary_meats__migrated`).get().n;
+    if (rowCountAfter !== rowCountBefore) {
+      throw new Error(
+        `Migration row count mismatch: ${rowCountBefore} before, ${rowCountAfter} after - aborting rather than risk data loss.`
+      );
+    }
+
+    db.exec('DROP TABLE commissary_meats');
+    db.exec('ALTER TABLE commissary_meats__migrated RENAME TO commissary_meats');
+
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  } finally {
+    if (fkWasOn) db.exec('PRAGMA foreign_keys = ON');
+  }
+
+  return { ran: true, commissaryId, rowsMigrated: rowCountBefore };
+}
+
+module.exports.migrateCommissaryMultiTenant = migrateCommissaryMultiTenant;

@@ -219,16 +219,54 @@ CREATE TABLE IF NOT EXISTS adjustments (
 
 -- 10. Commissary tables (see docs/commissary-and-stock-receipts.md)
 
--- commissary_meats: global list, independent of any restaurant's own
--- meats table.
+-- commissaries: item 3's multi-Commissary generalization (resolved
+-- 2026-08-31, see data-model.md section 10b / session-status.md's "Item 3
+-- design"). A Commissary branch is its own kind of thing, not a
+-- restaurants row with a type flag (Option B, deliberately kept separate).
+CREATE TABLE IF NOT EXISTS commissaries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,   -- e.g. "COM-A"
+  name TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
+);
+
+-- meat_types: admin-managed reference table, optional at the catalog
+-- level. Lets two different commissaries' independent catalogs (e.g. both
+-- have their own "Jowl" row) tag themselves as "the same root thing," so
+-- a Conversion Standard entered once can apply everywhere that type is
+-- supplied from, and the Dashboard can roll up "total Jowl across
+-- everything." See data-model.md section 10b.
+CREATE TABLE IF NOT EXISTS meat_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
+);
+
+-- commissary_meats: each commissary's own independent catalog - no
+-- structural sharing assumed between commissaries. commissary_id is step
+-- 23a (2026-08-31); meat_type_id is optional per-row tagging, only
+-- required once a Conversion Standard needs to reference this meat's
+-- underlying type (see commissary_conversion_standards' own rekey,
+-- deferred to step 23b - deliberately NOT changed in this table's
+-- neighbor below yet).
+-- NOTE: this table may already exist with the OLD single-commissary shape
+-- (no commissary_id, UNIQUE(code) global) in someone's local inventory.db
+-- - CREATE TABLE IF NOT EXISTS below cannot loosen or add a NOT NULL
+-- column on an existing table. server/db/migrate.js handles the one-time
+-- rebuild; it runs before this file, in connection.js.
 CREATE TABLE IF NOT EXISTS commissary_meats (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT NOT NULL UNIQUE,
+  commissary_id INTEGER NOT NULL,
+  code TEXT NOT NULL,
   name TEXT NOT NULL,
   unit TEXT NOT NULL CHECK (unit IN ('kg', 'unit')),
   allowed_leeway_pct REAL NOT NULL,
   cost_per_unit REAL,
-  active INTEGER NOT NULL DEFAULT 1
+  meat_type_id INTEGER,
+  active INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (commissary_id) REFERENCES commissaries(id),
+  FOREIGN KEY (meat_type_id) REFERENCES meat_types(id),
+  UNIQUE (commissary_id, code)
 );
 
 -- commissary_meat_map: explicit mapping between commissary meats and a
