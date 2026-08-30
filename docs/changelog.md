@@ -11,17 +11,17 @@ worth remembering if they happen again.
 
 ---
 
----
+## 2026-08-31 (Claude Code session) — Step 23a: schema + migration for multi-Commissary generalization
 
----
+First Claude Code (CLI) session on this project, per rule 18's 2026-08-31 addendum. Built exactly the schema+migration slice of item 3's already-resolved design (`data-model.md` section 10b): new `commissaries`/`meat_types` tables, `commissary_meats` gains `commissary_id` (NOT NULL FK) + `meat_type_id` (nullable FK), `UNIQUE(code)` reworked to `UNIQUE(commissary_id, code)`. No routes, no engine changes, no UI.
 
----
+**Scope conflict found and resolved before coding, not silently decided**: the assigned scope also included rekeying `commissary_conversion_standards` from `commissary_meat_id` to a NOT-NULL `meat_type_id`. Checking the actual code first showed this would immediately break `server/routes/commissary.js`'s existing shipment/standards write path plus 2 test files' `commissary_conversion_standards` fixtures (`commissary.test.js`, `dashboard.test.js`) — conflicting with rule 17 (never leave working behavior broken) and rule 19 (full suite green). Asked the project owner directly rather than guessing which side to break: resolved to defer that table's rekey entirely to step 23b, bundled with the route/engine changes that actually consume `meat_type_id`. Not touched in this session at all — schema, route, or tests.
 
----
+**Migration** (`server/db/migrate.js`'s new `migrateCommissaryMultiTenant`): mirrors the existing `migrateStockReceiptsNullableDestination` rebuild-and-rename pattern (NOT NULL columns and constraint changes aren't a plain `ALTER TABLE ADD COLUMN`). Since `commissaries`/`meat_types` are themselves brand-new tables a pre-23a database won't have, the migration creates them itself (matching `schema.sql`'s definitions exactly) before rebuilding `commissary_meats`, backfilling one real `commissaries` row (`COM-A`, "Commissary A") and pointing every existing row at it. Wired into `connection.js` before `schema.sql`, alongside the three existing migrations.
 
-## 2026-08-31 (final) — 23a resequenced mid-session: conversion_standards rekey moved to 23b
+**Real fixture fallout, fixed as real 23a work** (not deferred, per the project owner's explicit boundary): `commissary_meats`' new NOT NULL `commissary_id` broke `seed.js` and 6 existing test files that raw-inserted `commissary_meats` rows without it (`activityLog.test.js`, `commissaryAuditEngine.test.js`, `commissaryYieldEngine.test.js`, `commissary.test.js`, `dashboard.test.js`, `history.test.js`). Each now creates/references a real `commissaries` row first. `seed.js` seeds one `COM-A` row itself (matching the migration's own default) rather than reading a new JSON file, since there's still only ever been one real commissary.
 
-A Claude Code session starting 23a correctly flagged (rule 3), before writing any code, that `commissary_conversion_standards`' rekey — though specified as part of 23a's schema — only breaks a live route handler and 6 test files, both squarely 23b's (engine/routes) job. Doing a "minimal mechanical fix" to keep them green in 23a risked pre-building a half version of 23b's actual work. Resolved: the rekey itself (and its migration piece — backfilling `meat_types` from existing standards rows) moves to 23b, bundled with the route/engine changes that consume it. 23a is now genuinely additive-only: `commissaries`, `meat_types`, `commissary_meats`' new columns, and its own migration — nothing existing breaks, no route touched. `session-status.md`'s "Item 3 design" section and `data-model.md` section 10b both updated with the new step boundaries so this isn't re-litigated later.
+**Verified**: new `server/db/migrate.test.js`, 8/8 assertions — fresh-install no-op, already-migrated no-op, exactly one `commissaries` row created, every existing row's data preserved with `commissary_id` backfilled correctly, row count unchanged, the new `UNIQUE(commissary_id, code)` actually permits the same code under a second commissary while still rejecting a duplicate under the same one, and idempotent on a second run. Beyond the in-memory unit tests, also verified against a real on-disk `inventory.db` built with the literal pre-23a table shape (no `commissary_id`, global `UNIQUE(code)`) — booted the real `connection.js` against it and confirmed the migration ran for real, not just in a mocked scenario. Full existing suite re-run: **14/14 files, 200/200 assertions, 0 regressions** (was 192). `seed.js` re-run twice confirming idempotency (0 inserted the second time). Committed in two pieces per rule 16: schema+migration+migrate-tests, then the fixture fixups.
 
 ## 2026-08-31 (yet later) — Correction: .claude/ gitignore was too broad
 
