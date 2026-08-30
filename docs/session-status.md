@@ -1,12 +1,14 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (step 23a, schema + migration for the
-multi-Commissary generalization — see its entry under "Item 3 design"
-below, and `changelog.md`'s matching entry, for full detail). **Next up:
-23b.**
+Last updated: 2026-08-31 (step 23b, sub-piece 1 of 6: the
+`commissary_conversion_standards` rekey + its direct route/engine
+consumers — see its entry under "Item 3 design" below, and
+`changelog.md`'s matching entry, for full detail). **Next up: the
+remaining 5 items of 23b, or 23c** — project owner's call.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
-summary, predates step 23a and is unchanged by it.
+summary, predates step 23a/23b and is unchanged by them except where
+their entries note otherwise.
 
 Last updated (previous): 2026-08-30. All four Round 2 worker tasks are done,
 pushed, and independently verified by the architect conversation — not
@@ -1426,12 +1428,45 @@ fresh architecture session:**
   from `commissary_meat_id` to `meat_type_id` NOT NULL, plus the
   migration backfilling a `meat_types` row per existing standard) —
   deferred here from 23a on 2026-08-31, see 23a's entry above for why.
+
+  **[Done, 2026-08-31 — second Claude Code (CLI) session, sub-piece 1
+  of 6 only] The rekey itself + its direct route/engine consumers are
+  done.** `commissary_conversion_standards` swapped `commissary_meat_id`
+  for `meat_type_id` (NOT NULL FK), `UNIQUE` reworked to `(meat_type_id,
+  restaurant_id, meat_id)`. New `migrateConversionStandardsMeatType`
+  backfills a `meat_types` row per distinct commissary meat referenced by
+  an existing standard, tags that `commissary_meats` row, rewrites each
+  standard's key column — sequenced after 23a's
+  `migrateCommissaryMultiTenant`. `commissary.js`'s `GET
+  /commissary/conversion-standards` keeps its public contract
+  (`commissary_meat_id` + `restaurant_id` in), resolving internally via
+  `meat_type_id` (empty list for an untagged meat, not an error); `POST`
+  now takes `meat_type_id` directly. `dashboard.js`'s rollup query got the
+  matching minimal fix to stay correct. See `changelog.md`'s "Step 23b
+  sub-piece" entry for full detail.
+
+  **Explicitly NOT done this session — still open for a future
+  session**: Commissary CRUD, meat-type CRUD, `commissary_meats` CRUD,
+  every commissary-scoped engine function taking a `commissary_id` param
+  instead of assuming a singleton, and the *fuller* Dashboard rollup
+  restructuring (grouping multiple commissaries' same-`meat_type_id` rows
+  into one combined line — today's fix only kept the existing
+  per-commissary-meat rollup correct against the new schema, it did not
+  build that grouping). **Known, flagged gap**: `settings.html`'s "Create
+  Standard" admin form still POSTs `commissary_meat_id` and will fail
+  this route's validation until 23c ships a meat-type-aware picker —
+  `GET`/`PUT` (edit) on that page are unaffected. Full suite: **14/14
+  files, 207/207 assertions, 0 regressions** (was 200). Pushed to `main`
+  directly.
 - **23c (UI)**: Commissary + Meat Type tabs in Settings, commissary-meat
   creation UI, a commissary selector everywhere a screen currently
   assumes there's only one (`commissary.html`, `commissary-shipments.html`,
   Terminal, Dashboard drill-down).
 
-**Next up: 23b.** 23a is done; 23b/23c are not started.
+**Next up: the remaining 5 items of 23b** (Commissary CRUD, meat-type
+CRUD, `commissary_meats` CRUD, per-commissary engine params, fuller
+Dashboard grouping) **or 23c**, project owner's call on sequencing. 23a
+and 23b's rekey sub-piece are done; nothing else in 23b/23c is started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading
