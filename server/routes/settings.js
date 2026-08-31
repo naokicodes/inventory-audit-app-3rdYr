@@ -51,6 +51,138 @@ router.put('/settings/restaurants/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- COMMISSARIES ----------
+// Step 23b (2026-08-31): item 3's multi-Commissary generalization
+// (data-model.md section 10b) - until now there was exactly one implicit
+// commissary, backfilled by 23a's migration. Exact mirror of Restaurants
+// above: GET returns every row (active or not, so the admin table can
+// list and reactivate), POST creates, PUT edits name/active only - code
+// is set once at creation, matching restaurants/meats/dishes convention.
+// Not wired into activity_log - config data, not a daily transactional
+// log, same reasoning as every other admin CRUD section on this page.
+
+router.get('/settings/commissaries', (req, res) => {
+  const rows = db.prepare(`SELECT id, name, code, active FROM commissaries ORDER BY name`).all();
+  res.json(rows);
+});
+
+router.post('/settings/commissaries', (req, res) => {
+  const { name, code } = req.body;
+  if (!name || !code) {
+    return res.status(400).json({ error: 'name and code are required' });
+  }
+  try {
+    const result = db.prepare(
+      `INSERT INTO commissaries (name, code) VALUES (?, ?)`
+    ).run(name, code.toUpperCase());
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That commissary code already exists.' : err.message });
+  }
+});
+
+router.put('/settings/commissaries/:id', (req, res) => {
+  const { name, active } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.prepare(
+    `UPDATE commissaries SET name = ?, active = ? WHERE id = ?`
+  ).run(name.trim(), active ? 1 : 0, req.params.id);
+  res.json({ ok: true });
+});
+
+// ---------- MEAT TYPES ----------
+// Step 23b (2026-08-31): the admin-managed reference table item 3's
+// design introduced (data-model.md section 10b) so two different
+// commissaries' independently-cataloged meats (e.g. both have their own
+// "Jowl" row) can share one Conversion Standard. Exact mirror of
+// Adjustment Types above: global list, name + active, edit-in-place.
+
+router.get('/settings/meat-types', (req, res) => {
+  const rows = db.prepare(`SELECT id, name, active FROM meat_types ORDER BY name`).all();
+  res.json(rows);
+});
+
+router.post('/settings/meat-types', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  try {
+    const result = db.prepare(
+      `INSERT INTO meat_types (name) VALUES (?)`
+    ).run(name.trim());
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That meat type name already exists.' : err.message });
+  }
+});
+
+router.put('/settings/meat-types/:id', (req, res) => {
+  const { name, active } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.prepare(
+    `UPDATE meat_types SET name = ?, active = ? WHERE id = ?`
+  ).run(name.trim(), active ? 1 : 0, req.params.id);
+  res.json({ ok: true });
+});
+
+// ---------- COMMISSARY MEATS ----------
+// Step 23b (2026-08-31): absorbs the "no commissary-meat-creation UI" gap
+// from the Round 2 findings list - blocked until 23a gave commissary_meats
+// a commissary_id to create against. Scoped by commissary_id, same shape
+// Meats above is scoped by restaurant_id. meat_type_id is optional and
+// editable via PUT (it's a tag, not an identity field, unlike code).
+// UNIQUE(commissary_id, code) in the schema is the real guarantee of
+// "unique within one commissary's own catalog" - the friendly error below
+// is just a clearer message before hitting it. Deliberately separate from
+// the existing GET /api/commissary/meats in commissary.js, which is a
+// different, already-working active-only read route feeding the Shipment
+// form's dropdown - not touched here.
+
+router.get('/settings/commissary-meats', (req, res) => {
+  const commissaryId = Number(req.query.commissary_id);
+  if (!commissaryId) return res.status(400).json({ error: 'commissary_id required' });
+  const rows = db.prepare(
+    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active
+     FROM commissary_meats WHERE commissary_id = ? ORDER BY code`
+  ).all(commissaryId);
+  res.json(rows);
+});
+
+router.post('/settings/commissary-meats', (req, res) => {
+  const { commissary_id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id } = req.body;
+  if (!commissary_id || !code || !name || !unit
+      || allowed_leeway_pct === undefined || allowed_leeway_pct === null || allowed_leeway_pct === '') {
+    return res.status(400).json({ error: 'commissary_id, code, name, unit, and allowed_leeway_pct are required' });
+  }
+  if (!['kg', 'unit'].includes(unit)) {
+    return res.status(400).json({ error: 'unit must be "kg" or "unit"' });
+  }
+  try {
+    const result = db.prepare(
+      `INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(commissary_id, code.toUpperCase(), name, unit, Number(allowed_leeway_pct), cost_per_unit || null, meat_type_id || null);
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ error: err.message.includes('UNIQUE') ? 'That code already exists for this commissary.' : err.message });
+  }
+});
+
+router.put('/settings/commissary-meats/:id', (req, res) => {
+  const { name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active } = req.body;
+  db.prepare(
+    `UPDATE commissary_meats
+     SET name = ?, unit = ?, allowed_leeway_pct = ?, cost_per_unit = ?, meat_type_id = ?, active = ?
+     WHERE id = ?`
+  ).run(name, unit, Number(allowed_leeway_pct), cost_per_unit || null, meat_type_id || null, active ? 1 : 0, req.params.id);
+  res.json({ ok: true });
+});
+
 // ---------- MEATS ----------
 
 router.get('/settings/meats', (req, res) => {
