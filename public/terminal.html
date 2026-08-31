@@ -353,7 +353,7 @@
     // so the ambiguity message is identical everywhere it can appear.
     function ambiguousCommissaryMeatMessage(token, matches) {
       const example = matches.map(m => commissaryMeatToken(m)).find(t => t.includes('/'));
-      return `"${token}" matches ${matches.length} commissaries - qualify it, e.g. "${example || token}".`;
+      return `"${token}" is ambiguous - matches ${matches.length} meats. Qualify by code, e.g. "${example || token}".`;
     }
 
     // Filter candidates for the dropdown by a (possibly partial) typed
