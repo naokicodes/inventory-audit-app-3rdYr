@@ -13,6 +13,39 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (architect recheck) — 23c split into 23c-i/23c-ii; new backend gap found
+
+Pure architecture, no code changed. Project owner asked to recheck all of
+step 23 before dispatching a fresh Claude Code prompt. Full suite re-run
+independently (not trusted from commit messages): **14/14 files, 228/228
+assertions, 0 failures** — matches session-status.md exactly.
+
+Rechecking 23c's three listed pieces against the real code found it isn't
+one unblocked unit: the "commissary selector everywhere" piece
+(`commissary.html`, `commissary-shipments.html`, Terminal, Dashboard
+drill-down) depends on backend `commissary_id` filtering that doesn't
+exist yet. Two of the three backend gaps were already flagged (23b's
+"remaining 2 items"). A third wasn't: `grep`-confirmed zero
+`commissary_id` references anywhere in `commissaryAuditEngine.js`,
+`commissaryYieldEngine.js`, or the `GET /api/commissary/meats` route —
+the same route Terminal's slot-1 resolution and the Shipment form's
+dropdown both call. That route is a flat, unfiltered list today; adding
+a frontend selector would have nothing to filter against.
+
+Split 23c into **23c-i** (Settings tabs + commissary-meat creation UI —
+fully unblocked, exact mirror of the Restaurants/Meats tab pattern,
+backed entirely by 23b session 3's already-tested routes) and **23c-ii**
+(the selector — blocked on all 3 backend gaps, now folded into 23b's
+remaining backend work as a 3-item list instead of 2). Also noted 23c-i
+is a real prerequisite for 23c-ii, not just sequenced first for tidiness
+— there's no way to create a second commissary to test the selector
+against until the Settings tab exists.
+
+`session-status.md` updated to reflect the split and the new gap.
+Dispatching 23c-i to Claude Code today.
+
+---
+
 ## 2026-08-31 (Claude Code session 3) — Step 23b: Commissary/meat-type/commissary_meats admin CRUD
 
 Third Claude Code (CLI) session, continuing 23b's remaining 5-item list. Scoped to 3 of the 5 per rule 16 and stopped there: **Commissary CRUD, meat-type CRUD, and `commissary_meats` CRUD**, each an exact mirror of an existing admin CRUD pattern already in `settings.js` (Restaurants, Adjustment Types, and Meats respectively). Stated and confirmed this boundary before coding.

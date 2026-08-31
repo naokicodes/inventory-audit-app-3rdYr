@@ -4,9 +4,13 @@ Last updated: 2026-08-31 (step 23b, 4 of 6 items done: the
 `commissary_conversion_standards` rekey + its consumers, plus Commissary/
 meat-type/`commissary_meats` admin CRUD — see the entries under "Item 3
 design" below, and `changelog.md`'s matching entries, for full detail).
-**Next up: the remaining 2 items of 23b (per-commissary engine params +
-the fuller Dashboard grouping, the latter needing an architect decision
-on response shape first), or 23c** — project owner's call.
+**Architect recheck, same day: 23c was found to not be one unblocked
+piece — split into 23c-i (Settings tabs + commissary-meat creation UI,
+fully unblocked, dispatched today) and 23c-ii (commissary selector,
+blocked on 3 backend gaps — 2 previously known, 1 newly found: `GET
+/api/commissary/meats` has zero `commissary_id` filtering). See the full
+"23c" entry below for detail. Next up after 23c-i: the now-3-item
+remaining 23b backend work, then 23c-ii.**
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1498,17 +1502,46 @@ fresh architecture session:**
   can share a `meat_type_id`. Needs an architect decision before a future
   session builds it. Full suite: **14/14 files, 228/228 assertions, 0
   regressions** (was 207). Pushed to `main` directly.
-- **23c (UI)**: Commissary + Meat Type tabs in Settings, commissary-meat
-  creation UI, a commissary selector everywhere a screen currently
-  assumes there's only one (`commissary.html`, `commissary-shipments.html`,
-  Terminal, Dashboard drill-down).
+- **23c (UI)**, split 2026-08-31 by the architect conversation after
+  finding it wasn't actually one unblocked piece — see below:
+  - **23c-i: Commissary + Meat Type tabs in Settings, commissary-meat
+    creation UI.** Fully unblocked — exact mirror of the existing
+    Restaurants/Meats tab pattern, backed entirely by 23b session 3's
+    already-built, already-tested `GET`/`POST`/`PUT
+    /api/settings/commissaries` / `/meat-types` / `/commissary-meats`
+    routes. No new backend work. **This is also a real prerequisite for
+    23c-ii**, not just sequenced first for tidiness: there's no way to
+    even create a second commissary to test the selector against until
+    this tab exists.
+  - **23c-ii: a commissary selector everywhere a screen currently
+    assumes there's only one** (`commissary.html`,
+    `commissary-shipments.html`, Terminal, Dashboard drill-down).
+    **Blocked, do not dispatch yet.** Depends on three backend gaps, only
+    two of which were previously flagged:
+    1. `computeCommissaryDailyAudit`/`computeYieldLogForDate` + their
+       `GET` routes need an optional `commissary_id` filter (already
+       flagged below).
+    2. The fuller Dashboard grouped-rollup response shape needs an
+       architect decision first (already flagged below).
+    3. **Newly found, 2026-08-31 architect recheck**: `GET
+       /api/commissary/meats` — the route feeding both the Shipment
+       form's dropdown *and* Terminal's slot-1 token resolution — has
+       **zero `commissary_id` awareness**. It's a flat list of every
+       active commissary meat, no filter param at all (confirmed via
+       `grep` — zero hits for `commissary_id` in that route or either
+       engine file). Not in any prior "remaining 23b items" list.
+       Without this, adding a selector to the frontend has nothing to
+       actually filter against. This becomes the third item of 23b's
+       remaining backend work, not a 23c-ii frontend task.
 
-**Next up: the remaining 2 items of 23b** (per-commissary engine params
-for `computeCommissaryDailyAudit`/`computeYieldLogForDate` + their
-routes, and the fuller Dashboard grouping — the latter needs an architect
-decision on response shape first, see above) **or 23c**, project owner's
-call on sequencing. 23a, 23b's rekey sub-piece, and 23b's 3-item CRUD
-sub-piece are done; nothing else in 23b/23c is started.
+**Next up: 23c-i (today).** After that: the now-3-item remaining 23b
+backend work (per-commissary engine params for
+`computeCommissaryDailyAudit`/`computeYieldLogForDate` + their routes,
+the `commissary_id` filter on `GET /api/commissary/meats`, and the
+Dashboard grouping needing an architect response-shape decision first)
+must land before 23c-ii can be dispatched. 23a, 23b's rekey sub-piece,
+23b's 3-item CRUD sub-piece, and 23c-i are done or in progress; 23c-ii
+and the rest of 23b's backend items are not started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading
