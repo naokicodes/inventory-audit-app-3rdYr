@@ -274,6 +274,33 @@ started.
 - The repo is public (no secrets committed — `.env`, `*.db`, and
   `/uploads/` are gitignored and always have been). This was a deliberate
   choice to simplify tooling access; it doesn't change any of the above.
+- **Unit lives on the `commissary_meats` row (per meat, per lifecycle
+  stage), never on `meat_types`.** One meat type legitimately spans units
+  across its stages — raw Chicken is counted in `unit`, Processed Chicken
+  is `kg` — so there is no single authoritative unit for a meat type and
+  no `meat_types.unit` column should be added. The Dashboard's
+  `(meat_type_id, unit)` composite grouping is correct *permanently* for
+  this reason: it keeps incompatible units (counts vs kilos of the same
+  meat type) in separate rollup rows instead of summing them. Unit varies
+  along the *stage* axis, never the *commissary* axis — catalogs are
+  independent and never share a meat identity, so no unit ever reconciles
+  across commissaries. Every unit change happens on a standard-governed
+  edge (a yield stage, or a shipment's Conversion Standard), never by
+  relabeling a shared meat. Closes the "authoritative unit column" open
+  item as unnecessary. Settled 2026-09-01.
+- **Two commissary meats sharing a name under one commissary are allowed
+  by design; the ambiguity is guarded at point-of-use, not prevented at
+  creation.** `commissary_meats` enforces `UNIQUE(commissary_id, code)` on
+  code only, not name, and the settings create/edit routes deliberately do
+  not validate name uniqueness. Real catalogs distinguish meats by name in
+  practice (e.g. "Chicken Raw" vs "Chicken Processed"), so a true
+  same-name collision is a rare data-entry slip, not a normal case. The
+  Terminal's `resolveCommissaryMeat` handles it where it matters — an
+  ambiguous token is reported `ambiguous` and refused, forcing the
+  operator to qualify by code (fixed 2026-09-01) — rather than the
+  creation form blocking it. Do not later add name-uniqueness validation
+  to the settings form thinking it's a missing guard; it's an intentional
+  omission. Settled 2026-09-01.
 
 ## End-of-session checklist (every session, no exceptions)
 
