@@ -11,6 +11,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-01 (Claude Code session) — Step 23c-ii-b: page-level commissary selector on commissary-shipments.html
+
+Frontend-only, `public/commissary-shipments.html` alone — the second of the four 23c-ii sub-steps, same pattern as 23c-ii-a with the corrected scope from the architect's 23c-ii-a review baked in from the start. Added a `<select id="commissary">` above the add-form, populated from `GET /api/settings/commissaries` filtered client-side to `active === 1`, first and default option "All commissaries" (value `""`).
+
+Only `loadCommissaryMeats()` (`newCommissaryMeat`'s source) threads the selection as an optional `&commissary_id=N`. `loadContext()`, `loadPresets()`, and `loadStandards()` are deliberately left untouched — all three are already keyed by `commissary_meat_id`, which belongs to exactly one commissary, so adding `commissary_id` to those calls would be a live bug (23b-v makes a mismatched pair return `[]` rather than ignore it), not a no-op. The real work beyond the one threaded param is the change handler: since repopulating `newCommissaryMeat` resets its `.value` and silently invalidates everything downstream, selecting a different commissary reloads the meats list and then re-runs the same trio the existing `newCommissaryMeat` change handler runs (`loadContext()`, `loadPresets()`, `loadStandards()`), in that order.
+
+**Verified**: baseline full suite run before starting and again after — identical **14/14 files, 257/257 assertions, 0 failures** both times (frontend-only, no regressions, no new tests expected). `node --check` on the extracted inline script. Live end-to-end check against a real booted server: created a second real commissary ("Commissary Test B" / COM-TESTB) and a commissary meat under it (reusing code `M05` on purpose, to also probe the pre-existing label-ambiguity note from 23c-ii-c's spec — not fixed here, out of scope for this step) via `POST`, confirmed `GET /api/settings/commissaries` lists both, confirmed `GET /api/commissary/meats?commissary_id=<new>` returns only the new meat while the unfiltered call still returns all of them, confirmed `GET /api/commissary/daily-audit`, `.../shipment-presets`, and `.../conversion-standards` all still resolve correctly for the new meat's id via the exact params `loadContext()`/`loadPresets()`/`loadStandards()` actually send (no `commissary_id`), and confirmed the served page contains the new selector markup. Test rows cleaned up afterward (direct delete of the test commissary meat and commissary — no DELETE route exists for either, expected, catalog/settings tables). Server process stopped before ending the session (rule 21) — also found and stopped a stale server process already holding port 3000 from a prior session before starting, per rule 21's own warning.
+
+Pushed directly to `main`.
+
+---
+
 ## 2026-09-01 (Claude Code session) — Step 23c-ii-a: page-level commissary selector on commissary.html
 
 Frontend-only, `public/commissary.html` alone — the first of the four 23c-ii sub-steps split out by the architect session earlier the same day. Added a `<select id="commissary">` above the "On-hand balance" section, mirroring `daily-audit.html`'s restaurant selector pattern: populated from `GET /api/settings/commissaries`, filtered client-side to `active === 1`, first and default option "All commissaries" (value `""`).

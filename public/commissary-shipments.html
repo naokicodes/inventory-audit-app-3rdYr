@@ -48,6 +48,10 @@
   </div>
 
   <div class="add-form">
+    <label>Commissary <select id="commissary"></select></label>
+  </div>
+
+  <div class="add-form">
     <label>Date <input type="date" id="new-date"></label>
     <label>Source (commissary meat) <select id="new-commissary-meat"></select></label>
     <label>Total quantity <input type="number" step="0.01" id="new-total-qty" placeholder="0"></label>
@@ -85,6 +89,7 @@
 
   <script>
     const actorInput = document.getElementById('actor-name');
+    const commissarySelect = document.getElementById('commissary');
     const newDate = document.getElementById('new-date');
     const newCommissaryMeat = document.getElementById('new-commissary-meat');
     const newTotalQty = document.getElementById('new-total-qty');
@@ -112,8 +117,17 @@
       return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
     }
 
+    async function loadCommissaries() {
+      const res = await fetch('/api/settings/commissaries');
+      const commissaries = await res.json();
+      const opts = commissaries.filter(c => c.active === 1).map(c => `<option value="${c.id}">${c.code} - ${c.name}</option>`).join('');
+      commissarySelect.innerHTML = '<option value="">All commissaries</option>' + opts;
+    }
+
     async function loadCommissaryMeats() {
-      const res = await fetch('/api/commissary/meats');
+      const params = new URLSearchParams();
+      if (commissarySelect.value) params.set('commissary_id', commissarySelect.value);
+      const res = await fetch(`/api/commissary/meats?${params.toString()}`);
       const meats = await res.json();
       newCommissaryMeat.innerHTML = meats.map(m => `<option value="${m.id}">${m.code} - ${m.name} (${m.unit})</option>`).join('')
         || '<option value="">No commissary meats seeded yet</option>';
@@ -323,6 +337,13 @@
     newDate.addEventListener('change', loadContext);
     newRestaurant.addEventListener('change', () => { loadDestinationMeats(); loadPresets(); loadStandards(); });
     loadPresetBtn.addEventListener('click', loadSelectedPreset);
+    commissarySelect.addEventListener('change', () => {
+      loadCommissaryMeats().then(() => {
+        loadContext();
+        loadPresets();
+        loadStandards();
+      });
+    });
 
     document.getElementById('save-shipment').addEventListener('click', async () => {
       const commissary_meat_id = Number(newCommissaryMeat.value);
@@ -372,9 +393,11 @@
       }
     });
 
-    Promise.all([loadCommissaryMeats(), loadRestaurants()]).then(() => {
-      loadContext();
-      loadDestinationMeats();
+    loadCommissaries().then(() => {
+      Promise.all([loadCommissaryMeats(), loadRestaurants()]).then(() => {
+        loadContext();
+        loadDestinationMeats();
+      });
     });
   </script>
   <script src="command-panel.js"></script>

@@ -1,11 +1,14 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-09-01 (**23c-ii-a done** — page-level commissary
-selector on `public/commissary.html` only, per the four-way split below.
-14/14 files, 257/257 assertions, 0 failures, unchanged (frontend-only, as
-expected). Next up: **23c-ii-b** (same pattern on
-`commissary-shipments.html`) — see the "23c-ii split into four sub-steps"
-section further down for its full scope. Previously: **23c-ii split into
+Last updated: 2026-09-01 (**23c-ii-b done** — page-level commissary
+selector on `public/commissary-shipments.html` only, per the four-way
+split below. 14/14 files, 257/257 assertions, 0 failures, unchanged
+(frontend-only, as expected). Next up: **23c-ii-c** (additive commissary
+identity on `GET /api/commissary/meats` + the `stock-receipts.html` label
+fix) — see the "23c-ii split into four sub-steps" section further down for
+its full scope; it blocks 23c-ii-d. Previously: **23c-ii-a done**
+(page-level commissary selector on `commissary.html`) — 14/14 files,
+257/257 assertions, 0 failures, unchanged. Before that: **23c-ii split into
 four sub-steps** by the architect conversation — see the entry below.
 Before that: **23b-vi-b
 done**: the inline commissary drill-down on the Dashboard - a ▸/▾ toggle
@@ -1756,8 +1759,20 @@ the same treatment: one small additive step, cited as precedent.
   change provably behavior-preserving on load. That's what justifies
   shipping it with no new tests.
 
-- **23c-ii-b — page-level commissary selector on
-  `commissary-shipments.html`.** Same pattern and same "All" default as
+- **23c-ii-b [Done, 2026-09-01 — Claude Code (CLI) session] — page-level
+  commissary selector on `commissary-shipments.html`.** Built exactly as
+  the corrected scope below (only `loadCommissaryMeats()` threads
+  `commissary_id`; `loadContext()`/`loadPresets()`/`loadStandards()` left
+  untouched). See this session's `changelog.md` entry for full
+  verification detail (14/14 files, 257/257 assertions, 0 failures,
+  unchanged; live end-to-end check with a real second commissary +
+  commissary meat, confirming context/presets/standards all still resolve
+  correctly for the new meat after switching commissary; test rows cleaned
+  up; a stale server already on port 3000 from a prior session was found
+  and stopped before starting, then the session's own server stopped
+  before ending, per rule 21). Pushed directly to `main`.
+
+  Same pattern and same "All" default as
   23c-ii-a. **Corrected 2026-09-01, after 23c-ii-a landed**: an earlier
   version of this entry said the page's `GET /api/commissary/daily-audit`
   call also needed the filter. It does **not**, and adding it would be a
