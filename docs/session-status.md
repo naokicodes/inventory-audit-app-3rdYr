@@ -1,12 +1,17 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-09-01 (**23c-ii-b done** — page-level commissary
-selector on `public/commissary-shipments.html` only, per the four-way
-split below. 14/14 files, 257/257 assertions, 0 failures, unchanged
-(frontend-only, as expected). Next up: **23c-ii-c** (additive commissary
-identity on `GET /api/commissary/meats` + the `stock-receipts.html` label
-fix) — see the "23c-ii split into four sub-steps" section further down for
-its full scope; it blocks 23c-ii-d. Previously: **23c-ii-a done**
+Last updated: 2026-09-01 (**23c-ii-c done** — additive commissary
+identity on `GET /api/commissary/meats` plus the label fixes it unblocks
+on `commissary.html` and `stock-receipts.html`, per the four-way split
+below. 14/14 files, 260/260 assertions, 0 failures (257 baseline + 3 new
+tests). Live-verified against a real booted server with a second
+commissary and a duplicate-coded meat — see this session's
+`changelog.md` entry for full detail. Pushed to `main` in two commits.
+**Blocks 23c-ii-d, now unblocked — dispatch it next.** Previously:
+**23c-ii-b done** — page-level commissary selector on
+`public/commissary-shipments.html` only, per the four-way split below.
+14/14 files, 257/257 assertions, 0 failures, unchanged
+(frontend-only, as expected). Before that: **23c-ii-a done**
 (page-level commissary selector on `commissary.html`) — 14/14 files,
 257/257 assertions, 0 failures, unchanged. Before that: **23c-ii split into
 four sub-steps** by the architect conversation — see the entry below.
@@ -1810,8 +1815,17 @@ the same treatment: one small additive step, cited as precedent.
   either. A separate step from 23c-ii-a per rule 16: same pattern,
   different page, neither blocks the other.
 
-- **23c-ii-c — additive commissary identity on `GET
-  /api/commissary/meats`, plus the label fixes it unblocks.**
+- **23c-ii-c [Done, 2026-09-01 — Claude Code (CLI) session] — additive
+  commissary identity on `GET /api/commissary/meats`, plus the label
+  fixes it unblocks.** Built exactly as scoped below, all three
+  implementation points resolved here followed as specified. See this
+  session's `changelog.md` entry for full verification detail (14/14
+  files, baseline 257/257 → 260/260 with 3 new tests, 0 failures; live
+  end-to-end check with a real second commissary + a duplicate-coded
+  meat, confirming both the backend JSON and both pages' label logic;
+  test rows cleaned up; server stopped per rule 21). Pushed directly to
+  `main` in two commits (route+tests, then the two label fixes).
+
   Backend + small frontend, deliberately bundled exactly as 23c-i-b
   bundled its column addition with the form it unblocked. Add
   `commissary_id`, and the joined commissary's `code` and `name`, to that
