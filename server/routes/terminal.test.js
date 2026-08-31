@@ -39,7 +39,9 @@ function resolveCommissaryMeat(token, commissaryMeats) {
       normalize(m.commissary_code) === commissaryPart &&
       (normalize(m.code) === meatPart || normalize(m.name) === meatPart)
     );
-    return matches.length >= 1 ? { status: 'resolved', meat: matches[0] } : { status: 'unknown' };
+    if (matches.length === 1) return { status: 'resolved', meat: matches[0] };
+    if (matches.length > 1) return { status: 'ambiguous', matches };
+    return { status: 'unknown' };
   }
   const norm = normalize(token);
   const matches = commissaryMeats.filter(m =>
@@ -69,8 +71,14 @@ const comAJowl = { id: 1, code: 'M05', name: 'JOWL', commissary_id: 1, commissar
 const comBJowl = { id: 2, code: 'M05', name: 'JOWL', commissary_id: 2, commissary_code: 'COM-B', commissary_name: 'Commissary B' };
 const comAPata = { id: 3, code: 'M07', name: 'PATA', commissary_id: 1, commissary_code: 'COM-A', commissary_name: 'Commissary A' };
 const ghostMeat = { id: 4, code: 'M99', name: 'Ghost Meat', commissary_id: 9999, commissary_code: null, commissary_name: null };
+// Reachable same-commissary collision: schema.sql's UNIQUE is on
+// (commissary_id, code), not name, so two meats under COM-A can share a
+// name with different codes - this trips the QUALIFIED branch's own
+// filter (matches on code OR name), unlike comAJowl/comBJowl above which
+// only collide across different commissaries.
+const comAJowl2 = { id: 5, code: 'M06', name: 'JOWL', commissary_id: 1, commissary_code: 'COM-A', commissary_name: 'Commissary A' };
 
-const commissaryMeats = [comAJowl, comBJowl, comAPata, ghostMeat];
+const commissaryMeats = [comAJowl, comBJowl, comAPata, ghostMeat, comAJowl2];
 
 test('a bare unique token resolves', () => {
   const result = resolveCommissaryMeat('pata', commissaryMeats);
@@ -81,8 +89,8 @@ test('a bare unique token resolves', () => {
 test('a bare ambiguous token returns ambiguous, not a silent first match - this is the bug the resolver fixes', () => {
   const result = resolveCommissaryMeat('jowl', commissaryMeats);
   assert.strictEqual(result.status, 'ambiguous');
-  assert.strictEqual(result.matches.length, 2);
-  assert.deepStrictEqual(result.matches.map(m => m.id).sort(), [1, 2]);
+  assert.strictEqual(result.matches.length, 3);
+  assert.deepStrictEqual(result.matches.map(m => m.id).sort(), [1, 2, 5]);
 });
 
 test('a bare ambiguous token by code (not name) is also caught', () => {
@@ -102,9 +110,26 @@ test('a qualified token resolves the right one of two colliding meats', () => {
 });
 
 test('a qualified token matches the meat by normalized name too, not just code', () => {
-  const result = resolveCommissaryMeat('com-a/jowl', commissaryMeats);
+  const result = resolveCommissaryMeat('com-a/pata', commissaryMeats);
   assert.strictEqual(result.status, 'resolved');
-  assert.strictEqual(result.meat.id, 1);
+  assert.strictEqual(result.meat.id, 3);
+});
+
+test('a qualified token matching two same-commissary meats by name is ambiguous, not a silent first pick', () => {
+  const result = resolveCommissaryMeat('com-a/jowl', commissaryMeats);
+  assert.strictEqual(result.status, 'ambiguous');
+  assert.strictEqual(result.matches.length, 2);
+  assert.deepStrictEqual(result.matches.map(m => m.id).sort(), [1, 5]);
+});
+
+test('a qualified token still resolves uniquely when qualified by code even though the name collides', () => {
+  const resultCode1 = resolveCommissaryMeat('com-a/m05', commissaryMeats);
+  assert.strictEqual(resultCode1.status, 'resolved');
+  assert.strictEqual(resultCode1.meat.id, 1);
+
+  const resultCode2 = resolveCommissaryMeat('com-a/m06', commissaryMeats);
+  assert.strictEqual(resultCode2.status, 'resolved');
+  assert.strictEqual(resultCode2.meat.id, 5);
 });
 
 test('a qualified token works even when the bare form was already unique - never refused for over-qualifying', () => {

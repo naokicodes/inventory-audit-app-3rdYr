@@ -320,7 +320,9 @@
           normalize(m.commissary_code) === commissaryPart &&
           (normalize(m.code) === meatPart || normalize(m.name) === meatPart)
         );
-        return matches.length >= 1 ? { status: 'resolved', meat: matches[0] } : { status: 'unknown' };
+        if (matches.length === 1) return { status: 'resolved', meat: matches[0] };
+        if (matches.length > 1) return { status: 'ambiguous', matches };
+        return { status: 'unknown' };
       }
       const norm = normalize(token);
       const matches = commissaryMeats.filter(m =>
