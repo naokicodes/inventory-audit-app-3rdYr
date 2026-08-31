@@ -13,6 +13,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (Claude Code session) — Step 23c-i: Commissary/Meat Type tabs + commissary-meat creation UI
+
+Frontend-only, scoped exactly to the split-off 23c-i piece: three new tabs on `settings.html` (Commissaries, Meat Types, Commissary Meats), no backend or schema changes — all three of 23b session 3's `GET`/`POST`/`PUT /api/settings/commissaries` / `/meat-types` / `/commissary-meats` routes already existed and already had test coverage.
+
+Commissaries and Meat Types tabs are exact structural mirrors of the existing Restaurants and Adjustment Types tabs respectively (Meat Types simpler — `meat_types` only has `name`+`active`, no extra flag column). The Commissary Meats tab mirrors the existing Meats tab, but since `commissary_meats` is scoped by `commissary_id` and there's no page-level commissary selector (unlike the page-level restaurant selector Meats/Dishes/Recipes already share), it gets its own local commissary dropdown — same pattern the Shipment Presets/Conversion Standards sections already use for their local commissary-meat dropdown. Fields: code, name, unit, allowed leeway %, cost/unit, and an editable meat-type dropdown (optional tag, not an identity field, same treatment `PUT` already gives it on the backend).
+
+**Verified**: `node --check` on the extracted inline script (syntax), full existing suite re-run at **14/14 files green, 228/228 assertions, 0 regressions** (untouched — this is frontend-only), and a live end-to-end check against a real booted server — created/edited a commissary, a meat type, and a commissary meat via the exact fetch bodies the new JS sends, confirmed each response shape matches what the page's render/edit functions read, confirmed the served `settings.html` actually contains all three new tabs and their load calls. Test rows cleaned up from the dev DB afterward. No browser click-through (same open item every frontend step in this project has carried — no headless browser available).
+
+Pushed directly to `main` (`29b3858`) — this session had git access, no zip fallback needed.
+
+---
+
 ## 2026-08-31 (architect recheck) — 23c split into 23c-i/23c-ii; new backend gap found
 
 Pure architecture, no code changed. Project owner asked to recheck all of

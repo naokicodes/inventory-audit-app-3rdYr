@@ -1,15 +1,17 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (step 23b, 4 of 6 items done: the
+Last updated: 2026-08-31 (**23c-i done**: Commissary + Meat Type tabs and
+commissary-meat creation UI on `settings.html`, frontend-only, pushed to
+`main`. Step 23b remains at 4 of 6 items done: the
 `commissary_conversion_standards` rekey + its consumers, plus Commissary/
 meat-type/`commissary_meats` admin CRUD — see the entries under "Item 3
 design" below, and `changelog.md`'s matching entries, for full detail).
 **Architect recheck, same day: 23c was found to not be one unblocked
 piece — split into 23c-i (Settings tabs + commissary-meat creation UI,
-fully unblocked, dispatched today) and 23c-ii (commissary selector,
-blocked on 3 backend gaps — 2 previously known, 1 newly found: `GET
-/api/commissary/meats` has zero `commissary_id` filtering). See the full
-"23c" entry below for detail. Next up after 23c-i: the now-3-item
+fully unblocked, dispatched today, now done) and 23c-ii (commissary
+selector, blocked on 3 backend gaps — 2 previously known, 1 newly found:
+`GET /api/commissary/meats` has zero `commissary_id` filtering). See the
+full "23c" entry below for detail. Next up after 23c-i: the now-3-item
 remaining 23b backend work, then 23c-ii.**
 
 Everything below this point, through the end of the 2026-08-30 Round 2
@@ -1504,15 +1506,37 @@ fresh architecture session:**
   regressions** (was 207). Pushed to `main` directly.
 - **23c (UI)**, split 2026-08-31 by the architect conversation after
   finding it wasn't actually one unblocked piece — see below:
-  - **23c-i: Commissary + Meat Type tabs in Settings, commissary-meat
-    creation UI.** Fully unblocked — exact mirror of the existing
-    Restaurants/Meats tab pattern, backed entirely by 23b session 3's
-    already-built, already-tested `GET`/`POST`/`PUT
-    /api/settings/commissaries` / `/meat-types` / `/commissary-meats`
-    routes. No new backend work. **This is also a real prerequisite for
-    23c-ii**, not just sequenced first for tidiness: there's no way to
-    even create a second commissary to test the selector against until
-    this tab exists.
+  - **23c-i [Done, 2026-08-31 — Claude Code (CLI) session]: Commissary +
+    Meat Type tabs in Settings, commissary-meat creation UI.** Fully
+    unblocked — exact mirror of the existing Restaurants/Meats tab
+    pattern, backed entirely by 23b session 3's already-built,
+    already-tested `GET`/`POST`/`PUT /api/settings/commissaries` /
+    `/meat-types` / `/commissary-meats` routes. No backend or schema
+    changes. **This is also a real prerequisite for 23c-ii**, not just
+    sequenced first for tidiness: there's no way to even create a second
+    commissary to test the selector against until this tab exists.
+
+    Three new tabs on `settings.html`: Commissaries (global, name+code,
+    mirrors Restaurants exactly), Meat Types (global, name-only, mirrors
+    Adjustment Types minus the extra flag column), Commissary Meats
+    (mirrors the existing Meats tab, but since it's scoped by
+    `commissary_id` and there's no page-level commissary selector like
+    the page-level restaurant one, it gets its own local commissary
+    dropdown — same pattern the Shipment Presets/Conversion Standards
+    sections already use for their local commissary-meat dropdown).
+    Commissary Meats fields: code, name, unit, allowed leeway %,
+    cost/unit, and an editable meat-type dropdown (optional tag).
+
+    **Verified**: `node --check` on the extracted inline script, full
+    suite re-run at **14/14 files, 228/228 assertions, 0 regressions**
+    (untouched — frontend-only), and a live end-to-end check against a
+    real booted server — created/edited a commissary, a meat type, and a
+    commissary meat via the exact fetch bodies the new JS sends,
+    confirmed each response shape matches what the page reads, confirmed
+    the served page contains all three new tabs. Test rows cleaned up
+    afterward. Not verified: an actual browser click-through — same open
+    item every frontend step in this project has carried. Pushed to
+    `main` directly (`29b3858`).
   - **23c-ii: a commissary selector everywhere a screen currently
     assumes there's only one** (`commissary.html`,
     `commissary-shipments.html`, Terminal, Dashboard drill-down).
@@ -1534,14 +1558,14 @@ fresh architecture session:**
        actually filter against. This becomes the third item of 23b's
        remaining backend work, not a 23c-ii frontend task.
 
-**Next up: 23c-i (today).** After that: the now-3-item remaining 23b
-backend work (per-commissary engine params for
+**23c-i is done. Next up: the now-3-item remaining 23b backend work**
+(per-commissary engine params for
 `computeCommissaryDailyAudit`/`computeYieldLogForDate` + their routes,
 the `commissary_id` filter on `GET /api/commissary/meats`, and the
 Dashboard grouping needing an architect response-shape decision first)
 must land before 23c-ii can be dispatched. 23a, 23b's rekey sub-piece,
-23b's 3-item CRUD sub-piece, and 23c-i are done or in progress; 23c-ii
-and the rest of 23b's backend items are not started.
+23b's 3-item CRUD sub-piece, and 23c-i are done; 23c-ii and the rest of
+23b's backend items are not started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading
