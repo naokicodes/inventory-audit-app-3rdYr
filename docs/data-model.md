@@ -593,6 +593,30 @@ a lookup.
 grouped row has no single code. Untagged rows sort among them by their
 own name.
 
+**Inactive meat types: shown, never hidden, but flagged** (decided
+2026-08-31, after 23b-vi-a landed — the implementation had picked a side
+by accident rather than by decision). `meat_types` has an `active`
+column and 23b's CRUD can deactivate a type, but nothing anywhere reads
+it, so deactivating currently has no effect on the Dashboard at all.
+Resolved: grouped rows carry a `meat_type_active` boolean, and rows are
+**never** filtered out on it. Same reasoning as untagged meats — the
+stock physically exists, and an audit screen must not silently drop it;
+deactivating a type is a cataloguing statement, not a claim the meat
+vanished. The flag is deliberately additive so the UI can mark such rows
+(e.g. an "(inactive type)" label, 23b-vi-b's job) without the route
+having to decide presentation, and so a future decision to sort or
+filter differently has the data already present rather than needing
+another route change.
+
+**Robustness note for the same route**: the grouped-row build does
+`SELECT name FROM meat_types WHERE id = ?` and reads `.name` with no
+null guard. SQLite does not enforce foreign keys unless
+`PRAGMA foreign_keys = ON` is set, so a dangling `meat_type_id` would
+throw a `TypeError` and 500 the entire Dashboard rather than degrade
+gracefully — inconsistent with how every other missing-data case in this
+app is handled. Needs a guard; folded into 23b-vi-b rather than
+dispatched on its own.
+
 **Open question, deliberately NOT resolved here**: whether `meat_types`
 should gain its own authoritative `unit` column, validated when a
 commissary meat is tagged, so a mismatch becomes impossible at write time

@@ -13,6 +13,40 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (architect review of 23b-vi-a) — inactive meat types resolved; a missing null guard found
+
+Verified 23b-vi-a independently before reviewing: read the real route
+diff and re-ran the full suite (14/14 files, **254/254, 0 failures**).
+The implementation matches section 10c faithfully, and the motivating
+regression test is genuine — it asserts `1054, not 1094`, so the
+double-count bug fails loudly if it ever returns.
+
+Two things the spec hadn't covered, both now decided rather than left as
+accidents of implementation:
+
+**Inactive meat types.** `meat_types.active` exists and 23b's CRUD can
+set it, but nothing anywhere reads it — so deactivating a type currently
+has no effect on the Dashboard at all. Resolved: grouped rows gain a
+`meat_type_active` flag and are **never** filtered on it. Same reasoning
+as untagged meats — the stock physically exists and an audit screen must
+not silently drop it; deactivating is a cataloguing statement, not a
+claim the meat vanished. Chose this over leaving it entirely unread
+(which keeps `active` meaningless and would need a route change later to
+do anything) and over excluding inactive types (hides real stock, and
+contradicts the untagged decision). The flag is additive on purpose: the
+UI decides presentation, and a future sort/filter decision already has
+the data.
+
+**A missing null guard.** The grouped-row build does `SELECT name FROM
+meat_types WHERE id = ?` and reads `.name` unguarded. SQLite doesn't
+enforce foreign keys unless `PRAGMA foreign_keys = ON`, so a dangling
+`meat_type_id` would throw a `TypeError` and 500 the entire Dashboard
+rather than degrade — inconsistent with every other missing-data path in
+this app, which degrades gracefully.
+
+Both folded into 23b-vi-b rather than dispatched separately: each is a
+few lines, and that step is already opening the same two files.
+
 ## 2026-08-31 (Claude Code session) — Step 23b-vi-a: grouped stock rollup (fixes a live double-count bug)
 
 `GET /api/dashboard/stock-rollup` rebuilt per `data-model.md` section 10c: rows are now grouped by `(meat_type_id, unit)` rather than one row per commissary meat. This is a correctness fix, not a display change — `commissary_conversion_standards` is keyed by `meat_type_id`, so before this step, two commissary meats sharing a type (now possible since 23c-i shipped the Commissary-creation UI) would each independently resolve the same standards and each produce their own `by_restaurant` total, silently doubling the real restaurant figure anywhere those rows got summed together. Grouping computes the restaurant reverse-conversion exactly once per group, on the parent row, making that double-count structurally impossible rather than merely unlikely.

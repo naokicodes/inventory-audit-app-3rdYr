@@ -1767,8 +1767,21 @@ fresh architecture session:**
      stay on the parent (meat-type) row only, never per-commissary, by
      construction. `by_commissary`'s shape (`commissary_id, code, name,
      commissary_meat_id, balance, has_data`, sorted by commissary code)
-     is already finalized by 23b-vi-a — this step is UI-only, no backend
-     change expected.
+     is already finalized by 23b-vi-a — this step is UI-only **except for
+     two small backend items decided/found in the architect review of
+     23b-vi-a (2026-08-31), folded in here rather than dispatched
+     separately**:
+     1. **Inactive meat types**: `meat_types.active` is currently read by
+        nothing, so deactivating a type has no effect on the Dashboard.
+        Resolved — grouped rows gain a `meat_type_active` flag and are
+        **never** filtered on it (stock must not silently vanish, same
+        reasoning as untagged meats); the UI marks such rows instead.
+        See `data-model.md` section 10c.
+     2. **A missing null guard**: the grouped-row build reads
+        `meat_types.name` without checking the row exists. SQLite doesn't
+        enforce FKs unless `PRAGMA foreign_keys = ON`, so a dangling
+        `meat_type_id` would 500 the whole Dashboard instead of
+        degrading. One-line fix, same section 10c.
 
 5. **23c-ii** — the commissary selector, once 23b-vi-b has landed.
 
