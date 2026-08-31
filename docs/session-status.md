@@ -238,6 +238,17 @@ the same architecture session as item 3's rekey:**
 **Next up, after 23a/23b/23c: 24a.** None of the three sub-steps are
 started.
 
+**24b output-targeting must be nailed down before it's built (refined
+2026-09-01).** A yield row today credits `backed_weight_out` back to the
+SAME `commissary_meat_id` it names. The cross-unit case (`unit in → kg
+out`, raw chicken → processed chicken) requires the output to land on a
+DIFFERENT row in a DIFFERENT unit: the raw `unit` meat debited, the
+processed `kg` meat credited. The "no new schema concept" note above
+predates this being made explicit and should be re-examined against it —
+24b likely needs an explicit output-meat linkage, not just reusing the
+single `commissary_meat_id` column. 24a (the `raw_weight_in`-as-outflow
+fix) is unaffected and remains well-defined; this caveat is scoped to 24b.
+
 ## Things NOT to re-litigate (already decided, stable)
 
 - Tech stack: Node.js + Express + `node:sqlite` (not better-sqlite3, not
@@ -296,6 +307,35 @@ started.
   creation form blocking it. Do not later add name-uniqueness validation
   to the settings form thinking it's a missing guard; it's an intentional
   omission. Settled 2026-09-01.
+- **Balance unit is per `commissary_meats` row and is independent of the
+  arrival weigh-in.** The Commissary weighs everything on arrival as a
+  supplier control (don't lose paid-for weight), but that does NOT set the
+  tracking unit. Meats stocked and shipped by count stay `unit` rows (raw
+  chicken, whole items); others are `kg`. Weighing ≠ kg-tracking — do not
+  "simplify" a `unit` meat to `kg` just because it's weighed at intake.
+  This is why the unit-per-stage example above (raw chicken `unit`,
+  processed chicken `kg`) is real, and why the `(meat_type_id, unit)`
+  Dashboard grouping is load-bearing: one meat type (chicken) legitimately
+  owns both a `unit` row and a `kg` row, assuming raw and processed chicken
+  share a `meat_type_id` (the natural tagging). Settled 2026-09-01.
+- **Yield output is always `kg`; yield input may be `unit` or `kg`;
+  unit→unit yield does not occur.** The only cross-unit event in the system
+  is `unit in → kg out` (raw chicken → processed chicken); everything else
+  is `kg → kg` (belly; Shortplate sear→braise). Raw meats are deliberately
+  NOT pre-converted to a kg-equivalent at input — keeping the input in its
+  own unit is what makes the realized ratio (kg out per unit in) visible
+  and checkable against the standard. (An earlier "pre-convert to kg at
+  input" idea was considered and rejected for exactly this reason; do not
+  revive it.) Step 24 therefore KEEPS its cross-unit output mechanism (24b)
+  — it does not collapse to same-unit-only. Settled 2026-09-01.
+- **Commissary shrinkage that isn't a yield is a distinct loss
+  declaration, not forced through the yield log.** A direct-ship unit-meat
+  (e.g. 45 stocked in, 44 shipped, 1 lost to the portioning/wastage
+  process) has real shrinkage that is not a processing yield, and today
+  there is nowhere to declare it — so it silently becomes a variance. It is
+  the "loss" kind of step 24's already-designed Commissary-side allocation
+  mechanism, surfaced as a loss input on the Commissary page and accepting
+  unit-denominated losses (not only kg). Settled 2026-09-01.
 
 ## End-of-session checklist (every session, no exceptions)
 
