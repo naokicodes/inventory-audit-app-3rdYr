@@ -94,11 +94,12 @@ function stockRollup(date, restaurantIds) {
     ? restaurantIds.map(id => db.prepare('SELECT id, name FROM restaurants WHERE id = ? AND active = 1').get(id)).filter(Boolean)
     : db.prepare('SELECT id, name FROM restaurants WHERE active = 1 ORDER BY name').all();
 
+  // Mirrors dashboard.js's dangling-commissary_id guard (found 2026-09-01)
   const commissaryMeats = db.prepare(`
     SELECT cm.id, cm.code, cm.name, cm.unit, cm.meat_type_id, cm.commissary_id,
            c.code as commissary_code, c.name as commissary_name
     FROM commissary_meats cm
-    JOIN commissaries c ON c.id = cm.commissary_id
+    LEFT JOIN commissaries c ON c.id = cm.commissary_id
     WHERE cm.active = 1
   `).all();
 
@@ -136,8 +137,8 @@ function stockRollup(date, restaurantIds) {
     const byCommissary = members
       .map(m => ({
         commissary_id: m.commissary_id,
-        code: m.commissary_code,
-        name: m.commissary_name,
+        code: m.commissary_code !== null ? m.commissary_code : `(unknown commissary #${m.commissary_id})`,
+        name: m.commissary_name !== null ? m.commissary_name : `(unknown commissary #${m.commissary_id})`,
         commissary_meat_id: m.id,
         balance: m.balance,
         has_data: m.hasData
@@ -361,6 +362,31 @@ test('a dangling meat_type_id degrades gracefully instead of throwing / 500ing t
   assert.strictEqual(ghostRow.meat_type_active, false, 'a meat type that cannot be found is treated as not active');
   assert.strictEqual(ghostRow.commissary_balance, 2);
   assert.ok(ghostRow.name.includes('9999'), 'the fallback label should identify which meat_type_id is missing');
+});
+
+test('a dangling commissary_id degrades gracefully instead of silently dropping the meat (found 2026-09-01, "Known open items")', () => {
+  // Simulates a commissary_meats row whose commissary_id points at a
+  // commissaries row that no longer exists - SQLite doesn't enforce FKs
+  // unless PRAGMA foreign_keys=ON, so this IS reachable in practice, same
+  // as the dangling meat_type_id case above. Toggle FKs off just for this
+  // one insert.
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, meat_type_id) VALUES (8, 9999, 'CM07', 'Orphan Cut', 'kg', 0.1, 1)`).run();
+  db.prepare(`INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (8, '2026-08-15', 5)`).run();
+  db.exec('PRAGMA foreign_keys = ON');
+
+  assert.doesNotThrow(() => stockRollup('2026-08-15'), 'a dangling commissary_id must not throw and take down the whole route');
+  const r = stockRollup('2026-08-15');
+  const jowlRow = findJowlGroup(r.rows);
+  const orphanEntry = jowlRow.by_commissary.find(bc => bc.commissary_meat_id === 8);
+  assert.ok(orphanEntry, 'the meat must still appear in by_commissary rather than being silently dropped');
+  assert.strictEqual(orphanEntry.commissary_id, 9999);
+  assert.ok(orphanEntry.code.includes('9999'), 'the fallback label should identify which commissary_id is missing');
+  assert.ok(orphanEntry.name.includes('9999'), 'the fallback label should identify which commissary_id is missing');
+  assert.strictEqual(orphanEntry.balance, 5);
+  // its balance must be counted into the group total too, not just present
+  // in by_commissary
+  assert.strictEqual(jowlRow.commissary_balance, 1019, 'previous total 1014 + orphan\'s 5 = 1019');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

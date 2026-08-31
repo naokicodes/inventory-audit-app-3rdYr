@@ -96,11 +96,16 @@ router.get('/dashboard/stock-rollup', (req, res) => {
     ? restaurant_ids.split(',').map(Number).map(id => db.prepare('SELECT id, name FROM restaurants WHERE id = ? AND active = 1').get(id)).filter(Boolean)
     : db.prepare('SELECT id, name FROM restaurants WHERE active = 1 ORDER BY name').all();
 
+  // LEFT JOIN, not INNER - SQLite doesn't enforce FKs unless
+  // PRAGMA foreign_keys=ON, so a dangling commissary_id is reachable; an
+  // INNER JOIN would silently drop that meat's real stock from the whole
+  // Dashboard instead of just leaving commissary_code/commissary_name
+  // null. Same fix as 23c-ii-c's GET /api/commissary/meats.
   const commissaryMeats = db.prepare(`
     SELECT cm.id, cm.code, cm.name, cm.unit, cm.meat_type_id, cm.commissary_id,
            c.code as commissary_code, c.name as commissary_name
     FROM commissary_meats cm
-    JOIN commissaries c ON c.id = cm.commissary_id
+    LEFT JOIN commissaries c ON c.id = cm.commissary_id
     WHERE cm.active = 1
   `).all();
 
@@ -141,11 +146,17 @@ router.get('/dashboard/stock-rollup', (req, res) => {
 
     const commissaryBalance = members.reduce((sum, m) => sum + (m.balance || 0), 0);
     const commissaryHasData = members.some(m => m.hasData);
+    // Same "missing data is shown, not fatal" guard as the dangling
+    // meat_type_id case above (23b-vi-b) - a dangling commissary_id (LEFT
+    // JOIN above) leaves commissary_code/commissary_name null rather than
+    // dropping the row, so it must degrade to a labeled fallback here
+    // rather than surfacing null/undefined, and .sort() below needs a
+    // real string to compare regardless.
     const byCommissary = members
       .map(m => ({
         commissary_id: m.commissary_id,
-        code: m.commissary_code,
-        name: m.commissary_name,
+        code: m.commissary_code !== null ? m.commissary_code : `(unknown commissary #${m.commissary_id})`,
+        name: m.commissary_name !== null ? m.commissary_name : `(unknown commissary #${m.commissary_id})`,
         commissary_meat_id: m.id,
         balance: m.balance,
         has_data: m.hasData
