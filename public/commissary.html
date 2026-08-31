@@ -49,6 +49,10 @@
     <label>Your name (for the activity log) <input type="text" id="actor-name" placeholder="e.g. Dan"></label>
   </div>
 
+  <div class="filters">
+    <label>Commissary <select id="commissary"></select></label>
+  </div>
+
   <h2>On-hand balance</h2>
   <p class="hint">Beginning + Stock In + Backed Up - Shipped Out for the date below, via the same daily audit engine as the Shipments page and Dashboard - a real physical count where one's been entered, otherwise the calculated ending.</p>
   <div class="filters">
@@ -78,6 +82,7 @@
 
   <script>
     const actorInput = document.getElementById('actor-name');
+    const commissarySelect = document.getElementById('commissary');
     const newDate = document.getElementById('new-date');
     const newMeat = document.getElementById('new-meat');
     const newRaw = document.getElementById('new-raw');
@@ -105,8 +110,17 @@
       return (n === null || n === undefined) ? '-' : (Number(n) * 100).toFixed(1) + '%';
     }
 
+    async function loadCommissaries() {
+      const res = await fetch('/api/settings/commissaries');
+      const commissaries = await res.json();
+      const opts = commissaries.filter(c => c.active === 1).map(c => `<option value="${c.id}">${c.code} - ${c.name}</option>`).join('');
+      commissarySelect.innerHTML = '<option value="">All commissaries</option>' + opts;
+    }
+
     async function loadMeats() {
-      const res = await fetch('/api/commissary/meats');
+      const params = new URLSearchParams();
+      if (commissarySelect.value) params.set('commissary_id', commissarySelect.value);
+      const res = await fetch(`/api/commissary/meats?${params.toString()}`);
       const meats = await res.json();
       const opts = meats.map(m => `<option value="${m.id}">${m.code} - ${m.name} (${m.unit})</option>`).join('');
       newMeat.innerHTML = opts || '<option value="">No commissary meats seeded yet</option>';
@@ -130,7 +144,9 @@
       if (!date) return;
       const el = document.getElementById('balances');
       el.innerHTML = 'Loading...';
-      const res = await fetch(`/api/commissary/daily-audit?date=${date}`);
+      const params = new URLSearchParams({ date });
+      if (commissarySelect.value) params.set('commissary_id', commissarySelect.value);
+      const res = await fetch(`/api/commissary/daily-audit?${params.toString()}`);
       const rows = await res.json();
       if (rows.length === 0) {
         el.innerHTML = '<p class="hint">No commissary meats seeded yet - add some in the seed data or Settings.</p>';
@@ -170,6 +186,7 @@
       const params = new URLSearchParams();
       if (filterMeat.value) params.set('commissary_meat_id', filterMeat.value);
       if (filterDate.value) params.set('business_date', filterDate.value);
+      if (commissarySelect.value) params.set('commissary_id', commissarySelect.value);
 
       document.getElementById('yield-table').innerHTML = 'Loading...';
       const res = await fetch(`/api/commissary/yield-log?${params.toString()}`);
@@ -306,9 +323,18 @@
       loadYieldLog();
     });
 
-    loadMeats().then(() => {
-      loadBalances();
-      loadYieldLog();
+    commissarySelect.addEventListener('change', () => {
+      loadMeats().then(() => {
+        loadBalances();
+        loadYieldLog();
+      });
+    });
+
+    loadCommissaries().then(() => {
+      loadMeats().then(() => {
+        loadBalances();
+        loadYieldLog();
+      });
     });
   </script>
   <script src="command-panel.js"></script>

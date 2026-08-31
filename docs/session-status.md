@@ -1,7 +1,13 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-09-01 (**23c-ii split into four sub-steps** by the
-architect conversation — see the entry below. Previously: **23b-vi-b
+Last updated: 2026-09-01 (**23c-ii-a done** — page-level commissary
+selector on `public/commissary.html` only, per the four-way split below.
+14/14 files, 257/257 assertions, 0 failures, unchanged (frontend-only, as
+expected). Next up: **23c-ii-b** (same pattern on
+`commissary-shipments.html`) — see the "23c-ii split into four sub-steps"
+section further down for its full scope. Previously: **23c-ii split into
+four sub-steps** by the architect conversation — see the entry below.
+Before that: **23b-vi-b
 done**: the inline commissary drill-down on the Dashboard - a ▸/▾ toggle
 on grouped rows now renders `by_commissary` (previously correct in the
 JSON, invisible in the table), plus two small backend items folded in
@@ -1723,9 +1729,15 @@ the same treatment: one small additive step, cited as precedent.
 
 **Dispatch order for 23c-ii:**
 
-- **23c-ii-a — page-level commissary selector on `commissary.html` only.**
-  Fully unblocked, no decisions outstanding, dispatchable immediately and
-  independent of everything below. Add a commissary `<select>` mirroring
+- **23c-ii-a [Done, 2026-09-01 — Claude Code (CLI) session] — page-level
+  commissary selector on `commissary.html` only.** Built exactly as
+  scoped below. See this session's `changelog.md` entry for full
+  verification detail (14/14 files, 257/257 assertions, 0 failures,
+  unchanged; live end-to-end check with a real second commissary +
+  commissary meat; test rows cleaned up; server stopped per rule 21).
+  Pushed directly to `main`.
+
+  Add a commissary `<select>` mirroring
   the restaurant selector in `daily-audit.html` (~L61-77), populated from
   `GET /api/settings/commissaries` filtered to `active === 1`. First and
   **default** option is "All commissaries", value `""`. Thread the

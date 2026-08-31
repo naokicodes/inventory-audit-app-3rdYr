@@ -11,6 +11,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-01 (Claude Code session) — Step 23c-ii-a: page-level commissary selector on commissary.html
+
+Frontend-only, `public/commissary.html` alone — the first of the four 23c-ii sub-steps split out by the architect session earlier the same day. Added a `<select id="commissary">` above the "On-hand balance" section, mirroring `daily-audit.html`'s restaurant selector pattern: populated from `GET /api/settings/commissaries`, filtered client-side to `active === 1`, first and default option "All commissaries" (value `""`).
+
+The selection threads into the page's three commissary-scoped reads as an optional `&commissary_id=N`, omitted entirely when "All" is selected: `loadMeats()` → `GET /api/commissary/meats`, `loadBalances()` → `GET /api/commissary/daily-audit`, and the yield-log list → `GET /api/commissary/yield-log`. All three routes already accepted this filter (23b-iv, 23b-v) — no backend, schema, or route change. A `change` listener on the new selector re-runs all three, same as the existing date input's listener does for balances. The yield-log POST/PUT/DELETE paths were left untouched, per the step's explicit scope — they key off `commissary_meat_id`, which is already commissary-specific.
+
+**Verified**: baseline full suite run before starting and again after — identical **14/14 files, 257/257 assertions, 0 failures** both times, confirming the frontend-only change is behavior-preserving on load, as expected (no new tests, per the step's own reasoning: the routes' existing "omitted = everything" convention is what makes defaulting to All provably equivalent to today's behavior). `node --check` on the extracted inline script. Live end-to-end check against a real booted server: created a second real commissary ("Test Commissary B" / TESTB) and a commissary meat under it via `POST`, confirmed `GET /api/settings/commissaries` lists both, confirmed `GET /api/commissary/meats?commissary_id=<new>` returns only the new meat while the unfiltered call still returns all 15, confirmed `GET /api/commissary/daily-audit?commissary_id=<new>` and `GET /api/commissary/yield-log?commissary_id=<new>` both scope correctly, and confirmed the served page contains the new selector markup. Test rows cleaned up afterward (direct delete of the test commissary meat and commissary, no DELETE route exists for either — expected, they're catalog/settings tables, not the two rule-9 tables). Server process stopped before ending the session (rule 21).
+
+Pushed directly to `main`.
+
+---
+
 ---
 
 ## 2026-09-01 (architect, web session) — 23c-ii split four ways; "no decisions needed" was wrong on three counts
