@@ -32,6 +32,7 @@ The most recent landings, newest first — full detail for each is in
 
 | Step | What landed |
 |---|---|
+| — | Fixed 23c-ii-d follow-on: qualified-branch silent-first-match in `resolveCommissaryMeat` |
 | 23c-ii-d | Terminal qualified-token grammar (`com-a/m05`); closed a silent-first-match bug |
 | 23c-ii-c | Commissary identity on `GET /api/commissary/meats` (LEFT JOIN) + label fixes on two pages |
 | 23c-ii-b | Commissary selector on `commissary-shipments.html` |
@@ -66,20 +67,8 @@ The most recent landings, newest first — full detail for each is in
 - ~~**Restaurant B/C still aren't seeded**~~ — Restaurant B (FC) done as
   of step 19, 2026-08-29. Restaurant C (Likod) is still unseeded — no
   workbook for it exists yet, unlike FC's real `FC_MasterAudit.xlsx`.
-- **`resolveCommissaryMeat`'s qualified branch takes the first of a
-  multi-match (found 2026-09-01, not yet fixed).** In
-  `public/terminal.html`, the bare-token branch correctly returns
-  `resolved` only on exactly one match and `ambiguous` on more. The
-  qualified branch instead does
-  `matches.length >= 1 ? { status: 'resolved', meat: matches[0] }` —
-  the same silent-first-match pattern 23c-ii-d exists to eliminate,
-  reintroduced inside the fix. Reachable because `commissary_meats` is
-  `UNIQUE (commissary_id, code)` with **no constraint on `name`**, so two
-  meats named "Jowl" under COM-A make `com-a/jowl` ambiguous. Narrower
-  than the original bug, same class. Fix is to mirror the bare branch's
-  shape, plus a test in `server/routes/terminal.test.js` — without the
-  test the decision stays unprotected, which is the whole point of that
-  file.
+- ~~**`resolveCommissaryMeat`'s qualified branch takes the first of a
+  multi-match**~~ — fixed 2026-09-01, see `changelog.md`.
 
 - **A preset-*authoring* admin UI is still deferred, not forgotten.**
   Shipment presets can be created and edited via
