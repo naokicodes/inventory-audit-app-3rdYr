@@ -13,6 +13,21 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (architect) — Rule 21 added: stop any server you start
+
+Project owner hit `EADDRINUSE: address already in use :::3000` on
+`npm run dev`. Not an app bug — a Claude Code session had left a server
+running from its live verification check. Six sessions today each booted
+one; every one cleaned up its test rows, none stopped its process. Worse
+than a blocked port: the stale server kept serving `localhost:3000` from
+a commit several behind HEAD, so the app *looked* fine while actually
+serving old code.
+
+Added as rule 21 in `rules-for-claude-code.md` rather than only into the
+prompt template, so it binds every session regardless of whether whoever
+writes the next prompt remembers the line. The template in
+`architect-notes-PRIVATE.md` (not in this repo) gets a matching line.
+
 ## 2026-08-31 (Claude Code session) — Step 23b-vi-b: inline commissary drill-down + two backend gaps
 
 `public/dashboard.html`: `kind:"meat_type"` rows with a non-empty `by_commissary` array are now expandable — a ▸/▾ toggle in the first cell, click to show one child row per commissary (its code/name and its own balance). The restaurant columns and grand total stay on the parent row only, rendered exactly once, never repeated or recomputed per commissary in the child rows — the child rows only fill their first two cells and leave the rest blank via `colspan`. No client-side recomputation anywhere: expand/collapse re-renders the already-fetched JSON (`lastRollupData`), it never re-fetches or derives new numbers. `kind:"untagged"` rows render a disabled toggle since they have no `by_commissary` at all.

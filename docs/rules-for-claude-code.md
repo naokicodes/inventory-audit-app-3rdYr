@@ -267,6 +267,33 @@ standing constraints, not suggestions — they exist to keep a solo,
       back-and-forth to discover. `git commit -m "subject" -m "body
       paragraph"` on one line is the format that works.
 
+## Rule 21 — Stop any server you start
+
+Several rules above ask for live verification against a real booted
+server, and that has caught real bugs repeatedly — keep doing it. But
+**stop the process before you finish your session.** A left-running
+server holds port 3000, so the project owner's next `npm run dev` fails
+with `EADDRINUSE: address already in use :::3000` — which looks like an
+app bug and isn't one.
+
+This is not hypothetical: it happened on 2026-08-31, after six sessions
+in a row each booted a server for its live check. Every one correctly
+cleaned up its test *rows*; none stopped its *process*. The stale server
+kept serving `localhost:3000` from whatever commit was checked out when
+it started, several commits behind by then — so it looked like the app
+was working while actually serving old code.
+
+Concretely, before ending a session:
+- Kill any server you started (`Ctrl-C`, or kill the background PID).
+- Clean up test rows and any throwaway `.db` file you created, as
+  before — this rule is in addition to that, not a replacement.
+
+If the project owner reports `EADDRINUSE`, the fix is theirs to run, not
+a code change:
+`Get-NetTCPConnection -LocalPort 3000 -State Listen | Select-Object OwningProcess`
+then `Stop-Process -Id <pid> -Force` (PowerShell), or
+`netstat -ano | findstr :3000` then `taskkill /PID <pid> /F`.
+
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.
 - Suggesting a hosted database or cloud deployment.
