@@ -1758,12 +1758,28 @@ the same treatment: one small additive step, cited as precedent.
 
 - **23c-ii-b — page-level commissary selector on
   `commissary-shipments.html`.** Same pattern and same "All" default as
-  23c-ii-a. That page reads `GET /api/commissary/meats` (~L116) and
-  `GET /api/commissary/daily-audit` (~L147). Its
-  `shipment-presets`/`conversion-standards` reads are keyed by
-  `commissary_meat_id` and are already commissary-specific — do not add
-  `commissary_id` to them. A separate step from 23c-ii-a per rule 16:
-  same pattern, different page, and neither blocks the other.
+  23c-ii-a. **Corrected 2026-09-01, after 23c-ii-a landed**: an earlier
+  version of this entry said the page's `GET /api/commissary/daily-audit`
+  call also needed the filter. It does **not**, and adding it would be a
+  live bug rather than a no-op. `loadContext()` (~L147) already passes
+  `commissary_meat_id`, and a commissary meat belongs to exactly one
+  commissary, so that read is already narrowed. 23b-v deliberately made a
+  `commissary_meat_id` paired with a `commissary_id` it doesn't belong to
+  return `[]` rather than silently ignore the mismatch — so passing both
+  can blank the context panel during the window where the meat dropdown
+  hasn't re-rendered yet. **Only `loadCommissaryMeats()` (~L116) takes
+  the filter.**
+
+  The actual work beyond that one param is the change handler.
+  Repopulating `newCommissaryMeat` resets its `.value`, which silently
+  invalidates everything downstream of it — so on commissary change the
+  page must reload the meats and then re-run the same trio the existing
+  `newCommissaryMeat` change handler runs (L322): `loadContext()`,
+  `loadPresets()`, `loadStandards()`. The `shipment-presets` and
+  `conversion-standards` reads are keyed by `commissary_meat_id` and are
+  already commissary-specific — do not add `commissary_id` to them
+  either. A separate step from 23c-ii-a per rule 16: same pattern,
+  different page, neither blocks the other.
 
 - **23c-ii-c — additive commissary identity on `GET
   /api/commissary/meats`, plus the `stock-receipts.html` label fix.**
@@ -1775,7 +1791,15 @@ the same treatment: one small additive step, cited as precedent.
   live consumers pass nothing today and must all keep working unchanged.
   Then `stock-receipts.html`'s `loadCommissaryMeats()` (~L150) renders
   the commissary in its option label, so two same-coded meats are
-  distinguishable. **Blocks 23c-ii-d — dispatch before it, not after.**
+  distinguishable. **Also in scope, found 2026-09-01 in the architect
+  review of 23c-ii-a**: `commissary.html` has the identical label
+  ambiguity whenever "All commissaries" is selected — both `newMeat` and
+  `filterMeat` render `${m.code} - ${m.name}`, so two commissaries
+  sharing `M05` produce two indistinguishable options. Same cause, same
+  one-line fix, and this step already has the commissary on that route.
+  Neither is a correctness bug — the `<option value>` is `m.id`, so the
+  right row is written either way — but both are unreadable.
+  **Blocks 23c-ii-d — dispatch before it, not after.**
 
 - **23c-ii-d — Terminal qualified-token grammar.** The largest sub-step
   and the only one closing a correctness hole. Depends on 23c-ii-c.

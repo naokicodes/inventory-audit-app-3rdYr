@@ -25,6 +25,35 @@ Pushed directly to `main`.
 
 ---
 
+## 2026-09-01 (architect review of 23c-ii-a) — verified good; two spec corrections
+
+Verified 23c-ii-a independently before reviewing: read the real diff, ran
+the full suite (14 files, **257/257, 0 failures**), `node --check` on the
+extracted inline script. All three reads thread `commissary_id` correctly,
+and the "All" default sends `value=""` so the param is omitted and on-load
+behavior is genuinely unchanged. No rework needed.
+
+Two corrections to specs I wrote, both caught by reading the landed code
+rather than by anything failing:
+
+**23c-ii-b's entry was wrong** and would have had a worker introduce a bug.
+It said `commissary-shipments.html`'s `GET /api/commissary/daily-audit` call
+also needed the filter. It doesn't — `loadContext()` already passes
+`commissary_meat_id`, and a meat belongs to exactly one commissary, so that
+read is already narrowed. Worse, 23b-v deliberately made a mismatched
+`commissary_meat_id` + `commissary_id` pair return `[]` instead of ignoring
+the mismatch, so passing both can blank the context panel in the window
+before the meat dropdown re-renders. Only `loadCommissaryMeats()` takes the
+filter; the real work there is re-running the dependent trio after the meat
+list changes.
+
+**23c-ii-c gains one line of scope.** `commissary.html` has the same label
+ambiguity as `stock-receipts.html` whenever "All commissaries" is selected —
+both its dropdowns render `code - name`, so two commissaries sharing `M05`
+give two indistinguishable options. Not a correctness bug (the option value
+is `m.id`), but unreadable, and 23c-ii-c already has the commissary on that
+route.
+
 ## 2026-09-01 (architect, web session) — 23c-ii split four ways; "no decisions needed" was wrong on three counts
 
 No code changed. The hand-off into this session said 23c-ii was unblocked
