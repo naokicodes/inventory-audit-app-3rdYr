@@ -29,20 +29,35 @@ function getShipmentWithLines(shipmentId) {
   return { ...shipment, lines };
 }
 
-// GET /api/commissary/meats
+// GET /api/commissary/meats?commissary_id=
 // Active commissary meats, for the yield-entry form's dropdown. Global
-// list, independent of any restaurant's own meats table.
+// list (every commissary's meats) when commissary_id is omitted -
+// six live pages call this with no param today (commissary.html,
+// commissary-shipments.html, terminal.html, stock-receipts.html, and
+// settings.html's Shipment Presets and Conversion Standards sections)
+// and must keep working unchanged. commissary_id is an OPTIONAL filter,
+// not required - deliberately NOT the GET /api/settings/meats convention
+// (which requires restaurant_id), same optional-filter convention
+// GET /commissary/yield-log and GET /commissary/daily-audit above
+// already use. Step 23b-iv (2026-08-31): added the filter itself; no
+// page passes it yet - that's 23c-ii's job, landing the commissary
+// selector on each consuming page incrementally.
 // Step 23c-i-b (2026-08-31): meat_type_id added to the SELECT, purely
 // additive, so settings.html's Conversion Standards section can resolve
 // a selected commissary meat to its meat_type_id (POST
 // /commissary/conversion-standards is keyed by meat_type_id, not
-// commissary_meat_id). No filter/param change - a commissary_id filter
-// on this route is separate step 23b-iv; don't add it here.
+// commissary_meat_id).
 router.get('/commissary/meats', (req, res) => {
+  const { commissary_id } = req.query;
+
+  const clauses = ['active = 1'];
+  const params = [];
+  if (commissary_id) { clauses.push('commissary_id = ?'); params.push(Number(commissary_id)); }
+
   const meats = db.prepare(
     `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id
-     FROM commissary_meats WHERE active = 1 ORDER BY code`
-  ).all();
+     FROM commissary_meats WHERE ${clauses.join(' AND ')} ORDER BY code`
+  ).all(...params);
   res.json(meats);
 });
 

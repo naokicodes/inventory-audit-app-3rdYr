@@ -42,10 +42,25 @@ db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES 
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit, active) VALUES (3, 1, 'M03', 'Retired Cut', 'kg', 0)`).run();
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (4, 2, 'M01', 'Some Meat', 'kg')`).run();
 db.prepare(`INSERT INTO commissaries (id, code, name) VALUES (1, 'COM-A', 'Commissary A')`).run();
+// Step 23b-iv: a second commissary, for the commissary_id filter tests -
+// its own separately-catalogued meat, not reused from Commissary A's.
+db.prepare(`INSERT INTO commissaries (id, code, name) VALUES (2, 'COM-B', 'Commissary B')`).run();
 db.prepare(`INSERT INTO meat_types (id, name) VALUES (1, 'Jowl')`).run();
 db.prepare(`INSERT INTO meat_types (id, name, active) VALUES (2, 'Retired Type', 0)`).run();
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, meat_type_id) VALUES (1, 1, 'CM01', 'Jowl', 'kg', 0.2, 1)`).run();
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, active) VALUES (2, 1, 'CM02', 'Retired Meat', 'kg', 0.2, 0)`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (3, 2, 'CM01', 'Beef Cut', 'kg', 0.2)`).run();
+
+// Mirrors GET /api/commissary/meats (step 23b-iv: optional commissary_id filter)
+function listCommissaryMeats({ commissary_id } = {}) {
+  const clauses = ['active = 1'];
+  const params = [];
+  if (commissary_id) { clauses.push('commissary_id = ?'); params.push(Number(commissary_id)); }
+  return db.prepare(
+    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id
+     FROM commissary_meats WHERE ${clauses.join(' AND ')} ORDER BY code`
+  ).all(...params);
+}
 
 function getReceiptRow(id) {
   return db.prepare('SELECT * FROM stock_receipts WHERE id = ?').get(id);
@@ -616,6 +631,39 @@ test('the implied-input math this feature exists for: ratio_per_unit correctly i
   const impliedInputKg = outputQuantity / row.ratio_per_unit;
   assert.strictEqual(row.ratio_per_unit, 0.25);
   assert.strictEqual(impliedInputKg, 12, '3 units at 0.25 units/kg implies 12kg of input');
+});
+
+console.log('\nCommissary Route Tests (GET /commissary/meats: step 23b-iv optional commissary_id filter)\n');
+
+test('omitted commissary_id returns every active meat across every commissary, exactly as before', () => {
+  const rows = listCommissaryMeats();
+  // CM01 (Commissary A, id 1) + CM01 (Commissary B, id 3) - CM02 (id 2) is inactive, correctly excluded.
+  assert.strictEqual(rows.length, 2);
+  assert.deepStrictEqual(rows.map(r => r.id).sort(), [1, 3]);
+});
+
+test('a commissary_id filters to only that commissary\'s meats', () => {
+  const rows = listCommissaryMeats({ commissary_id: 1 });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].id, 1);
+  assert.strictEqual(rows[0].meat_type_id, 1, 'meat_type_id (added by 23c-i-b) must still be present in the filtered response');
+});
+
+test('a second commissary\'s meats are excluded when filtering to the first', () => {
+  const rows = listCommissaryMeats({ commissary_id: 1 });
+  assert.ok(!rows.some(r => r.id === 3), 'Commissary B\'s meat must not appear when filtering to Commissary A');
+});
+
+test('filtering to the second commissary returns only its own meat', () => {
+  const rows = listCommissaryMeats({ commissary_id: 2 });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].id, 3);
+  assert.strictEqual(rows[0].code, 'CM01', 'same code as Commissary A\'s own CM01 - codes are unique per commissary, not globally');
+});
+
+test('an unknown commissary_id returns an empty array, not an error', () => {
+  const rows = listCommissaryMeats({ commissary_id: 9999 });
+  assert.deepStrictEqual(rows, []);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

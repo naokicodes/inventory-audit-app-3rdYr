@@ -1,22 +1,26 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (**23c-i-b done**: fixed the Settings ->
-Conversion Standards "Create" form, broken since 23b's rekey - see its
-entry below for full detail. 23c-i also done: Commissary + Meat Type
-tabs and commissary-meat creation UI on `settings.html`, frontend-only,
-pushed to `main`. Step 23b remains at 4 of 6 items done: the
-`commissary_conversion_standards` rekey + its consumers, plus Commissary/
-meat-type/`commissary_meats` admin CRUD — see the entries under "Item 3
-design" below, and `changelog.md`'s matching entries, for full detail).
-**Architect recheck, same day: 23c was found to not be one unblocked
-piece — split into 23c-i (Settings tabs + commissary-meat creation UI,
-fully unblocked, dispatched today, now done) and 23c-ii (commissary
-selector, blocked on 3 backend gaps — 2 previously known, 1 newly found:
-`GET /api/commissary/meats` has zero `commissary_id` filtering). See the
-full "23c" entry below for detail.**
+Last updated: 2026-08-31 (**23b-iv done**: optional `commissary_id`
+filter on `GET /api/commissary/meats` - see the dispatch-order list
+under the "23c" entry below for full detail. 23c-i-b also done: fixed
+the Settings -> Conversion Standards "Create" form, broken since 23b's
+rekey. 23c-i also done: Commissary + Meat Type tabs and commissary-meat
+creation UI on `settings.html`, frontend-only, pushed to `main`. Step 23b
+is now at 5 of 6 items done overall — only the Dashboard grouped rollup
+(23b-vi) remains, and it's blocked on an architect response-shape
+decision. See the entries under "Item 3 design" below, and
+`changelog.md`'s matching entries, for full detail).
+**Architect recheck, same day (2026-08-31): 23c was found to not be one
+unblocked piece — split into 23c-i (Settings tabs + commissary-meat
+creation UI, fully unblocked, done) and 23c-ii (commissary selector,
+blocked on backend gaps, most now closed — see below). See the full "23c"
+entry below for detail.**
 
-**23c-i-b is done. Next up: the 3-item remaining 23b backend work, then
-23c-ii** — see the dispatch-order list under the "23c" entry below.
+**23b-iv is done. Next up: 23b-v** (optional `commissary_id` param on
+`computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`, and
+the same filter on `GET /api/commissary/yield-log`), **then 23b-vi**
+(blocked on an architect decision) **and 23c-ii** — see the dispatch-order
+list under the "23c" entry below.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1637,39 +1641,46 @@ fresh architecture session:**
        actually needs the filter.
     2. The fuller Dashboard grouped-rollup response shape needs an
        architect decision first (already flagged below).
-    3. **Newly found, 2026-08-31 architect recheck**: `GET
+    3. ~~**Newly found, 2026-08-31 architect recheck**: `GET
        /api/commissary/meats` — the route feeding both the Shipment
        form's dropdown *and* Terminal's slot-1 token resolution — has
-       **zero `commissary_id` awareness**. It's a flat list of every
-       active commissary meat, no filter param at all (confirmed via
-       `grep` — zero hits for `commissary_id` in that route or either
-       engine file). Not in any prior "remaining 23b items" list.
-       Without this, adding a selector to the frontend has nothing to
-       actually filter against. This becomes the third item of 23b's
-       remaining backend work, not a 23c-ii frontend task.
+       **zero `commissary_id` awareness**.~~ **Closed 2026-08-31 (23b-iv,
+       Claude Code session)** — the route now takes an optional
+       `commissary_id` filter (omitted behaves exactly as before). See
+       23b-iv's own entry below for full detail. Still nothing consumes
+       it yet — 23c-ii's own frontend job, once dispatched.
 
 **23c-i and 23c-i-b are both done. Dispatch order from here, decided
 2026-08-31:**
 1. ~~**23c-i-b**~~ — done, see its entry above.
-2. **23b-iv** — an **optional** `commissary_id` filter on `GET
-   /api/commissary/meats`. Smallest of the three backend items and the
-   one 23c-ii most directly needs. **Resolved 2026-08-31 (architect, web
-   session), correcting this line's earlier wording**: an earlier draft
-   said to mirror the `restaurant_id` convention of `GET
-   /api/settings/meats`. **Do not** — that route *requires* the param
-   (400s without it, `settings.js` ~L190), and this route has **six**
-   live consumers that pass nothing today: `commissary.html`,
-   `commissary-shipments.html`, `terminal.html`, `stock-receipts.html`,
-   and `settings.html` in two places (Shipment Presets and Conversion
-   Standards). A required param would break all six in one commit,
-   against rule 17, and would force 23c-ii's selector work to happen
-   simultaneously — collapsing the step sizing this project has
-   deliberately maintained. Follow instead the convention the sibling
-   routes in `commissary.js` already use: `GET /commissary/yield-log`
-   and `GET /commissary/daily-audit` both take optional filters and list
-   everything when the filter is omitted. Omitted `commissary_id` must
-   behave exactly as today; 23c-ii then adds `?commissary_id=N` per page
-   incrementally as each selector lands.
+2. ~~**23b-iv**~~ — done, 2026-08-31 (Claude Code session). An
+   **optional** `commissary_id` filter on `GET /api/commissary/meats`.
+   **Resolved 2026-08-31 (architect, web session), correcting this
+   line's earlier wording**: an earlier draft said to mirror the
+   `restaurant_id` convention of `GET /api/settings/meats`. **Do not** —
+   that route *requires* the param (400s without it, `settings.js`
+   ~L190), and this route has **six** live consumers that pass nothing
+   today: `commissary.html`, `commissary-shipments.html`,
+   `terminal.html`, `stock-receipts.html`, and `settings.html` in two
+   places (Shipment Presets and Conversion Standards). A required param
+   would break all six in one commit, against rule 17, and would force
+   23c-ii's selector work to happen simultaneously — collapsing the step
+   sizing this project has deliberately maintained. Followed instead the
+   convention the sibling routes in `commissary.js` already use: `GET
+   /commissary/yield-log` and `GET /commissary/daily-audit` both take
+   optional filters and list everything when the filter is omitted.
+   Omitted `commissary_id` behaves exactly as before, confirmed by
+   test and live check, not just by not changing that code path;
+   23c-ii will add `?commissary_id=N` per page incrementally as each
+   selector lands. New tests in `commissary.test.js`: a second
+   `commissaries` row + its own commissary meat, 5 new tests (omitted
+   param unchanged, filter includes only the right commissary, excludes
+   the other, an unknown id returns `[]`). Full suite: **14/14 files,
+   233/233 assertions, 0 regressions** (was 228). Live-verified against a
+   real booted server, including confirming `commissary-shipments.html`
+   (one of the six untouched consumers) still serves and still calls the
+   route with no param. Pushed to `main` directly. See
+   `changelog.md`'s matching entry for full detail.
 
    **Also newly noted here**: `stock-receipts.html` is a consumer of
    this route and is **not** in 23c-ii's page list below (which names
@@ -1685,8 +1696,8 @@ fresh architecture session:**
    resolved.
 5. **23c-ii** — the commissary selector, once 2-4 have landed.
 
-23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, and 23c-i are
-done. Everything in the numbered list above is not started.
+23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, 23c-i, 23c-i-b,
+and 23b-iv are done. 23b-v, 23b-vi, and 23c-ii are not started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading

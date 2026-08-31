@@ -13,6 +13,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (Claude Code session) — Step 23b-iv: optional commissary_id filter on GET /api/commissary/meats
+
+Single-route change, exactly the scope dispatched: `GET /api/commissary/meats` gains an OPTIONAL `commissary_id` query param — omitted, it behaves exactly as before (every active commissary meat, unfiltered); when present, adds `AND commissary_id = ?` to the existing WHERE. Follows the same optional-filter convention `GET /commissary/yield-log` and `GET /commissary/daily-audit` already use in this file, deliberately not `GET /api/settings/meats`'s required-`restaurant_id` convention — six live pages call this route with no param today (`commissary.html`, `commissary-shipments.html`, `terminal.html`, `stock-receipts.html`, and `settings.html`'s Shipment Presets and Conversion Standards sections) and a required param would have broken all six in one commit. `meat_type_id` (added by 23c-i-b) stays in the SELECT. No page passes the new param yet — that's 23c-ii's job, landing the commissary selector on each consuming page incrementally.
+
+`server/routes/commissary.test.js` gained a second `commissaries` row (Commissary B) and a commissary meat under it, plus 5 new tests: omitted param returns every active meat across both commissaries unchanged; a `commissary_id` filters to only that commissary's meats with `meat_type_id` still present; a second commissary's meats are excluded when filtering to the first; filtering to the second commissary returns only its own meat (confirming codes are unique per commissary, not globally, by reusing the same code `CM01` on both sides); an unknown `commissary_id` returns `[]` rather than erroring.
+
+**Verified**: baseline full suite run first (14/14 files, 228/228 assertions, 0 failures) and again after (**14/14 files, 233/233 assertions, 0 failures** — the +5 new tests, no regressions elsewhere). `node --check` on both changed files. Live end-to-end check against a real booted server: unfiltered call still returns the full unfiltered list unchanged; created a second real commissary + meat, confirmed filtering to the first commissary excludes it, filtering to the second returns only it, unfiltered returns both, and an unknown `commissary_id` returns `[]`; confirmed `commissary-shipments.html` (one of the six unchanged consumers) still serves and still calls the route with no param. Test rows cleaned up afterward.
+
+Pushed directly to `main`.
+
+---
+
 ## 2026-08-31 (architect, web session) — 23b-iv resolved as an OPTIONAL filter; two stale doc entries corrected
 
 Pure architecture, no code changed. Verified 23c-i-b's landed work first
