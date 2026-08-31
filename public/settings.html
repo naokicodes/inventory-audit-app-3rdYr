@@ -47,6 +47,9 @@
     <button data-section="locations">Locations</button>
     <button data-section="shipment-presets">Shipment Presets</button>
     <button data-section="conversion-standards">Conversion Standards</button>
+    <button data-section="commissaries">Commissaries</button>
+    <button data-section="meat-types">Meat Types</button>
+    <button data-section="commissary-meats">Commissary Meats</button>
   </div>
 
   <section id="section-restaurants" class="section-panel active">
@@ -166,6 +169,45 @@
       <button id="add-conversion-standard">Add Standard</button>
     </div>
     <div id="cs-status" class="status-message"></div>
+  </section>
+
+  <section id="section-commissaries" class="section-panel">
+    <h2>Commissaries</h2>
+    <small class="hint">Global list, not scoped by the Restaurant selector above. Code is set once at creation and can't be edited in place, same as Restaurant codes.</small>
+    <div class="add-form">
+      <label>Name <input id="commissary-name" placeholder="e.g. Commissary B"></label>
+      <label>Code <input id="commissary-code" placeholder="e.g. COM-B"></label>
+      <button id="add-commissary">Add Commissary</button>
+    </div>
+    <div id="commissaries-table">Loading...</div>
+  </section>
+
+  <section id="section-meat-types" class="section-panel">
+    <h2>Meat Types</h2>
+    <small class="hint">The reference tag two different commissaries' independently-cataloged meats (e.g. both have their own "Jowl" row) can share so a Conversion Standard can apply across them. Global list.</small>
+    <div class="add-form">
+      <label>Name <input id="meattype-name" placeholder="e.g. Jowl"></label>
+      <button id="add-meattype">Add Meat Type</button>
+    </div>
+    <div id="meat-types-table">Loading...</div>
+  </section>
+
+  <section id="section-commissary-meats" class="section-panel">
+    <h2>Commissary Meats</h2>
+    <small class="hint">Each commissary catalogs its own meats independently, same as each restaurant catalogs its own Meats tab above. Meat Type (optional) tags this meat for cross-commissary Conversion Standards.</small>
+    <div class="add-form">
+      <label>Commissary <select id="commissary-meat-commissary"></select></label>
+    </div>
+    <div class="add-form">
+      <label>Code <input id="commissary-meat-code" placeholder="e.g. CM10"></label>
+      <label>Name <input id="commissary-meat-name" placeholder="e.g. Pork Jowl"></label>
+      <label>Unit <select id="commissary-meat-unit"><option value="kg">kg</option><option value="unit">unit</option></select></label>
+      <label>Allowed leeway % <input id="commissary-meat-leeway" type="number" step="0.01"></label>
+      <label>Cost/unit <input id="commissary-meat-cost" type="number" step="0.01"></label>
+      <label>Meat Type <select id="commissary-meat-type"><option value="">(none)</option></select></label>
+      <button id="add-commissary-meat">Add Commissary Meat</button>
+    </div>
+    <div id="commissary-meats-table">Loading...</div>
   </section>
 
   <script>
@@ -813,6 +855,224 @@
 
     csCommissaryMeatSelect.addEventListener('change', loadConversionStandards);
 
+    // ---------- COMMISSARIES ----------
+    // Step 23c-i: exact mirror of Restaurants above - global list, not
+    // scoped by the page-level restaurant selector. Code is set once at
+    // creation, matching restaurants/meats/dishes convention.
+    async function loadCommissariesTable() {
+      const res = await fetch('/api/settings/commissaries');
+      const commissaries = await res.json();
+      document.getElementById('commissaries-table').innerHTML = `
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Active</th></tr></thead>
+          <tbody>${commissaries.map(c => `
+            <tr>
+              <td>${c.code}</td>
+              <td><input value="${c.name}" data-field="name" data-id="${c.id}" class="commissary-edit"></td>
+              <td><input type="checkbox" ${c.active ? 'checked' : ''} data-field="active" data-id="${c.id}" class="commissary-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.commissary-edit').forEach(el => el.addEventListener('change', saveCommissaryRow));
+    }
+
+    async function saveCommissaryRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      const result = await fetch(`/api/settings/commissaries/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          active: get('active').checked
+        })
+      }).then(r => r.json());
+      if (!result.ok) { alert(result.error); }
+      loadCommissariesTable();
+      loadCommissaryMeatCommissaryDropdown();
+    }
+
+    document.getElementById('add-commissary').addEventListener('click', async () => {
+      const name = document.getElementById('commissary-name').value.trim();
+      const code = document.getElementById('commissary-code').value.trim();
+      if (!name || !code) return alert('Name and code are required.');
+      const res = await fetch('/api/settings/commissaries', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, code })
+      });
+      const result = await res.json();
+      if (!result.ok) return alert(result.error);
+      document.getElementById('commissary-name').value = '';
+      document.getElementById('commissary-code').value = '';
+      loadCommissariesTable();
+      loadCommissaryMeatCommissaryDropdown();
+    });
+
+    // ---------- MEAT TYPES ----------
+    // Step 23c-i: mirror of Adjustment Types above, minus the extra flag
+    // column - meat_types only has name + active. Global list.
+    async function loadMeatTypesTable() {
+      const res = await fetch('/api/settings/meat-types');
+      const types = await res.json();
+      document.getElementById('meat-types-table').innerHTML = `
+        <table>
+          <thead><tr><th>Name</th><th>Active</th></tr></thead>
+          <tbody>${types.map(t => `
+            <tr>
+              <td><input value="${t.name}" data-field="name" data-id="${t.id}" class="meattype-edit"></td>
+              <td><input type="checkbox" ${t.active ? 'checked' : ''} data-field="active" data-id="${t.id}" class="meattype-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.meattype-edit').forEach(el => el.addEventListener('change', saveMeatTypeRow));
+    }
+
+    async function saveMeatTypeRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      const result = await fetch(`/api/settings/meat-types/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          active: get('active').checked
+        })
+      }).then(r => r.json());
+      if (!result.ok) { alert(result.error); loadMeatTypesTable(); }
+      loadCommissaryMeatTypeDropdown();
+    }
+
+    document.getElementById('add-meattype').addEventListener('click', async () => {
+      const name = document.getElementById('meattype-name').value.trim();
+      if (!name) return alert('Name is required.');
+      const res = await fetch('/api/settings/meat-types', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const result = await res.json();
+      if (!result.ok) return alert(result.error);
+      document.getElementById('meattype-name').value = '';
+      loadMeatTypesTable();
+      loadCommissaryMeatTypeDropdown();
+    });
+
+    // ---------- COMMISSARY MEATS ----------
+    // Step 23c-i: mirror of Meats above, but scoped by a commissary
+    // instead of a restaurant. There's no page-level commissary selector
+    // (unlike the restaurant one at the top), so this section gets its
+    // own local commissary dropdown, same pattern the Shipment Presets/
+    // Conversion Standards sections already use for their local
+    // commissary-meat dropdown.
+    const commissaryMeatCommissarySelect = document.getElementById('commissary-meat-commissary');
+    const commissaryMeatTypeSelect = document.getElementById('commissary-meat-type');
+    let currentCommissaryMeatCommissaryId = null;
+
+    async function loadCommissaryMeatCommissaryDropdown() {
+      const res = await fetch('/api/settings/commissaries');
+      const commissaries = await res.json();
+      const active = commissaries.filter(c => c.active);
+      commissaryMeatCommissarySelect.innerHTML = active.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
+        || '<option value="">No commissaries yet - add one on the Commissaries tab</option>';
+      currentCommissaryMeatCommissaryId = commissaryMeatCommissarySelect.value || null;
+    }
+
+    async function loadCommissaryMeatTypeDropdown() {
+      const res = await fetch('/api/settings/meat-types');
+      const types = await res.json();
+      const active = types.filter(t => t.active);
+      commissaryMeatTypeSelect.innerHTML = '<option value="">(none)</option>' +
+        active.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    }
+
+    async function loadCommissaryMeats() {
+      if (!currentCommissaryMeatCommissaryId) {
+        document.getElementById('commissary-meats-table').innerHTML = 'Pick a commissary above to see this.';
+        return;
+      }
+      const res = await fetch(`/api/settings/commissary-meats?commissary_id=${currentCommissaryMeatCommissaryId}`);
+      const meats = await res.json();
+      const typesRes = await fetch('/api/settings/meat-types');
+      const types = await typesRes.json();
+      const typeOptionsFor = selectedId => '<option value="">(none)</option>' +
+        types.map(t => `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.name}</option>`).join('');
+      document.getElementById('commissary-meats-table').innerHTML = `
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Leeway %</th><th>Cost/unit</th><th>Meat Type</th><th>Active</th></tr></thead>
+          <tbody>${meats.map(m => `
+            <tr>
+              <td>${m.code}</td>
+              <td><input value="${m.name}" data-field="name" data-id="${m.id}" class="commissary-meat-edit"></td>
+              <td>
+                <select data-field="unit" data-id="${m.id}" class="commissary-meat-edit">
+                  <option value="kg" ${m.unit==='kg'?'selected':''}>kg</option>
+                  <option value="unit" ${m.unit==='unit'?'selected':''}>unit</option>
+                </select>
+              </td>
+              <td><input type="number" step="0.01" value="${m.allowed_leeway_pct ?? ''}" data-field="allowed_leeway_pct" data-id="${m.id}" class="commissary-meat-edit" style="width:5rem"></td>
+              <td><input type="number" step="0.01" value="${m.cost_per_unit ?? ''}" data-field="cost_per_unit" data-id="${m.id}" class="commissary-meat-edit"></td>
+              <td>
+                <select data-field="meat_type_id" data-id="${m.id}" class="commissary-meat-edit">
+                  ${typeOptionsFor(m.meat_type_id)}
+                </select>
+              </td>
+              <td><input type="checkbox" ${m.active ? 'checked' : ''} data-field="active" data-id="${m.id}" class="commissary-meat-edit"></td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+      `;
+      document.querySelectorAll('.commissary-meat-edit').forEach(el => el.addEventListener('change', saveCommissaryMeatRow));
+    }
+
+    async function saveCommissaryMeatRow(e) {
+      const id = e.target.dataset.id;
+      const row = e.target.closest('tr');
+      const get = field => row.querySelector(`[data-field="${field}"]`);
+      await fetch(`/api/settings/commissary-meats/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: get('name').value,
+          unit: get('unit').value,
+          allowed_leeway_pct: get('allowed_leeway_pct').value,
+          cost_per_unit: get('cost_per_unit').value || null,
+          meat_type_id: get('meat_type_id').value || null,
+          active: get('active').checked
+        })
+      });
+    }
+
+    document.getElementById('add-commissary-meat').addEventListener('click', async () => {
+      const commissary_id = currentCommissaryMeatCommissaryId;
+      const code = document.getElementById('commissary-meat-code').value.trim();
+      const name = document.getElementById('commissary-meat-name').value.trim();
+      const unit = document.getElementById('commissary-meat-unit').value;
+      const allowed_leeway_pct = document.getElementById('commissary-meat-leeway').value;
+      const cost_per_unit = document.getElementById('commissary-meat-cost').value;
+      const meat_type_id = commissaryMeatTypeSelect.value || null;
+      if (!commissary_id) return alert('Pick a commissary first.');
+      if (!code || !name || allowed_leeway_pct === '') return alert('Code, name, and allowed leeway % are required.');
+      const res = await fetch('/api/settings/commissary-meats', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commissary_id, code, name, unit, allowed_leeway_pct, cost_per_unit: cost_per_unit || null, meat_type_id })
+      });
+      const result = await res.json();
+      if (!result.ok) return alert(result.error);
+      document.getElementById('commissary-meat-code').value = '';
+      document.getElementById('commissary-meat-name').value = '';
+      document.getElementById('commissary-meat-leeway').value = '';
+      document.getElementById('commissary-meat-cost').value = '';
+      loadCommissaryMeats();
+    });
+
+    commissaryMeatCommissarySelect.addEventListener('change', () => {
+      currentCommissaryMeatCommissaryId = commissaryMeatCommissarySelect.value || null;
+      loadCommissaryMeats();
+    });
+
     restaurantSelect.addEventListener('change', () => {
       currentRestaurantId = restaurantSelect.value;
       loadMeats(); loadDishes(); loadRecipes(); loadRecipeDropdowns();
@@ -828,6 +1088,11 @@
       loadCsCommissaryMeats();
       loadCsDestinationMeats().then(() => loadConversionStandards());
     });
+
+    loadCommissariesTable();
+    loadMeatTypesTable();
+    loadCommissaryMeatCommissaryDropdown().then(() => loadCommissaryMeats());
+    loadCommissaryMeatTypeDropdown();
   </script>
   <script src="command-panel.js"></script>
   <script src="commands/sync-batch-stock.js"></script>
