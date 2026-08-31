@@ -103,19 +103,25 @@ chat's fresh-sandbox constraint?
   reading order (rule per this project) still applies at the *start* of a
   session, but shouldn't need repeating mid-session the way a stateless web
   chat effectively does.
-- **`session-status.md` itself is now large (1700+ lines) and mixes current
-  truth with a lot of resolved historical narrative** (full Round 1 and
-  Round 2 write-ups, old step-by-step reasoning that's fully done and
-  verified). Every session — web chat or Claude Code — pays to read all of
-  it per the standing instruction ("read this first"), even though most of
-  it is dead weight for someone about to build step 24a. **Not fixed in this
-  session** — a real trim (moving fully-resolved, no-longer-actionable
-  sections into `changelog.md` or a dedicated archive doc, leaving
-  `session-status.md` as just current/active state) would measurably cut
-  the per-session reading cost for every future worker, Claude Code or web
-  chat. Flagging this as a real, worthwhile cleanup — not done here since it
-  touches a lot of the file and deserves its own pass, not a rider on
-  today's architecture session.
+- **`session-status.md`'s size — FIXED 2026-09-01.** It had grown to ~2,600
+  lines mixing current truth with fully-resolved historical narrative, and
+  every session paid to read all of it per the standing "read this first"
+  instruction, even though most of it was dead weight for someone about to
+  build step 24a. Split into `session-status.md` (**319 lines** — current
+  state, known open items, the step-24 design, stable decisions, the
+  end-of-session checklist) and `session-history.md` (the resolved tail:
+  steps 1–22, the steps 10–19 scope list, Round 2, item 3's design, and all
+  of step 23). An integrity check confirmed zero content loss — every
+  substantive line landed in one file or the other.
+
+  Two still-pending items were deliberately lifted out of the archived
+  sections into "Known open items" first, so the split couldn't bury them:
+  the preset-*authoring* admin UI (deferred since step 20c) and
+  `resolveCommissaryMeat`'s qualified-branch gap. **The standing rule going
+  forward: finished work gets archived, never moved back.** If
+  `session-status.md` starts creeping past a few hundred lines again, that
+  is the signal to archive, not to keep appending.
+
 - **`graphify`** (github.com/Graphify-Labs/graphify), raised by the project
   owner, turns out to be a direct fit for the problem above — confirmed by
   reading its actual docs, not assumed. It builds a local, deterministic

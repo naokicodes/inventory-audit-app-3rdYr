@@ -329,13 +329,22 @@ advisory. Keep that line in every prompt.
 
 **Cause 2: prompts that instruct a linear read of the biggest files.**
 Every worker prompt opened with "read `docs/rules-for-claude-code.md`, then
-`docs/session-status.md`" — a cold linear read of a ~2,300-line file plus
+`docs/session-status.md`" — a cold linear read of a ~2,600-line file plus
 this one, on every dispatch. That instruction is more specific and more
 imperative than `CLAUDE.md`'s standing graphify guidance, so it wins, and
 graphify goes unused. **Cite the section, not the file**: "read the
 '23c-ii split into four sub-steps' section," "note rules 16, 21, 22." A
 step's spec still gets read in full — rule 16 requires the step text BE the
 task — but that is one section, not the whole document.
+
+**Structural fix, done 2026-09-01: `session-status.md` was split.** It is
+now ~320 lines (current state, known open items, the next step's design,
+stable decisions, the checklist); the resolved tail moved to
+`docs/session-history.md`. **Finished work gets archived, never moved
+back** — if `session-status.md` creeps past a few hundred lines again, that
+is the signal to archive, not to keep appending. When archiving, lift any
+still-pending item out of the sections being moved *first*; two were nearly
+buried in this split and had to be rescued deliberately.
 
 **Also tell workers to use graphify for the code half.** It has been
 installed and committed since 2026-08-31 and no worker prompt has ever

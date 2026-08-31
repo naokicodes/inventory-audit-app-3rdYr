@@ -1,0 +1,2208 @@
+# Session History — resolved, kept for "why", not "what's next"
+
+This is the archived tail of `session-status.md`, split out 2026-09-01
+because that file had reached ~2,600 lines and **every worker session read
+it cold** (see `rules-for-claude-code.md` rule 22).
+
+**Nothing in here is live work.** Every step described below is done and
+verified. Read this only when you need the *reasoning* behind something
+already built — why a table is shaped the way it is, why an approach was
+rejected, what a bug turned out to be. For what to build next, read
+`session-status.md`; for dated fix-and-decision history, read
+`changelog.md`.
+
+Anything still pending was deliberately lifted out of this file and into
+`session-status.md`'s "Known open items" before the split. If you find
+something here that reads as unresolved, it is either stale wording or a
+real miss — flag it to the project owner rather than acting on it.
+
+---
+
+## Steps 1–22, and the terminal's docked-bar layout
+
+## Where things stand: steps 1–22 done. The AutoCAD-style docked-bar
+layout for the terminal (discussed and deliberately deferred under step
+21's entry) has now been built and verified live — see step 21's entry
+below for the exact detail, and changelog.md's 2026-08-30 entry. This
+worker had no push credentials, so it's not yet on `main` — standard
+handoff format used (see below). **No step is currently queued next** —
+project owner's call on what comes after step 22 / the terminal layout.
+
+**Step 20 is now fully closed out, including the
+`commissary_shipment_presets` piece 20c deferred.** New this session:
+`GET`/`POST`/`PUT /api/commissary/shipment-presets` in
+`server/routes/commissary.js`, and a "Load preset" autofill control on
+`public/commissary-shipments.html`. Verified live this session (network
++ git access were available, no zip fallback needed) — booted a real
+server, exercised create/list/edit/deactivate/reject-bad-line over
+real HTTP, confirmed the page serves and the preset JSON shape matches
+what the frontend reads. Full suite: **11/11 files, 154/154 assertions,
+0 regressions** (was 138). Pushed to `main`. See this session's
+`changelog.md` entry for the full breakdown, including what's still
+explicitly deferred (a preset-*authoring* admin UI — presets can be
+created via the API today, just not yet through a browser form).
+
+**20c's hand-off is fully closed out.** The step-20c coder session had
+no network access (403s on `git clone`/`npm install`, same zip-fallback
+situation steps 12–19 hit) and could only hand back files + git
+commands for the project owner to apply manually — that happened, it's
+pushed (`f9b61cf`/`8fd71c3`/`b4d0411`), and the architect conversation
+independently re-verified it afterward rather than trusting the commit
+messages alone: pulled fresh, re-ran the full suite (**11/11 files,
+138/138 assertions, confirmed clean**, matching the coder session's own
+number), then did the live-server check that session couldn't — booted
+a real server, `POST`'d a real shipment (Jowl → FC's Bagnet + Sisig),
+confirmed usage moved 0→9 via `GET /api/commissary/daily-audit`,
+confirmed both destination `stock_receipts` rows landed with the
+correct `source`/`commissary_meat_id`, confirmed `activity_log` entries
+use `source: 'MANUAL'` correctly (human-triggered write, not a
+`SYSTEM` background job like `sync-batch-stock`'s). No gaps found.
+
+- **Steps 1–6**: done, committed, unchanged in a while (schema, audit
+  engine, commissary yield engine, Stock Receipts page, Commissary page,
+  activity log wiring). See `docs/changelog.md` for detail on each.
+- **Step 7** (Admin History tab): done, committed, verified live against
+  real data. `server/routes/history.js` + `public/history.html` exist and
+  are mounted.
+- **Step 8** (Commissary meat mapping admin screen): done, committed.
+  **Retired 2026-08-29** (item 4 cleanup pass) - see step 20's
+  "commissary_meat_map's fate" entry below. `settings.html`'s
+  "Commissary Mapping" tab, `settings.js`'s
+  `GET`/`POST`/`DELETE /api/settings/commissary-mappings`, and
+  `server/routes/settings.test.js` (which tested only this) are all
+  gone. The `commissary_meat_map` table itself is untouched.
+- **Step 9** (Unallocated-receipts support): done, committed. Rebuilt
+  from `docs/data-model.md` section 5 and
+  `docs/commissary-and-stock-receipts.md` Part 2 after an earlier attempt
+  was lost to a usage cutoff before it could commit (see `changelog.md`'s
+  two 2026-08-28 entries — one documents the loss, the other the
+  successful rebuild). This incident is also why the roadmap below was
+  re-split into smaller steps — see rule 16 in `rules-for-claude-code.md`.
+  - `schema.sql`/`migrate.js`: `stock_receipts.restaurant_id`/`meat_id`
+    nullable, CHECK constraint, idempotent migration for pre-existing
+    local databases.
+  - `stockReceipts.js`: `POST` accepts an Unallocated COMMISSARY receipt
+    (client supplies `commissary_meat_id` directly since there's no
+    restaurant+meat pair yet to map through); `GET` uses `LEFT JOIN` so
+    Unallocated rows aren't hidden, plus `?unallocated=true`; `PATCH`
+    gains one-time assignment of `restaurant_id`+`meat_id`, enforcing the
+    `commissary_meat_id` continuity check.
+  - `stock-receipts.html`: "Leave Unassigned" toggle on the add form, an
+    "Unallocated" badge + Assign action per row, an "Unallocated only"
+    filter.
+  - Tests: 72/72 total (55 pre-existing + 17 new), plus live HTTP
+    verification against the actual running server (the first time this
+    route file has ever been exercised that way) and a payload-shape
+    replay confirming the new frontend and backend actually agree.
+  - `commissaryYieldEngine.test.js`'s Belly Slab test now asserts the
+    real 14.8 balance (was 19.8, a documented gap) — closed automatically
+    once the Unallocated row became representable, no engine code change
+    needed.
+
+- **Step 10** (Landing backend: unify the read endpoint into one mixed
+  grid): done. `computeDishAudit`/`computeMixedDailyAudit` added to
+  `auditEngine.js`, `GET /api/daily-audit/mixed` added to
+  `dailyAudit.js` (additive, `GET /api/daily-audit` untouched), 6 new
+  tests in `auditEngine.test.js` (5 dish-audit + 1 mixed-grid; 9
+  pre-existing + 6 new = 15/15 in that file). Verified `portion_ending_
+  actual`'s columns (`restaurant_id`, `dish_id`, `business_date`,
+  `portions_counted`) already matched what the tests assumed — no schema
+  gap.
+- **Step 11** (Landing frontend: render the mixed grid): done, with one
+  scope decision made explicitly this session (see below) rather than
+  assumed. `daily-audit.html` now reads from `/api/daily-audit/mixed`
+  instead of `/api/daily-audit` and renders meats + BATCH_PREPPED dishes
+  as rows in one table. Meat rows: unchanged editable fields/save flow
+  (still posts to the untouched `POST /api/daily-audit`). Dish rows:
+  were **display-only** at the time this entry was first written —
+  **that gap is closed as of 2026-08-29**, see the dedicated changelog
+  entry for the `POST /api/daily-audit/portions` write path. User-facing
+  label is "Over/Short"; `variance`
+  stays the internal/code term, per the roadmap's vocabulary note.
+  `GET /api/daily-audit/mixed` gained a small, doc-anticipated addition
+  (`dailyAudit.js`'s own step-10 comment flagged this as step 11's job):
+  MEAT rows are now decorated with the same `in_house`/`wastage`/
+  `other`/`remarks` lookups the old endpoint already had, via a shared
+  `getMeatInputDecoration` helper — needed so the Landing UI shows
+  previously-entered values, not just calculated columns.
+  - **Verification caveat**: this session worked from an uploaded zip of
+    the repo (no `.git` present, no network for `npm install`), so there
+    was no live Express server to click-test against — same gap already
+    logged under "Known open items" for stock receipts/commissary. What
+    *was* done: `node --check` on both changed files (syntax), the full
+    `auditEngine.test.js` suite re-run (still 15/15 green — this session
+    didn't touch the engine), and a hand-run script (`node -e '...'`,
+    not committed) that seeded a real test DB, called
+    `computeMixedDailyAudit` + the new decoration helper exactly as the
+    route does, and confirmed the JSON shape matches what
+    `daily-audit.html`'s JS reads (`newStock`/`endingCalculated`/
+    `unexplainedVariance`/`actual` for meat rows; `portionBeginning`/
+    `prepped`/`sold`/`portionEndingCalculated`/`portionActual`/
+    `portionVariance` for dish rows). A real click-through is still owed,
+    same as the existing open item below.
+  - **Pushed and verified** (2026-08-29): a fresh session cloned `main`
+    independently, confirmed the step-10/11 commits are present
+    (`7b0c541`, `2ff3032`, `5b31717`), ran the full test suite from a
+    clean `npm install` (6/6 suites, 0 failures), and did a live smoke
+    test — seeded a real DB, booted the actual Express server, and hit
+    `GET /api/daily-audit/mixed` for real, confirming the response shape
+    matches what `daily-audit.html` reads. The earlier "not yet pushed /
+    check with the project owner" caveat is resolved; no need to verify
+    this again. A true browser click-through is still not done (see
+    "Known open items" below) — the live smoke test confirms the backend
+    contract, not the UI interaction.
+
+- **Step 12** (Opening-stock fix): done. No schema change needed -
+  `opening_stock` and `getBeginningStock`'s fallback to it already
+  existed; the gap was that nothing ever wrote to it. `POST
+  /api/daily-audit` now accepts an optional `opening_stock` field per
+  row, written via `INSERT OR IGNORE` - the table's existing
+  `UNIQUE(restaurant_id, meat_id)` constraint makes write-once a DB-level
+  fact. `daily-audit.html`'s Beginning cell is editable only when
+  `r.beginning === null`; `save()` includes `opening_stock` only for
+  those rows. Nothing else on Landing touched. Not run through
+  `activity_log` (rule 9 scopes that to `stock_receipts`/
+  `commissary_yield_log` only). 6 new tests in a new
+  `dailyAudit.test.js`; full suite 78/78 (was 72/72). Verified beyond the
+  usual hand-mirrored test: `npm install` succeeded this session, so this
+  was checked with a real live HTTP smoke test against a booted Express
+  server (seeded DB, POST `opening_stock` for a real meat, confirmed
+  `beginning` flipped from null to the written value via `GET
+  /api/daily-audit/mixed`, then confirmed a second POST with a different
+  value was silently ignored). See `changelog.md`'s 2026-08-29 step-12
+  entry for full detail.
+  - **Not yet committed**: this session, like the step-11 session before
+    it, worked from an uploaded zip with no `.git` present - there's
+    nothing to commit *to*. Unlike step 11, `npm install` did work this
+    time (network allowlist covered the registry), which is what made
+    the live HTTP smoke test above possible even without git. The actual
+    commit (`wip:`-free, this step is fully done and tested) still needs
+    to happen wherever the real git history lives - next session with
+    git access should commit this exactly as-is, no re-verification
+    needed, same as step 10/11's "Pushed and verified" entry above once
+    resolved that same way.
+
+- **Step 13** (Live recalculation on Landing): done. `public/daily-audit.html`
+  only — Ending(calc)/Over-Short/Status now update live as a meat row's
+  editable inputs change, no save+reload needed. Scope note made
+  explicitly this session (see `changelog.md`'s step-13 entry): the
+  roadmap line said "New Stock/Usage/Actual" but New Stock and Usage
+  aren't editable on this screen, so live recalc is wired to what
+  actually feeds the formula and is actually editable — Beginning (only
+  when it's still the opening-stock input), In-House, Wastage, Other,
+  Ending (actual). `recalcMeatRow()` mirrors `auditEngine.js`'s
+  `computeMeatAudit` formula and thresholds exactly, via one delegated
+  `input` listener on `#grid-container`. Dish rows untouched (nothing
+  editable to recalc). Save/reload flow untouched — this is a pure
+  display overlay, no new network calls.
+  - **Verified**: no engine/backend change, so no new automated tests
+    (rule 6 scopes those to the audit/yield engines). Hand-mirrored the
+    recalc formula against the existing waste-adjustment fixture in
+    `auditEngine.test.js` via a standalone script — matched exactly.
+    `node --check` on the extracted inline script. Full existing test
+    suite re-run before and after — identical 84 passing / 0 failing
+    across all 7 test files both times, no regression. (Note: 84, not
+    the "78/78" figure step 12's entry claims — see `changelog.md`'s
+    step-13 entry; flagged, not corrected retroactively.)
+  - **Not yet committed**: same as step 12 — this session worked from an
+    uploaded zip, no `.git` present. Unlike step 12's session, this one
+    also had **no network at all** (`git clone` and `npm install` were
+    both blocked), so there was no `npm install`/live Express
+    server/browser this time — no live HTTP smoke test, no click-through.
+    Next session with git access should commit this as-is, no
+    re-verification needed, same as step 10/11/12's pattern.
+  - **Known gap carried forward**: a real browser click-through (typing
+    into an input, watching Ending(calc)/Over-Short/Status update) is
+    still owed — same open item as Stock Receipts' Unallocated/Assign
+    flow and Commissary's Edit/Delete flows below.
+
+- **Step 14** (Command panel scaffold): done. New `public/command-panel.js`
+  + one-line `<script>` include on all six pages. `window.CommandPanel`
+  exposes `register(id, label, run)`/`list()`; a floating "Commands"
+  button opens a panel listing registered commands with a Run button per
+  row. One no-op command registered on load — proves register → appear →
+  run end to end with no real functionality yet, per the roadmap. Running
+  never touches the server; the result is an ephemeral on-screen line
+  only. See `changelog.md`'s step-14 entry for the rule-10 scope note
+  (Landing gets the panel too, same as every page — flagged, not
+  resolved, since it's currently inert).
+  - **Verified**: no backend/schema/engine change, so no new automated
+    tests (rule 6 scope). `node --check` on the new file; registry logic
+    (register/list/duplicate-id-rejection/run() resolution) smoke-tested
+    standalone outside the DOM — all passed. Full existing suite re-run —
+    still 84/0, no regression.
+  - **Not yet committed**: same as steps 12–13 — no `.git`, no network
+    this session either.
+  - **Known gap carried forward**: no live browser click-through of the
+    actual injected UI (button placement, panel open/close, Run click) —
+    same bucket as step 13's open item.
+- **Step 15** ("Sync batch stock" command): done. New backend route
+  `POST /api/commands/sync-batch-stock` (`server/routes/commands.js`) +
+  new frontend file `public/commands/sync-batch-stock.js`, registered
+  against the step-14 panel on all six pages. Copies `sales` into
+  `prepped` for `BATCH_PREPPED` dish/date/restaurant combos with no
+  `prepped` row yet, summing multiple sales rows per combo; always safe
+  to re-run (existing rows, manual or synced, are never overwritten).
+  See `changelog.md`'s step-15 entry for full detail, including a scope
+  decision made this session: a narrow, documented exception lets this
+  one SYSTEM write path log to `activity_log` for `prepped`, despite
+  `scope.md`'s standing deferral of that pattern — written into
+  `scope.md` and `data-model.md` section 11 directly, not left implicit.
+  - **Verified**: 7/7 new tests in `commands.test.js` (mirrored-logic
+    style, same approach as `stockReceipts.test.js`), full suite re-run
+    at 8/8 files green, AND a live end-to-end check — real seeded sales
+    rows, real booted server, real `POST`, confirmed by direct DB read
+    that `prepped` and `activity_log` both got the right rows, and a
+    second `POST` correctly synced 0. Not verified: clicking the actual
+    "Sync batch stock" button in a real browser — same sandbox
+    limitation as steps 13–14's open item.
+- **Step 16** (Sales backend): done. New route `server/routes/sales.js`,
+  mounted in `server/index.js`: `GET /api/sales` returns a month's
+  matrix (one row per active dish, a `days` map for every day of the
+  month), `PATCH /api/sales` upserts or clears one cell's `MANUAL` row.
+  New schema addition: a partial unique index scoping "one row per
+  cell" to `MANUAL` only, so a future `LOYVERSE` sync isn't constrained.
+  See `changelog.md`'s step-16 entry for full detail, including two doc
+  conflicts resolved this session (a stale `data-model.md` line, and
+  `sales` missing from `scope.md`'s deferred-logging list) and an
+  interaction bug the full-suite re-run caught and fixed (step 15's own
+  test had assumed something step 16's new index now forbids).
+  - **Verified**: 13/13 new tests in `sales.test.js` (mirrored-logic
+    style), full suite re-run at 9/9 files green, AND a live end-to-end
+    check against a real booted server — create, upsert-replace (single
+    row confirmed, not a duplicate), clear via `quantity: null`, and
+    negative-quantity rejection, each confirmed by direct DB read after
+    the real HTTP call. Not verified: the step-17 grid UI doesn't exist
+    yet (this step is backend + tests only, per its own scope), so
+    there's nothing to click-test yet.
+- **Step 17** (Sales frontend): done. New page `public/sales.html` —
+  monthly grid, rows = active dishes, columns = days of the selected
+  month, on top of step 16's `GET`/`PATCH /api/sales`. Confirm-on-
+  override: editing an already-filled cell (including clearing it)
+  prompts before saving; a fresh entry into an empty cell doesn't.
+  "Sales" added to nav on all seven pages; the new page also gets
+  `command-panel.js` + `commands/sync-batch-stock.js`, matching step
+  14's "any tab" scaffold.
+  - **Verified**: `node --check` on the extracted inline script, plus a
+    live end-to-end check against a real booted server — confirmed the
+    page serves with the right nav/scripts, confirmed the six existing
+    pages' nav picked up the new link, and replayed the exact
+    `GET`→`PATCH`→`GET` sequence the page's own JS performs, checking
+    the response shape at each step matches what `renderGrid()`/
+    `onCellChange()` expect. No new automated tests — frontend-only,
+    same precedent as steps 11/13/14. **Not verified**: an actual
+    browser click-through of the grid or the confirm-dialog interaction
+    — no headless browser available in this sandbox, same open item as
+    steps 13–15's.
+- **Step 18** (BATCH_PREPPED over-sold warning): done. New route
+  `GET /api/commands/oversold-check` (read-only) + new frontend file
+  `public/commands/oversold-check.js`, registered on all seven pages.
+  Flags `(restaurant, dish, date)` combos where a `BATCH_PREPPED` dish's
+  same-day sold exceeds same-day prepped. **Interpretation call made
+  explicitly** (see `changelog.md`'s step-18 entry): reads "available
+  prepped portions" as same-day only, not the fuller running portion
+  balance `computeDishAudit` computes, since the latter depends on
+  `portion_ending_actual` having real data — which it never does yet
+  (step 11), so a check built on it would never fire. Small scaffold
+  tweak: added `white-space: pre-wrap` to `command-panel.js`'s
+  `.cmd-result` CSS so a multi-line warning list actually shows as
+  multiple lines.
+  - **Verified**: 6 new tests in `commands.test.js` (13/13 total in
+    that file), full suite re-run at 9/9 files green, AND a live
+    end-to-end check — seeded a real prepped/sold mismatch via a booted
+    server, confirmed the correct shortfall came back, confirmed a
+    clean state returns zero, confirmed by direct DB read that the
+    check itself writes nothing, and confirmed the script is served on
+    every page. Not verified: an actual browser click on the button —
+    same sandbox limitation as every frontend step this session.
+- **Step 19** (Restaurant B/FC onboarding): done. New
+  `server/db/seed-data-B.json` extracted directly from
+  `FC_MasterAudit.xlsx` (13 real meats, 34 real dishes, 35
+  `recipe_bom` links — 46 unused placeholder dish rows in the source
+  correctly excluded, not silently included). `seed.js` refactored to
+  loop over any number of restaurant seed files, not hand-duplicated.
+  Deliberately scoped narrow, per the project owner: FC's own local
+  catalog only, no Commissary cross-referencing — steps 20-22's open
+  design questions don't block this.
+  - **Verified**: full suite 9/9 files green, `seed.js` re-run twice
+    live confirming idempotency, and a live server check — both
+    restaurants list correctly, FC's mixed Landing grid returns the
+    right shape (13 MEAT rows including Bagnet as FC's own stock item,
+    1 DISH row for the Batch-Prepped Chicken Skewers).
+
+**Everything through step 20b is on real `main`, pulled and confirmed
+2026-08-29** — steps 10 through 19, all the architecture-discussion docs
+commits (steps 20-22's ongoing design conversation), step 20a's schema
+addition, and step 20b's Commissary audit engine + read route. No
+local-only or uncommitted work remains anywhere. The two decisions worker
+1 flagged from step 20a (no activity-log wiring on
+`commissary_stock_receipts`; preset scoping to one
+`(commissary_meat_id, restaurant_id)` pair) were both reviewed and
+confirmed correct — see the step-20 entry below for detail. **Two more
+decisions flagged from step 20b were also reviewed and confirmed
+correct** (no `commissary_adjustments` table exists yet, so
+`expectedEnding` always equals `endingCalculated` for now — correct,
+that's new scope, not something to infer; the GET route's
+always-an-array shape genuinely mirrors the existing
+`/commissary/yield-log` convention, not an arbitrary choice) — see the
+step-20b entry below for detail.
+
+**Step 20 is fully closed out** (including the `commissary_shipment_presets`
+piece 20c deferred, closed 2026-08-29) — see the top of this file and
+its roadmap entry below for the full breakdown. Still explicitly
+deferred as its own follow-up: a preset-*authoring* admin UI (see the
+20c roadmap entry). **Next up: step 21 or 22** (both still drafts under
+discussion, not committed designs) — or the preset-authoring UI
+follow-up, if the project owner wants that picked up before 21/22.
+Distribution follows rule 18: pull from `main` directly, review, resolve
+any flags, write the *single next* worker prompt, hand off a fresh repo
+— not a batch of prompts for several steps at once. If you're a fresh
+session with no memory of how this worked in practice, rules 18 and 19
+in `rules-for-claude-code.md` are the complete description; this
+paragraph is just the current pointer into that flow.
+
+## WIP hand-offs are now allowed (experimental — see rule 17)
+
+Until 2026-08-28 the implicit policy was "land a whole tested step or
+land nothing," which is exactly what turned step 9's usage cutoff into a
+**total** loss instead of partial progress that the next session could
+pick up. That's now flipped: **a partial, honestly-labeled commit is
+better than no commit**, provided it follows rule 17 in
+`rules-for-claude-code.md` — `wip:`-prefixed commit message, nothing
+previously-working left broken, full existing test suite still green,
+and a precise status update here.
+
+This is marked experimental on purpose — it's a real change from how
+step 9 was handled, it hasn't been tested across many sessions yet, and
+it should be revisited (tightened or dropped) if broken hand-offs start
+costing more time than they save.
+
+**Status legend used below and in the "Where things stand" list**:
+- **Not started** — no code exists for this step yet.
+- **WIP** — some code exists, doesn't fully satisfy the step yet; the
+  step's own list entry says exactly what's done, what's not, and what's
+  untested. Read that before touching anything.
+- **Done** — implemented, tested, committed, matches its own step text.
+
+**If you're the session that picks up a WIP step**: read its done/not
+done/untested breakdown below, verify the existing test suite still
+passes at the current commit (rule 17 requires it did when committed,
+but confirm), then continue from there — don't re-plan the step or
+second-guess decisions already made, per rule 3.
+
+
+## Remaining scope (steps 10–19) — all complete
+
+## Remaining scope (steps 10–19)
+
+Re-split on 2026-08-28 from the old 3-item "steps 10–12" list, per rule
+16 in `rules-for-claude-code.md`. Two things changed from how this list
+used to work, both worth reading before starting any step below:
+
+1. **Each step's own text is the whole task, not a pointer to a design
+   doc.** Step 9 had a fully-written spec across two docs and still took
+   a session to a total loss before it landed — a complete blueprint
+   doesn't make "build the whole feature" the right size for one
+   session. Where a step below references a doc, that's background, not
+   the assignment; the assignment is the sentence describing the step.
+2. **A step doesn't have to fully succeed to be worth committing** — see
+   "WIP hand-offs" above. Each step below is still sized to comfortably
+   fit one session with margin, same as before; WIP is the fallback for
+   when that estimate is wrong, not the new target.
+
+Status tags below: **Not started** (default for everything not yet
+begun), **WIP**, **Done**. Only step 10 onward is listed here — steps
+1–9 are already covered in "Where things stand" above.
+
+Notice the command panel (old step 12) moved earlier, to before Sales —
+Sales' over-sold warning (step 18 below) needs somewhere to surface
+through, so building the command panel after it would've meant either
+building Sales twice or quietly growing step 11 back into a multi-part
+step. Sequencing steps so each one's dependencies already exist is part
+of sizing them correctly, not a separate concern.
+
+10. **[Done] Landing backend: unify the read endpoint into one
+    mixed grid.** See "Where things stand" above for detail.
+11. **[Done] Landing frontend: render the mixed grid.** See "Where things
+    stand" above for detail, including the dish-rows-are-read-only
+    decision and the not-yet-pushed caveat.
+12. **[Done] Opening-stock fix.** See "Where things stand" above for
+    detail.
+13. **[Done] Live recalculation on Landing.** See "Where things stand"
+    above for detail, including the New-Stock/Usage scope note.
+14. **[Done] Command panel scaffold.** See "Where things stand" above
+    for detail, including the rule-10 scope note.
+15. **[Done] First real command: "Sync batch stock."** See the
+    2026-08-29 changelog entry for full detail, including a scope
+    decision made this session (narrow `activity_log` exception for
+    `prepped`, written into `scope.md` and `data-model.md` section 11).
+16. **[Done] Sales backend.** See the 2026-08-29 changelog entry for
+    full detail, including two doc conflicts resolved this session (the
+    stale "Loyverse only" line in `data-model.md`, and `sales` missing
+    from `scope.md`'s deferred-activity-logging list) and an interaction
+    bug the full-suite re-run caught between this step and step 15.
+17. **[Done] Sales frontend.** See the 2026-08-29 changelog entry for
+    full detail — new `public/sales.html`, confirm-on-override behavior,
+    "Sales" added to nav on all seven pages.
+18. **[Done] BATCH_PREPPED over-sold warning.** See the 2026-08-29
+    changelog entry for full detail, including an interpretation call
+    made explicitly: reads "available prepped portions" as same-day
+    prepped only, not the fuller running portion balance, since the
+    latter depends on `portion_ending_actual`, which has no write path
+    anywhere in the app yet — a check built on it would be dead code
+    today. Worth revisiting once a portion-count entry UI exists.
+19. **[Done] Restaurant B (FC) onboarding.** Scoped deliberately narrow
+    per the project owner 2026-08-29: seed FC's own local catalog only,
+    no cross-referencing to Commissary — steps 20-22's design questions
+    don't block this, confirmed independently true.
+
+    New `server/db/seed-data-B.json`, extracted directly from
+    `FC_MasterAudit.xlsx` (not hand-typed): 13 real meats (`M14`-`M16`
+    were blank rows in the source, excluded), 34 real dishes (46
+    "New Dish NN (rename me)" placeholder template rows in the source
+    sheet excluded — not a data error, just an unfinished part of FC's
+    own workbook, worth knowing about), 35 real `recipe_bom` links.
+    `Chicken Skewers` (`D022`) is the one `BATCH_PREPPED` dish, correctly
+    has no `recipe_bom` row (matches the pattern — portions drive it,
+    not a direct meat link) — and matches exactly what the project owner
+    described earlier about Whole Chicken's fan-out, good independent
+    corroboration from the raw data.
+
+    `server/db/seed.js` refactored into a reusable `seedRestaurant()`
+    function, looped over both `seed-data.json` (Restaurant A) and the
+    new `seed-data-B.json` — adding a third restaurant later is a new
+    JSON file plus one line in the filenames array, no other code
+    change, which is what "no new code expected" in this step's
+    original description turned out to actually mean. Also fixed a
+    stale comment (claimed "only 3 hand-verified commissary meats,"
+    contradicted its own very next `console.log` line saying 14 — the
+    real count, confirmed correct back in the step-9 session).
+
+    **Verified**: full suite re-run at 9/9 files green (no regressions
+    from the seed.js refactor), a live re-run of `seed.js` twice
+    confirming idempotency (0 inserted the second time, for both
+    restaurants), and a live server check — `GET /api/restaurants` shows
+    both restaurants, `GET /api/daily-audit/mixed?restaurant_id=2` for
+    FC returns 13 MEAT rows + 1 DISH row with the right shape, Bagnet
+    correctly appears as FC's own local stock item (not remapped to
+    Commissary), matching step 20's onboarding decision exactly.
+20. **[Done, 2026-08-29 — core work complete across all of
+    20a/20b/20c plus the presets follow-up; one small piece (a
+    preset-authoring admin UI) still explicitly deferred, see the 20c
+    bullet below] Give
+    Commissary its own Landing-style audit, and replace the too-rigid
+    `commissary_meat_map` with a real shipment/allocation event.**
+    Grounded in three real sources checked 2026-08-29, not guessed:
+    `Commi_Audit_Master.xlsx`'s `Commissary_Stock`/`Yield_Log`/
+    `Outbound_Log` sheets, the project owner's description of the real
+    process, and `UPDATED_PARDZ_INV_Commi.xlsx`'s "Remake V3" sheet — an
+    auditor-run paper version of exactly this that's already in use.
+
+    **What Remake V3 actually shows**: a top table per Commissary meat
+    (Beginning / Stock In / Backed Up / [destination]-Out, one column
+    per kitchen: FC, Silingan, and presumably Likod / not yet a column
+    here / Ending — **a real physical count**, not the always-computed
+    balance `Commissary_Stock` has today). Below it, one sub-table per
+    destination kitchen, breaking that kitchen's shipment into named
+    portions (Jowl → Bagnet/Sisig/Sinigang/Dinuguan for FC, etc.). This
+    resolves the open question from the prior session: **portioning
+    happens at shipping/allocation time, not at the raw→processed
+    Backed-Up step** — Backed Up stays a plain 1:1 yield (unchanged
+    engine), and only the outbound side needs new modeling. FC's own
+    sub-table still lists plain "JOWL" as one of its own rows too — raw
+    and portioned shipments of the same underlying meat coexist, matches
+    "dynamic, not a fixed formula."
+
+    **Concrete schema gap, confirmed by reading `schema.sql` directly,
+    not assumed**: `commissary_meat_map` has
+    `UNIQUE (commissary_meat_id, restaurant_id)` — it hard-assumes one
+    commissary meat maps to exactly one destination meat per restaurant.
+    That's precisely what Jowl→four-FC-items breaks. This table's job
+    needs to change from an enforced mapping to, at most, a loose
+    autofill reference — or be replaced outright by the shipment
+    concept below.
+
+    **Draft table shapes (react-to, not final)**:
+    - `commissary_ending_actual` (mirrors `ending_actual`) — the real
+      physical count Remake V3 already collects on paper but the app
+      has nowhere to put today. Closes the "trusted, never audited" gap
+      directly.
+    - `commissary_opening_stock` (mirrors `opening_stock`, step 12's
+      pattern) — first-ever beginning value per commissary meat; every
+      day after derives from the prior day's `commissary_ending_actual`,
+      same as restaurants.
+    - `commissary_stock_receipts` — raw meat arriving at Commissary from
+      an outside supplier ("Stock In"). Distinct from the existing
+      `stock_receipts` table, which is restaurant-facing; this is
+      Commissary receiving, not a restaurant receiving.
+    - `commissary_shipments` (id, commissary_meat_id, restaurant_id
+      destination, business_date, total_quantity, notes, ...) — one row
+      per outbound batch, `total_quantity` feeding the top table's
+      matching "[Kitchen]-Out" column and thus Commissary's own usage.
+    - `commissary_shipment_lines` (shipment_id, meat_id — the
+      *destination restaurant's own* meat row, e.g. FC's "Bagnet" —
+      quantity) — the named-portion breakdown. **Each line, on save,
+      also writes a normal `stock_receipts` row for the destination**
+      (source='COMMISSARY', `commissary_meat_id` set) — reuses existing,
+      already-tested destination-side mechanics unchanged; nothing new
+      needed there.
+    - Reconciliation between a shipment's `total_quantity` and the sum
+      of its lines is informational only, not enforced — different
+      units on each side (kg of Jowl vs. portion-units of Bagnet) make a
+      strict equality check not generally meaningful anyway, and an
+      enforced check would contradict "dynamic, no static formula."
+    - Settings-managed `commissary_shipment_presets` (+ preset lines) —
+      the "quick formulas" the project owner asked for, pure autofill
+      for the entry form, never authoritative; the auditor can always
+      change every number before saving.
+    - Auto-computed output-percentages for a future management
+      dashboard — derived on read from `commissary_shipment_lines` vs.
+      `total_quantity`, never feeding back into any audit-engine
+      calculation. Not urgent, no new table needed yet.
+
+    **Migrate-vs-extend — RESOLVED 2026-08-29**: extend, not migrate.
+    "Commissary is the root" was the project owner's own framing —
+    Commissary's own tables get built out first-class, restaurants build
+    onto that, rather than folding Commissary into `restaurants` to
+    inherit machinery that (per the analysis above) wasn't going to be
+    free anyway.
+
+    **Shipment-logging UI — RESOLVED 2026-08-29**: its own dedicated
+    page, like Stock Receipts. Not the Command Panel widget. See step 21
+    below for how the Command Panel itself is evolving instead.
+
+    **`commissary_meat_map`'s fate — RESOLVED 2026-08-29, then FULLY
+    RETIRED 2026-08-29 (later same day, next architecture session)**:
+    originally "leave it alone, vestigial but untouched" (below) — that
+    stance is now superseded. On review, the project owner identified a
+    cleaner resolution than partial retirement: once Commissary always
+    names the destination restaurant at shipment time (a required field
+    on `POST /api/commissary/shipments`), there is no remaining
+    legitimate scenario where a human manually types "this is a
+    COMMISSARY receipt" into the restaurant Stock Receipts form — that
+    manual path only ever existed *before* Shipments could do it
+    properly. This includes the "Unallocated → assign later" feature
+    (`stockReceipts.js`'s `PATCH` assignment flow, `commissary_meat_map`
+    lookup in 3 places: initial `POST`, `PATCH`-assign, `PATCH`-edit) —
+    not just the simpler duplicate case. Even the "what if Commissary
+    forgets to log a shipment" edge case argues for full retirement, not
+    a partial keep: the correct fix for a missed shipment is a
+    *retroactive Shipment entry* (dated appropriately), which updates
+    both Commissary's own usage record and the destination's stock
+    together — a manually backfilled `COMMISSARY` stock_receipts row
+    would update only the restaurant's side, recreating exactly the
+    untracked mismatch this whole redesign exists to eliminate.
+
+    **Decision**: the manual Stock Receipts form should only ever mean
+    `DIRECT` (an outside-supplier purchase). `COMMISSARY`-sourced
+    `stock_receipts` rows should only ever be written as a side effect
+    of a real Shipment (`POST /api/commissary/shipments`'s per-line
+    write, already built in 20c) — never typed by a human directly.
+
+    **Not yet built — this is a design decision, not a completed
+    step.** What a coder session should do once picked up: remove the
+    `commissary_meat_map` lookup/rejection logic from all three call
+    sites in `server/routes/stockReceipts.js` (initial `POST` with
+    `source=COMMISSARY`+restaurant+meat; `PATCH` assignment of a
+    previously-Unallocated row; `PATCH` edit of an already-allocated
+    row's source to `COMMISSARY`) — restaurant-scoped manual entry
+    should simply no longer accept `source=COMMISSARY` at all, only
+    `DIRECT`; remove the whole "Unallocated" receipt concept alongside
+    it, since it only ever existed to support this now-retired manual
+    path; remove `commissary_meat_map`'s admin CRUD from
+    `server/routes/settings.js` and its "Commissary Mappings" section
+    from `public/settings.html`; update `stockReceipts.test.js` to
+    match (several existing tests assert the *old* behavior and need
+    rewriting, not just deleting) - `settings.test.js` turned out to be
+    dedicated entirely to the retired routes with nothing else to
+    salvage, so it's deleted outright rather than rewritten; leave
+    the `commissary_meat_map` **table itself** in `schema.sql` untouched
+    (don't `DROP TABLE` — no destructive schema changes, matches this
+    project's existing caution about schema.sql edits) even though
+    nothing will read or write it anymore. Update
+    `commissary-and-stock-receipts.md` and `data-model.md`'s
+    `commissary_meat_map` sections to describe this as retired, not
+    active. Full suite must stay green throughout — this touches
+    validation logic multiple existing tests depend on, exactly the
+    kind of change that needs the regression-catching discipline rule
+    19 describes, not a quick unverified edit.
+
+    **Split into three sequential sub-steps for handoff — too large for
+    one session, per rule 16's step-sizing philosophy**:
+    - **20a [Done, 2026-08-29] (schema only)**: added the six new tables
+      (+ one preset-lines child table = 7 total) to `schema.sql`. No
+      engine, no routes, no UI. Verified: schema creates cleanly in an
+      in-memory DB, all FKs resolve, `commissary_meat_map` confirmed
+      untouched, a fresh `seed.js` run (twice, confirming idempotency)
+      works unchanged, and the full existing test suite re-run at 9/9
+      files green (110/110 assertions, 0 regressions) — expected, since
+      nothing existing references these new tables yet. Two decisions
+      flagged for the architect conversation rather than assumed
+      unilaterally, see `changelog.md`'s step-20a entry: (1)
+      `commissary_stock_receipts` deliberately has no `deleted_at`/
+      activity-log wiring, since rule 9 scopes that pattern to
+      `stock_receipts`/`commissary_yield_log` only; (2)
+      `commissary_shipment_presets` was scoped to one
+      `(commissary_meat_id, restaurant_id)` pair, inferred from Remake
+      V3's layout — the draft below never states this explicitly. Not
+      committed to git this session — worked from an uploaded zip, no
+      `.git` present, same limitation as steps 12-19's sessions; whoever
+      has git access should commit this as-is (it's a complete, tested,
+      non-WIP change) before starting 20b.
+      **Both flagged decisions resolved 2026-08-29**: (1) confirmed
+      correct — `commissary_stock_receipts` added to `scope.md`'s
+      deferred-logging list, same treatment as `sales` got in step 16.
+      (2) confirmed correct — the preset scoping matches Remake V3's
+      real layout exactly (one sub-table per destination kitchen, each
+      with several named output lines for that meat→kitchen
+      combination). No schema change needed either way, just wasn't
+      written down explicitly before — now it is.
+    - **20b [Done, 2026-08-29] (Commissary audit engine + read route)**:
+      new `server/engines/commissaryAuditEngine.js` —
+      `computeCommissaryMeatAudit` mirroring `computeMeatAudit`'s
+      beginning/inflow/usage/ending/variance shape, with Stock In
+      (`commissary_stock_receipts`) and Backed Up
+      (`commissary_yield_log.backed_weight_out`) as two separate inflow
+      fields (not merged into one "new stock"), and usage summed across
+      every destination restaurant's shipments for that meat/date
+      (`commissary_shipments.total_quantity`, not sales×recipe). Beginning
+      derives from prior-day `commissary_ending_actual`, falling back to
+      `commissary_opening_stock` only on the meat's first tracked day
+      (step 12's pattern). New `GET /api/commissary/daily-audit?date=&
+      commissary_meat_id=` in `server/routes/commissary.js`, always
+      returning an array (all active commissary meats for the date, or
+      one if `commissary_meat_id` is given) — mirrors
+      `GET /api/commissary/yield-log`'s existing optional-filter
+      convention in that same file.
+      **Two decisions flagged for the architect conversation, not
+      assumed unilaterally** (full detail in `changelog.md`'s step-20b
+      entry): (1) no commissary-side adjustments table exists among
+      step 20a's six tables, so `expectedEnding` always equals
+      `endingCalculated` and `unexplainedVariance` always equals
+      `variance` right now — both fields are still returned for shape
+      parity with `computeMeatAudit`, but they're currently redundant,
+      a real gap from "same as every other actual-vs-calculated
+      comparison in this app," not a silently-invented adjustments
+      source. (2) the GET route's always-an-array shape was this
+      session's call on the "one meat/date at a time, or a mixed-grid
+      -style list" open question — chosen to match
+      `/commissary/yield-log`'s existing convention rather than
+      switching to a single object when `commissary_meat_id` is given;
+      worth a second look before a future UI depends on it.
+      **Verified**: `server/engines/commissaryAuditEngine.test.js`,
+      11/11 assertions, real hand-calculated numbers (JOWL:
+      beginning=10, stockIn=5, backedUp=3, usage=3.5 →
+      endingCalculated=14.5, matches actual → OK; plus day-2
+      carry-forward, shortage, surplus, missing-actual,
+      missing-beginning, unfiltered list excluding inactive meats, and
+      the single-meat filter). Also verified live against a real booted
+      server (fresh seeded `inventory.db`, `node server/index.js`,
+      curl) — the live route returned the exact same hand-calculated
+      numbers as the test file, and the `backed_weight_out` fixture was
+      written through the real `POST /api/commissary/yield-log` route
+      (not raw SQL) to exercise that inflow through actual app code, not
+      just the mirrored engine. Full existing suite re-run after:
+      **10/10 files green, 121/121 assertions, 0 regressions.** Repo was
+      reachable via `git clone` this session (no zip fallback needed);
+      pushed straight to `main` per rule 18.
+    - **20c [Done, 2026-08-29 — pushed to `main` and independently
+      verified live by the architect conversation] (shipment logging:
+      write route + page)**: new `POST /api/commissary/shipments` in
+      `server/routes/commissary.js` — one `commissary_shipments` row + N
+      `commissary_shipment_lines` rows in one transaction, each line ALSO
+      writing a normal `stock_receipts` row for the destination
+      (`source='COMMISSARY'`, `commissary_meat_id` set) via the exact
+      same table/columns `POST /api/stock-receipts` already uses — reused
+      unchanged, not reinvented, per the step's own instruction. Each
+      `stock_receipts` write gets its own `activity_log` CREATE in the
+      same transaction (rule 9); `commissary_shipments`/
+      `commissary_shipment_lines` themselves get none (not in rule 9's
+      scope, same treatment `commissary_stock_receipts` got in 20a). All
+      validation (active commissary meat, active restaurant, every
+      line's meat belongs to that restaurant and is active) happens
+      up-front, before the transaction opens, so a bad line fails clean
+      with nothing written — confirmed by a dedicated test. No
+      `commissary_meat_map` lookup anywhere in this route — matches
+      "commissary_meat_map's fate" above: the auditor picks the
+      destination meat live in the form. No reconciliation enforced
+      between `total_quantity` and the line sum (informational only, per
+      the step's own instruction — different units on each side).
+
+      New dedicated page `public/commissary-shipments.html` (own page,
+      not the Command Panel — per the already-resolved "Shipment-logging
+      UI" note above). Form: date, source commissary meat, total
+      quantity, a read-only context block (beginning/stockIn/backedUp/
+      "shipped out so far", pulled from step 20b's `GET
+      /api/commissary/daily-audit` on meat/date change — so the auditor
+      isn't typing blind, re-fetched after save so it reflects the new
+      shipment immediately), destination restaurant, 1+ output lines
+      (destination meat from the *existing* `GET /api/stock-receipts/
+      meats?restaurant_id=` route — no new GET route needed — plus
+      quantity, add/remove), an informational "Lines total: X (shipment
+      total: Y)" hint that never blocks Save, notes. "Shipments" added to
+      nav on all seven existing pages + the new page itself.
+
+      **`commissary_shipment_presets` / `commissary_shipment_preset_lines`
+      (the "quick formulas" autofill) — closed out 2026-08-29, see this
+      session's `changelog.md` entry.** Originally deferred out of 20c
+      (already the largest of the three 20a/20b/20c sub-steps) as a
+      follow-up, not silently dropped — then built in a dedicated
+      follow-up session. **Done**: `GET`/`POST`/`PUT /api/commissary/shipment-presets` in
+      `commissary.js`, and the "Load preset" control on
+      `commissary-shipments.html`. **Still explicitly deferred as its
+      own (smaller) follow-up**: a preset-*authoring* admin UI (a settings page
+      or section to create new presets through the browser, not just
+      consume existing ones) — presets can be created via the API
+      today (see the new tests and the live curl verification in this
+      session's changelog entry), but there's no in-app form for it
+      yet. Smallest reasonable shape for that follow-up is likely a
+      small section on `settings.html`, since presets are
+      settings-managed data — the CRUD routes it would need already
+      exist.
+
+      **Verified**: new `server/routes/commissary.test.js`, 17/17
+      assertions, mirrored-logic style (same convention as
+      `commands.test.js`/`stockReceipts.test.js`) — covers missing/
+      invalid fields, no lines, unknown/inactive commissary meat,
+      unknown/inactive restaurant, a line's meat belonging to a
+      different restaurant or being inactive, a valid two-line shipment
+      landing both the shipment+lines and both destination
+      `stock_receipts` rows correctly, sum-of-lines allowed to differ
+      from `total_quantity` with no rejection, each `stock_receipts`
+      write getting its own `activity_log` CREATE,
+      `commissary_shipments`/`commissary_shipment_lines` correctly
+      getting zero `activity_log` entries, the new receipts feeding a
+      `getNewStock`-style sum for the destination, and a rejected line
+      rolling back cleanly with nothing written. **Environment
+      limitation, flagged rather than hidden**: no network this session
+      (`git clone`/`npm install` both 403'd, zip fallback used, same as
+      steps 12–19's sessions), so **no live Express server was possible**
+      — beyond the mirrored-logic test file, verification is a hand-run
+      script that exercises the REAL `commissaryAuditEngine.js` and the
+      EXACT transaction code copied from the actual route (not
+      re-derived) against a real in-memory DB, confirming `usage` moved
+      from 0 to 9 after a two-line shipment and the destination's
+      `stock_receipts` landed correctly — real production code, just
+      without an HTTP layer. Full suite re-run: **11/11 files green,
+      138/138 assertions, 0 regressions** (was 121). **The live-HTTP
+      smoke test this session couldn't do was completed afterward by
+      the architect conversation**: booted a real server, `POST`'d a
+      real two-line shipment (Jowl → FC's Bagnet + Sisig), confirmed
+      usage moved 0→9 via `GET /api/commissary/daily-audit`, confirmed
+      both destination `stock_receipts` rows landed with the correct
+      `source`/`commissary_meat_id`, confirmed `activity_log` uses
+      `source: 'MANUAL'` correctly for this human-triggered write (not
+      `SYSTEM`, which is reserved for background jobs like
+      `sync-batch-stock`'s). Only a browser click-through of the new
+      page's actual UI remains unverified — same open item every
+      frontend step in this project has carried, no headless browser
+      available in any sandbox used so far.
+
+    **Scope relative to step 19**: still doesn't block Restaurant B
+    onboarding. FC's Bagnet/Sisig/Sinigang/DNG/etc. get onboarded as
+    FC's own local stock items regardless of how this design lands —
+    additive on top, not a prerequisite. Sequencing is the project
+    owner's call.
+
+21. **[Done, 2026-08-29 — built as 21a+21b] A second, bigger
+    Command surface: a dedicated console/terminal page, separate from
+    the step-14 floating widget.** Requested 2026-08-29. The floating
+    panel (steps 14/15/18) stays exactly as it is — quick, single-click,
+    "any tab" micro-actions. This is a *different*, full-page surface
+    for people who'd rather type than click through forms, aimed
+    specifically at Commissary's shipment logging first (Commissary is
+    "more dynamic" than the restaurants, which are "more on the static
+    side" — project owner's framing) — not a general command line for
+    every screen on day one.
+
+    **Standing constraint, unchanged**: the terminal must call the
+    *same* backend endpoint the GUI form does — the real
+    `POST /api/commissary/shipments` route (`server/routes/commissary.js`)
+    added in step 20c — so it's a second input surface on one data path,
+    never a parallel system that could drift out of sync with what the
+    form writes. No new backend route is expected for this step; if a
+    session finds it genuinely needs one, flag it rather than adding it
+    unilaterally.
+
+    **Command style — RESOLVED 2026-08-29**: Discord-slash-command style,
+    not strict CLI-flag syntax and not a separate multi-screen wizard.
+    One input line; a hint bar above it and a filtering dropdown update
+    live as the user types, based on which "slot" the cursor is
+    currently in. This is a small state machine keyed on token position,
+    not a natural-language parser — no grammar/synonym handling needed.
+
+    **Slot sequence for the `ship` command** (the only command this step
+    builds):
+    1. `ship` — literal keyword, typing it opens the command.
+    2. `<commissary-meat>` — dropdown of active commissary meats (Jowl,
+       Whole Chicken, ...), filtered as the user types.
+    3. `<restaurant>` — dropdown of destination restaurants (FC,
+       Silingan, Likod once onboarded), filtered as the user types.
+    4. `<total-qty>` — free-numeric entry, no dropdown.
+    5. One or more `<line-name>:<qty>` pairs — **prefilled from
+       `commissary_shipment_presets`** for the
+       `(commissary_meat_id, restaurant_id)` pair already chosen in
+       slots 2–3 (e.g. once Jowl+FC are picked, the hint bar already
+       shows `bagnet:_ sisig:_ sinigang:_ dng:_` as fillable slots
+       instead of the user having to know or type the names). The
+       auditor can still add a line name the preset doesn't have, or
+       drop one it does — presets are autofill, never enforced, same
+       principle as the GUI form.
+    6. Enter submits the finished line to
+       `POST /api/commissary/shipments`, exactly the payload shape the
+       GUI form already sends. A malformed or unmatched token at any
+       slot keeps the hint bar showing that slot's expected type/options
+       rather than silently guessing — the user corrects that token and
+       continues, they don't restart the line.
+
+    **Scope for v1 — RESOLVED 2026-08-29**: `ship` only. The existing
+    step-15/18 floating-panel commands (sync-batch-stock, oversold-check)
+    are **not** ported into the terminal — the floating panel already
+    serves those well as single-click actions, and folding them in now
+    would mean a second, differently-shaped slot sequence per command
+    for no real UX gain. Revisit only if real usage shows people
+    actually want more command coverage here.
+
+    **History — RESOLVED 2026-08-29**: in scope for v1, not deferred.
+    Up-arrow recalls recent submitted commands (in-memory or
+    localStorage, no backend storage) — cheap enough that there's no
+    reason to split it out as its own follow-up.
+
+    **Autocomplete/hint-bar — RESOLVED 2026-08-29**: this is not a
+    separate polish item to defer; it *is* the feature that makes the
+    Discord-style approach work instead of being a bare text box. Ships
+    with the first build, not after.
+
+    **Split into two sequential sub-steps for handoff, same pattern as
+    step 20**:
+    - **21a [Done, 2026-08-29 — verified live by the architect session
+      after the worker handoff, see breakdown below] (terminal shell +
+      slot state machine, no live submission yet)**: new
+      `public/terminal.html` with the input line, hint bar, dropdown,
+      and slot-position tracking wired for the `ship` command's five
+      slot types above, plus up-arrow history. Submitting a complete
+      line `console.log`s the assembled payload for now rather than
+      actually calling the API — mirrors step 14's "prove the plumbing
+      works before the real command" pattern. No backend changes.
+
+      **Built by the worker**: input line, hint bar, filtering dropdown,
+      and a state machine keyed on committed-token count for all five
+      slots (`ship` literal, `<commissary-meat>`, `<restaurant>`,
+      `<total-qty>`, one-or-more `<name:qty>` pairs). Up/down-arrow
+      history via `localStorage` (`terminal_command_history`, last 25),
+      falling back to dropdown navigation when a dropdown is open. Enter
+      on a complete valid line assembles the payload and `console.log`s
+      it (plus an on-page "Last logged payload" panel) — does not call
+      the API, per the step's own boundary. `business_date` defaults to
+      today (not one of the five named slots — flagged, not silently
+      assumed, see changelog). Line-name resolution (slot 5) looks up
+      the destination restaurant's real active meats via the existing
+      `GET /api/stock-receipts/meats?restaurant_id=` — ordinary lookup,
+      not the preset-prefill 21b is scoped to add. "Terminal" nav link
+      added to all 8 existing pages.
+
+      **Added directly by the architect session, same day, before
+      21b**: a persistent slot guide above the hint bar
+      (`renderSlotGuide`/`computeSlotStatus` in `terminal.html`) — the
+      project owner found the original hint-bar-only design hard to
+      follow once past a slot, since the hint disappears as soon as the
+      cursor moves on. The guide shows all five slots at once: filled
+      ones in green with their resolved value, the active one
+      highlighted, upcoming ones dimmed, and the first bad token flagged
+      red in place (e.g. `commissary-meat: "badmeat"?`) rather than
+      silently letting later slots look reachable. Reuses
+      `resolveExact`/`validateLinePair` exactly as `validateCommitted`
+      does, so it can't disagree with what the hint bar or Enter would
+      say about the same token. This wasn't in the original step 21
+      design (which only specified a hint bar + filtering dropdown) —
+      noted here as a same-day addition, not retroactively written into
+      the design section above.
+
+      **Not done**: nothing scoped to 21a is missing — 21b's real
+      submission + preset-prefill remain untouched, as intended.
+
+      **Verified live, 2026-08-29 (architect session, after the worker
+      handoff)**: worker's diff pulled from `main` and independently
+      checked rather than trusted from the transcript alone. `node
+      --check` on the extracted inline script (clean, both before and
+      after the slot-guide addition). Full backend suite re-run fresh
+      from a clean clone: **11/11 files, 154/154 assertions, 0
+      regressions** (twice — once at the worker's handoff point, once
+      again after the slot-guide patch). Payload assembly read
+      side-by-side against `commissary.js`'s real
+      `POST /api/commissary/shipments` handler and confirmed to match
+      the expected shape field-for-field, not just against the docs'
+      description of it. Booted the real server against freshly-seeded
+      data and hit `/api/commissary/meats`, `/api/restaurants`, and
+      `/api/stock-receipts/meats?restaurant_id=` — all endpoints
+      `terminal.html` depends on return real, usable data, and
+      `GET /terminal.html` itself serves 200 with the new markup
+      present. The slot state machine and the new slot guide were both
+      exercised with a Node `vm`-context simulation (a real script
+      execution with proper `let`/`const` scoping, not hand-copied
+      logic) driving `updateStateMachine()` through the full happy path
+      and several error paths (unknown commissary meat, unknown
+      restaurant, negative quantity, unknown destination meat) —
+      confirmed the guide correctly freezes at the first bad token
+      instead of showing later slots as reachable.
+
+      **Still genuinely untested**: no actual browser click-through with
+      a mouse/keyboard (no headless browser available in any sandbox
+      used so far — a real, standing gap, not a formality). The `vm`
+      simulation above exercises the same code paths a real browser
+      would but isn't a substitute for someone actually clicking through
+      it once.
+    - **21b [Done, 2026-08-29 — built and verified live by the architect
+      session, same day as 21a's verification] (real submission +
+      preset-prefill)**: wires the completed `ship` line to the actual
+      `POST /api/commissary/shipments` call, and wires slot 5's prefill
+      to `commissary_shipment_presets` for the chosen meat+restaurant
+      pair.
+
+      **Real submission**: `handleSubmit` now `fetch`es
+      `POST /api/commissary/shipments` with the assembled payload,
+      disabling the input while the request is in flight (prevents a
+      stray keystroke firing a duplicate write against a live path).
+      Three outcomes handled distinctly: network failure (input
+      re-enabled, line preserved, explicit "was NOT sent" wording so the
+      auditor never wonders if it went through); server-side rejection —
+      HTTP non-2xx, e.g. an inactive/foreign meat_id (the real
+      `{error: "..."}` message surfaced verbatim in the hint bar and
+      status line, line preserved for a fix-and-resubmit, matching what
+      the GUI form would do for the same bad input); and success (the
+      real server response — `{ok, id, ...shipment, lines}` — shown in
+      the renamed "Last saved shipment" panel, history updated, input
+      cleared). The page's own copy and the "Last logged payload" panel
+      (now "Last saved shipment") were updated to drop every 21a-boundary
+      reference, since Enter is now a real write, not a preview.
+
+      **Preset-prefill**: new `loadShipmentPresets(commissaryMeatId,
+      restaurantId)` fetches `GET /api/commissary/shipment-presets` once
+      both slot 1 and slot 2 resolve (tracked via a
+      `lastPresetPairKey`, mirroring the existing `lastRestaurantId`
+      pattern), merging every active preset's lines for that pair into
+      one `meat_id -> default_quantity` map (first preset wins on a
+      conflict — pure autofill, so a collision doesn't need stronger
+      handling; the auditor can always overwrite the number). Slot 4's
+      dropdown now shows preset-covered meats first, each already
+      carrying its default quantity in the token (e.g. `bagnet:10`
+      instead of a bare `bagnet:`), with a `(preset default N)` note in
+      the sub-text and a one-line hint-bar mention of how many lines
+      came from a preset. A meat with no matching preset line behaves
+      exactly as it did in 21a — bare `name:` token, no default.
+
+      **Verified live** (real server + real database, not mirrored
+      logic): booted the app against freshly-seeded data, created a real
+      preset via `POST /api/commissary/shipment-presets` (Jowl→FC,
+      Bagnet default 10 + Sisig default 6), then drove the actual
+      extracted `terminal.html` script through a Node `vm` context with
+      a *real* `fetch` implementation (raw `http` requests against the
+      live server, not a stub) — confirmed: (1) `shipmentPresetDefaults`
+      populates correctly once both slots resolve; (2) the slot-4
+      dropdown surfaces `bagnet:10`/`sisig:6` first, correctly tagged
+      `hasDefault: true`, with the hint bar reporting "2 lines prefilled
+      from a saved preset for this pair"; (3) a full valid line
+      (`ship jowl fc 20 bagnet:10 sisig:6`) submitted via the real
+      `handleSubmit()` actually created a `commissary_shipments` row +
+      2 `commissary_shipment_lines` rows + 2 `stock_receipts` rows in
+      the live database, returned the real server response, cleared the
+      input, and updated history; (4) a submission referencing a
+      foreign `meat_id` was correctly rejected by the server with the
+      real error message surfaced in the UI, and — critically — the
+      typed line was preserved rather than wiped on failure. Full
+      backend suite re-run clean after these changes: **11/11 files,
+      154/154 assertions, 0 regressions** (still frontend-only). Test
+      database cleaned up after.
+
+      **Still genuinely untested**: same standing gap as 21a — no real
+      mouse/keyboard browser click-through. Everything above was driven
+      programmatically through the real code paths against a real
+      server, which is strong verification, but isn't the same as
+      someone actually typing it.
+
+      **Deferred, not forgotten — now built, 2026-08-30 (see changelog.md
+    for full detail)**: the project owner proposed an
+      AutoCAD-style layout — command bar docked bottom-center instead
+      of top-of-page, with history reached both via up-arrow (already
+      built) and a togglable slide-in sidebar for browsing further back,
+      rather than the current always-visible history panel. Decided:
+      non-modal (page content stays visible above the docked bar,
+      unlike AutoCAD's more immersive feel), and the sidebar and the
+      slot guide/dropdown don't compete for space since they sit on
+      different axes (sidebar at the screen edge, guide/dropdown
+      anchored to the input). Explicitly scheduled *after* logic/backend
+      work is settled, not before — this note exists so it isn't
+      silently dropped, not as a signal to start it next.
+
+      Built as pure frontend layout work on `public/terminal.html` —
+      no backend or slot-state-machine changes. Docked bar, flipped
+      internal stacking (dropdown now opens above the input, not
+      below), and a right-edge togglable history sidebar (edge not
+      specified by the resolved note, flagged as a call made) replacing
+      the old always-visible history panel. Verified live: real server,
+      real extracted script driven through a Node `vm` context with a
+      real `fetch` against it, a full `ship` line submitted through the
+      real `handleSubmit()` and confirmed as a real `commissary_shipments`
+      row in the database. Full backend suite re-run clean:
+      **12/12 files, 178/178 assertions, 0 regressions**. No push
+      credentials this session — standard handoff, not yet on `main`.
+      Still genuinely untested: real browser click-through, same
+      standing gap as 21a/21b.
+
+22. **[Done, 2026-08-29 — built by a fresh session and verified live]
+    Merge Landing's In-House/Wastage/Other into one read-only
+    "Allocations" cell, fed by a new dedicated Allocations page.**
+    Requested 2026-08-29, framed explicitly as "do to Adjustments what
+    the 2026-08-27 change already did to New Stock" — move detailed
+    entry off Landing onto its own page, Landing shows a read-only sum.
+
+    **Confirmed by reading the actual code before building anything**:
+    this was smaller than it sounded. `computeMeatAudit` already only
+    ever produced *one* summed `adjustments` number
+    (`SUM(quantity) FROM adjustments WHERE ...`) — Landing's three boxes
+    were a frontend-only illusion. Each one silently wrote to one
+    specific hardcoded `adjustment_type` row (`Wastage`,
+    `Staff Meal / In-House`, `Other / Uncategorized`) via
+    `server/routes/dailyAudit.js`'s delete-then-insert helper. The
+    seeded `adjustment_types` table already had three *more* real
+    categories — `Allocation / Transfer`, `Spoilage`, `Damaged` — with
+    no entry path anywhere in the app; the Allocations page finishes
+    something the schema already promised, not just a Landing
+    simplification.
+
+    **Open question resolved before building, not assumed**: `locations`
+    (needed for the `Allocation / Transfer` type's from/to fields) had
+    zero rows and no admin UI at all — confirmed by querying it directly,
+    not assumed from the schema. Flagged back to the project owner rather
+    than picking a default unilaterally; decided: build minimal admin
+    CRUD for both `adjustment_types` and `locations` now (new Settings
+    tabs, name + a couple flags each), not deferred and not shipped with
+    dead-end empty dropdowns.
+
+    **Behavior change, deliberate, not incidental**: the old Landing
+    boxes were a delete-then-insert singleton per (restaurant, meat,
+    date, type) — at most one Wastage row per day, overwritten on every
+    save. The new Allocations page is append-only, one row per entry,
+    matching how `computeMeatAudit` already sums *every* row for that
+    meat/date regardless of type. Two separate Wastage events the same
+    day now both count instead of the second silently overwriting the
+    first — verified live (see below), not just asserted.
+
+    **What shipped**:
+    - `schema.sql`/`migrate.js`/`connection.js`: `locations.active`
+      added (a plain `ALTER TABLE ADD COLUMN`, not the rebuild-and-rename
+      step 9's nullable-constraint change needed — a new column with a
+      default doesn't require that).
+    - `server/routes/settings.js`: full CRUD for Adjustment Types
+      (`GET`/`POST`/`PUT /api/settings/adjustment-types`) and Locations
+      (`GET`/`POST`/`PUT /api/settings/locations`), same pattern as the
+      existing Meats/Dishes sections. Both are global lists, not
+      restaurant-scoped — `adjustment_types` has no `restaurant_id`
+      column at all, and `locations`' picklist needs to span every
+      restaurant plus shared/central locations (e.g. the commissary) for
+      a transfer to make sense.
+    - New `server/routes/allocations.js`: `GET`/`POST /api/allocations`.
+      Append-only per the behavior-change note above — no `PUT`/`DELETE`
+      yet, matching `adjustments`' existing spot on `scope.md`'s
+      deferred-activity-logging list (same treatment `sales`/
+      `commissary_stock_receipts` already got). Validates active
+      restaurant/meat/type, and — the one genuinely tricky bit — requires
+      both `from_location_id`/`to_location_id` when the chosen type's
+      `requires_transfer_locations = 1`, and *rejects* them (not silent
+      ignore) when the type doesn't use them, on the theory that a client
+      sending transfer fields for a plain Wastage entry is a bug worth
+      surfacing. Reuses existing `GET /api/restaurants` and
+      `GET /api/stock-receipts/meats?restaurant_id=` for its dropdowns
+      rather than duplicating them.
+    - `server/routes/dailyAudit.js`: `getMeatInputDecoration` no longer
+      looks up in_house/wastage/other — just `remarks` now.
+      `GET /api/daily-audit` explicitly adds `adjustments: audit.adjustments`
+      to its response (it existed on the engine's return value all along,
+      just was never surfaced). `GET /api/daily-audit/mixed` didn't need
+      a code change for this — `adjustments` was already flowing through
+      via `computeMixedDailyAudit`'s object spread, only the stale comment
+      needed updating. `POST /api/daily-audit` no longer accepts or writes
+      `in_house`/`wastage`/`other` at all — confirmed live that a stale
+      client still sending those old field names doesn't error (Express
+      silently ignores unrecognized body fields) and doesn't corrupt the
+      `adjustments` sum.
+    - `public/daily-audit.html`: three input boxes → one read-only
+      `Adjustments` cell, carried as a fixed `data-adjustments` attribute
+      (same pattern as the existing `data-new-stock`/`data-usage`) rather
+      than three live inputs; step 13's live-recalculation now reads that
+      fixed value instead of summing three fields client-side. Dish rows'
+      three `-` placeholder cells collapsed to one.
+    - New `public/allocations.html`: entry form (date, restaurant, meat,
+      type, quantity, notes, from/to shown only when the type requires
+      it) + a filterable list below, mirroring `stock-receipts.html`'s
+      structure.
+    - `public/settings.html`: new "Adjustment Types" and "Locations"
+      tabs, each with an add-form and an inline-editable table.
+    - "Allocations" nav link added to all 9 other pages.
+
+    **Verified live** (real server, real database, not mirrored logic
+    alone): booted the app against freshly-seeded data. Created two
+    Locations via the real API (a restaurant-level one, a shared/central
+    one — confirmed the `null restaurant_id` case sorts first per the
+    route's `ORDER BY r.name IS NULL DESC`). Submitted two separate
+    Wastage entries for the same meat/date (2.5, then 1.0) — confirmed
+    both persisted as distinct rows, not one overwriting the other.
+    Submitted an `Allocation / Transfer` entry without locations — got
+    the exact expected rejection. Submitted one with valid locations —
+    succeeded, with the from/to names correctly resolved in the list
+    response. Confirmed `GET /api/daily-audit` and `GET /api/daily-audit/mixed`
+    both return `adjustments: 4` (2.5 + 1.0 + 0.5, the exact sum of all
+    three entries) for that meat/date — the number that will render in
+    Landing's new read-only cell. Confirmed `daily-audit.html` serves
+    the new `data-adjustments` markup and the `Adjustments` header, with
+    zero leftover references to `.in_house`/`.wastage`/`.other` anywhere
+    in the file. Every inline `<script>` block across all 10 pages in
+    the app was syntax-checked as a full sweep (`node --check`), not
+    just the files touched this session. Full backend suite re-run
+    clean throughout, including a brand-new `allocations.test.js` (11
+    tests, mirrored-logic pattern matching this project's established
+    convention): **12/12 files, 165/165 assertions, 0 regressions.**
+
+    **A real bug was caught mid-build, not shipped**: `settings.html`'s
+    first draft of the Locations tab included a dead helper function
+    (`restaurantOptsFor`) referencing an undefined variable — would have
+    thrown at runtime the first time the Locations tab rendered. Found
+    and removed before the live verification pass above, not after.
+
+    **Still genuinely untested**: same standing gap as every prior
+    frontend step in this project — no real mouse/keyboard browser
+    click-through. Everything above was driven via real HTTP requests
+    against a real running server, which is strong verification, but
+    isn't the same as someone actually clicking through the three new/
+    changed pages once.
+
+
+## Round 2, item 3's design, and step 23 in full
+
+## Round 2 findings (2026-08-30) — the plate refilled, UI explicitly delayed
+
+Surfaced by a direct Settings/architecture audit the project owner asked
+for, not raised speculatively. **Decision made this session: item 3 is
+un-shelved** (was "confirmed non-blocking, safe to leave indefinitely" as
+of 2026-08-29) — the project owner described an actual near-term need
+("create future commi branches"), not a hypothetical one, which changes
+its priority entirely. **UI work is explicitly deferred further** in
+favor of these logic gaps. Sequencing agreed: item 3 first, architected
+properly (ask-before-build, same discipline as every other design
+decision this project has made), then the rest below.
+
+### Item 3 design — RESOLVED 2026-08-30, ready to build, none of it started yet
+
+Settled through real back-and-forth, every fork below was an actual
+question asked and answered, not assumed:
+
+- **Option B: separate `commissaries`, not a unified `restaurants`/
+  `commissaries` table.** A Commissary branch is its own kind of thing,
+  not a `restaurants` row with a type flag. Considered unifying them
+  (matches the project's own "just another kitchen" framing) but
+  rejected — kept separate, deliberately.
+- **Each commissary has its own fully independent meat catalog.** No
+  structural sharing assumed — one commissary might stock all 14
+  current items, another might stock 3 completely different ones, with
+  anywhere from zero to full overlap in what they happen to both carry.
+- **A restaurant can receive shipments from more than one commissary.**
+  Not tied to a single "home" commissary — FC could get Jowl-derived
+  Bagnet from Commissary A one week and Pork-Belly-derived Bagnet from
+  Commissary B another week (illustrative, not a real current plan).
+- **IDs**: plain numeric primary keys + a short human-readable `code`
+  per commissary (e.g. `COM-A`, `COM-B`) for display — same pattern
+  `meats`/`dishes`/`restaurants` already use. Considered and rejected: a
+  single combined identifier encoding commissary+restaurant+meat
+  together (barcode-style) — makes querying harder (string-parsing
+  instead of a foreign key) and couples dimensions that should be able
+  to change independently. The numeric-ID-plus-readable-code pattern
+  gives the same at-a-glance clarity without those downsides.
+- **The real tension found, and how it resolved**: independent catalogs
+  (above) directly conflicted with "Conversion Standards should reflect
+  restaurant expectations, not vary by which commissary supplied it" —
+  if catalogs share nothing structurally, a standard entered for
+  Commissary A's Jowl has no way to also apply to Commissary B's Jowl,
+  even though it's supposed to. **Resolved as option (a) of three
+  offered**: a new, admin-managed **meat-type reference table** —
+  optional, not a structural requirement on the catalog itself, but
+  something a commissary's catalog row can tag itself with (e.g. both
+  commissaries' "Jowl" rows point at the same shared "Jowl" type) purely
+  so a Conversion Standard entered once can apply everywhere that type
+  is supplied from. Rejected: (b) accept duplication, re-enter the same
+  ratio per commissary, and (c) key standards off the restaurant's own
+  meat only with no source dimension at all (loses the ability to say
+  "this ratio is specifically about Jowl," which the live implied-input
+  math on the Shipment form needs).
+- **The meat-type table is a real admin-managed reference table, not
+  loose free text.** Explicit call: more control for admins as the app
+  scales over the coming months outweighs the small extra complexity,
+  especially since this complexity stays entirely on the admin side —
+  the auditor's daily screens are completely unaffected by any of this.
+- **This same meat-type concept is what makes the Dashboard's "total
+  Jowl across everything" correct, not just a Conversion-Standards
+  convenience.** The rollup needs to know that Commissary A's Jowl,
+  Commissary B's Jowl, and FC's Bagnet/Sisig (via their own standards)
+  are all "the same root thing" to total them meaningfully — the
+  meat-type table is the thing that makes that grouping real instead of
+  name-matching strings.
+- **Restaurant-creation UI stays a separate, later step** — not bundled
+  into Commissary-creation despite being the same *kind* of gap. Kept
+  apart deliberately to keep worker-sized tasks small, not because
+  they're unrelated.
+- **Dashboard**: still UI-only for later, not designed in detail now.
+  Two views eventually: the existing combined total, plus a new
+  drill-down that lets you pick one specific commissary or restaurant
+  and see just that location's stock. The rollup's underlying logic
+  already needs to handle "which location contributed how much" (it's
+  literally what the reverse-conversion math produces per restaurant
+  today) — the drill-down view is presenting data the logic layer will
+  already have, not new calculation work.
+
+**RESOLVED 2026-08-31 — the remaining open question above (`commissary_conversion_standards`'s rekey) and exact table shapes, settled in a
+fresh architecture session:**
+
+- **`commissaries`**: `id`, `code` (unique, e.g. `COM-A`), `name`,
+  `active` — same shape as `restaurants`.
+- **`meat_types`**: `id`, `name`, `active` — admin-managed reference
+  table, no other columns needed yet.
+- **`commissary_meats` gets two new columns**: `commissary_id` (NOT
+  NULL FK → `commissaries`) and `meat_type_id` (nullable FK →
+  `meat_types` — optional at the catalog level, exactly as designed
+  above). Its existing `UNIQUE(code)` becomes `UNIQUE(commissary_id,
+  code)` — codes are only unique within one commissary's own catalog
+  now, not globally.
+- **Every other commissary-scoped table needs zero new columns.**
+  `commissary_yield_log`, `commissary_shipments`,
+  `commissary_stock_receipts`, `commissary_ending_actual`,
+  `commissary_opening_stock`, and `commissary_shipment_presets` all
+  reference `commissary_meat_id` already — they inherit commissary
+  scoping transitively through that FK, for free. Confirmed
+  deliberately, per rule 4 (never store a derivable value
+  redundantly) — don't let a coder add a `commissary_id` column to any
+  of these "for convenience."
+- **`commissary_conversion_standards`'s rekey, resolved**: this is a
+  real column swap, not an added fallback lookup. Drop
+  `commissary_meat_id`, add `meat_type_id` (NOT NULL FK →
+  `meat_types`). New uniqueness: `UNIQUE(meat_type_id, restaurant_id,
+  meat_id)`. Consequence, confirmed as intentional: a commissary meat
+  can only get a Conversion Standard once it's tagged with a
+  `meat_type` — untagged/raw-dynamic meats are unaffected, exactly the
+  "optional at the catalog level, required for a Standard" framing
+  above. The Shipment form's live implied-input math and the
+  Dashboard's cross-commissary rollup both join through this same
+  `meat_type_id`, one join, no special-casing.
+- **Migration, since there's one implicit commissary today**: create
+  one real `commissaries` row for it; every existing `commissary_meats`
+  row gets `commissary_id` set to that row. For every existing
+  `commissary_conversion_standards` row, create (or reuse) a
+  `meat_types` row for its `commissary_meat_id`'s meat, point that
+  `commissary_meat`'s `meat_type_id` at it, and rewrite the standard's
+  key column from `commissary_meat_id` to the new `meat_type_id`. Real
+  `ALTER`/data-migration work, not a `schema.sql` edit alone — matches
+  the standing gotcha that `CREATE TABLE IF NOT EXISTS` can't loosen an
+  existing local `inventory.db`'s constraints.
+
+**Sub-step plan, confirmed — mirrors 20a/20b/20c:**
+- **23a [Done, 2026-08-31 — first Claude Code (CLI) session on this
+  project] (schema only)**: `commissaries`/`meat_types` tables added;
+  `commissary_meats` gains `commissary_id` (NOT NULL FK) + `meat_type_id`
+  (nullable FK), `UNIQUE(code)` reworked to `UNIQUE(commissary_id, code)`;
+  `server/db/migrate.js`'s new `migrateCommissaryMultiTenant` backfills one
+  real `commissaries` row (`COM-A`) for today's single implicit commissary
+  and rebuilds `commissary_meats` preserving every row, same
+  rebuild-and-rename pattern as the existing stock_receipts migration.
+  **Scope conflict found and resolved before coding, not decided
+  unilaterally**: the original assignment also included rekeying
+  `commissary_conversion_standards` from `commissary_meat_id` to
+  `meat_type_id`, which would have broken `commissary.js`'s existing write
+  route and 2 test files' fixtures — that table's rekey is now explicitly
+  **deferred to 23b** (bundled with the route/engine work that actually
+  consumes `meat_type_id`), not touched in 23a at all, schema or code.
+  `seed.js` and 6 other existing test files' raw `commissary_meats`
+  inserts needed updating for the new NOT NULL `commissary_id` — done as
+  real 23a work, per explicit direction, not deferred. **Verified**: new
+  `server/db/migrate.test.js` (8/8 — fresh-install no-op, already-migrated
+  no-op, correct backfill/data preservation, row count unchanged, new
+  UNIQUE constraint behavior, idempotent re-run), plus a real on-disk
+  `inventory.db` built with the literal pre-23a shape and booted through
+  the real `connection.js` to confirm the migration path end-to-end, not
+  just in-memory. Full suite: **14/14 files, 200/200 assertions, 0
+  regressions** (was 192). See `changelog.md`'s 2026-08-31 "Step 23a"
+  entry for full detail. Pushed to `main` directly (this session had git
+  access, no zip fallback needed).
+- **23b (engine/routes)**: Commissary CRUD, meat-type CRUD,
+  `commissary_meats` CRUD (this absorbs numbered-list item 2 below —
+  "no commissary-meat-creation UI" — since it can't be built sensibly
+  without a `commissary_id` to create against), every commissary-scoped
+  engine function updated to take a `commissary_id` param instead of
+  assuming a singleton, Shipment-form implied-input math rejoined via
+  `meat_type_id`, Dashboard rollup grouped by `meat_type_id`. **Now also
+  includes `commissary_conversion_standards`' own rekey** (schema swap
+  from `commissary_meat_id` to `meat_type_id` NOT NULL, plus the
+  migration backfilling a `meat_types` row per existing standard) —
+  deferred here from 23a on 2026-08-31, see 23a's entry above for why.
+
+  **[Done, 2026-08-31 — second Claude Code (CLI) session, sub-piece 1
+  of 6 only] The rekey itself + its direct route/engine consumers are
+  done.** `commissary_conversion_standards` swapped `commissary_meat_id`
+  for `meat_type_id` (NOT NULL FK), `UNIQUE` reworked to `(meat_type_id,
+  restaurant_id, meat_id)`. New `migrateConversionStandardsMeatType`
+  backfills a `meat_types` row per distinct commissary meat referenced by
+  an existing standard, tags that `commissary_meats` row, rewrites each
+  standard's key column — sequenced after 23a's
+  `migrateCommissaryMultiTenant`. `commissary.js`'s `GET
+  /commissary/conversion-standards` keeps its public contract
+  (`commissary_meat_id` + `restaurant_id` in), resolving internally via
+  `meat_type_id` (empty list for an untagged meat, not an error); `POST`
+  now takes `meat_type_id` directly. `dashboard.js`'s rollup query got the
+  matching minimal fix to stay correct. See `changelog.md`'s "Step 23b
+  sub-piece" entry for full detail.
+
+  **Architect review, 2026-08-31**: reviewed against rule 17 specifically,
+  since this is a previously-working screen now partially broken.
+  **Accepted as-is, not hot-patched** — narrow (Create only; `GET`/`PUT`
+  on the same admin page are unaffected), low-frequency (an admin
+  config screen, not a daily-auditor screen protected under rule 10),
+  and 23c is already the real fix — a standalone patch now would just
+  get discarded once 23c ships its actual meat-type-aware picker.
+  Anyone using Settings → Conversion Standards → Create between now and
+  23c will hit a validation error; use `PUT` (edit an existing row) or
+  wait for 23c.
+
+  **Explicitly NOT done this session — still open for a future
+  session**: Commissary CRUD, meat-type CRUD, `commissary_meats` CRUD,
+  every commissary-scoped engine function taking a `commissary_id` param
+  instead of assuming a singleton, and the *fuller* Dashboard rollup
+  restructuring (grouping multiple commissaries' same-`meat_type_id` rows
+  into one combined line — today's fix only kept the existing
+  per-commissary-meat rollup correct against the new schema, it did not
+  build that grouping). **Known, flagged gap — owned by 23c-i-b, see
+  below — fixed 2026-08-31**: `settings.html`'s "Create Standard" admin
+  form POSTed `commissary_meat_id` and failed this route's validation.
+  `GET`/`PUT` (edit) on that page were unaffected throughout. Full suite:
+  **14/14 files, 207/207 assertions, 0 regressions** (was 200). Pushed to
+  `main` directly.
+
+  **Correction to that flagged gap, 2026-08-31 second architect
+  recheck**: this entry originally said the gap would close "until 23c
+  ships a meat-type-aware picker." That was wrong on both halves — 23c-i
+  shipped without touching this form, and 23c-ii is a commissary
+  *selector*, an unrelated concern. The gap was orphaned, owned by no
+  step, and blocked on nothing, while being a previously-working admin
+  screen that is broken today. It is now its own step, **23c-i-b**,
+  dispatched ahead of the remaining 23b backend work — see its entry
+  under "23c" below.
+  **[Done, 2026-08-31 — third Claude Code (CLI) session, 3 of the
+  remaining 5 items] Commissary CRUD, meat-type CRUD, and
+  `commissary_meats` CRUD are done.** New `GET`/`POST`/`PUT
+  /api/settings/commissaries` (exact mirror of Restaurants),
+  `/api/settings/meat-types` (mirror of Adjustment Types),
+  `/api/settings/commissary-meats` (mirror of Meats, scoped by
+  `commissary_id` instead of `restaurant_id`; `meat_type_id` editable via
+  `PUT`). Absorbs the "no commissary-meat-creation UI" gap from the
+  numbered list below (item 2). `commissary.js`'s existing `GET
+  /api/commissary/meats` (a different, already-working read route for the
+  Shipment form's dropdown) is untouched. See `changelog.md`'s "Step 23b:
+  Commissary/meat-type/commissary_meats admin CRUD" entry for full detail.
+
+  **Explicitly NOT done — still open for a future session**: the
+  remaining 2 of 23b's 6 items — (a) threading an optional `commissary_id`
+  filter through `commissaryAuditEngine.js`'s `computeCommissaryDailyAudit`
+  (lists across every commissary's meats today, no per-commissary filter)
+  plus `GET /api/commissary/daily-audit`, and the equivalent filter on
+  `GET /api/commissary/yield-log`; (b) the fuller Dashboard rollup restructuring
+  (grouping multiple commissaries' same-`meat_type_id` rows into one
+  line). **Flagged, not decided**: (b)'s exact grouped-rollup response
+  shape isn't specified in `data-model.md`/`session-status.md` — they
+  describe intent (combined grand total, a future per-location
+  drill-down) but not the concrete API shape once multiple commissaries
+  can share a `meat_type_id`. Needs an architect decision before a future
+  session builds it. Full suite: **14/14 files, 228/228 assertions, 0
+  regressions** (was 207). Pushed to `main` directly.
+- **23c (UI)**, split 2026-08-31 by the architect conversation after
+  finding it wasn't actually one unblocked piece — see below:
+  - **23c-i [Done, 2026-08-31 — Claude Code (CLI) session]: Commissary +
+    Meat Type tabs in Settings, commissary-meat creation UI.** Fully
+    unblocked — exact mirror of the existing Restaurants/Meats tab
+    pattern, backed entirely by 23b session 3's already-built,
+    already-tested `GET`/`POST`/`PUT /api/settings/commissaries` /
+    `/meat-types` / `/commissary-meats` routes. No backend or schema
+    changes. **This is also a real prerequisite for 23c-ii**, not just
+    sequenced first for tidiness: there's no way to even create a second
+    commissary to test the selector against until this tab exists.
+
+    Three new tabs on `settings.html`: Commissaries (global, name+code,
+    mirrors Restaurants exactly), Meat Types (global, name-only, mirrors
+    Adjustment Types minus the extra flag column), Commissary Meats
+    (mirrors the existing Meats tab, but since it's scoped by
+    `commissary_id` and there's no page-level commissary selector like
+    the page-level restaurant one, it gets its own local commissary
+    dropdown — same pattern the Shipment Presets/Conversion Standards
+    sections already use for their local commissary-meat dropdown).
+    Commissary Meats fields: code, name, unit, allowed leeway %,
+    cost/unit, and an editable meat-type dropdown (optional tag).
+
+    **Verified**: `node --check` on the extracted inline script, full
+    suite re-run at **14/14 files, 228/228 assertions, 0 regressions**
+    (untouched — frontend-only), and a live end-to-end check against a
+    real booted server — created/edited a commissary, a meat type, and a
+    commissary meat via the exact fetch bodies the new JS sends,
+    confirmed each response shape matches what the page reads, confirmed
+    the served page contains all three new tabs. Test rows cleaned up
+    afterward. Not verified: an actual browser click-through — same open
+    item every frontend step in this project has carried. Pushed to
+    `main` directly (`29b3858`).
+  - **23c-i-b [Done, 2026-08-31 — Claude Code (CLI) session]: fix the
+    broken "Create Standard" form on Settings -> Conversion Standards.**
+    Its own step rather than a rider on the next backend one, per the
+    project owner's explicit call. The reasoning, worth keeping because
+    it is the rule-16 test applied cleanly: this bug is fully
+    independent of the three `commissary_id` backend items — it is a
+    Conversion Standards fix on a different Settings tab, touching
+    nothing the commissary selector touches — so bundling it into the
+    next backend step would mix two unrelated concerns into one worker
+    prompt, exactly what 23a's scope-conflict flag and 23b's own
+    sub-piece splits already established as the thing to avoid. And
+    leaving it (the prior plan) does not survive checking what it is
+    blocked on: nothing. It is small, self-contained, and closes a
+    previously-working admin screen that is broken today.
+
+    **The bug**: 23b's rekey made `POST
+    /api/commissary/conversion-standards` require `meat_type_id`
+    (`server/routes/commissary.js` ~L421), but `public/settings.html`
+    (~L841) still POSTs `commissary_meat_id`. `GET` and the inline
+    `PUT` edit on that same section are unaffected and must stay so.
+
+    **Scope, two changes and nothing else**: (1) add `meat_type_id` to
+    the SELECT column list of `GET /api/commissary/meats` — purely
+    additive, no filter, no WHERE change; (2) in `settings.html`'s
+    Conversion Standards section, carry each meat's `meat_type_id` onto
+    its `<option>`, POST `meat_type_id` instead of `commissary_meat_id`,
+    and refuse client-side with a clear message when the selected
+    commissary meat is untagged. `loadConversionStandards()` is left
+    alone — the `GET` route deliberately keeps its
+    `commissary_meat_id`+`restaurant_id` public contract.
+
+    **Why this is not frontend-only, which is how it was first scoped**:
+    the section's dropdown is populated from `GET
+    /api/commissary/meats`, whose SELECT returns `id, code, name, unit,
+    allowed_leeway_pct, cost_per_unit` — no `meat_type_id`, so the page
+    cannot resolve the selected meat to a meat type. The considered
+    alternative was repointing that dropdown at `GET
+    /api/settings/commissary-meats?commissary_id=N` (which does return
+    `meat_type_id`), which would have been genuinely frontend-only —
+    rejected because that route *requires* a `commissary_id`, forcing a
+    local commissary dropdown into this section, which is 23c-ii scope
+    creeping into a step deliberately sized as tiny. Adding one column
+    to a catalog read route is the smaller and more honest change.
+
+    **Note for whoever picks up 23b-iv**: that step also touches `GET
+    /api/commissary/meats` (adding the `commissary_id` filter). These
+    are sequential dispatches, not parallel, so there is no conflict —
+    but 23b-iv should expect `meat_type_id` to already be in that
+    route's SELECT and must not remove it.
+
+    **Verified**: baseline full suite run before starting and again
+    after — identical **14/14 files, 228/228 assertions, 0 failures**
+    both times (`commissary.test.js` has no exact-shape assertion on the
+    changed SELECT, so the added column was confirmed transparent, not
+    assumed). `node --check` on both changed files. Live end-to-end
+    check against a real booted server: tagged a real commissary meat
+    with a meat type via the existing (untouched) `PUT
+    /api/settings/commissary-meats/:id`, confirmed `GET
+    /api/commissary/meats` now returns its `meat_type_id`, POSTed a
+    standard with the exact `meat_type_id` body the fixed page now
+    sends and confirmed it landed, confirmed the existing `GET` (still
+    keyed by `commissary_meat_id`+`restaurant_id`) sees it, confirmed
+    the inline `PUT` edit still works unchanged, and confirmed the
+    client-side untagged-meat guard's logic in isolation (empty
+    `data-meat-type-id` correctly refuses, a real id correctly passes
+    through). Test rows cleaned up afterward. Pushed to `main` directly.
+  - **23c-ii, split 2026-09-01 into 23c-ii-a .. 23c-ii-d.** What follows
+    immediately below is the ORIGINAL entry, preserved because its
+    three-backend-gap history is still the reason 23b-iv/23b-v exist.
+    **The page list in it is wrong and the "blocked" status is stale** —
+    read the "23c-ii split" section further down for what to actually
+    dispatch.
+
+    **23c-ii (original framing): a commissary selector everywhere a
+    screen currently assumes there's only one** (`commissary.html`,
+    `commissary-shipments.html`, Terminal, Dashboard drill-down).
+    Depended on three backend gaps, only two of which were previously
+    flagged:
+    1. ~~`computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`,
+       and `GET /api/commissary/yield-log`, all need an optional
+       `commissary_id` filter.~~ **Closed 2026-08-31 (23b-v, Claude Code
+       session)** — see 23b-v's own entry below for full detail.
+       **Correction, 2026-08-31 second architect recheck (preserved for
+       context)**: earlier versions of this list paired
+       `computeCommissaryDailyAudit` with
+       `commissaryYieldEngine.js`'s `computeYieldLogForDate` and called
+       them "their two `GET` routes." That was wrong and would have sent
+       a worker to patch dead code: `computeYieldLogForDate` has **no
+       route consumer at all** — only `commissaryYieldEngine.test.js`
+       calls it, and 23b-v correctly left it untouched. The live
+       yield-log route builds its own query inline and calls
+       `computeYieldRow` per id, which is what actually needed (and got)
+       the filter.
+    2. The fuller Dashboard grouped-rollup response shape needs an
+       architect decision first (already flagged below). **Still open —
+       the only one of the three backend gaps not yet closed.**
+    3. ~~**Newly found, 2026-08-31 architect recheck**: `GET
+       /api/commissary/meats` — the route feeding both the Shipment
+       form's dropdown *and* Terminal's slot-1 token resolution — has
+       **zero `commissary_id` awareness**.~~ **Closed 2026-08-31 (23b-iv,
+       Claude Code session)** — the route now takes an optional
+       `commissary_id` filter (omitted behaves exactly as before). See
+       23b-iv's own entry below for full detail. Still nothing consumes
+       it yet — 23c-ii's own frontend job, once dispatched.
+
+### 23c-ii split into four sub-steps — resolved 2026-09-01 (architect)
+
+The hand-off into this session said 23c-ii was "unblocked and needs no
+decisions from me." Checked against the actual code rather than taken on
+trust, that was wrong on three counts. All three are now resolved; the
+step is split per rule 16, since "a selector on four screens" is exactly
+the "X, Y, and Z" shape that rule says should be separate steps.
+
+**Resolution 1 — Terminal is a correctness problem, not a dropdown.**
+`schema.sql` L269 is `UNIQUE (commissary_id, code)`, so `M05` may
+legitimately exist in both COM-A and COM-B. `terminal.html`'s
+`resolveExact` (~L290) resolves a typed token with `list.find(...)`
+against an *unfiltered* `/api/commissary/meats`: type `M05`, silently
+get whichever row came back first, no warning anywhere on screen. This
+is the same shape as the `/dashboard/stock-rollup` double-count 23b-vi-a
+closed — it cannot fire today because COM-A is the only commissary, and
+it is one admin action away from firing now that 23c-i ships a
+Commissary-creation UI.
+
+**Decided: qualified tokens (`com-a/m05`), NOT a page-level selector on
+Terminal.** The project owner's call, and the reasoning is Terminal's
+whole purpose: it exists as a keyboard-only alternative to aiming a
+mouse at the other pages' forms. A commissary dropdown would put a mouse
+trip back on the one screen built to avoid it. A selector was the
+smaller build and was rejected on those grounds — recorded here so it
+isn't re-proposed later as an "obvious simplification." Full grammar
+under 23c-ii-d below.
+
+**Resolution 2 — the Dashboard is dropped from the page list.**
+`dashboard.js` L69 states outright that the route takes no
+`commissary_id` filter because the Dashboard is deliberately
+cross-commissary, and 23b-vi-b already shipped the ▸/▾ per-commissary
+drill-down. A selector there would mean "show one commissary's rollup,"
+which is what `commissary.html` is for. This item was almost certainly
+listed before the drill-down existed. **Build nothing for the Dashboard
+in 23c-ii.**
+
+**Resolution 3 — `stock-receipts.html` is in scope, as a label fix only.**
+The previously-flagged open question. Its dropdown renders
+`${m.code} - ${m.name}` (~L150), so two commissaries sharing a code
+produce two visually identical `M05 - JOWL` options. The `value` is
+`m.id`, so whichever the user picks still writes the correct
+`commissary_meat_id` — this is a "which one is which" problem, not a
+silent-wrong-data one, and is therefore materially less severe than
+Terminal's. Resolved with the cheap fix: append the commissary to the
+label. No selector on that page.
+
+**Newly found while resolving 1 and 3 — a fourth backend gap nobody had
+flagged.** `GET /api/commissary/meats` selects
+`id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id`
+(`server/routes/commissary.js` L58) — **no commissary identity at all.**
+So Terminal cannot detect that `M05` is ambiguous, cannot render
+`com-a/m05`, and cannot resolve a qualified token; and
+`stock-receipts.html` cannot append `(COM-A)`. Neither frontend piece is
+buildable until this route returns the commissary. This is the exact
+shape as 23c-i-b's finding (a catalog read route missing one column,
+blocking a frontend fix that had been scoped as frontend-only), and gets
+the same treatment: one small additive step, cited as precedent.
+
+**Dispatch order for 23c-ii:**
+
+- **23c-ii-a [Done, 2026-09-01 — Claude Code (CLI) session] — page-level
+  commissary selector on `commissary.html` only.** Built exactly as
+  scoped below. See this session's `changelog.md` entry for full
+  verification detail (14/14 files, 257/257 assertions, 0 failures,
+  unchanged; live end-to-end check with a real second commissary +
+  commissary meat; test rows cleaned up; server stopped per rule 21).
+  Pushed directly to `main`.
+
+  Add a commissary `<select>` mirroring
+  the restaurant selector in `daily-audit.html` (~L61-77), populated from
+  `GET /api/settings/commissaries` filtered to `active === 1`. First and
+  **default** option is "All commissaries", value `""`. Thread the
+  selection as an optional `&commissary_id=N`, omitted entirely when
+  "All" is chosen, into the page's three commissary-scoped reads:
+  `loadMeats()` → `GET /api/commissary/meats`, `loadBalances()` →
+  `GET /api/commissary/daily-audit`, and the yield-log list →
+  `GET /api/commissary/yield-log`. All three already accept that optional
+  param (23b-iv, 23b-v). Frontend-only; no backend, schema, or route
+  change. The yield-log POST/PUT/DELETE paths are explicitly out of scope
+  — they key off a `commissary_meat_id`, which is already
+  commissary-specific.
+
+  **Why "All" is the default**: the routes' optional-filter convention
+  already means "omitted = everything," so defaulting to All makes the
+  change provably behavior-preserving on load. That's what justifies
+  shipping it with no new tests.
+
+- **23c-ii-b [Done, 2026-09-01 — Claude Code (CLI) session] — page-level
+  commissary selector on `commissary-shipments.html`.** Built exactly as
+  the corrected scope below (only `loadCommissaryMeats()` threads
+  `commissary_id`; `loadContext()`/`loadPresets()`/`loadStandards()` left
+  untouched). See this session's `changelog.md` entry for full
+  verification detail (14/14 files, 257/257 assertions, 0 failures,
+  unchanged; live end-to-end check with a real second commissary +
+  commissary meat, confirming context/presets/standards all still resolve
+  correctly for the new meat after switching commissary; test rows cleaned
+  up; a stale server already on port 3000 from a prior session was found
+  and stopped before starting, then the session's own server stopped
+  before ending, per rule 21). Pushed directly to `main`.
+
+  Same pattern and same "All" default as
+  23c-ii-a. **Corrected 2026-09-01, after 23c-ii-a landed**: an earlier
+  version of this entry said the page's `GET /api/commissary/daily-audit`
+  call also needed the filter. It does **not**, and adding it would be a
+  live bug rather than a no-op. `loadContext()` (~L147) already passes
+  `commissary_meat_id`, and a commissary meat belongs to exactly one
+  commissary, so that read is already narrowed. 23b-v deliberately made a
+  `commissary_meat_id` paired with a `commissary_id` it doesn't belong to
+  return `[]` rather than silently ignore the mismatch — so passing both
+  can blank the context panel during the window where the meat dropdown
+  hasn't re-rendered yet. **Only `loadCommissaryMeats()` (~L116) takes
+  the filter.**
+
+  The actual work beyond that one param is the change handler.
+  Repopulating `newCommissaryMeat` resets its `.value`, which silently
+  invalidates everything downstream of it — so on commissary change the
+  page must reload the meats and then re-run the same trio the existing
+  `newCommissaryMeat` change handler runs (L322): `loadContext()`,
+  `loadPresets()`, `loadStandards()`. The `shipment-presets` and
+  `conversion-standards` reads are keyed by `commissary_meat_id` and are
+  already commissary-specific — do not add `commissary_id` to them
+  either. A separate step from 23c-ii-a per rule 16: same pattern,
+  different page, neither blocks the other.
+
+- **23c-ii-c [Done, 2026-09-01 — Claude Code (CLI) session] — additive
+  commissary identity on `GET /api/commissary/meats`, plus the label
+  fixes it unblocks.** Built exactly as scoped below, all three
+  implementation points resolved here followed as specified. See this
+  session's `changelog.md` entry for full verification detail (14/14
+  files, baseline 257/257 → 260/260 with 3 new tests, 0 failures; live
+  end-to-end check with a real second commissary + a duplicate-coded
+  meat, confirming both the backend JSON and both pages' label logic;
+  test rows cleaned up; server stopped per rule 21). Pushed directly to
+  `main` in two commits (route+tests, then the two label fixes).
+
+  Backend + small frontend, deliberately bundled exactly as 23c-i-b
+  bundled its column addition with the form it unblocked. Add
+  `commissary_id`, and the joined commissary's `code` and `name`, to that
+  route's SELECT. **Purely additive** — no new filter, no WHERE change,
+  no removal of `meat_type_id` (23c-i-b added it; don't drop it). Six
+  live consumers pass nothing today and must all keep working unchanged.
+
+  **Three implementation points resolved 2026-09-01 rather than left to
+  be guessed:**
+
+  1. **Alias the joined columns `commissary_code` / `commissary_name`.**
+     The SELECT already returns the *meat's* own `code` and `name`, so
+     unaliased joined columns would collide and silently shadow them.
+     `dashboard.js` (~L101) already uses exactly this aliasing — follow
+     it rather than inventing a second convention.
+  2. **Use a LEFT JOIN, not an INNER JOIN.** SQLite only enforces foreign
+     keys under `PRAGMA foreign_keys = ON`, so a dangling
+     `commissary_id` is reachable. Under an INNER JOIN that meat would
+     **silently disappear** from every one of the six consumers — real
+     stock vanishing from an audit screen, the exact failure mode
+     23b-vi-b's null guard exists to prevent, but worse because there is
+     no error to notice. A LEFT JOIN degrades to null `commissary_code` /
+     `commissary_name` instead. Consumers must tolerate those nulls.
+  3. **Qualify every column once the JOIN exists.** The current WHERE is
+     an unqualified `active = 1`, and `active` exists on **both**
+     `commissary_meats` and `commissaries` — after the join, SQLite
+     raises "ambiguous column name" and the route 500s. `active` and
+     `commissary_id` in the WHERE both need the `cm.` prefix. Note the
+     filter stays on the *meat's* `active`, not the commissary's: whether
+     to hide meats belonging to a deactivated commissary is a separate
+     question nobody has asked, and quietly answering it here would be
+     the same silent-drop mistake as point 2.
+
+  **The label fixes.** `stock-receipts.html`'s `loadCommissaryMeats()`
+  (~L150) renders `${m.code} - ${m.name}`, so two commissaries sharing
+  `M05` produce two indistinguishable options. **Also in scope, found
+  2026-09-01 in the architect review of 23c-ii-a**: `commissary.html` has
+  the identical ambiguity whenever "All commissaries" is selected — both
+  `newMeat` and `filterMeat` render the same way. Neither is a
+  correctness bug (the `<option value>` is `m.id`, so the right row is
+  written either way) — both are simply unreadable.
+
+  **The rule for both, so they don't diverge**: append the commissary
+  suffix only when the fetched list actually spans more than one distinct
+  commissary. Self-adjusting, identical on both pages, and it works on
+  `stock-receipts.html` which has no selector at all — a single-commissary
+  install sees no change anywhere, and the suffix appears exactly when it
+  starts carrying information. Rows with a null `commissary_code` (point
+  2) render without a suffix rather than "undefined".
+
+  **Blocks 23c-ii-d — dispatch before it, not after.**
+
+- **23c-ii-d [Done, 2026-09-01 — Claude Code (CLI) session] — Terminal
+  qualified-token grammar.** Built exactly as scoped below, all eight
+  grammar rules followed as specified. See this session's `changelog.md`
+  entry for full verification detail (15/15 files, baseline 260/260 →
+  273/273 with 13 new tests in a new `terminal.test.js`, 0 failures;
+  live end-to-end check with a real second commissary + a duplicate-coded
+  meat, confirming the bare-ambiguous refusal, both qualified forms, and
+  the unchanged non-colliding bare case; test rows cleaned up; server
+  stopped per rule 21). Pushed directly to `main`. **Step 23 is now fully
+  closed out — all of 23a, 23b (6 items), and 23c (23c-i, 23c-i-b,
+  23c-ii-a through 23c-ii-d) are done.**
+
+  The largest sub-step
+  and the only one closing a correctness hole. Depends on 23c-ii-c.
+  Grammar, decided here so the worker does not have to invent it:
+
+  1. **Qualifier syntax is `<commissary-code>/<meat>`**, e.g.
+     `com-a/m05`. `/` is safe: the input line is whitespace-tokenized, so
+     a `/` cannot split a token, and `normalize()` only lowercases and
+     strips whitespace, so a code like `COM-A` survives normalization
+     intact as `com-a`.
+  2. **A bare token still resolves whenever it is unique across all
+     commissaries** — today's exact behavior, and every existing habit,
+     is preserved until a real collision exists. Same
+     provably-behavior-preserving reasoning as 23c-ii-a's "All" default.
+  3. **An ambiguous bare token is an ERROR, never silently resolved.**
+     The slot guide already has an `error` state (red, `"M05"?` — see
+     `renderSlotGuide`); use it. The hint bar says how many commissaries
+     matched. This is the actual bug fix; everything else is ergonomics.
+  4. **The dropdown offers qualified forms when, and only when, the
+     partial token is ambiguous**, each row showing the qualified token
+     plus the meat and commissary names so the two are distinguishable.
+  5. **`canonicalToken` inserts the bare normalized name when unique, the
+     qualified form when not** — so selecting from the dropdown always
+     produces a re-parseable token, which is a property the existing code
+     already guarantees and must keep.
+  6. **A qualified token is always accepted, even when the bare form
+     would have been unambiguous.** Someone who types `com-a/m05` out of
+     habit must never be told they didn't need to.
+  7. **Right-hand side matches code OR normalized name**, same as today —
+     `com-a/jowl` must work as well as `com-a/m05`.
+  8. **Slot 2 (restaurant) is untouched.** Restaurants are globally
+     unique; there is nothing to qualify.
+
+  Not decided here, flag if it comes up: what happens if two
+  *commissaries* ever share a code. `commissaries.code` is `UNIQUE`
+  (`schema.sql` L228), so it cannot happen today.
+
+**23c-i and 23c-i-b are both done. Dispatch order from here, decided
+2026-08-31:**
+1. ~~**23c-i-b**~~ — done, see its entry above.
+2. ~~**23b-iv**~~ — done, 2026-08-31 (Claude Code session). An
+   **optional** `commissary_id` filter on `GET /api/commissary/meats`.
+   **Resolved 2026-08-31 (architect, web session), correcting this
+   line's earlier wording**: an earlier draft said to mirror the
+   `restaurant_id` convention of `GET /api/settings/meats`. **Do not** —
+   that route *requires* the param (400s without it, `settings.js`
+   ~L190), and this route has **six** live consumers that pass nothing
+   today: `commissary.html`, `commissary-shipments.html`,
+   `terminal.html`, `stock-receipts.html`, and `settings.html` in two
+   places (Shipment Presets and Conversion Standards). A required param
+   would break all six in one commit, against rule 17, and would force
+   23c-ii's selector work to happen simultaneously — collapsing the step
+   sizing this project has deliberately maintained. Followed instead the
+   convention the sibling routes in `commissary.js` already use: `GET
+   /commissary/yield-log` and `GET /commissary/daily-audit` both take
+   optional filters and list everything when the filter is omitted.
+   Omitted `commissary_id` behaves exactly as before, confirmed by
+   test and live check, not just by not changing that code path;
+   23c-ii will add `?commissary_id=N` per page incrementally as each
+   selector lands. New tests in `commissary.test.js`: a second
+   `commissaries` row + its own commissary meat, 5 new tests (omitted
+   param unchanged, filter includes only the right commissary, excludes
+   the other, an unknown id returns `[]`). Full suite: **14/14 files,
+   233/233 assertions, 0 regressions** (was 228). Live-verified against a
+   real booted server, including confirming `commissary-shipments.html`
+   (one of the six untouched consumers) still serves and still calls the
+   route with no param. Pushed to `main` directly. See
+   `changelog.md`'s matching entry for full detail.
+
+   **Also newly noted here**: `stock-receipts.html` is a consumer of
+   this route and is **not** in 23c-ii's page list below (which names
+   `commissary.html`, `commissary-shipments.html`, Terminal, and the
+   Dashboard drill-down). Whether it needs a selector too is an open
+   question for whoever scopes 23c-ii — flagged, not decided.
+3. ~~**23b-v**~~ — done, 2026-08-31 (Claude Code session). Optional
+   `commissary_id` param on `computeCommissaryDailyAudit` + `GET
+   /api/commissary/daily-audit`, and the same filter on `GET
+   /api/commissary/yield-log`. Same optional-filter convention as
+   23b-iv. `computeCommissaryDailyAudit` gained a fourth, optional
+   `commissaryId` param combining sensibly with the existing
+   `commissaryMeatId` filter (a `commissaryMeatId` that doesn't belong
+   to the given `commissaryId` correctly returns `[]`, not an error).
+   `GET /commissary/yield-log` needed a join to `commissary_meats` to
+   filter by commissary, since `commissary_yield_log` has no
+   `commissary_id` column of its own. Deliberately left
+   `computeYieldLogForDate` in `commissaryYieldEngine.js` untouched —
+   it has no route consumer (see the corrected note under 23c-ii's item
+   1 above). New tests: 5 in `commissaryAuditEngine.test.js` (a second
+   `commissaries` fixture added after every test asserting an exact
+   unfiltered count, so none of them shifted), 12 in
+   `commissary.test.js` (mirrored route logic for both routes, reusing
+   23b-iv's second-commissary fixture). Full suite: **14/14 files,
+   250/250 assertions, 0 regressions** (was 233). Live-verified against
+   a real booted server with a real second commissary and a real
+   yield-log entry under it, confirming both routes filter correctly in
+   both directions and an unknown `commissary_id` returns `[]`;
+   confirmed `commissary.html` (a consumer of both routes, unfiltered)
+   still serves and its exact fetch calls still return the correct
+   shape. Pushed to `main` directly. See `changelog.md`'s matching
+   entry for full detail.
+4. **23b-vi**, split into two sub-steps once the response shape was
+   resolved (same "route shape first, UI second" split rule 16 already
+   uses elsewhere in step 23):
+   - ~~**23b-vi-a**~~ — done, 2026-08-31 (Claude Code session). The
+     grouped route shape + the minimum `dashboard.html` change to keep
+     rendering correctly against it. `GET /api/dashboard/stock-rollup`
+     rebuilt per `data-model.md` section 10c: rows grouped by
+     `(meat_type_id, unit)` — not `meat_type_id` alone, since
+     `meat_types` has no `unit` column and a type whose members disagree
+     on unit would otherwise sum into a meaningless number — with
+     `computeRestaurantTotals` factored out and called exactly ONCE per
+     group, on the parent row. Untagged meats (`meat_type_id IS NULL`)
+     each still get their own `kind: "untagged"` row, never grouped
+     together or dropped. Sort order moved from `ORDER BY code` to
+     sorting the combined list by name. `dashboard.html` got only the
+     minimum fix — the row-label cell branches on `row.kind` — needed
+     to stop it rendering `"undefined - Jowl"` for a grouped row; the
+     table stays flat this step, `by_commissary` is present and correct
+     in the JSON but has no UI consumer yet.
+
+     `dashboard.test.js`'s mirror was rebuilt to match (existing tests
+     retargeted to find the Jowl row via `kind`+`meat_type_id` instead
+     of a `code` that no longer exists on grouped rows), with 4 new
+     tests including **the actual motivating case**: two commissaries
+     both stocking a meat tagged to the same `meat_type_id`, asserting
+     `by_restaurant[FC].total` is exactly 40 (not 80) and the grand
+     total isn't doubled. Also: a unit mismatch splitting into two rows,
+     an untagged meat kept as its own row, and sort order. Full suite:
+     **14/14 files, 254/254 assertions, 0 regressions** (was 250).
+     Live-verified against a real booted server: created a real second
+     commissary + shared meat type with real opening-stock balances on
+     both sides, confirmed the live JSON matches section 10c exactly
+     (summed-once `commissary_balance`, correct `by_commissary`, no
+     restaurant double-count), and confirmed `dashboard.html` still
+     serves with no `"undefined"` anywhere across all 14 real seeded
+     rows. Test rows cleaned up. Pushed to `main` directly. See
+     `changelog.md`'s matching entry for full detail. **The LIVE HAZARD
+     recorded below is now FIXED, not just described** — see that note
+     for what it was.
+   - ~~**23b-vi-b**~~ — done, 2026-08-31 (Claude Code session). The
+     inline expand/collapse drill-down UI on `dashboard.html` that
+     actually renders `by_commissary`, plus the two small backend items
+     folded in from the architect review of 23b-vi-a:
+     1. **Inactive meat types**: grouped rows now carry a
+        `meat_type_active` boolean (`meat_types.active`), **never**
+        filtered on it — a deactivated type is a cataloguing statement,
+        not a claim the stock vanished, same reasoning untagged rows
+        already got. `dashboard.html` marks such rows with an
+        understated `(inactive type)` label next to the name.
+     2. **The missing null guard**: the grouped-row build's
+        `SELECT name FROM meat_types WHERE id = ?` no longer reads
+        `.name` unguarded — a dangling `meat_type_id` (reachable since
+        SQLite only enforces FKs with `PRAGMA foreign_keys = ON`) now
+        degrades to a `(unknown meat type #N)` label and
+        `meat_type_active: false` instead of throwing and 500ing the
+        whole Dashboard.
+
+     `dashboard.html`: a ▸/▾ toggle on `kind:"meat_type"` rows with a
+     non-empty `by_commissary` expands to one child row per commissary
+     (its code/name + its own balance); `kind:"untagged"` rows render a
+     disabled toggle since they have no `by_commissary` at all. The
+     restaurant columns and grand total render exactly once, on the
+     parent row — child rows only fill their first two cells and leave
+     the rest blank, never recomputing or repeating those figures.
+     Expand/collapse is a pure re-render of the already-fetched JSON
+     (`lastRollupData`) — no re-fetch, no client-side math.
+
+     **Verified**: baseline full suite (14/14 files, 254/254 assertions,
+     0 failures), confirmed unchanged after the source-only backend
+     edits, then **14/14 files, 257/257 assertions, 0 regressions**
+     after the 3 new tests (an active type's flag, an inactive type's
+     flag with the row explicitly asserted to still appear, and a
+     dangling `meat_type_id` constructed by toggling `PRAGMA
+     foreign_keys` off for one insert, confirmed to degrade rather than
+     throw). `node --check` on the extracted inline script. Live
+     end-to-end check against a real booted server: seeded a real
+     second commissary sharing a meat type with Commissary A, confirmed
+     the parent row expands to show both commissaries with correct
+     individual balances, confirmed the restaurant/grand-total columns
+     appear exactly once (blank on the children), confirmed an
+     untagged row's toggle is disabled, and confirmed deactivating the
+     test meat type flips `meat_type_active` to `false` while the row
+     keeps reporting its real stock. Test rows cleaned up. Pushed to
+     `main` directly. See `changelog.md`'s matching entry for full
+     detail.
+
+5. **23c-ii — [Done, 2026-09-01] split 2026-09-01 into 23c-ii-a .. 23c-ii-d; see the
+   "23c-ii split" section above for the specs and the three
+   resolutions.** The three backend gaps listed above are indeed all
+   closed — but a fourth, missing commissary identity on `GET
+   /api/commissary/meats`, was found on 2026-09-01 and is now 23c-ii-c.
+   Dispatch order: **23c-ii-a and 23c-ii-b in either order, then
+   23c-ii-c, then 23c-ii-d** (which 23c-ii-c blocks). All four sub-steps
+   are done as of 23c-ii-d landing 2026-09-01.
+
+**Step 23 is fully done.** 23a, 23b's rekey sub-piece, 23b's 3-item CRUD
+sub-piece, 23c-i, 23c-i-b, 23b-iv, 23b-v, 23b-vi-a, 23b-vi-b, and all
+four 23c-ii sub-steps (23c-ii-a through 23c-ii-d) are done. No step is
+currently queued next — project owner's call on what comes after step
+23.
+
+**LIVE HAZARD, present in `main` from 2026-08-31 until 23b-vi-a fixed it
+the same day — kept here for history, not because it's still open.**
+`dashboard.js`'s `/dashboard/stock-rollup` used to return one row per
+commissary meat, and each row looked up conversion standards with
+`WHERE meat_type_id = ? AND restaurant_id = ?`. Once two commissary
+meats shared a `meat_type_id`, both rows would resolve the same
+standards and count the same restaurant stock — a live correctness bug,
+not hypothetical or cosmetic, that could not trigger before 23c-i
+shipped the Commissary-creation UI (only one commissary, `COM-A`,
+existed). **Now closed**: grouping computes the restaurant total once
+per group, on the parent row, making the double-count structurally
+impossible rather than merely avoided by there only being one
+commissary. See 23b-vi-a's entry above for the fix and its verification.
+
+1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
+   route file — `restaurants` rows only ever came from `seed.js` reading
+   a JSON file. Blocked the stated goal of handing this skeletal app to
+   a new branch for genuine self-onboarding. Built as `GET`/`POST`/
+   `PUT /api/settings/restaurants` (same CRUD shape as Meats/Dishes/
+   Adjustment Types/Locations) + a new Restaurants tab on
+   `settings.html` + `server/routes/settings.test.js` (a fresh file —
+   the old one was deleted in item 4's cleanup). See `changelog.md`'s
+   entry for full build/verification detail, including live
+   confirmation that a newly-created restaurant can immediately take a
+   new meat through the existing route — the actual onboarding gap is
+   closed end-to-end, not just that the new route returns 200. Kept
+   separate from item 3's Commissary-creation work as designed, and did
+   not touch it.
+
+2. **[Done, 2026-08-31] No commissary-meat-creation UI either.** Same
+   story — `commissary_meats` only ever came from
+   `commissary-seed-data.json`. A new commissary item (raw or
+   processed) couldn't be added through the app. Closed in two halves,
+   both under item 3's multi-Commissary work rather than as its own
+   step: **23b** built the backend (`GET`/`POST`/`PUT
+   /api/settings/commissary-meats`, scoped by `commissary_id` the way
+   Meats is scoped by `restaurant_id`), and **23c-i** built the
+   Commissary Meats tab on `settings.html`. Marked done here
+   2026-08-31 by the architect — the entry had drifted, still reading
+   as open after both halves had shipped.
+
+3. **[Done, 2026-08-30] Conversion Standards has no admin UI.** Backend
+   CRUD existed already (item 5) but there was no Settings page for it —
+   only read-only consumption on the Shipment form; creating one
+   required calling the API directly. Built as a new "Conversion
+   Standards" tab on `settings.html`, same structural pattern as the
+   Shipment Presets section (closest template — pick a commissary meat +
+   restaurant, list/create/edit entries for that pair). No backend
+   changes — built entirely against the existing routes, no bug found.
+   See `changelog.md`'s entry for full build/verification detail,
+   including live confirmation of create, the duplicate-pairing
+   rejection, and edit, against a booted server. This is the
+   numbered-list item 3 here, distinct from the "item 3 design" section
+   above (multi-Commissary generalization) which remains untouched and
+   un-started.
+
+4. **The AutoCAD-style Terminal only exists on its own page.** The
+   lightweight floating Command Panel (2 simple commands, step 14) is on
+   every page; the full multi-slot Terminal (steps 21a/21b, the
+   AutoCAD-style layout) is not reachable from anywhere except
+   `terminal.html` itself.
+
+5. **[Done, 2026-08-30] A real, live inconsistency — two disagreeing Commissary balance
+   calculations, both currently shown to a user.** Confirmed by reading
+   the code directly, not suspected:
+   - `commissary.html` (older, steps 6-9) called
+     `GET /api/commissary/balances` →
+     `commissaryYieldEngine.js`'s `getCommissaryBalance`:
+     `SUM(commissary_yield_log.backed_weight_out) −
+     SUM(stock_receipts.quantity WHERE source='COMMISSARY')`. **Had no
+     concept of `commissary_stock_receipts` (New Stock) at all** —
+     lifetime-cumulative, no date scoping, no physical actual-count
+     comparison.
+   - `commissary-shipments.html`/the Dashboard (newer, step 20b) call
+     `GET /api/commissary/daily-audit` →
+     `commissaryAuditEngine.js`'s `computeCommissaryMeatAudit`: a
+     proper Beginning + Stock In + Backed Up − Usage = Ending daily
+     audit, correctly including New Stock, comparable against a real
+     physical count.
+
+   The newer one was strictly more correct and more complete. **Retired,
+   2026-08-30**: `getCommissaryBalance`/`listCommissaryBalances` and
+   `GET /api/commissary/balances` are gone; `commissary.html` now calls
+   `GET /api/commissary/daily-audit` with a date field (defaults to
+   today) instead. See `changelog.md`'s entry for full detail, including
+   the no-network verification caveat — a real HTTP click-through against
+   a booted server is still owed next time a session has network/npm
+   access.
+
+
+## Original five items, raised 2026-08-29 — all resolved
+
+## Original five items, raised 2026-08-29
+
+**[Done, 2026-08-29] Item 6**: step 18's over-sold
+check (`GET /api/commands/oversold-check`) deliberately used same-day
+`sold > prepped` instead of the fuller running portion balance
+(`portionBeginning + prepped - sold`), specifically *because*
+`portion_ending_actual` had no write path and the fuller check would
+have been dead code. That write path now exists (see the 2026-08-29
+"Portion Actual write path" changelog entry) — resolved as a hybrid,
+not a straight swap: uses the fuller running balance wherever a
+beginning count is established, falls back to the same-day check
+where it isn't. See `changelog.md`'s item-6 entry for the full detail,
+including a real bug caught in the *existing* tests (the mirrored
+function was stale, coincidentally passing without ever exercising
+the fuller branch) before any new code was even added.
+
+**Priority, made explicit 2026-08-29, superseded 2026-08-30**: item 1
+was the one auditing-service gap (real day-to-day recording need),
+items 2-5 were app-level (dashboard, cleanup, future-proofing, a
+refinement) — secondary. **Items 1, 2, and 5 are done. Item 4 has one
+real find fixed, not a full audit. Item 6 is done.** As of 2026-08-30,
+this "nothing urgent" framing no longer holds — see "Round 2 findings"
+above for what's actually next (item 3, architected first, then the
+rest of that list).
+
+1. **[Done, 2026-08-29] Allocations item-to-item conversion type.**
+   Built as `POST /api/allocations/conversion` + a "Converts to" field
+   on `allocations.html` — see `changelog.md`'s entry for full detail,
+   including a real bug caught and fixed (the settings route wasn't
+   returning the new flag) and the real supplier-pricing leak found and
+   fixed in passing. Distinct from
+   step 22's `Allocation/Transfer` type, which moves the *same* item
+   between *locations* (from/to fields). This is converting stock *of
+   one item into a different item* at the same location — e.g. 2 units
+   of FC's Bagnet Sinigang becoming 2 units of Dinuguan, since both
+   trace back to the same Jowl. Needs a different shape (a "converts
+   to" item + quantity, not a from/to location) — don't conflate it
+   with the existing transfer type in the UI or the data model.
+
+2. **[Done, 2026-08-29] Management dashboard — cross-location stock rollup.** Upper
+   management currently does this by hand in a spreadsheet, described
+   as painful. Envisioned shape: rows = Commissary meat items (the root
+   meats), columns = each location (Commissary, Silingan/A, FC, Likod —
+   toggleable, up to 3 at once) + a grand total column. Real complexity:
+   some locations' stock isn't a 1:1 match to a root meat (FC's Bagnet
+   isn't literally "some kg of Jowl" without a conversion ratio) — the
+   rollup needs to reverse-convert portioned items back to their
+   raw-meat-equivalent to total correctly. Built as
+   `GET /api/dashboard/stock-rollup` + `public/dashboard.html` — see
+   `changelog.md`'s entry for the full build/verification detail.
+
+3. **[Un-shelved 2026-08-30, next to be architected] RESOLVED
+   2026-08-29, correcting an earlier mis-model** — yield
+   stays Commissary-only, but the fix is to stop treating Commissary as
+   a singleton, not to give restaurants their own yield table. The
+   original framing above (restaurant-level yield) was wrong: Likod
+   "processing meat itself" isn't a separate event at all — Commissary,
+   Restaurant A/Silingan, and Restaurant C/Likod are physically the
+   same site. What looks like Likod marinating/prepping meat for its
+   grill menu is Commissary's own yield step, just landing in Likod's
+   stock without needing real shipment logistics (no delivery, same
+   building). FC is the only genuinely remote location, which is why it
+   needs real Shipments. The right generalization, if a future site
+   ever *does* need its own on-site processing: **another Commissary
+   instance**, not a restaurant-level feature — turn Commissary from an
+   implicit singleton into a repeatable pattern (a `commissary_id`
+   scoping `commissary_meats`/`commissary_yield_log`/etc., the same way
+   `restaurant_id` already scopes restaurant data), not something
+   special-cased once. Not designed yet, but the direction is settled;
+   don't reopen "should restaurants get their own yield table."
+   **Confirmed non-blocking, 2026-08-29** for anything planned *at the
+   time* (including Restaurant C onboarding — Likod is co-located with
+   Commissary too, uses the same single-Commissary model Restaurant A
+   does). **Un-shelved 2026-08-30**: the project owner described an
+   actual near-term need for creating future Commissary branches, not
+   a hypothetical one — this is no longer "safe to leave indefinitely."
+   Next up to be architected properly (ask-before-build), see the
+   "Round 2 findings" section above.
+
+4. **[Substantially done, 2026-08-30] A dedicated cleanup pass is
+   owed.** First real find and fix (2026-08-29): `commissary_meat_map`'s
+   "full retirement" (step 20's entry above) had been designed but
+   never actually implemented - retired for real that session, see
+   `changelog.md`'s item-4 entry, including a genuine test-suite
+   problem caught along the way (`stockReceipts.test.js` was passing
+   against a stale duplicated copy of the old logic). **A systematic
+   sweep followed on 2026-08-30** (not just the one known gap this
+   time): found and fixed a missing nav link (`dashboard.html`), two
+   stale comments (`daily-audit.html`, `server/index.js`), and a real
+   mirrored-logic gap in `sales.test.js` (missing two validation
+   branches the real route has) - see `changelog.md`'s "Item 4
+   continued" entry. The architect's own review of that pass then found
+   one more thing the sweep itself introduced a regression in
+   elsewhere (`commissaryYieldEngine.test.js`, from a different,
+   parallel task's retirement work) - see the "Architect review" entry
+   right above it in the changelog. Not claiming this is now
+   exhaustive - a codebase this size could always have more - but two
+   real passes plus an independent review is a meaningfully stronger
+   claim than "one gap fixed."
+
+5. **[Done, 2026-08-29] Three tables, each
+   doing one job — not one reused table, and not a single blanket
+   dynamic-entry policy.** Originally framed as "step 20's dynamic-
+   no-formula call vs. the dashboard needing ratios to total against" —
+   settled through discussion, not guessed:
+
+   - **Raw type stays exactly as step 20 decided.** Plain Jowl shipped
+     as itself: no ratio concept applies, genuinely dynamic, unchanged.
+
+   - **The key distinction for named portions turned out to be "the
+     mix" vs. "the rate," and they need different treatment.** Given
+     7kg of Jowl, *how it splits* across Bagnet/Sisig/Sinigang/DNG is a
+     demand decision (legitimately different week to week, no single
+     correct answer — `commissary_shipment_presets` already handles
+     this fine, several presets can coexist for the same pairing,
+     unchanged, not touched by this design). But *for however much
+     Jowl actually goes toward Bagnet specifically, how many Bagnet
+     portions that should produce* is a conversion-rate fact, not a
+     demand choice — closer to what `recipe_bom` already stores for
+     dish-to-meat consumption than to a preset. That's the thing worth
+     a real Standard.
+
+   - **New table, not a repurposed `commissary_shipment_presets`**:
+     one row per `(commissary_meat_id, restaurant_id, meat_id)` —
+     e.g. "Jowl → FC's Bagnet: 0.3 units per kg." Confirmed
+     **ratio-per-unit-of-input**, not a percentage-of-shipment or a
+     typical-batch-size shape — this matches the project owner's own
+     real auditing standard from their contractors directly, not
+     assumed, and is also the simplest to implement. Built as
+     `commissary_conversion_standards` — see `changelog.md`'s entry
+     for the full build/verification detail.
+
+   - **No explicit raw-vs-portioned classifier column anywhere.** A
+     `(commissary_meat, restaurant, meat)` pairing with a Standard row
+     is portioned-type; one with no row is raw/dynamic. The row's
+     existence *is* the classifier.
+
+   - **The comparison this unlocks, mechanically**: each shipment
+     line implies an input amount (e.g. "3 Bagnet units at 0.3
+     units/kg" implies ~10kg of Jowl). Sum that across every line,
+     compare against the shipment's actual `total_quantity` — roughly
+     matches is consistent, well over means claiming more output than
+     standard efficiency supports, well under means some input isn't
+     accounted for by named outputs (could be legitimate - raw Jowl
+     shipped alongside portions - or could be shrinkage or a missed
+     line). Purely informational, never blocking, same philosophy as
+     every other Actual-vs-Calculated comparison in this app. Shown
+     live on the Shipment form as the auditor types each line (a
+     running "~X kg implied so far, of Y kg total"), not on a save-
+     time popup or after the fact.
+
+   - **This also directly unblocks item 2's dashboard** (below) — the
+     same per-pairing ratio table reverse-converts a restaurant's
+     portioned stock back to Jowl-equivalent for the cross-location
+     rollup, later, as its own separate piece of work, not bundled
+     into building this table.
+

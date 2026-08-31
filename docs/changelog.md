@@ -61,6 +61,37 @@ Pushed directly to `main`.
 
 ---
 
+## 2026-09-01 (architect) — session-status.md split: 2,587 lines to 319
+
+The cleanup that had been "highest-leverage, next in the queue" for three
+sessions without being done. `session-status.md` was read cold by every
+worker on every dispatch, and most of it was resolved narrative — full
+Round 1/Round 2 write-ups, the steps 10–19 scope list, all of step 23.
+
+Split into `session-status.md` (**319 lines**: current state, known open
+items, the step-24 design, stable decisions, end-of-session checklist) and
+a new `docs/session-history.md` (**2,208 lines**: the resolved tail). The
+accreted "Last updated / Previously / Before that" header chain — ~155
+lines of nested history at the top of the file — was replaced with a short
+current-state block and a table.
+
+**Verified rather than assumed**: a script checked every substantive line
+of the original from line 156 onward against both output files. Exactly one
+line was unaccounted for — the old step-24 heading, deliberately reworded.
+Zero content loss.
+
+**Two pending items were nearly buried and had to be lifted out first**,
+which is the real hazard in a split like this: the preset-*authoring* admin
+UI (deferred since step 20c, re-confirmed as deferred several times, and
+mentioned only inside sections being archived) and `resolveCommissaryMeat`'s
+qualified-branch gap. Both now live in "Known open items." Rule 22 gained
+the standing rule this establishes: finished work gets archived, never moved
+back, and lift pending items out *before* moving a section.
+
+Also corrected the stale "not fixed in this session" note in
+`web-vs-claude-code.md`, which had been describing this as outstanding
+since 2026-08-31.
+
 ## 2026-09-01 (architect) — Rule 22 added: context economy; graphify was installed but never used
 
 Project owner flagged a measured regression: worker sessions that had been
