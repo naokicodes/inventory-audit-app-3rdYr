@@ -294,6 +294,66 @@
       ) || null;
     }
 
+    // ------------------------------------------------------------------
+    // Slot 1 (commissary-meat) resolver - the only slot that can be
+    // ambiguous. schema.sql's commissary_meats.code is UNIQUE per
+    // commissary, not globally (UNIQUE(commissary_id, code)), so "M05"
+    // can legitimately exist in two commissaries. resolveExact's
+    // list.find(...) would silently return whichever came back first;
+    // this resolver instead reports resolved/ambiguous/unknown and is
+    // routed through EVERY commissary-meat lookup in this file (23c-ii-d)
+    // so the hint bar, slot guide, and submit path can never disagree.
+    //
+    // Accepts a bare token ("m05", "jowl") or a qualified
+    // "<commissary-code>/<meat>" token ("com-a/m05", "com-a/jowl") - the
+    // meat half matches code OR normalized name, same as resolveExact.
+    // A "/" is safe as a separator: the input line is whitespace-
+    // tokenized, so "/" can never split a token, and normalize() only
+    // lowercases/strips whitespace, so a code like "COM-A" survives
+    // normalization intact as "com-a".
+    function resolveCommissaryMeat(token) {
+      const slashIdx = token.indexOf('/');
+      if (slashIdx !== -1) {
+        const commissaryPart = normalize(token.slice(0, slashIdx));
+        const meatPart = normalize(token.slice(slashIdx + 1));
+        const matches = commissaryMeats.filter(m =>
+          normalize(m.commissary_code) === commissaryPart &&
+          (normalize(m.code) === meatPart || normalize(m.name) === meatPart)
+        );
+        return matches.length >= 1 ? { status: 'resolved', meat: matches[0] } : { status: 'unknown' };
+      }
+      const norm = normalize(token);
+      const matches = commissaryMeats.filter(m =>
+        normalize(m.code) === norm || normalize(m.name) === norm
+      );
+      if (matches.length === 1) return { status: 'resolved', meat: matches[0] };
+      if (matches.length > 1) return { status: 'ambiguous', matches };
+      return { status: 'unknown' };
+    }
+
+    // Canonical token for a commissary meat: the bare normalized name
+    // when that name resolves uniquely back to THIS meat, otherwise the
+    // qualified "<commissary-code>/<code>" form - so a dropdown selection
+    // (or a copy-pasted example) always produces a re-parseable token.
+    // A meat with no commissary_code (a dangling commissary_id - reachable
+    // since SQLite only enforces FKs under PRAGMA foreign_keys=ON, and
+    // 23c-ii-c's LEFT JOIN preserves such rows deliberately) has no
+    // qualified form to fall back to, so it always uses the bare name.
+    function commissaryMeatToken(meat) {
+      const bareNorm = normalize(meat.name);
+      const bareResult = resolveCommissaryMeat(bareNorm);
+      if (bareResult.status === 'resolved' && bareResult.meat.id === meat.id) return bareNorm;
+      if (!meat.commissary_code) return bareNorm;
+      return `${normalize(meat.commissary_code)}/${normalize(meat.code)}`;
+    }
+
+    // Shared wording for validateCommitted/computeSlotStatus's error paths
+    // so the ambiguity message is identical everywhere it can appear.
+    function ambiguousCommissaryMeatMessage(token, matches) {
+      const example = matches.map(m => commissaryMeatToken(m)).find(t => t.includes('/'));
+      return `"${token}" matches ${matches.length} commissaries - qualify it, e.g. "${example || token}".`;
+    }
+
     // Filter candidates for the dropdown by a (possibly partial) typed
     // prefix, against code or normalized name.
     function filterCandidates(partial, list, nameField, codeField) {
@@ -431,8 +491,23 @@
         dropdownItems = filterSimple(active, ['ship']);
       } else if (slot === 1) {
         hintText = '<commissary-meat> - which commissary meat is shipping out?';
+        // commissaryMeatToken() only qualifies a candidate's token when
+        // that candidate's own bare name is ambiguous (23c-ii-d rule 4) -
+        // so the qualified form appears exactly when needed to
+        // distinguish it, and the sub-label shows the commissary too in
+        // that case.
         dropdownItems = filterCandidates(active, commissaryMeats, 'name', 'code')
-          .map(m => ({ label: normalize(m.name), sub: `${m.code} - ${m.name} (${m.unit})`, token: canonicalToken(m, 'name', 'code') }));
+          .map(m => {
+            const token = commissaryMeatToken(m);
+            const qualified = token.includes('/');
+            return {
+              label: normalize(m.name),
+              sub: qualified && m.commissary_code
+                ? `${m.code} - ${m.name} (${m.unit}) - ${m.commissary_code}`
+                : `${m.code} - ${m.name} (${m.unit})`,
+              token
+            };
+          });
       } else if (slot === 2) {
         hintText = '<restaurant> - which restaurant is receiving it?';
         dropdownItems = filterCandidates(active, restaurants, 'name', 'code')
@@ -509,8 +584,9 @@
         return { error: `Unknown command "${committed[0]}". Only "ship" is supported.` };
       }
       if (committed.length >= 2) {
-        const meat = resolveExact(committed[1], commissaryMeats, 'name', 'code');
-        if (!meat) return { error: `Unknown commissary meat "${committed[1]}".` };
+        const result = resolveCommissaryMeat(committed[1]);
+        if (result.status === 'unknown') return { error: `Unknown commissary meat "${committed[1]}".` };
+        if (result.status === 'ambiguous') return { error: ambiguousCommissaryMeatMessage(committed[1], result.matches) };
       }
       if (committed.length >= 3) {
         const restaurant = resolveExact(committed[2], restaurants, 'name', 'code');
@@ -567,8 +643,8 @@
         }
       }
       if (errorIndex === -1 && committed.length >= 2) {
-        const meat = resolveExact(committed[1], commissaryMeats, 'name', 'code');
-        if (meat) { results[1] = { ok: true, display: normalize(meat.name) }; }
+        const result = resolveCommissaryMeat(committed[1]);
+        if (result.status === 'resolved') { results[1] = { ok: true, display: normalize(result.meat.name) }; }
         else { results[1] = { ok: false, display: committed[1] }; errorIndex = 1; }
       }
       if (errorIndex === -1 && committed.length >= 3) {
@@ -678,7 +754,15 @@
       const validation = validateCommitted(allTokens);
       if (validation.error) return { error: validation.error };
 
-      const commissaryMeat = resolveExact(allTokens[1], commissaryMeats, 'name', 'code');
+      // validateCommitted above already confirmed this resolves cleanly;
+      // re-checking here (rather than trusting that) keeps this call site
+      // routed through the same resolver as the other three, so it can
+      // never disagree with what the hint bar/slot guide already showed.
+      const meatResult = resolveCommissaryMeat(allTokens[1]);
+      if (meatResult.status !== 'resolved') {
+        return { error: `Unknown or ambiguous commissary meat "${allTokens[1]}".` };
+      }
+      const commissaryMeat = meatResult.meat;
       const restaurant = resolveExact(allTokens[2], restaurants, 'name', 'code');
       const totalQty = Number(allTokens[3]);
       const lines = allTokens.slice(4).map(token => {
@@ -863,7 +947,10 @@
     input.addEventListener('input', () => {
       const { committed } = splitInput(input.value);
       let meat = null, restaurant = null;
-      if (committed.length >= 2) meat = resolveExact(committed[1], commissaryMeats, 'name', 'code');
+      if (committed.length >= 2) {
+        const meatResult = resolveCommissaryMeat(committed[1]);
+        meat = meatResult.status === 'resolved' ? meatResult.meat : null;
+      }
       if (committed.length >= 3) restaurant = resolveExact(committed[2], restaurants, 'name', 'code');
       const key = (meat && restaurant) ? `${meat.id}:${restaurant.id}` : null;
       if (key !== lastPresetPairKey) {
