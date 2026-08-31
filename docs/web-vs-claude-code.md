@@ -166,6 +166,45 @@ chat's fresh-sandbox constraint?
     either errors on an unknown driver or silently falls back to
     normal conflict-marker merging. `.gitattributes` alone doesn't
     carry this.
+  - **Three `graphify-out/` paths are still undecided (raised
+    2026-08-31, deliberately left alone, NOT a problem right now).**
+    Because the post-commit hook regenerates the graph on every commit,
+    `git status` shows `graphify-out/` dirty constantly — that part is
+    expected and fine. But three things in it don't obviously belong in
+    the "commit it" bucket the way `graph.json`/`GRAPH_REPORT.md` do:
+    - `graphify-out/cache/` (e.g. `cache/stat-index.json`,
+      `cache/ast/<tool-version>/<hash>.json`) — a derived rebuild cache,
+      keyed by the graphify version string. Churns on every run and
+      would accumulate stale entries across tool upgrades. Almost
+      certainly should be ignored, alongside the two `cache/` entries
+      `.gitignore` already carves out — but note `cache/semantic/` is
+      deliberately committed, so this needs a targeted line, not a
+      blanket `graphify-out/cache/`.
+    - `graphify-out/.graphify_labels.json.sig` — a signature file. Not
+      yet checked whether it's meant to travel with the labels it signs
+      or is machine-local like the merge driver in `.git/config`.
+    - `graphify-out/<YYYY-MM-DD>/` — a date-stamped directory. If
+      graphify writes one per working day, committing them means a new
+      folder in the repo every day. Worth checking before committing
+      even one.
+
+    **Status: uncommitted and left that way on purpose.** Nothing is at
+    risk — untracked and modified files persist on disk; only an
+    explicit `git checkout --`/`reset --hard`/`clean` discards them.
+    Resolve by checking graphify's own docs for what the `.sig` and the
+    dated directory are for, then add targeted `.gitignore` lines and
+    replace this note with the decision. This is the same shape as two
+    corrections already made here (the over-broad `.claude/` ignore, and
+    `cost.json`): graphify writes several things with different
+    lifetimes into one directory, so "commit the whole folder" isn't
+    quite right.
+
+    **Also worth deciding at the same time**: whether the graph should
+    be regenerated *and committed* on every commit at all. Today a
+    two-line doc fix drags a ~1.2 MB graph rebuild into the diff, which
+    makes `git log` noisier and reviews harder. Committing the graph
+    only at step boundaries is a plausible alternative. Not urgent, but
+    the commit cadence on this project is high enough that it adds up.
   - **Still genuinely untested on this specific repo** — the recall/
     accuracy numbers in graphify's own benchmarks are on other codebases,
     not this one. Worth treating as "on" but not yet fully trusted for a

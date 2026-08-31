@@ -13,6 +13,37 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (architect, web session) — graphify's dirty working tree: expected, three paths flagged as undecided
+
+No code changed. Project owner asked whether `graphify-out/` constantly
+showing modified/untracked in `git status` is normal. It is — the
+post-commit hook regenerates the graph on every commit, so the directory
+is dirty by design.
+
+Three paths in it, though, don't clearly belong in the "commit it"
+bucket that `graph.json`/`GRAPH_REPORT.md` do: `graphify-out/cache/`
+(a version-keyed rebuild cache — note `cache/semantic/` is deliberately
+committed, so this needs a targeted line rather than a blanket ignore),
+`.graphify_labels.json.sig`, and a date-stamped `graphify-out/<date>/`
+directory that would add a folder per working day if committed.
+
+**Deliberately not decided or ignored yet** — resolving it needs a check
+of graphify's own docs for what the `.sig` and dated directory are for,
+which is cheap but wasn't worth interrupting the 23b dispatch sequence.
+Left uncommitted, which is safe: untracked and modified files persist on
+disk regardless of the editor closing. Full detail and the alternative
+worth deciding alongside it (whether to regenerate/commit the graph on
+every commit at all, vs. only at step boundaries) recorded in
+`web-vs-claude-code.md`'s graphify section rather than here, since that's
+where the rest of the graphify setup notes live.
+
+Same shape as two corrections already made on this tool (the over-broad
+`.claude/` ignore, and `cost.json`): graphify writes several things with
+different lifetimes into one directory, so "commit the whole folder"
+keeps needing refinement.
+
+---
+
 ## 2026-08-31 (Claude Code session) — Step 23b-iv: optional commissary_id filter on GET /api/commissary/meats
 
 Single-route change, exactly the scope dispatched: `GET /api/commissary/meats` gains an OPTIONAL `commissary_id` query param — omitted, it behaves exactly as before (every active commissary meat, unfiltered); when present, adds `AND commissary_id = ?` to the existing WHERE. Follows the same optional-filter convention `GET /commissary/yield-log` and `GET /commissary/daily-audit` already use in this file, deliberately not `GET /api/settings/meats`'s required-`restaurant_id` convention — six live pages call this route with no param today (`commissary.html`, `commissary-shipments.html`, `terminal.html`, `stock-receipts.html`, and `settings.html`'s Shipment Presets and Conversion Standards sections) and a required param would have broken all six in one commit. `meat_type_id` (added by 23c-i-b) stays in the SELECT. No page passes the new param yet — that's 23c-ii's job, landing the commissary selector on each consuming page incrementally.
