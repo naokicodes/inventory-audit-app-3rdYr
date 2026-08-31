@@ -18,6 +18,10 @@
     .no-data { color: #bbb; }
     .grand-total-col { font-weight: bold; background: #fafafa; }
     tfoot td { font-weight: bold; background: #f0f0f0; }
+    .row-toggle { background: none; border: none; cursor: pointer; font-size: 0.8rem; padding: 0 0.3rem 0 0; }
+    .row-toggle:disabled { visibility: hidden; }
+    .drilldown-row td { background: #fbfbfb; color: #666; font-size: 0.85rem; }
+    .drilldown-row td:first-child { padding-left: 1.6rem; }
   </style>
 </head>
 <body style="max-width: 1200px;">
@@ -64,6 +68,17 @@
 
     let allRestaurants = [];
     let selectedRestaurantIds = new Set();
+    let lastRollupData = null;
+    // Step 23b-vi-b: which meat_type groups are expanded, keyed by
+    // "meat_type_id::unit" (matching the grouping key dashboard.js uses)
+    // so the kg and unit rows of the same type expand independently.
+    // Purely a display toggle - never re-fetches or recomputes anything,
+    // just re-renders the same data already in lastRollupData.
+    let expandedGroups = new Set();
+
+    function groupKey(row) {
+      return `${row.meat_type_id}::${row.unit}`;
+    }
 
     dateInput.value = new Date().toISOString().slice(0, 10);
 
@@ -107,21 +122,52 @@
           return `<td>${cell.hasData ? fmt(cell.total) : '<span class="no-data">-</span>'}</td>`;
         }).join('');
         const rowClass = row.row_has_any_data ? '' : ' class="no-data"';
-        // Step 23b-vi-a: a grouped ("meat_type") row has no code column
-        // (data-model.md section 10c) - label it by name only. An
-        // "untagged" row still has its own commissary meat's code, same
-        // as every row did before grouping.
+
+        // Step 23b-vi-b: a meat_type row with by_commissary entries can
+        // expand to show the per-commissary breakdown. The restaurant
+        // columns and grand total stay on THIS parent row only, never
+        // repeated per commissary - they belong to the meat type, which
+        // is exactly what makes 23b-vi-a's double-count fix hold.
+        // kind:"untagged" rows have no by_commissary at all, so they're
+        // never expandable.
+        const isExpandable = row.kind === 'meat_type' && Array.isArray(row.by_commissary) && row.by_commissary.length > 0;
+        const key = isExpandable ? groupKey(row) : null;
+        const isExpanded = isExpandable && expandedGroups.has(key);
+        const toggle = isExpandable
+          ? `<button type="button" class="row-toggle" data-key="${key}">${isExpanded ? '▾' : '▸'}</button>`
+          : `<button type="button" class="row-toggle" disabled>▸</button>`;
+        const inactiveLabel = (row.kind === 'meat_type' && !row.meat_type_active)
+          ? ' <span class="hint">(inactive type)</span>'
+          : '';
         const rowLabel = row.kind === 'meat_type'
-          ? `${row.name} <span class="hint">(${row.unit})</span>`
+          ? `${row.name} <span class="hint">(${row.unit})</span>${inactiveLabel}`
           : `${row.code} - ${row.name} <span class="hint">(${row.unit})</span>`;
-        return `
+
+        const parentRow = `
           <tr${rowClass}>
-            <td>${rowLabel}</td>
+            <td>${toggle}${rowLabel}</td>
             <td>${commissaryCell}</td>
             ${restaurantCells}
             <td class="grand-total-col">${fmt(row.grand_total)}</td>
           </tr>
         `;
+
+        // Render what the JSON already provides - no client-side
+        // recomputation. Each drill-down row only shows that one
+        // commissary's own balance; the restaurant/grand-total columns
+        // are left blank here since those figures don't exist per
+        // commissary, only per meat type (the parent row above).
+        const childRows = isExpanded
+          ? row.by_commissary.map(bc => `
+              <tr class="drilldown-row">
+                <td>↳ ${bc.code} - ${bc.name}</td>
+                <td>${bc.has_data ? fmt(bc.balance) : '<span class="no-data">-</span>'}</td>
+                <td colspan="${restaurants.length + 1}"></td>
+              </tr>
+            `).join('')
+          : '';
+
+        return parentRow + childRows;
       }).join('');
 
       tableEl.innerHTML = `
@@ -136,8 +182,17 @@
           </thead>
           <tbody>${bodyRows}</tbody>
         </table>
-        <p class="hint">"n/a" means no Conversion Standard exists linking that restaurant's stock back to this Commissary meat - set one up in Settings if this pairing should be tracked. "-" means a standard exists but there's no data yet for that meat/date.</p>
+        <p class="hint">"n/a" means no Conversion Standard exists linking that restaurant's stock back to this Commissary meat - set one up in Settings if this pairing should be tracked. "-" means a standard exists but there's no data yet for that meat/date. Click ▸ on a meat-type row to see which commissaries make up its total.</p>
       `;
+
+      tableEl.querySelectorAll('.row-toggle:not(:disabled)').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.key;
+          if (expandedGroups.has(key)) expandedGroups.delete(key);
+          else expandedGroups.add(key);
+          renderTable(lastRollupData); // re-render only - no re-fetch, no recomputation
+        });
+      });
     }
 
     async function loadRollup() {
@@ -152,6 +207,7 @@
       }
       const res = await fetch(`/api/dashboard/stock-rollup?${params.toString()}`);
       const data = await res.json();
+      lastRollupData = data;
       renderTable(data);
     }
 

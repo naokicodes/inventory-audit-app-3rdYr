@@ -130,7 +130,14 @@ router.get('/dashboard/stock-rollup', (req, res) => {
   const meatTypeRows = [...groups.values()].map(members => {
     const meatTypeId = members[0].meat_type_id;
     const unit = members[0].unit;
-    const meatType = db.prepare('SELECT name FROM meat_types WHERE id = ?').get(meatTypeId);
+    // Step 23b-vi-b: SQLite doesn't enforce FKs unless PRAGMA
+    // foreign_keys=ON, so a dangling meat_type_id (the row it pointed to
+    // was deleted, or never existed) must not throw and 500 the whole
+    // Dashboard - degrade this one row instead, same "missing data is
+    // shown, not fatal" treatment as every other gap in this route.
+    const meatType = db.prepare('SELECT name, active FROM meat_types WHERE id = ?').get(meatTypeId);
+    const meatTypeName = meatType ? meatType.name : `(unknown meat type #${meatTypeId})`;
+    const meatTypeActive = meatType ? !!meatType.active : false;
 
     const commissaryBalance = members.reduce((sum, m) => sum + (m.balance || 0), 0);
     const commissaryHasData = members.some(m => m.hasData);
@@ -150,8 +157,13 @@ router.get('/dashboard/stock-rollup', (req, res) => {
     return {
       kind: 'meat_type',
       meat_type_id: meatTypeId,
-      name: meatType.name,
+      name: meatTypeName,
       unit,
+      // Step 23b-vi-b (data-model.md section 10c): additive, informational
+      // only - rows are NEVER filtered on this. Deactivating a meat type is
+      // a cataloguing statement, not a claim the stock vanished; hiding it
+      // would be exactly the kind of silent-drop this audit tool must not do.
+      meat_type_active: meatTypeActive,
       commissary_balance: commissaryBalance,
       commissary_has_data: commissaryHasData,
       by_commissary: byCommissary,

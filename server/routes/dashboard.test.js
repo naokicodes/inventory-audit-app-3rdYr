@@ -126,7 +126,10 @@ function stockRollup(date, restaurantIds) {
   const meatTypeRows = [...groups.values()].map(members => {
     const meatTypeId = members[0].meat_type_id;
     const unit = members[0].unit;
-    const meatType = db.prepare('SELECT name FROM meat_types WHERE id = ?').get(meatTypeId);
+    // Mirrors dashboard.js's dangling-meat_type_id guard (step 23b-vi-b)
+    const meatType = db.prepare('SELECT name, active FROM meat_types WHERE id = ?').get(meatTypeId);
+    const meatTypeName = meatType ? meatType.name : `(unknown meat type #${meatTypeId})`;
+    const meatTypeActive = meatType ? !!meatType.active : false;
 
     const commissaryBalance = members.reduce((sum, m) => sum + (m.balance || 0), 0);
     const commissaryHasData = members.some(m => m.hasData);
@@ -144,7 +147,8 @@ function stockRollup(date, restaurantIds) {
     const { byRestaurant, restaurantsSum, anyHasData } = computeRestaurantTotals(date, restaurants, meatTypeId);
 
     return {
-      kind: 'meat_type', meat_type_id: meatTypeId, name: meatType.name, unit,
+      kind: 'meat_type', meat_type_id: meatTypeId, name: meatTypeName, unit,
+      meat_type_active: meatTypeActive,
       commissary_balance: commissaryBalance, commissary_has_data: commissaryHasData,
       by_commissary: byCommissary, by_restaurant: byRestaurant,
       grand_total: commissaryBalance + restaurantsSum,
@@ -315,6 +319,48 @@ test('rows are sorted by name, not code - meat_type and untagged rows interleave
   const names = r.rows.map(row => row.name);
   const sorted = [...names].sort((a, b) => a.localeCompare(b));
   assert.deepStrictEqual(names, sorted);
+});
+
+// Step 23b-vi-b: an active and an inactive meat type, each with a real
+// commissary meat tagged to it. Added late, same reasoning as the
+// fixtures above - after every test that asserts an exact row count.
+db.prepare(`INSERT INTO meat_types (id, name, active) VALUES (2, 'Retired Type', 0)`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, meat_type_id) VALUES (6, 1, 'CM05', 'Old Cut', 'kg', 0.1, 2)`).run();
+db.prepare(`INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (6, '2026-08-15', 4)`).run();
+
+test('meat_type_active is true for an active meat type', () => {
+  const r = stockRollup('2026-08-15');
+  const jowlRow = findJowlGroup(r.rows);
+  assert.strictEqual(jowlRow.meat_type_active, true);
+});
+
+test('meat_type_active is false for an inactive meat type, but the row still APPEARS - never filtered on it', () => {
+  const r = stockRollup('2026-08-15');
+  const retiredRow = r.rows.find(row => row.kind === 'meat_type' && row.meat_type_id === 2);
+  assert.ok(retiredRow, 'an inactive meat type\'s row must still appear - deactivating a type is a cataloguing statement, not a claim the stock vanished');
+  assert.strictEqual(retiredRow.meat_type_active, false);
+  assert.strictEqual(retiredRow.commissary_balance, 4, 'the real stock is still counted, same as any other row');
+});
+
+test('a dangling meat_type_id degrades gracefully instead of throwing / 500ing the route', () => {
+  // Simulates a commissary_meats row whose meat_type_id points at a
+  // meat_types row that no longer exists - SQLite doesn't enforce FKs
+  // unless PRAGMA foreign_keys=ON, so this IS reachable in practice even
+  // though this test file itself normally runs with FKs on; toggle it
+  // off just for this one insert to construct the scenario, same as the
+  // real gap this guard protects against.
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, meat_type_id) VALUES (7, 1, 'CM06', 'Ghost Cut', 'kg', 0.1, 9999)`).run();
+  db.prepare(`INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (7, '2026-08-15', 2)`).run();
+  db.exec('PRAGMA foreign_keys = ON');
+
+  assert.doesNotThrow(() => stockRollup('2026-08-15'), 'a dangling meat_type_id must not throw and take down the whole route');
+  const r = stockRollup('2026-08-15');
+  const ghostRow = r.rows.find(row => row.kind === 'meat_type' && row.meat_type_id === 9999);
+  assert.ok(ghostRow, 'the row must still appear rather than being silently dropped');
+  assert.strictEqual(ghostRow.meat_type_active, false, 'a meat type that cannot be found is treated as not active');
+  assert.strictEqual(ghostRow.commissary_balance, 2);
+  assert.ok(ghostRow.name.includes('9999'), 'the fallback label should identify which meat_type_id is missing');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

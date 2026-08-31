@@ -1,30 +1,25 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (**23b-vi-a done**: the Dashboard grouped stock
-rollup - `GET /api/dashboard/stock-rollup` rebuilt per `data-model.md`
-section 10c, plus the minimum `dashboard.html` change to keep it
-rendering correctly. **This closes a live double-count bug**, not just a
-display grouping - see the dispatch-order list under the "23c" entry
-below for full detail. 23b-v/23b-iv also done: optional `commissary_id`
-filters on the three remaining commissary-scoped read routes. 23c-i-b
-also done: fixed the Settings -> Conversion Standards "Create" form,
-broken since 23b's rekey. 23c-i also done: Commissary + Meat Type tabs
-and commissary-meat creation UI on `settings.html`, frontend-only,
-pushed to `main`. Step 23b is now fully done, all 6 items landed. See
-the entries under "Item 3 design" below, and `changelog.md`'s matching
-entries, for full detail).
-**Architect recheck, same day (2026-08-31): 23c was found to not be one
-unblocked piece — split into 23c-i (Settings tabs + commissary-meat
-creation UI, fully unblocked, done) and 23c-ii (commissary selector,
-blocked on 3 backend gaps, all 3 now closed - but still waiting on
-23b-vi-b, the drill-down UI, before it's the right next step). See the
-full "23c" entry below for detail.**
+Last updated: 2026-08-31 (**23b-vi-b done**: the inline commissary
+drill-down on the Dashboard - a ▸/▾ toggle on grouped rows now renders
+`by_commissary` (previously correct in the JSON, invisible in the
+table), plus two small backend items folded in from the architect
+review of 23b-vi-a (a `meat_type_active` flag, never used to filter, and
+a null-guard so a dangling `meat_type_id` degrades instead of 500ing the
+whole Dashboard). **Step 23 now has exactly one item left: 23c-ii, the
+commissary selector** — see the dispatch-order list under the "23c"
+entry below for full detail. 23b-vi-a (the grouping itself, which closed
+a live double-count bug), 23b-v/23b-iv (optional `commissary_id`
+filters), 23c-i-b (the Conversion Standards "Create" form fix), and
+23c-i (Commissary + Meat Type tabs) are all also done — step 23b is
+fully done, all 6 items landed. See the entries under "Item 3 design"
+below, and `changelog.md`'s matching entries, for full detail).
 
-**23b-vi-a is done - the double-count hazard flagged below is FIXED, not
-just described. Next up: 23b-vi-b** (the inline expand/collapse
-drill-down UI that actually renders `by_commissary`, currently correct
-in the JSON but invisible in the table), **then 23c-ii** — see the
-dispatch-order list under the "23c" entry below.
+**23b-vi-b is done. Next and final step-23 item: 23c-ii** (the
+commissary selector everywhere a screen currently assumes there's only
+one — `commissary.html`, `commissary-shipments.html`, Terminal, and the
+Dashboard drill-down; every backend gap it was blocked on is now
+closed) — see the dispatch-order list under the "23c" entry below.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1759,35 +1754,61 @@ fresh architecture session:**
      `changelog.md`'s matching entry for full detail. **The LIVE HAZARD
      recorded below is now FIXED, not just described** — see that note
      for what it was.
-   - **23b-vi-b [queued, not started]** — the inline expand/collapse
-     drill-down UI on `dashboard.html` that actually renders
-     `by_commissary` (currently correct in the JSON, invisible in the
-     table). Per the decision recorded below: inline expand/collapse on
-     the existing table, not a separate view; the restaurant columns
-     stay on the parent (meat-type) row only, never per-commissary, by
-     construction. `by_commissary`'s shape (`commissary_id, code, name,
-     commissary_meat_id, balance, has_data`, sorted by commissary code)
-     is already finalized by 23b-vi-a — this step is UI-only **except for
-     two small backend items decided/found in the architect review of
-     23b-vi-a (2026-08-31), folded in here rather than dispatched
-     separately**:
-     1. **Inactive meat types**: `meat_types.active` is currently read by
-        nothing, so deactivating a type has no effect on the Dashboard.
-        Resolved — grouped rows gain a `meat_type_active` flag and are
-        **never** filtered on it (stock must not silently vanish, same
-        reasoning as untagged meats); the UI marks such rows instead.
-        See `data-model.md` section 10c.
-     2. **A missing null guard**: the grouped-row build reads
-        `meat_types.name` without checking the row exists. SQLite doesn't
-        enforce FKs unless `PRAGMA foreign_keys = ON`, so a dangling
-        `meat_type_id` would 500 the whole Dashboard instead of
-        degrading. One-line fix, same section 10c.
+   - ~~**23b-vi-b**~~ — done, 2026-08-31 (Claude Code session). The
+     inline expand/collapse drill-down UI on `dashboard.html` that
+     actually renders `by_commissary`, plus the two small backend items
+     folded in from the architect review of 23b-vi-a:
+     1. **Inactive meat types**: grouped rows now carry a
+        `meat_type_active` boolean (`meat_types.active`), **never**
+        filtered on it — a deactivated type is a cataloguing statement,
+        not a claim the stock vanished, same reasoning untagged rows
+        already got. `dashboard.html` marks such rows with an
+        understated `(inactive type)` label next to the name.
+     2. **The missing null guard**: the grouped-row build's
+        `SELECT name FROM meat_types WHERE id = ?` no longer reads
+        `.name` unguarded — a dangling `meat_type_id` (reachable since
+        SQLite only enforces FKs with `PRAGMA foreign_keys = ON`) now
+        degrades to a `(unknown meat type #N)` label and
+        `meat_type_active: false` instead of throwing and 500ing the
+        whole Dashboard.
 
-5. **23c-ii** — the commissary selector, once 23b-vi-b has landed.
+     `dashboard.html`: a ▸/▾ toggle on `kind:"meat_type"` rows with a
+     non-empty `by_commissary` expands to one child row per commissary
+     (its code/name + its own balance); `kind:"untagged"` rows render a
+     disabled toggle since they have no `by_commissary` at all. The
+     restaurant columns and grand total render exactly once, on the
+     parent row — child rows only fill their first two cells and leave
+     the rest blank, never recomputing or repeating those figures.
+     Expand/collapse is a pure re-render of the already-fetched JSON
+     (`lastRollupData`) — no re-fetch, no client-side math.
+
+     **Verified**: baseline full suite (14/14 files, 254/254 assertions,
+     0 failures), confirmed unchanged after the source-only backend
+     edits, then **14/14 files, 257/257 assertions, 0 regressions**
+     after the 3 new tests (an active type's flag, an inactive type's
+     flag with the row explicitly asserted to still appear, and a
+     dangling `meat_type_id` constructed by toggling `PRAGMA
+     foreign_keys` off for one insert, confirmed to degrade rather than
+     throw). `node --check` on the extracted inline script. Live
+     end-to-end check against a real booted server: seeded a real
+     second commissary sharing a meat type with Commissary A, confirmed
+     the parent row expands to show both commissaries with correct
+     individual balances, confirmed the restaurant/grand-total columns
+     appear exactly once (blank on the children), confirmed an
+     untagged row's toggle is disabled, and confirmed deactivating the
+     test meat type flips `meat_type_active` to `false` while the row
+     keeps reporting its real stock. Test rows cleaned up. Pushed to
+     `main` directly. See `changelog.md`'s matching entry for full
+     detail.
+
+5. **23c-ii** — the commissary selector. **Now the last queued item in
+   step 23** — every backend gap it was blocked on (the three
+   `commissary_id` filters, the Dashboard rollup shape, and both small
+   items folded into 23b-vi-b) is closed.
 
 23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, 23c-i, 23c-i-b,
-23b-iv, 23b-v, and 23b-vi-a are done. 23b-vi-b and 23c-ii are not
-started.
+23b-iv, 23b-v, 23b-vi-a, and 23b-vi-b are done. Only 23c-ii remains in
+step 23.
 
 **LIVE HAZARD, present in `main` from 2026-08-31 until 23b-vi-a fixed it
 the same day — kept here for history, not because it's still open.**

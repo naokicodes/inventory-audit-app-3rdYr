@@ -13,6 +13,22 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (Claude Code session) — Step 23b-vi-b: inline commissary drill-down + two backend gaps
+
+`public/dashboard.html`: `kind:"meat_type"` rows with a non-empty `by_commissary` array are now expandable — a ▸/▾ toggle in the first cell, click to show one child row per commissary (its code/name and its own balance). The restaurant columns and grand total stay on the parent row only, rendered exactly once, never repeated or recomputed per commissary in the child rows — the child rows only fill their first two cells and leave the rest blank via `colspan`. No client-side recomputation anywhere: expand/collapse re-renders the already-fetched JSON (`lastRollupData`), it never re-fetches or derives new numbers. `kind:"untagged"` rows render a disabled toggle since they have no `by_commissary` at all.
+
+Two backend gaps closed in `server/routes/dashboard.js`, both found by the architect review of 23b-vi-a rather than assumed unilaterally in this session:
+1. Every `kind:"meat_type"` row now carries a `meat_type_active` boolean, sourced from `meat_types.active`. Rows are never filtered on it — a deactivated type is a cataloguing statement, not a claim the stock vanished, same reasoning untagged rows already got. `dashboard.html` renders it as an understated `(inactive type)` label next to the row's name.
+2. The grouped-row build's `SELECT name FROM meat_types WHERE id = ?` used to read `.name` with no null guard — since SQLite doesn't enforce foreign keys unless `PRAGMA foreign_keys = ON`, a dangling `meat_type_id` would throw a `TypeError` and 500 the entire Dashboard. Now degrades gracefully: a missing meat type falls back to a `(unknown meat type #N)` label and `meat_type_active: false`, consistent with how every other missing-data case in this route already behaves.
+
+`dashboard.test.js`'s mirror was updated to match (not weakened) and gained 3 new tests: `meat_type_active` correct for both an active and an inactive type (with the inactive type's row explicitly asserted to still appear, not be filtered), and a dangling `meat_type_id` (constructed by toggling `PRAGMA foreign_keys` off just for that one insert, since this test file otherwise runs with FKs enforced) confirmed to degrade rather than throw.
+
+**Verified**: baseline full suite run first (14/14 files, 254/254 assertions, 0 failures) and again after the source-only backend edits (still 254/254, confirming the additive field and guard caused no regression before any new tests were added), then again after the new tests (**14/14 files, 257/257 assertions, 0 failures**). `node --check` on the extracted inline `<script>` from `dashboard.html`. Live end-to-end check against a real booted server: seeded a real second commissary sharing a meat type with Commissary A, confirmed the parent row expands to show both commissaries with their correct individual balances, confirmed the restaurant/grand-total columns appear exactly once (on the parent, blank on the children), confirmed an untagged row's toggle is disabled, and confirmed deactivating the test meat type flips `meat_type_active` to `false` while the row keeps reporting its real stock. Test rows cleaned up afterward.
+
+Pushed directly to `main`.
+
+---
+
 ## 2026-08-31 (architect review of 23b-vi-a) — inactive meat types resolved; a missing null guard found
 
 Verified 23b-vi-a independently before reviewing: read the real route
