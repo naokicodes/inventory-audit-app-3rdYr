@@ -61,21 +61,27 @@ router.get('/commissary/meats', (req, res) => {
   res.json(meats);
 });
 
-// GET /api/commissary/yield-log?business_date=&commissary_meat_id=
+// GET /api/commissary/yield-log?business_date=&commissary_meat_id=&commissary_id=
 // Filterable list, newest first, excluding soft-deleted rows. Each row
 // includes the computed actual_loss_pct/status/excess_loss (never
 // stored - see rules-for-claude-code.md rule 4).
+// Step 23b-v (2026-08-31): commissary_id added as a third, independent
+// optional filter. commissary_yield_log has no commissary_id column of
+// its own - the commissary lives on the joined commissary_meats row - so
+// this always joins to it rather than assuming a column that isn't there.
 router.get('/commissary/yield-log', (req, res) => {
-  const { business_date, commissary_meat_id } = req.query;
+  const { business_date, commissary_meat_id, commissary_id } = req.query;
 
   const clauses = ['cyl.deleted_at IS NULL'];
   const params = [];
   if (business_date) { clauses.push('cyl.business_date = ?'); params.push(business_date); }
   if (commissary_meat_id) { clauses.push('cyl.commissary_meat_id = ?'); params.push(Number(commissary_meat_id)); }
+  if (commissary_id) { clauses.push('cm.commissary_id = ?'); params.push(Number(commissary_id)); }
 
   const ids = db.prepare(`
     SELECT cyl.id
     FROM commissary_yield_log cyl
+    JOIN commissary_meats cm ON cm.id = cyl.commissary_meat_id
     WHERE ${clauses.join(' AND ')}
     ORDER BY cyl.created_at DESC, cyl.id DESC
   `).all(...params);
@@ -89,7 +95,7 @@ router.get('/commissary/yield-log', (req, res) => {
   res.json(rows);
 });
 
-// GET /api/commissary/daily-audit?date=2026-08-25&commissary_meat_id=5
+// GET /api/commissary/daily-audit?date=2026-08-25&commissary_meat_id=5&commissary_id=
 // Step 20b (session-status.md): Commissary's own audit engine exposed as a
 // read route, mirroring GET /api/daily-audit's job for restaurants but
 // with Commissary's two-inflow/shipment-usage shape (see
@@ -102,6 +108,10 @@ router.get('/commissary/yield-log', (req, res) => {
 // architect conversation as a shape choice, not an obviously-only-correct
 // one: session-status.md left "one meat/date at a time, or a mixed-grid
 // -style list" as an open call.
+// Step 23b-v (2026-08-31): commissary_id added as a second, independent
+// optional filter (same optional-param convention as 23b-iv's GET
+// /commissary/meats) - restricts the meats listed to one commissary. No
+// page passes it yet; that's 23c-ii's job.
 router.get('/commissary/daily-audit', (req, res) => {
   const date = req.query.date;
   if (!date) {
@@ -109,7 +119,8 @@ router.get('/commissary/daily-audit', (req, res) => {
   }
 
   const commissaryMeatId = req.query.commissary_meat_id ? Number(req.query.commissary_meat_id) : null;
-  const rows = computeCommissaryDailyAudit(db, date, commissaryMeatId);
+  const commissaryId = req.query.commissary_id ? Number(req.query.commissary_id) : null;
+  const rows = computeCommissaryDailyAudit(db, date, commissaryMeatId, commissaryId);
   res.json(rows);
 });
 

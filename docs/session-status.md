@@ -1,26 +1,28 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (**23b-iv done**: optional `commissary_id`
-filter on `GET /api/commissary/meats` - see the dispatch-order list
-under the "23c" entry below for full detail. 23c-i-b also done: fixed
-the Settings -> Conversion Standards "Create" form, broken since 23b's
-rekey. 23c-i also done: Commissary + Meat Type tabs and commissary-meat
-creation UI on `settings.html`, frontend-only, pushed to `main`. Step 23b
-is now at 5 of 6 items done overall — only the Dashboard grouped rollup
-(23b-vi) remains, and it's blocked on an architect response-shape
-decision. See the entries under "Item 3 design" below, and
-`changelog.md`'s matching entries, for full detail).
+Last updated: 2026-08-31 (**23b-v done**: optional `commissary_id`
+filter on `computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`,
+and the same filter on `GET /api/commissary/yield-log` - see the
+dispatch-order list under the "23c" entry below for full detail. 23b-iv
+also done: the same filter on `GET /api/commissary/meats`. 23c-i-b also
+done: fixed the Settings -> Conversion Standards "Create" form, broken
+since 23b's rekey. 23c-i also done: Commissary + Meat Type tabs and
+commissary-meat creation UI on `settings.html`, frontend-only, pushed to
+`main`. Step 23b is now at all 6 items scoped, 5 of 6 landed — only the
+Dashboard grouped rollup (23b-vi) remains, and it's blocked on an
+architect response-shape decision. See the entries under "Item 3 design"
+below, and `changelog.md`'s matching entries, for full detail).
 **Architect recheck, same day (2026-08-31): 23c was found to not be one
 unblocked piece — split into 23c-i (Settings tabs + commissary-meat
 creation UI, fully unblocked, done) and 23c-ii (commissary selector,
-blocked on backend gaps, most now closed — see below). See the full "23c"
+blocked on 3 backend gaps — 2 now closed by 23b-iv/23b-v, 1 still open:
+the Dashboard grouped-rollup shape decision, 23b-vi). See the full "23c"
 entry below for detail.**
 
-**23b-iv is done. Next up: 23b-v** (optional `commissary_id` param on
-`computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`, and
-the same filter on `GET /api/commissary/yield-log`), **then 23b-vi**
-(blocked on an architect decision) **and 23c-ii** — see the dispatch-order
-list under the "23c" entry below.
+**23b-v is done. Next up: 23b-vi** (the Dashboard grouped rollup, still
+blocked on an architect response-shape decision — the last remaining
+piece before 23c-ii can be dispatched) — see the dispatch-order list
+under the "23c" entry below.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1626,21 +1628,24 @@ fresh architecture session:**
     `commissary-shipments.html`, Terminal, Dashboard drill-down).
     **Blocked, do not dispatch yet.** Depends on three backend gaps, only
     two of which were previously flagged:
-    1. `computeCommissaryDailyAudit` + `GET
-       /api/commissary/daily-audit`, and `GET
-       /api/commissary/yield-log`, all need an optional `commissary_id`
-       filter (already flagged below). **Correction, 2026-08-31 second
-       architect recheck**: earlier versions of this list paired
+    1. ~~`computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`,
+       and `GET /api/commissary/yield-log`, all need an optional
+       `commissary_id` filter.~~ **Closed 2026-08-31 (23b-v, Claude Code
+       session)** — see 23b-v's own entry below for full detail.
+       **Correction, 2026-08-31 second architect recheck (preserved for
+       context)**: earlier versions of this list paired
        `computeCommissaryDailyAudit` with
        `commissaryYieldEngine.js`'s `computeYieldLogForDate` and called
-       them "their two `GET` routes." That is wrong and would send a
-       worker to patch dead code: `computeYieldLogForDate` has **no
+       them "their two `GET` routes." That was wrong and would have sent
+       a worker to patch dead code: `computeYieldLogForDate` has **no
        route consumer at all** — only `commissaryYieldEngine.test.js`
-       calls it. The live yield-log route builds its own query inline
-       and calls `computeYieldRow` per id, so that is the thing that
-       actually needs the filter.
+       calls it, and 23b-v correctly left it untouched. The live
+       yield-log route builds its own query inline and calls
+       `computeYieldRow` per id, which is what actually needed (and got)
+       the filter.
     2. The fuller Dashboard grouped-rollup response shape needs an
-       architect decision first (already flagged below).
+       architect decision first (already flagged below). **Still open —
+       the only one of the three backend gaps not yet closed.**
     3. ~~**Newly found, 2026-08-31 architect recheck**: `GET
        /api/commissary/meats` — the route feeding both the Shipment
        form's dropdown *and* Terminal's slot-1 token resolution — has
@@ -1687,17 +1692,40 @@ fresh architecture session:**
    `commissary.html`, `commissary-shipments.html`, Terminal, and the
    Dashboard drill-down). Whether it needs a selector too is an open
    question for whoever scopes 23c-ii — flagged, not decided.
-3. **23b-v** — optional `commissary_id` param on
-   `computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`,
-   and the same filter on `GET /api/commissary/yield-log`.
+3. ~~**23b-v**~~ — done, 2026-08-31 (Claude Code session). Optional
+   `commissary_id` param on `computeCommissaryDailyAudit` + `GET
+   /api/commissary/daily-audit`, and the same filter on `GET
+   /api/commissary/yield-log`. Same optional-filter convention as
+   23b-iv. `computeCommissaryDailyAudit` gained a fourth, optional
+   `commissaryId` param combining sensibly with the existing
+   `commissaryMeatId` filter (a `commissaryMeatId` that doesn't belong
+   to the given `commissaryId` correctly returns `[]`, not an error).
+   `GET /commissary/yield-log` needed a join to `commissary_meats` to
+   filter by commissary, since `commissary_yield_log` has no
+   `commissary_id` column of its own. Deliberately left
+   `computeYieldLogForDate` in `commissaryYieldEngine.js` untouched —
+   it has no route consumer (see the corrected note under 23c-ii's item
+   1 above). New tests: 5 in `commissaryAuditEngine.test.js` (a second
+   `commissaries` fixture added after every test asserting an exact
+   unfiltered count, so none of them shifted), 12 in
+   `commissary.test.js` (mirrored route logic for both routes, reusing
+   23b-iv's second-commissary fixture). Full suite: **14/14 files,
+   250/250 assertions, 0 regressions** (was 233). Live-verified against
+   a real booted server with a real second commissary and a real
+   yield-log entry under it, confirming both routes filter correctly in
+   both directions and an unknown `commissary_id` returns `[]`;
+   confirmed `commissary.html` (a consumer of both routes, unfiltered)
+   still serves and its exact fetch calls still return the correct
+   shape. Pushed to `main` directly. See `changelog.md`'s matching
+   entry for full detail.
 4. **23b-vi** — the Dashboard grouped rollup. **Still blocked on an
    architect response-shape decision** (see the "Flagged, not decided"
-   note above); it gates only itself, so 1-3 can all ship before it is
-   resolved.
-5. **23c-ii** — the commissary selector, once 2-4 have landed.
+   note above) — the only remaining prerequisite before 23c-ii can be
+   dispatched.
+5. **23c-ii** — the commissary selector, once 4 has landed.
 
 23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, 23c-i, 23c-i-b,
-and 23b-iv are done. 23b-v, 23b-vi, and 23c-ii are not started.
+23b-iv, and 23b-v are done. 23b-vi and 23c-ii are not started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading

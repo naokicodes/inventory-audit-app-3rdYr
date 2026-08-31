@@ -145,11 +145,23 @@ function computeCommissaryMeatAudit(db, commissaryMeatId, businessDate) {
  * response shape either way. See the GET route in routes/commissary.js,
  * which mirrors this same optional-filter/list convention already used by
  * GET /api/commissary/yield-log in this project.
+ *
+ * Step 23b-v (2026-08-31): commissaryId is a second, independent optional
+ * filter, restricting the meats iterated to one commissary's own catalog.
+ * Omitted, behavior is unchanged. Combines sensibly with commissaryMeatId:
+ * both narrow the same WHERE, so a commissaryMeatId that doesn't belong to
+ * the given commissaryId correctly returns nothing rather than silently
+ * ignoring the mismatch.
  */
-function computeCommissaryDailyAudit(db, businessDate, commissaryMeatId = null) {
-  const meats = commissaryMeatId
-    ? db.prepare(`SELECT id, code, name, unit FROM commissary_meats WHERE id = ? AND active = 1`).all(commissaryMeatId)
-    : db.prepare(`SELECT id, code, name, unit FROM commissary_meats WHERE active = 1 ORDER BY code`).all();
+function computeCommissaryDailyAudit(db, businessDate, commissaryMeatId = null, commissaryId = null) {
+  const clauses = ['active = 1'];
+  const params = [];
+  if (commissaryMeatId) { clauses.push('id = ?'); params.push(commissaryMeatId); }
+  if (commissaryId) { clauses.push('commissary_id = ?'); params.push(commissaryId); }
+
+  const meats = db.prepare(
+    `SELECT id, code, name, unit FROM commissary_meats WHERE ${clauses.join(' AND ')} ORDER BY code`
+  ).all(...params);
 
   return meats.map(meat => ({
     commissary_meat_id: meat.id,

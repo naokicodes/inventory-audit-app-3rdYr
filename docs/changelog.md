@@ -13,6 +13,24 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (Claude Code session) — Step 23b-v: optional commissary_id filter on the Commissary daily-audit and yield-log read paths
+
+Same optional-filter convention 23b-iv just landed on `GET /api/commissary/meats`, applied to the two remaining commissary-scoped read paths. Omitted, both routes behave exactly as before in every case; no page passes the new param yet — that's 23c-ii's job.
+
+`server/engines/commissaryAuditEngine.js`'s `computeCommissaryDailyAudit` gains a fourth, optional `commissaryId` param (default `null`), restricting the meats it iterates to one commissary's catalog when given. The existing `commissaryMeatId` filter keeps working alongside it — both narrow the same WHERE clause, so a `commissaryMeatId` that doesn't belong to the given `commissaryId` correctly returns an empty array rather than silently ignoring the mismatch. `server/routes/commissary.js`'s `GET /commissary/daily-audit` reads the new `commissary_id` query param and passes it through unchanged otherwise (`date` still required, `commissary_meat_id` still optional).
+
+`GET /commissary/yield-log` gets its own `commissary_id` clause added to the existing optional-clause builder. Unlike the other two routes, `commissary_yield_log` has no `commissary_id` column of its own — the commissary lives on the joined `commissary_meats` row — so the route's `ids` query now always joins to `commissary_meats` (harmless when the filter is omitted) and filters on `cm.commissary_id` when it's given.
+
+**Explicitly not touched, per the dispatch prompt**: `computeYieldLogForDate` in `commissaryYieldEngine.js` — it has no route consumer (only its own test file calls it; the live yield-log route builds its own query and calls `computeYieldRow` per id), so it was left alone entirely. Whether it's dead code is a separate open question, not this step's call.
+
+New tests: `commissaryAuditEngine.test.js` gained a second `commissaries` fixture (added after every existing test that asserts an exact unfiltered row count, so it doesn't shift any of them) plus 5 new tests on `computeCommissaryDailyAudit` — unchanged unfiltered listing now spanning two commissaries, filtering to each one, and both directions of combining `commissaryMeatId` with a matching/mismatched `commissaryId`. `commissary.test.js` gained mirrored route logic for both `GET /commissary/daily-audit` (calling the real, now-imported `computeCommissaryDailyAudit`) and `GET /commissary/yield-log` (mirroring its exact query-building, including the new join), plus 12 new tests covering the same shape of cases for both routes, reusing the second-commissary fixture 23b-iv already added rather than creating a third.
+
+**Verified**: baseline full suite confirmed unchanged after the source-only edits (14/14 files, 233/233 assertions, 0 failures) before adding any tests, then again after adding the new tests: **14/14 files, 250/250 assertions, 0 failures** (+17 new). Live end-to-end check against a real booted server: unfiltered calls to both routes confirmed unchanged; created a second real commissary with its own meat and a real yield-log entry under it, confirmed `commissary_id` correctly includes/excludes the right rows on both routes, confirmed an unknown `commissary_id` returns `[]` rather than erroring; confirmed `commissary.html` (a consumer of both routes, calling them with no param) still serves and its exact unfiltered fetch calls still return the correct shape. Test rows cleaned up afterward.
+
+Pushed directly to `main`.
+
+---
+
 ## 2026-08-31 (architect, web session) — graphify's dirty working tree: expected, three paths flagged as undecided
 
 No code changed. Project owner asked whether `graphify-out/` constantly

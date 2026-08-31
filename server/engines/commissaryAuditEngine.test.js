@@ -193,6 +193,43 @@ test('inactive commissary meats are excluded from the unfiltered list', () => {
   db.prepare('UPDATE commissary_meats SET active = 1 WHERE id = ?').run(bellyId); // restore
 });
 
+// Step 23b-v: a second commissary, added here (after every test above that
+// asserts an exact unfiltered row count) rather than up top with the rest
+// of the fixtures, so it doesn't shift any already-asserted count.
+db.prepare(`INSERT INTO commissaries (code, name) VALUES ('COM-B', 'Commissary B')`).run();
+const commissaryBId = db.prepare(`SELECT id FROM commissaries WHERE code = 'COM-B'`).get().id;
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryBId, 'M01', 'Beef Cut', 'kg', 0.20);
+const beefCutId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryBId, 'M01').id;
+
+test('computeCommissaryDailyAudit with no commissaryId still lists every active meat across every commissary, unchanged, now that a second commissary exists', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01');
+  assert.strictEqual(rows.length, 3); // JOWL + Belly Slab (Commissary A) + Beef Cut (Commissary B)
+});
+
+test('computeCommissaryDailyAudit filters to only Commissary A\'s meats when given its commissaryId', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', null, commissaryId);
+  assert.strictEqual(rows.length, 2);
+  assert.ok(rows.every(r => r.commissary_meat_id !== beefCutId), 'Commissary B\'s meat must not appear');
+});
+
+test('computeCommissaryDailyAudit filters to only Commissary B\'s meat when given its commissaryId', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', null, commissaryBId);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_meat_id, beefCutId);
+});
+
+test('combining commissaryMeatId with a commissaryId it does not belong to returns nothing, not an error', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', jowlId, commissaryBId);
+  assert.strictEqual(rows.length, 0);
+});
+
+test('combining commissaryMeatId with the commissaryId it actually belongs to returns exactly that meat', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', jowlId, commissaryId);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_meat_id, jowlId);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 
 db.close();

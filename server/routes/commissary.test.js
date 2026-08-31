@@ -11,6 +11,8 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
+const { computeCommissaryDailyAudit } = require('../engines/commissaryAuditEngine.js');
+const { computeYieldRow } = require('../engines/commissaryYieldEngine.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -60,6 +62,27 @@ function listCommissaryMeats({ commissary_id } = {}) {
     `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id
      FROM commissary_meats WHERE ${clauses.join(' AND ')} ORDER BY code`
   ).all(...params);
+}
+
+// Mirrors GET /api/commissary/yield-log (step 23b-v: optional commissary_id,
+// via a join to commissary_meats since the log row has no commissary_id
+// column of its own)
+function listYieldLog({ business_date, commissary_meat_id, commissary_id } = {}) {
+  const clauses = ['cyl.deleted_at IS NULL'];
+  const params = [];
+  if (business_date) { clauses.push('cyl.business_date = ?'); params.push(business_date); }
+  if (commissary_meat_id) { clauses.push('cyl.commissary_meat_id = ?'); params.push(Number(commissary_meat_id)); }
+  if (commissary_id) { clauses.push('cm.commissary_id = ?'); params.push(Number(commissary_id)); }
+
+  const ids = db.prepare(`
+    SELECT cyl.id
+    FROM commissary_yield_log cyl
+    JOIN commissary_meats cm ON cm.id = cyl.commissary_meat_id
+    WHERE ${clauses.join(' AND ')}
+    ORDER BY cyl.created_at DESC, cyl.id DESC
+  `).all(...params);
+
+  return ids.map(({ id }) => computeYieldRow(db, id));
 }
 
 function getReceiptRow(id) {
@@ -664,6 +687,84 @@ test('filtering to the second commissary returns only its own meat', () => {
 test('an unknown commissary_id returns an empty array, not an error', () => {
   const rows = listCommissaryMeats({ commissary_id: 9999 });
   assert.deepStrictEqual(rows, []);
+});
+
+console.log('\nCommissary Route Tests (GET /commissary/daily-audit and GET /commissary/yield-log: step 23b-v optional commissary_id filter)\n');
+
+// Fixtures for this block: commissary meat id 1 (Jowl, Commissary A, id 1)
+// and id 3 (Beef Cut, Commissary B, id 2) already exist from the 23b-iv
+// block above. commissary meat id 1 gets a yield log row and an opening
+// stock so computeCommissaryDailyAudit has something other than
+// MISSING_BEGINNING_STOCK to report - not required for the filter itself,
+// but makes the fixture more representative.
+db.prepare(`INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (1, '2026-08-01', 10)`).run();
+db.prepare(`INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (1, '2026-08-01', 5, 4)`).run();
+db.prepare(`INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (3, '2026-08-01', 2, 1.5)`).run();
+
+test('daily-audit: omitted commissary_id lists every active commissary meat across every commissary, unchanged', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01');
+  assert.strictEqual(rows.length, 2); // meat id 1 (Commissary A) + meat id 3 (Commissary B) - meat id 2 is inactive
+});
+
+test('daily-audit: a commissary_id filters to only that commissary\'s meats', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', null, 1);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_meat_id, 1);
+});
+
+test('daily-audit: a second commissary\'s meats are excluded when filtering to the first', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', null, 1);
+  assert.ok(!rows.some(r => r.commissary_meat_id === 3));
+});
+
+test('daily-audit: filtering to the second commissary returns only its own meat', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', null, 2);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_meat_id, 3);
+});
+
+test('daily-audit: combining commissary_meat_id with a commissary_id it does not belong to returns nothing', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', 1, 2);
+  assert.strictEqual(rows.length, 0);
+});
+
+test('daily-audit: combining commissary_meat_id with its own correct commissary_id returns exactly that meat', () => {
+  const rows = computeCommissaryDailyAudit(db, '2026-08-01', 1, 1);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_meat_id, 1);
+});
+
+test('yield-log: omitted commissary_id lists every non-deleted row across every commissary, unchanged', () => {
+  const rows = listYieldLog();
+  assert.strictEqual(rows.length, 2);
+});
+
+test('yield-log: a commissary_id filters to only that commissary\'s rows (via the commissary_meats join)', () => {
+  const rows = listYieldLog({ commissary_id: 1 });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_meat_id, 1);
+});
+
+test('yield-log: a second commissary\'s rows are excluded when filtering to the first', () => {
+  const rows = listYieldLog({ commissary_id: 1 });
+  assert.ok(!rows.some(r => r.commissary_meat_id === 3));
+});
+
+test('yield-log: filtering to the second commissary returns only its own row', () => {
+  const rows = listYieldLog({ commissary_id: 2 });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_meat_id, 3);
+});
+
+test('yield-log: combining commissary_meat_id with a commissary_id it does not belong to returns nothing', () => {
+  const rows = listYieldLog({ commissary_meat_id: 1, commissary_id: 2 });
+  assert.strictEqual(rows.length, 0);
+});
+
+test('yield-log: combining commissary_meat_id with its own correct commissary_id returns exactly that row', () => {
+  const rows = listYieldLog({ commissary_meat_id: 1, commissary_id: 1 });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_meat_id, 1);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
