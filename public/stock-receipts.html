@@ -148,7 +148,12 @@
     async function loadCommissaryMeats() {
       const res = await fetch('/api/commissary/meats');
       commissaryMeats = await res.json();
-      newCommissaryMeat.innerHTML = commissaryMeats.map(m => `<option value="${m.id}">${m.code} - ${m.name}</option>`).join('');
+      // Append the commissary as a disambiguator only when the list
+      // actually spans more than one commissary - a single-commissary
+      // install sees no change. A null commissary_code (dangling
+      // commissary_id) renders with no suffix rather than "undefined".
+      const multiCommissary = new Set(commissaryMeats.map(m => m.commissary_id)).size > 1;
+      newCommissaryMeat.innerHTML = commissaryMeats.map(m => `<option value="${m.id}">${m.code} - ${m.name}${multiCommissary && m.commissary_code ? ` (${m.commissary_code})` : ''}</option>`).join('');
     }
 
     function updateMappingWarning() {

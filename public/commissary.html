@@ -122,7 +122,14 @@
       if (commissarySelect.value) params.set('commissary_id', commissarySelect.value);
       const res = await fetch(`/api/commissary/meats?${params.toString()}`);
       const meats = await res.json();
-      const opts = meats.map(m => `<option value="${m.id}">${m.code} - ${m.name} (${m.unit})</option>`).join('');
+      // Append the commissary as a disambiguator only when the fetched
+      // list actually spans more than one commissary - e.g. whenever
+      // "All commissaries" is selected and two commissaries share a
+      // code. A null commissary_code (dangling commissary_id) renders
+      // with no suffix rather than "undefined".
+      const multiCommissary = new Set(meats.map(m => m.commissary_id)).size > 1;
+      const label = m => `${m.code} - ${m.name}${multiCommissary && m.commissary_code ? ` (${m.commissary_code})` : ''} (${m.unit})`;
+      const opts = meats.map(m => `<option value="${m.id}">${label(m)}</option>`).join('');
       newMeat.innerHTML = opts || '<option value="">No commissary meats seeded yet</option>';
       filterMeat.innerHTML = '<option value="">All</option>' + opts;
     }
