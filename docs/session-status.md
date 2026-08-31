@@ -20,8 +20,11 @@ suite, and how to keep context costs down.
 
 **Step 23 is fully closed.** All of 23a, 23b's six items, and 23c
 (23c-i, 23c-i-b, 23c-ii-a through 23c-ii-d) are done and pushed. Full
-suite: **15 files, 273/273 assertions, 0 failures**, verified
-independently by the architect rather than taken from commit messages.
+suite (as of this session's dashboard fix): **15 files, 276/276
+assertions, 0 failures** (`node <file>.test.js` run individually — no
+test runner script exists yet; includes `server/db/activityLog.test.js`
+and `server/db/migrate.test.js`, easy to miss since they live outside
+`server/routes`/`server/engines`).
 
 **No step is currently queued.** What comes next is the project owner's
 call. The designed-but-unstarted work is step 24 (below); the cheap
@@ -32,6 +35,7 @@ The most recent landings, newest first — full detail for each is in
 
 | Step | What landed |
 |---|---|
+| — | Fixed dashboard.js's dangling-`commissary_id` INNER JOIN silently dropping stock |
 | — | Fixed 23c-ii-d follow-on: qualified-branch silent-first-match in `resolveCommissaryMeat` |
 | 23c-ii-d | Terminal qualified-token grammar (`com-a/m05`); closed a silent-first-match bug |
 | 23c-ii-c | Commissary identity on `GET /api/commissary/meats` (LEFT JOIN) + label fixes on two pages |
@@ -42,19 +46,10 @@ The most recent landings, newest first — full detail for each is in
 
 ## Known open items (not the next step's problem, just not forgotten)
 
-- **`dashboard.js`'s INNER JOIN to `commissaries` (found 2026-09-01,
-  not yet fixed).** `/dashboard/stock-rollup` (~L103) does `JOIN
-  commissaries c ON c.id = cm.commissary_id`. SQLite only enforces FKs
-  under `PRAGMA foreign_keys = ON`, so a dangling `commissary_id` would
-  make that meat **silently vanish** from the Dashboard — no error, no
-  degraded row, just missing stock. Same hazard class as the
-  `meat_type_id` null guard 23b-vi-b closed, but caught on the
-  commissary side instead, and arguably worse since a missing row is
-  harder to notice than a wrong label. 23c-ii-c specifies a LEFT JOIN for
-  the route *it* touches; this one is a different route and was left
-  alone deliberately rather than bundled, per rule 16. Small enough to
-  ride along with the next Dashboard-touching step, or to dispatch on its
-  own if none comes up soon.
+- ~~**`dashboard.js`'s INNER JOIN to `commissaries`**~~ — fixed
+  2026-09-01, see `changelog.md`. Changed to `LEFT JOIN` (matching
+  23c-ii-c) with a `(unknown commissary #N)` fallback label on the
+  `by_commissary` entries, mirroring the existing `meat_type_id` guard.
 
 - **A real click-through in an actual browser is still owed** for Stock
   Receipts' Unallocated/Assign flow specifically — the 2026-08-28 session
