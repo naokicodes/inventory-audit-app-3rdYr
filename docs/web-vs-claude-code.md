@@ -35,7 +35,7 @@ available. It skips that setup tax entirely.
 That's the whole trade-off. Pick based on how many times, in a row,
 you're about to touch the repo.
 
-## Push access — the other real difference, not yet confirmed
+## Push access — CONFIRMED for Claude Code, 2026-09-01
 
 Free-tier web chat "coder workers" have **uneven** git push access per rule
 18 — some sessions get read-only network, some get none, and the standing
@@ -47,11 +47,21 @@ are already configured there — which would make direct push the normal case,
 not the exception, collapsing most of rule 18's file-handoff dance for
 Claude Code sessions specifically.
 
-**This is not yet confirmed** — whether the project owner's local Claude Code
-setup actually has push credentials configured needs a direct answer before
-rule 18 gets amended to say so. Until confirmed, a Claude Code session should
-try `git push` and fall back to rule 18's standard file-handoff format if it
-fails, same as any worker — not assume push will work.
+**Confirmed 2026-09-01** by the architect conversation, from evidence rather
+than from asking: every Claude Code session in step 23 — 23c-i (`29b3858`),
+23c-i-b, 23b-iv, 23b-v, 23b-vi-a, and 23b-vi-b (`eaec9b8`) — pushed directly
+to `main`, six for six, with no file-handoff fallback used once. `git log` on
+`main` is the receipt.
+
+So for **Claude Code sessions specifically**, direct push is the normal case
+and the rule-18 file-handoff dance does not apply. A Claude Code session
+should just commit and push.
+
+This does **not** generalize to free-tier web chat workers, whose access
+remains uneven exactly as rule 18 describes — that half of the rule stands
+unchanged. And a Claude Code session that *does* somehow fail to push should
+still fall back to rule 18's standard file-handoff format rather than
+reaching for a bundle, a patch, or any other git mechanism.
 
 ## Use web chat for
 

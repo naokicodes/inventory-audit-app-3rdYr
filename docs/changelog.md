@@ -13,6 +13,58 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-01 (architect, web session) — 23c-ii split four ways; "no decisions needed" was wrong on three counts
+
+No code changed. The hand-off into this session said 23c-ii was unblocked
+and decision-free. Verified independently first (fresh clone, full suite
+run: 14 files, **257/257, 0 failures**), then checked that claim against
+the code rather than taking it — it was wrong three times over.
+
+**Also settled the open question that opened the session**: the Dashboard
+rendering as a flat table is correct, not broken. Reproduced live — seeded
+a `Jowl` meat type, tagged `M05`, added a Conversion Standard, booted a
+real server, and confirmed the row comes back as `kind: "meat_type"` with
+`by_commissary` populated. One correction to the expected explanation: with
+only COM-A existing, Jowl's toggle is **enabled and clickable**, not
+disabled — a group of one still has a non-empty `by_commissary`. Only
+`kind: "untagged"` rows get the disabled toggle. Also diffed the served
+`dashboard.html` against the checked-out source to rule out rule 21's
+stale-server trap.
+
+**Terminal has a live correctness hazard.** `UNIQUE (commissary_id, code)`
+means `M05` can exist in two commissaries; `resolveExact` uses
+`list.find(...)` against an unfiltered `/api/commissary/meats` and silently
+returns the first hit. Same shape as the double-count 23b-vi-a closed:
+harmless today because COM-A is the only commissary, one admin action from
+firing. Resolved as **qualified tokens (`com-a/m05`)** rather than a
+page-level selector — the project owner's call, on the grounds that
+Terminal exists precisely as a keyboard-only alternative to aiming a mouse
+at forms, so a dropdown there defeats the screen's purpose. The selector
+was the smaller build and was rejected knowingly.
+
+**The Dashboard item was already built.** `dashboard.js` L69 says the route
+is deliberately cross-commissary, and 23b-vi-b shipped the drill-down.
+Dropped from 23c-ii's page list; nothing to build.
+
+**A fourth backend gap, previously unflagged.** `GET
+/api/commissary/meats` returns no commissary identity whatsoever, so
+Terminal can't detect ambiguity or render a qualified token, and
+`stock-receipts.html` can't label which `M05 - JOWL` is which. Neither
+frontend piece was buildable. Identical shape to 23c-i-b — a catalog read
+route missing one column, silently blocking work scoped as frontend-only —
+and given the same additive treatment.
+
+Split into 23c-ii-a (`commissary.html` selector), 23c-ii-b
+(`commissary-shipments.html` selector), 23c-ii-c (the additive columns +
+the `stock-receipts.html` label fix), and 23c-ii-d (the Terminal grammar,
+which 23c-ii-c blocks). Full specs and the grammar's eight rules are in
+`session-status.md`.
+
+**Also corrected**: `web-vs-claude-code.md`'s "Push access — not yet
+confirmed" section. Six Claude Code sessions in step 23 pushed straight to
+`main` with no fallback used; the doc had been telling every session to
+expect it might not work.
+
 ## 2026-08-31 (architect) — Rule 21 added: stop any server you start
 
 Project owner hit `EADDRINUSE: address already in use :::3000` on

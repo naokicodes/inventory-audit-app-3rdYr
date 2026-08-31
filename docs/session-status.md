@@ -1,25 +1,28 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (**23b-vi-b done**: the inline commissary
-drill-down on the Dashboard - a ▸/▾ toggle on grouped rows now renders
-`by_commissary` (previously correct in the JSON, invisible in the
-table), plus two small backend items folded in from the architect
-review of 23b-vi-a (a `meat_type_active` flag, never used to filter, and
-a null-guard so a dangling `meat_type_id` degrades instead of 500ing the
-whole Dashboard). **Step 23 now has exactly one item left: 23c-ii, the
-commissary selector** — see the dispatch-order list under the "23c"
-entry below for full detail. 23b-vi-a (the grouping itself, which closed
+Last updated: 2026-09-01 (**23c-ii split into four sub-steps** by the
+architect conversation — see the entry below. Previously: **23b-vi-b
+done**: the inline commissary drill-down on the Dashboard - a ▸/▾ toggle
+on grouped rows now renders `by_commissary` (previously correct in the
+JSON, invisible in the table), plus two small backend items folded in
+from the architect review of 23b-vi-a (a `meat_type_active` flag, never
+used to filter, and a null-guard so a dangling `meat_type_id` degrades
+instead of 500ing the whole Dashboard). 23b-vi-a (the grouping itself, which closed
 a live double-count bug), 23b-v/23b-iv (optional `commissary_id`
 filters), 23c-i-b (the Conversion Standards "Create" form fix), and
 23c-i (Commissary + Meat Type tabs) are all also done — step 23b is
 fully done, all 6 items landed. See the entries under "Item 3 design"
 below, and `changelog.md`'s matching entries, for full detail).
 
-**23b-vi-b is done. Next and final step-23 item: 23c-ii** (the
-commissary selector everywhere a screen currently assumes there's only
-one — `commissary.html`, `commissary-shipments.html`, Terminal, and the
-Dashboard drill-down; every backend gap it was blocked on is now
-closed) — see the dispatch-order list under the "23c" entry below.
+**23b-vi-b is done. 23c-ii is next — but it was NOT one dispatchable
+item, and it was not decision-free.** The architect conversation of
+2026-09-01 checked the claim "23c-ii needs no decisions" against the
+actual code and found it false on three counts (a live correctness
+hazard in Terminal, a Dashboard item that was already built, and an
+undiscovered backend gap). 23c-ii is now split into **four sub-steps,
+23c-ii-a through 23c-ii-d**, and the Dashboard is dropped from its page
+list entirely. See the "23c-ii, split 2026-09-01" entry below for all of
+it. 23c-ii-a is dispatchable now; the rest are sequenced behind it.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1620,11 +1623,18 @@ fresh architecture session:**
     client-side untagged-meat guard's logic in isolation (empty
     `data-meat-type-id` correctly refuses, a real id correctly passes
     through). Test rows cleaned up afterward. Pushed to `main` directly.
-  - **23c-ii: a commissary selector everywhere a screen currently
-    assumes there's only one** (`commissary.html`,
+  - **23c-ii, split 2026-09-01 into 23c-ii-a .. 23c-ii-d.** What follows
+    immediately below is the ORIGINAL entry, preserved because its
+    three-backend-gap history is still the reason 23b-iv/23b-v exist.
+    **The page list in it is wrong and the "blocked" status is stale** —
+    read the "23c-ii split" section further down for what to actually
+    dispatch.
+
+    **23c-ii (original framing): a commissary selector everywhere a
+    screen currently assumes there's only one** (`commissary.html`,
     `commissary-shipments.html`, Terminal, Dashboard drill-down).
-    **Blocked, do not dispatch yet.** Depends on three backend gaps, only
-    two of which were previously flagged:
+    Depended on three backend gaps, only two of which were previously
+    flagged:
     1. ~~`computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`,
        and `GET /api/commissary/yield-log`, all need an optional
        `commissary_id` filter.~~ **Closed 2026-08-31 (23b-v, Claude Code
@@ -1651,6 +1661,145 @@ fresh architecture session:**
        `commissary_id` filter (omitted behaves exactly as before). See
        23b-iv's own entry below for full detail. Still nothing consumes
        it yet — 23c-ii's own frontend job, once dispatched.
+
+### 23c-ii split into four sub-steps — resolved 2026-09-01 (architect)
+
+The hand-off into this session said 23c-ii was "unblocked and needs no
+decisions from me." Checked against the actual code rather than taken on
+trust, that was wrong on three counts. All three are now resolved; the
+step is split per rule 16, since "a selector on four screens" is exactly
+the "X, Y, and Z" shape that rule says should be separate steps.
+
+**Resolution 1 — Terminal is a correctness problem, not a dropdown.**
+`schema.sql` L269 is `UNIQUE (commissary_id, code)`, so `M05` may
+legitimately exist in both COM-A and COM-B. `terminal.html`'s
+`resolveExact` (~L290) resolves a typed token with `list.find(...)`
+against an *unfiltered* `/api/commissary/meats`: type `M05`, silently
+get whichever row came back first, no warning anywhere on screen. This
+is the same shape as the `/dashboard/stock-rollup` double-count 23b-vi-a
+closed — it cannot fire today because COM-A is the only commissary, and
+it is one admin action away from firing now that 23c-i ships a
+Commissary-creation UI.
+
+**Decided: qualified tokens (`com-a/m05`), NOT a page-level selector on
+Terminal.** The project owner's call, and the reasoning is Terminal's
+whole purpose: it exists as a keyboard-only alternative to aiming a
+mouse at the other pages' forms. A commissary dropdown would put a mouse
+trip back on the one screen built to avoid it. A selector was the
+smaller build and was rejected on those grounds — recorded here so it
+isn't re-proposed later as an "obvious simplification." Full grammar
+under 23c-ii-d below.
+
+**Resolution 2 — the Dashboard is dropped from the page list.**
+`dashboard.js` L69 states outright that the route takes no
+`commissary_id` filter because the Dashboard is deliberately
+cross-commissary, and 23b-vi-b already shipped the ▸/▾ per-commissary
+drill-down. A selector there would mean "show one commissary's rollup,"
+which is what `commissary.html` is for. This item was almost certainly
+listed before the drill-down existed. **Build nothing for the Dashboard
+in 23c-ii.**
+
+**Resolution 3 — `stock-receipts.html` is in scope, as a label fix only.**
+The previously-flagged open question. Its dropdown renders
+`${m.code} - ${m.name}` (~L150), so two commissaries sharing a code
+produce two visually identical `M05 - JOWL` options. The `value` is
+`m.id`, so whichever the user picks still writes the correct
+`commissary_meat_id` — this is a "which one is which" problem, not a
+silent-wrong-data one, and is therefore materially less severe than
+Terminal's. Resolved with the cheap fix: append the commissary to the
+label. No selector on that page.
+
+**Newly found while resolving 1 and 3 — a fourth backend gap nobody had
+flagged.** `GET /api/commissary/meats` selects
+`id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id`
+(`server/routes/commissary.js` L58) — **no commissary identity at all.**
+So Terminal cannot detect that `M05` is ambiguous, cannot render
+`com-a/m05`, and cannot resolve a qualified token; and
+`stock-receipts.html` cannot append `(COM-A)`. Neither frontend piece is
+buildable until this route returns the commissary. This is the exact
+shape as 23c-i-b's finding (a catalog read route missing one column,
+blocking a frontend fix that had been scoped as frontend-only), and gets
+the same treatment: one small additive step, cited as precedent.
+
+**Dispatch order for 23c-ii:**
+
+- **23c-ii-a — page-level commissary selector on `commissary.html` only.**
+  Fully unblocked, no decisions outstanding, dispatchable immediately and
+  independent of everything below. Add a commissary `<select>` mirroring
+  the restaurant selector in `daily-audit.html` (~L61-77), populated from
+  `GET /api/settings/commissaries` filtered to `active === 1`. First and
+  **default** option is "All commissaries", value `""`. Thread the
+  selection as an optional `&commissary_id=N`, omitted entirely when
+  "All" is chosen, into the page's three commissary-scoped reads:
+  `loadMeats()` → `GET /api/commissary/meats`, `loadBalances()` →
+  `GET /api/commissary/daily-audit`, and the yield-log list →
+  `GET /api/commissary/yield-log`. All three already accept that optional
+  param (23b-iv, 23b-v). Frontend-only; no backend, schema, or route
+  change. The yield-log POST/PUT/DELETE paths are explicitly out of scope
+  — they key off a `commissary_meat_id`, which is already
+  commissary-specific.
+
+  **Why "All" is the default**: the routes' optional-filter convention
+  already means "omitted = everything," so defaulting to All makes the
+  change provably behavior-preserving on load. That's what justifies
+  shipping it with no new tests.
+
+- **23c-ii-b — page-level commissary selector on
+  `commissary-shipments.html`.** Same pattern and same "All" default as
+  23c-ii-a. That page reads `GET /api/commissary/meats` (~L116) and
+  `GET /api/commissary/daily-audit` (~L147). Its
+  `shipment-presets`/`conversion-standards` reads are keyed by
+  `commissary_meat_id` and are already commissary-specific — do not add
+  `commissary_id` to them. A separate step from 23c-ii-a per rule 16:
+  same pattern, different page, and neither blocks the other.
+
+- **23c-ii-c — additive commissary identity on `GET
+  /api/commissary/meats`, plus the `stock-receipts.html` label fix.**
+  Backend + one-line frontend, deliberately bundled exactly as 23c-i-b
+  bundled its column addition with the form it unblocked. Add
+  `commissary_id`, and the joined commissary's `code` and `name`, to that
+  route's SELECT. **Purely additive** — no new filter, no WHERE change,
+  no removal of `meat_type_id` (23c-i-b added it; don't drop it). Six
+  live consumers pass nothing today and must all keep working unchanged.
+  Then `stock-receipts.html`'s `loadCommissaryMeats()` (~L150) renders
+  the commissary in its option label, so two same-coded meats are
+  distinguishable. **Blocks 23c-ii-d — dispatch before it, not after.**
+
+- **23c-ii-d — Terminal qualified-token grammar.** The largest sub-step
+  and the only one closing a correctness hole. Depends on 23c-ii-c.
+  Grammar, decided here so the worker does not have to invent it:
+
+  1. **Qualifier syntax is `<commissary-code>/<meat>`**, e.g.
+     `com-a/m05`. `/` is safe: the input line is whitespace-tokenized, so
+     a `/` cannot split a token, and `normalize()` only lowercases and
+     strips whitespace, so a code like `COM-A` survives normalization
+     intact as `com-a`.
+  2. **A bare token still resolves whenever it is unique across all
+     commissaries** — today's exact behavior, and every existing habit,
+     is preserved until a real collision exists. Same
+     provably-behavior-preserving reasoning as 23c-ii-a's "All" default.
+  3. **An ambiguous bare token is an ERROR, never silently resolved.**
+     The slot guide already has an `error` state (red, `"M05"?` — see
+     `renderSlotGuide`); use it. The hint bar says how many commissaries
+     matched. This is the actual bug fix; everything else is ergonomics.
+  4. **The dropdown offers qualified forms when, and only when, the
+     partial token is ambiguous**, each row showing the qualified token
+     plus the meat and commissary names so the two are distinguishable.
+  5. **`canonicalToken` inserts the bare normalized name when unique, the
+     qualified form when not** — so selecting from the dropdown always
+     produces a re-parseable token, which is a property the existing code
+     already guarantees and must keep.
+  6. **A qualified token is always accepted, even when the bare form
+     would have been unambiguous.** Someone who types `com-a/m05` out of
+     habit must never be told they didn't need to.
+  7. **Right-hand side matches code OR normalized name**, same as today —
+     `com-a/jowl` must work as well as `com-a/m05`.
+  8. **Slot 2 (restaurant) is untouched.** Restaurants are globally
+     unique; there is nothing to qualify.
+
+  Not decided here, flag if it comes up: what happens if two
+  *commissaries* ever share a code. `commissaries.code` is `UNIQUE`
+  (`schema.sql` L228), so it cannot happen today.
 
 **23c-i and 23c-i-b are both done. Dispatch order from here, decided
 2026-08-31:**
@@ -1801,14 +1950,17 @@ fresh architecture session:**
      `main` directly. See `changelog.md`'s matching entry for full
      detail.
 
-5. **23c-ii** — the commissary selector. **Now the last queued item in
-   step 23** — every backend gap it was blocked on (the three
-   `commissary_id` filters, the Dashboard rollup shape, and both small
-   items folded into 23b-vi-b) is closed.
+5. **23c-ii** — **split 2026-09-01 into 23c-ii-a .. 23c-ii-d; see the
+   "23c-ii split" section above for the specs and the three
+   resolutions.** The three backend gaps listed above are indeed all
+   closed — but a fourth, missing commissary identity on `GET
+   /api/commissary/meats`, was found on 2026-09-01 and is now 23c-ii-c.
+   Dispatch order: **23c-ii-a and 23c-ii-b in either order, then
+   23c-ii-c, then 23c-ii-d** (which 23c-ii-c blocks).
 
 23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, 23c-i, 23c-i-b,
-23b-iv, 23b-v, 23b-vi-a, and 23b-vi-b are done. Only 23c-ii remains in
-step 23.
+23b-iv, 23b-v, 23b-vi-a, and 23b-vi-b are done. 23c-ii's four sub-steps
+are all that remain in step 23.
 
 **LIVE HAZARD, present in `main` from 2026-08-31 until 23b-vi-a fixed it
 the same day — kept here for history, not because it's still open.**
