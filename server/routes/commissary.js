@@ -47,16 +47,29 @@ function getShipmentWithLines(shipmentId) {
 // a selected commissary meat to its meat_type_id (POST
 // /commissary/conversion-standards is keyed by meat_type_id, not
 // commissary_meat_id).
+// Step 23c-ii-c (2026-09-01): commissary_id + the joined commissary's own
+// code/name added, purely additive - lets a consumer disambiguate two
+// commissaries' meats sharing the same code (see commissary.html and
+// stock-receipts.html's label fixes). Joined columns are aliased
+// commissary_code/commissary_name (matches dashboard.js's convention)
+// since the meat's own code/name are already in this SELECT unaliased.
+// LEFT JOIN, not INNER - SQLite doesn't enforce FKs unless
+// PRAGMA foreign_keys=ON, so a dangling commissary_id is reachable; an
+// INNER JOIN would silently drop that meat from all six consumers
+// instead of just showing a null commissary_code/commissary_name.
 router.get('/commissary/meats', (req, res) => {
   const { commissary_id } = req.query;
 
-  const clauses = ['active = 1'];
+  const clauses = ['cm.active = 1'];
   const params = [];
-  if (commissary_id) { clauses.push('commissary_id = ?'); params.push(Number(commissary_id)); }
+  if (commissary_id) { clauses.push('cm.commissary_id = ?'); params.push(Number(commissary_id)); }
 
   const meats = db.prepare(
-    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id
-     FROM commissary_meats WHERE ${clauses.join(' AND ')} ORDER BY code`
+    `SELECT cm.id, cm.code, cm.name, cm.unit, cm.allowed_leeway_pct, cm.cost_per_unit, cm.meat_type_id,
+            cm.commissary_id, c.code as commissary_code, c.name as commissary_name
+     FROM commissary_meats cm
+     LEFT JOIN commissaries c ON c.id = cm.commissary_id
+     WHERE ${clauses.join(' AND ')} ORDER BY cm.code`
   ).all(...params);
   res.json(meats);
 });

@@ -53,14 +53,20 @@ db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, a
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, active) VALUES (2, 1, 'CM02', 'Retired Meat', 'kg', 0.2, 0)`).run();
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (3, 2, 'CM01', 'Beef Cut', 'kg', 0.2)`).run();
 
-// Mirrors GET /api/commissary/meats (step 23b-iv: optional commissary_id filter)
+// Mirrors GET /api/commissary/meats (step 23b-iv: optional commissary_id
+// filter; step 23c-ii-c: commissary_id + joined commissary_code/
+// commissary_name, via LEFT JOIN so a dangling commissary_id degrades
+// instead of dropping the row)
 function listCommissaryMeats({ commissary_id } = {}) {
-  const clauses = ['active = 1'];
+  const clauses = ['cm.active = 1'];
   const params = [];
-  if (commissary_id) { clauses.push('commissary_id = ?'); params.push(Number(commissary_id)); }
+  if (commissary_id) { clauses.push('cm.commissary_id = ?'); params.push(Number(commissary_id)); }
   return db.prepare(
-    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id
-     FROM commissary_meats WHERE ${clauses.join(' AND ')} ORDER BY code`
+    `SELECT cm.id, cm.code, cm.name, cm.unit, cm.allowed_leeway_pct, cm.cost_per_unit, cm.meat_type_id,
+            cm.commissary_id, c.code as commissary_code, c.name as commissary_name
+     FROM commissary_meats cm
+     LEFT JOIN commissaries c ON c.id = cm.commissary_id
+     WHERE ${clauses.join(' AND ')} ORDER BY cm.code`
   ).all(...params);
 }
 
@@ -689,6 +695,25 @@ test('an unknown commissary_id returns an empty array, not an error', () => {
   assert.deepStrictEqual(rows, []);
 });
 
+console.log('\nCommissary Route Tests (GET /commissary/meats: step 23c-ii-c commissary identity)\n');
+
+test('the joined commissary_id/commissary_code/commissary_name come back populated and correct', () => {
+  const rows = listCommissaryMeats({ commissary_id: 1 });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_id, 1);
+  assert.strictEqual(rows[0].commissary_code, 'COM-A');
+  assert.strictEqual(rows[0].commissary_name, 'Commissary A');
+});
+
+test('a second commissary\'s meat gets its own correct commissary identity', () => {
+  const rows = listCommissaryMeats({ commissary_id: 2 });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].commissary_id, 2);
+  assert.strictEqual(rows[0].commissary_code, 'COM-B');
+  assert.strictEqual(rows[0].commissary_name, 'Commissary B');
+});
+
+
 console.log('\nCommissary Route Tests (GET /commissary/daily-audit and GET /commissary/yield-log: step 23b-v optional commissary_id filter)\n');
 
 // Fixtures for this block: commissary meat id 1 (Jowl, Commissary A, id 1)
@@ -765,6 +790,29 @@ test('yield-log: combining commissary_meat_id with its own correct commissary_id
   const rows = listYieldLog({ commissary_meat_id: 1, commissary_id: 1 });
   assert.strictEqual(rows.length, 1);
   assert.strictEqual(rows[0].commissary_meat_id, 1);
+});
+
+console.log('\nCommissary Route Tests (GET /commissary/meats: step 23c-ii-c dangling commissary_id)\n');
+
+test('a meat with a dangling commissary_id is still returned, with null commissary_code/commissary_name, not dropped', () => {
+  // SQLite doesn't enforce FKs unless PRAGMA foreign_keys=ON, so this IS
+  // reachable in practice - toggle it off just for this one insert to
+  // construct the scenario, same as dashboard.test.js's dangling
+  // meat_type_id case. This is the whole reason the route uses a LEFT
+  // JOIN instead of an INNER JOIN - an INNER JOIN would silently drop
+  // this row instead. Placed at the very end of the file, after every
+  // other test that relies on the earlier fixtures' unfiltered counts,
+  // so this one extra row doesn't perturb them.
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (8, 9999, 'CM99', 'Ghost Meat', 'kg', 0.2)`).run();
+  db.exec('PRAGMA foreign_keys = ON');
+
+  const rows = listCommissaryMeats();
+  const ghostRow = rows.find(r => r.id === 8);
+  assert.ok(ghostRow, 'the meat with a dangling commissary_id must still be returned, not silently dropped');
+  assert.strictEqual(ghostRow.commissary_id, 9999);
+  assert.strictEqual(ghostRow.commissary_code, null);
+  assert.strictEqual(ghostRow.commissary_name, null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
