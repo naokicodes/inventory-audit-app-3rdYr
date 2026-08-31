@@ -32,9 +32,15 @@ function getShipmentWithLines(shipmentId) {
 // GET /api/commissary/meats
 // Active commissary meats, for the yield-entry form's dropdown. Global
 // list, independent of any restaurant's own meats table.
+// Step 23c-i-b (2026-08-31): meat_type_id added to the SELECT, purely
+// additive, so settings.html's Conversion Standards section can resolve
+// a selected commissary meat to its meat_type_id (POST
+// /commissary/conversion-standards is keyed by meat_type_id, not
+// commissary_meat_id). No filter/param change - a commissary_id filter
+// on this route is separate step 23b-iv; don't add it here.
 router.get('/commissary/meats', (req, res) => {
   const meats = db.prepare(
-    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit
+    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id
      FROM commissary_meats WHERE active = 1 ORDER BY code`
   ).all();
   res.json(meats);

@@ -13,6 +13,20 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (Claude Code session) — Step 23c-i-b: fix the broken Conversion Standards "Create Standard" form
+
+Two-file fix, exactly the scope dispatched: 23b's rekey of `commissary_conversion_standards` from `commissary_meat_id` to `meat_type_id` had left `POST /api/commissary/conversion-standards` requiring `meat_type_id` while `settings.html`'s Create form still posted `commissary_meat_id`, a 400 on every attempt. `GET` and the inline `PUT` edit on that same section were never affected and stayed untouched.
+
+`server/routes/commissary.js`'s `GET /api/commissary/meats` gained `meat_type_id` in its SELECT — purely additive, no filter/param change (a `commissary_id` filter on this same route is separate step 23b-iv, not built here). This was needed, not optional, because the Conversion Standards dropdown is populated from this route, which previously had no way to tell the page which meat type a selected commissary meat belongs to. The alternative — repointing the dropdown at `GET /api/settings/commissary-meats?commissary_id=N`, which already returns `meat_type_id` — was considered and rejected: that route requires a `commissary_id`, which would have forced a local commissary selector into this section, pulling 23c-ii's selector scope into a step deliberately sized as tiny.
+
+`public/settings.html`'s Conversion Standards section: `loadCsCommissaryMeats()` now carries each option's `meat_type_id` via `data-meat-type-id`; the `#add-conversion-standard` handler resolves the selected option's tag and sends `meat_type_id` in place of `commissary_meat_id`. An untagged commissary meat is refused client-side before any request is sent, with the message specified in the dispatch prompt pointing the admin at the Commissary Meats tab. `loadConversionStandards()`, the PUT path, the Shipment Presets section's near-identical dropdown, and every other tab are untouched.
+
+**Verified**: baseline full suite run first (14/14 files, 228/228 assertions, 0 failures) and again after (identical counts — `commissary.test.js` has no exact-shape assertion on the SELECT, so the added column was transparent, confirmed rather than assumed). `node --check` on both changed files. Live end-to-end check against a real booted server: seeded a meat type, tagged a real commissary meat with it via the existing (untouched) `PUT /api/settings/commissary-meats/:id`, confirmed `GET /api/commissary/meats` now returns `meat_type_id` for it, POSTed a standard with the exact `meat_type_id` body the fixed page now sends and confirmed it landed, confirmed the existing `GET` (still keyed by `commissary_meat_id`+`restaurant_id`) sees it, confirmed the inline `PUT` edit still works, and confirmed the client-side untagged-meat guard's logic in isolation (empty `data-meat-type-id` → refused, a real id → passes through). Test rows cleaned up afterward.
+
+Pushed directly to `main`.
+
+---
+
 ## 2026-08-31 (architect recheck #2, first one run from Claude Code) — 23c confirmed incomplete; orphaned Create-Standard bug given its own step
 
 Pure architecture and docs, no code changed. Project owner asked whether

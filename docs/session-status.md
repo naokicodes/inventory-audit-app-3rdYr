@@ -1,8 +1,10 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (**23c-i done**: Commissary + Meat Type tabs and
-commissary-meat creation UI on `settings.html`, frontend-only, pushed to
-`main`. Step 23b remains at 4 of 6 items done: the
+Last updated: 2026-08-31 (**23c-i-b done**: fixed the Settings ->
+Conversion Standards "Create" form, broken since 23b's rekey - see its
+entry below for full detail. 23c-i also done: Commissary + Meat Type
+tabs and commissary-meat creation UI on `settings.html`, frontend-only,
+pushed to `main`. Step 23b remains at 4 of 6 items done: the
 `commissary_conversion_standards` rekey + its consumers, plus Commissary/
 meat-type/`commissary_meats` admin CRUD — see the entries under "Item 3
 design" below, and `changelog.md`'s matching entries, for full detail).
@@ -13,13 +15,8 @@ selector, blocked on 3 backend gaps — 2 previously known, 1 newly found:
 `GET /api/commissary/meats` has zero `commissary_id` filtering). See the
 full "23c" entry below for detail.**
 
-**Next up, decided by the architect conversation 2026-08-31 (second
-recheck, first one run from Claude Code against the local checkout
-rather than a web sandbox): 23c-i-b first** — a tiny, self-contained
-fix for the Settings -> Conversion Standards "Create" form, which 23b's
-rekey broke and which neither 23c-i nor 23c-ii actually owned. Then the
-3-item remaining 23b backend work, then 23c-ii. See 23c-i-b's own entry
-below.
+**23c-i-b is done. Next up: the 3-item remaining 23b backend work, then
+23c-ii** — see the dispatch-order list under the "23c" entry below.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1478,11 +1475,12 @@ fresh architecture session:**
   restructuring (grouping multiple commissaries' same-`meat_type_id` rows
   into one combined line — today's fix only kept the existing
   per-commissary-meat rollup correct against the new schema, it did not
-  build that grouping). **Known, flagged gap — now owned by 23c-i-b, see
-  below**: `settings.html`'s "Create Standard" admin form still POSTs
-  `commissary_meat_id` and fails this route's validation. `GET`/`PUT`
-  (edit) on that page are unaffected. Full suite: **14/14 files, 207/207
-  assertions, 0 regressions** (was 200). Pushed to `main` directly.
+  build that grouping). **Known, flagged gap — owned by 23c-i-b, see
+  below — fixed 2026-08-31**: `settings.html`'s "Create Standard" admin
+  form POSTed `commissary_meat_id` and failed this route's validation.
+  `GET`/`PUT` (edit) on that page were unaffected throughout. Full suite:
+  **14/14 files, 207/207 assertions, 0 regressions** (was 200). Pushed to
+  `main` directly.
 
   **Correction to that flagged gap, 2026-08-31 second architect
   recheck**: this entry originally said the gap would close "until 23c
@@ -1553,7 +1551,7 @@ fresh architecture session:**
     afterward. Not verified: an actual browser click-through — same open
     item every frontend step in this project has carried. Pushed to
     `main` directly (`29b3858`).
-  - **23c-i-b [Queued, not started — dispatched 2026-08-31]: fix the
+  - **23c-i-b [Done, 2026-08-31 — Claude Code (CLI) session]: fix the
     broken "Create Standard" form on Settings -> Conversion Standards.**
     Its own step rather than a rider on the next backend one, per the
     project owner's explicit call. The reasoning, worth keeping because
@@ -1602,6 +1600,23 @@ fresh architecture session:**
     are sequential dispatches, not parallel, so there is no conflict —
     but 23b-iv should expect `meat_type_id` to already be in that
     route's SELECT and must not remove it.
+
+    **Verified**: baseline full suite run before starting and again
+    after — identical **14/14 files, 228/228 assertions, 0 failures**
+    both times (`commissary.test.js` has no exact-shape assertion on the
+    changed SELECT, so the added column was confirmed transparent, not
+    assumed). `node --check` on both changed files. Live end-to-end
+    check against a real booted server: tagged a real commissary meat
+    with a meat type via the existing (untouched) `PUT
+    /api/settings/commissary-meats/:id`, confirmed `GET
+    /api/commissary/meats` now returns its `meat_type_id`, POSTed a
+    standard with the exact `meat_type_id` body the fixed page now
+    sends and confirmed it landed, confirmed the existing `GET` (still
+    keyed by `commissary_meat_id`+`restaurant_id`) sees it, confirmed
+    the inline `PUT` edit still works unchanged, and confirmed the
+    client-side untagged-meat guard's logic in isolation (empty
+    `data-meat-type-id` correctly refuses, a real id correctly passes
+    through). Test rows cleaned up afterward. Pushed to `main` directly.
   - **23c-ii: a commissary selector everywhere a screen currently
     assumes there's only one** (`commissary.html`,
     `commissary-shipments.html`, Terminal, Dashboard drill-down).
@@ -1633,9 +1648,9 @@ fresh architecture session:**
        actually filter against. This becomes the third item of 23b's
        remaining backend work, not a 23c-ii frontend task.
 
-**23c-i is done. Dispatch order from here, decided 2026-08-31:**
-1. **23c-i-b** — the Conversion Standards Create fix above. Independent
-   of everything else, blocked on nothing, dispatched first.
+**23c-i and 23c-i-b are both done. Dispatch order from here, decided
+2026-08-31:**
+1. ~~**23c-i-b**~~ — done, see its entry above.
 2. **23b-iv** — `commissary_id` filter on `GET /api/commissary/meats`.
    Smallest of the three backend items and the one 23c-ii most directly
    needs; mirror the `restaurant_id` convention `GET

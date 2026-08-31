@@ -763,7 +763,7 @@
     async function loadCsCommissaryMeats() {
       const res = await fetch('/api/commissary/meats');
       const meats = await res.json();
-      csCommissaryMeatSelect.innerHTML = meats.map(m => `<option value="${m.id}">${m.code} - ${m.name}</option>`).join('')
+      csCommissaryMeatSelect.innerHTML = meats.map(m => `<option value="${m.id}" data-meat-type-id="${m.meat_type_id ?? ''}">${m.code} - ${m.name}</option>`).join('')
         || '<option value="">No commissary meats seeded yet</option>';
     }
 
@@ -832,13 +832,25 @@
         return;
       }
 
+      // Step 23c-i-b: this route is keyed by meat_type_id, not
+      // commissary_meat_id - resolve the selected option's tag rather
+      // than sending the id the route no longer accepts.
+      const selectedOption = csCommissaryMeatSelect.options[csCommissaryMeatSelect.selectedIndex];
+      const meatTypeIdRaw = selectedOption ? selectedOption.dataset.meatTypeId : '';
+      const meat_type_id = meatTypeIdRaw ? Number(meatTypeIdRaw) : null;
+      if (!meat_type_id) {
+        csStatus.textContent = 'This commissary meat has no Meat Type yet. Tag it in the Commissary Meats tab first - Conversion Standards are keyed by Meat Type so they can span commissaries.';
+        csStatus.className = 'status-message error';
+        return;
+      }
+
       csStatus.textContent = 'Saving...';
       csStatus.className = 'status-message';
       try {
         const res = await fetch('/api/commissary/conversion-standards', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ commissary_meat_id, restaurant_id, meat_id, ratio_per_unit, notes: notes || null })
+          body: JSON.stringify({ meat_type_id, restaurant_id, meat_id, ratio_per_unit, notes: notes || null })
         });
         const result = await res.json();
         if (!result.ok) throw new Error(result.error || 'Unknown error');
