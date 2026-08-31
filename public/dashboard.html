@@ -107,9 +107,16 @@
           return `<td>${cell.hasData ? fmt(cell.total) : '<span class="no-data">-</span>'}</td>`;
         }).join('');
         const rowClass = row.row_has_any_data ? '' : ' class="no-data"';
+        // Step 23b-vi-a: a grouped ("meat_type") row has no code column
+        // (data-model.md section 10c) - label it by name only. An
+        // "untagged" row still has its own commissary meat's code, same
+        // as every row did before grouping.
+        const rowLabel = row.kind === 'meat_type'
+          ? `${row.name} <span class="hint">(${row.unit})</span>`
+          : `${row.code} - ${row.name} <span class="hint">(${row.unit})</span>`;
         return `
           <tr${rowClass}>
-            <td>${row.code} - ${row.name} <span class="hint">(${row.unit})</span></td>
+            <td>${rowLabel}</td>
             <td>${commissaryCell}</td>
             ${restaurantCells}
             <td class="grand-total-col">${fmt(row.grand_total)}</td>

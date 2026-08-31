@@ -1,32 +1,30 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (**23b-v done**: optional `commissary_id`
-filter on `computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`,
-and the same filter on `GET /api/commissary/yield-log` - see the
-dispatch-order list under the "23c" entry below for full detail. 23b-iv
-also done: the same filter on `GET /api/commissary/meats`. 23c-i-b also
-done: fixed the Settings -> Conversion Standards "Create" form, broken
-since 23b's rekey. 23c-i also done: Commissary + Meat Type tabs and
-commissary-meat creation UI on `settings.html`, frontend-only, pushed to
-`main`. Step 23b is now at all 6 items scoped, 5 of 6 landed — only the
-Dashboard grouped rollup (23b-vi) remains, and its response shape was
-resolved 2026-08-31, so it is ready to dispatch rather than blocked. See
-the entries under "Item 3 design"
-below, and `changelog.md`'s matching entries, for full detail).
+Last updated: 2026-08-31 (**23b-vi-a done**: the Dashboard grouped stock
+rollup - `GET /api/dashboard/stock-rollup` rebuilt per `data-model.md`
+section 10c, plus the minimum `dashboard.html` change to keep it
+rendering correctly. **This closes a live double-count bug**, not just a
+display grouping - see the dispatch-order list under the "23c" entry
+below for full detail. 23b-v/23b-iv also done: optional `commissary_id`
+filters on the three remaining commissary-scoped read routes. 23c-i-b
+also done: fixed the Settings -> Conversion Standards "Create" form,
+broken since 23b's rekey. 23c-i also done: Commissary + Meat Type tabs
+and commissary-meat creation UI on `settings.html`, frontend-only,
+pushed to `main`. Step 23b is now fully done, all 6 items landed. See
+the entries under "Item 3 design" below, and `changelog.md`'s matching
+entries, for full detail).
 **Architect recheck, same day (2026-08-31): 23c was found to not be one
 unblocked piece — split into 23c-i (Settings tabs + commissary-meat
 creation UI, fully unblocked, done) and 23c-ii (commissary selector,
-blocked on 3 backend gaps — 2 closed by 23b-iv/23b-v, the third now
-unblocked by 23b-vi's resolved shape). See the full "23c"
-entry below for detail. Also note the LIVE double-count hazard recorded
-in the dispatch-order list below — present in `main` today, untriggerable
-only because one commissary exists.**
+blocked on 3 backend gaps, all 3 now closed - but still waiting on
+23b-vi-b, the drill-down UI, before it's the right next step). See the
+full "23c" entry below for detail.**
 
-**23b-v is done, and 23b-vi's response shape is now RESOLVED — nothing
-in step 23 is blocked on an architect decision any more.** Next up:
-**23b-vi** (the Dashboard grouped rollup, ready to dispatch, full spec
-in `data-model.md` section 10c), then 23c-ii — see the dispatch-order list
-under the "23c" entry below.
+**23b-vi-a is done - the double-count hazard flagged below is FIXED, not
+just described. Next up: 23b-vi-b** (the inline expand/collapse
+drill-down UI that actually renders `by_commissary`, currently correct
+in the JSON but invisible in the table), **then 23c-ii** — see the
+dispatch-order list under the "23c" entry below.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1722,60 +1720,75 @@ fresh architecture session:**
    still serves and its exact fetch calls still return the correct
    shape. Pushed to `main` directly. See `changelog.md`'s matching
    entry for full detail.
-4. **23b-vi** — the Dashboard grouped rollup. **Response shape RESOLVED
-   2026-08-31 (architect, web session) — no longer blocked, ready to
-   dispatch.** Full spec in `data-model.md` section 10c. Summary of what
-   was decided, and why, so a worker doesn't re-litigate it:
+4. **23b-vi**, split into two sub-steps once the response shape was
+   resolved (same "route shape first, UI second" split rule 16 already
+   uses elsewhere in step 23):
+   - ~~**23b-vi-a**~~ — done, 2026-08-31 (Claude Code session). The
+     grouped route shape + the minimum `dashboard.html` change to keep
+     rendering correctly against it. `GET /api/dashboard/stock-rollup`
+     rebuilt per `data-model.md` section 10c: rows grouped by
+     `(meat_type_id, unit)` — not `meat_type_id` alone, since
+     `meat_types` has no `unit` column and a type whose members disagree
+     on unit would otherwise sum into a meaningless number — with
+     `computeRestaurantTotals` factored out and called exactly ONCE per
+     group, on the parent row. Untagged meats (`meat_type_id IS NULL`)
+     each still get their own `kind: "untagged"` row, never grouped
+     together or dropped. Sort order moved from `ORDER BY code` to
+     sorting the combined list by name. `dashboard.html` got only the
+     minimum fix — the row-label cell branches on `row.kind` — needed
+     to stop it rendering `"undefined - Jowl"` for a grouped row; the
+     table stays flat this step, `by_commissary` is present and correct
+     in the JSON but has no UI consumer yet.
 
-   - **Group by `(meat_type_id, unit)`, with a nested per-commissary
-     breakdown** — chosen over a flat meat-type grouping (loses which
-     commissary holds what, and 23c-ii's drill-down would immediately
-     need it back) and over keeping per-commissary-meat rows plus a
-     separate summary block (two representations of the same numbers
-     that can drift — precisely the failure mode retired in Round 2
-     item 5's two-disagreeing-balance-calculations bug).
-   - **`unit` is part of the grouping key on purpose.** `meat_types` has
-     no `unit` column (`id`/`name`/`active` only) — the unit lives on
-     each `commissary_meats` row, and the existing seed data already
-     uses two (`kg` and `unit`). Nothing prevents two commissaries
-     tagging differently-united meats to one type, which a
-     `meat_type_id`-only grouping would sum into a meaningless number.
-     Including `unit` makes a wrong sum structurally impossible: a
-     mismatch surfaces as two honest rows ("Jowl (kg)", "Jowl (unit)")
-     rather than one wrong one, and the split is itself visible evidence
-     of a miscategorization.
-   - **Untagged meats (`meat_type_id IS NULL`) each get their own
-     ungrouped row**, not omitted. Plenty exist today — the tag is
-     nullable and 23b's migration only tagged meats that had a
-     Conversion Standard. Omitting them would make real stock silently
-     vanish from an audit tool; the row also acts as a visible nudge
-     that the meat needs tagging.
-   - **Drill-down is inline expand/collapse** on `dashboard.html`, not a
-     separate view. The restaurant columns stay on the parent row only —
-     they belong to the meat type, not to any one commissary, which is
-     what makes the double-count below impossible by construction.
+     `dashboard.test.js`'s mirror was rebuilt to match (existing tests
+     retargeted to find the Jowl row via `kind`+`meat_type_id` instead
+     of a `code` that no longer exists on grouped rows), with 4 new
+     tests including **the actual motivating case**: two commissaries
+     both stocking a meat tagged to the same `meat_type_id`, asserting
+     `by_restaurant[FC].total` is exactly 40 (not 80) and the grand
+     total isn't doubled. Also: a unit mismatch splitting into two rows,
+     an untagged meat kept as its own row, and sort order. Full suite:
+     **14/14 files, 254/254 assertions, 0 regressions** (was 250).
+     Live-verified against a real booted server: created a real second
+     commissary + shared meat type with real opening-stock balances on
+     both sides, confirmed the live JSON matches section 10c exactly
+     (summed-once `commissary_balance`, correct `by_commissary`, no
+     restaurant double-count), and confirmed `dashboard.html` still
+     serves with no `"undefined"` anywhere across all 14 real seeded
+     rows. Test rows cleaned up. Pushed to `main` directly. See
+     `changelog.md`'s matching entry for full detail. **The LIVE HAZARD
+     recorded below is now FIXED, not just described** — see that note
+     for what it was.
+   - **23b-vi-b [queued, not started]** — the inline expand/collapse
+     drill-down UI on `dashboard.html` that actually renders
+     `by_commissary` (currently correct in the JSON, invisible in the
+     table). Per the decision recorded below: inline expand/collapse on
+     the existing table, not a separate view; the restaurant columns
+     stay on the parent (meat-type) row only, never per-commissary, by
+     construction. `by_commissary`'s shape (`commissary_id, code, name,
+     commissary_meat_id, balance, has_data`, sorted by commissary code)
+     is already finalized by 23b-vi-a — this step is UI-only, no backend
+     change expected.
 
-5. **23c-ii** — the commissary selector, once 4 has landed.
+5. **23c-ii** — the commissary selector, once 23b-vi-b has landed.
 
 23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, 23c-i, 23c-i-b,
-23b-iv, and 23b-v are done. 23b-vi is fully specified and ready to
-dispatch; 23c-ii is not started.
+23b-iv, 23b-v, and 23b-vi-a are done. 23b-vi-b and 23c-ii are not
+started.
 
-**LIVE HAZARD, present in `main` right now — found 2026-08-31 while
-specifying 23b-vi, fixed by it.** `dashboard.js`'s `/dashboard/stock-rollup`
-returns one row per commissary meat, and each row looks up conversion
-standards with `WHERE meat_type_id = ? AND restaurant_id = ?`. Once two
-commissary meats share a `meat_type_id`, **both rows resolve the same
-standards and count the same restaurant stock**, so restaurant-side
-inventory is double-counted — once per commissary stocking that type,
-tripled with three, and so on. This is not hypothetical or cosmetic; it
-is a live correctness bug. It cannot trigger today only because `COM-A`
-is the sole commissary. **Trigger condition**: the moment anyone creates
-a second commissary through the Settings tab 23c-i shipped and tags one
-of its meats to an already-used meat type, the Dashboard begins
-silently reporting inflated totals with no warning. Anyone doing that
-before 23b-vi lands should be told not to trust the Dashboard's
-restaurant columns or grand total until it does.
+**LIVE HAZARD, present in `main` from 2026-08-31 until 23b-vi-a fixed it
+the same day — kept here for history, not because it's still open.**
+`dashboard.js`'s `/dashboard/stock-rollup` used to return one row per
+commissary meat, and each row looked up conversion standards with
+`WHERE meat_type_id = ? AND restaurant_id = ?`. Once two commissary
+meats shared a `meat_type_id`, both rows would resolve the same
+standards and count the same restaurant stock — a live correctness bug,
+not hypothetical or cosmetic, that could not trigger before 23c-i
+shipped the Commissary-creation UI (only one commissary, `COM-A`,
+existed). **Now closed**: grouping computes the restaurant total once
+per group, on the parent row, making the double-count structurally
+impossible rather than merely avoided by there only being one
+commissary. See 23b-vi-a's entry above for the fix and its verification.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading

@@ -13,6 +13,22 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (Claude Code session) — Step 23b-vi-a: grouped stock rollup (fixes a live double-count bug)
+
+`GET /api/dashboard/stock-rollup` rebuilt per `data-model.md` section 10c: rows are now grouped by `(meat_type_id, unit)` rather than one row per commissary meat. This is a correctness fix, not a display change — `commissary_conversion_standards` is keyed by `meat_type_id`, so before this step, two commissary meats sharing a type (now possible since 23c-i shipped the Commissary-creation UI) would each independently resolve the same standards and each produce their own `by_restaurant` total, silently doubling the real restaurant figure anywhere those rows got summed together. Grouping computes the restaurant reverse-conversion exactly once per group, on the parent row, making that double-count structurally impossible rather than merely unlikely.
+
+`server/routes/dashboard.js`: each active commissary meat's own balance is still computed individually (needed either way, for `by_commissary`), then grouped into `kind: "meat_type"` rows (grouping key `(meat_type_id, unit)`, not `meat_type_id` alone — `meat_types` has no `unit` column, and a type whose members disagree on unit would otherwise sum into a meaningless number) or left as standalone `kind: "untagged"` rows for `meat_type_id IS NULL` meats, which are never grouped together or dropped. `computeRestaurantTotals` was factored out of the row loop specifically so it's called once per group. Sort order moved from `ORDER BY code` to sorting the combined row list by `name` (meat-type name for grouped rows, the meat's own name for untagged rows), since a grouped row has no single code.
+
+`public/dashboard.html` got the minimum change needed to keep rendering correctly: the row-label cell now branches on `row.kind` (`meat_type` → name + unit only, `untagged` → `code - name` + unit, same as every row rendered before this step). Everything else in the render path — `by_restaurant` cell rendering, `commissary_balance`, `grand_total`, `row_has_any_data` — needed no change since both row kinds carry those fields with identical shapes. The table stays flat this step; `by_commissary` is present and correct in the JSON but has no UI yet — that's 23b-vi-b, queued next.
+
+`server/routes/dashboard.test.js`'s mirror was rebuilt to match (not weakened) — existing tests now locate the Jowl row via `kind === 'meat_type' && meat_type_id === 1` instead of a `code` that no longer exists on grouped rows, with a second `commissaries` fixture added only after every test that asserts an exact single-commissary count, so none of them shifted. Four new tests: **the motivating case** — two commissaries both stocking a meat tagged to the same `meat_type_id` are grouped into one row, `commissary_balance` sums both real balances once, and `by_restaurant[FC].total` is asserted to be exactly 40, not 80 (what the old per-meat code would have produced if two such rows existed and their restaurant totals were ever summed) — a unit mismatch within one meat type splitting into two separate rows, an untagged meat keeping its own row rather than being dropped, and row sort order.
+
+**Verified**: baseline full suite run first (14/14 files, 250/250 assertions, 0 failures) and again after (**14/14 files, 254/254 assertions, 0 failures** — the +4 new dashboard tests). `node --check` on all three changed files (including the extracted inline `<script>` from `dashboard.html`). Live end-to-end check against a real booted server: created a real second commissary + meat type, tagged one meat from each commissary to it with real opening-stock balances (20 and 15), confirmed the live JSON matches section 10c's shape exactly — `commissary_balance: 35`, `by_commissary` listing both commissaries by their own code/name, `grand_total: 35` with no restaurant double-count; confirmed `dashboard.html` still serves and its render logic produces no `"undefined"` label anywhere across all 14 seeded rows, with the grouped row correctly labeled by name+unit only. Test rows cleaned up afterward.
+
+Pushed directly to `main`.
+
+---
+
 ## 2026-08-31 (architect, web session) — 23b-vi's rollup shape resolved; a live double-count bug found while specifying it
 
 No code changed. Resolved the last open architect decision in step 23,
