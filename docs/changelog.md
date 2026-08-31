@@ -13,7 +13,40 @@ worth remembering if they happen again.
 
 ---
 
-## 2026-08-31 (Claude Code session) — Step 23c-i-b: fix the broken Conversion Standards "Create Standard" form
+## 2026-08-31 (architect, web session) — 23b-iv resolved as an OPTIONAL filter; two stale doc entries corrected
+
+Pure architecture, no code changed. Verified 23c-i-b's landed work first
+rather than trusting its commit message: read the real diff (exactly the
+two intended changes, nothing extra) and re-ran the full suite
+independently — **14/14 files, 228/228, 0 failures**, matching the
+session's own claim.
+
+**Decision, made here before dispatch rather than left to a worker**:
+23b-iv's `commissary_id` filter on `GET /api/commissary/meats` is
+**optional**, not required. The dispatch-order list had said to mirror
+the `restaurant_id` convention of `GET /api/settings/meats` — checking
+that route showed it *requires* the param (400s without it,
+`settings.js` ~L190), while this route has six live consumers that pass
+nothing today (`commissary.html`, `commissary-shipments.html`,
+`terminal.html`, `stock-receipts.html`, and `settings.html` twice —
+Shipment Presets and Conversion Standards). A required param would have
+broken all six in one commit against rule 17, and forced 23c-ii's
+selector work to happen at the same time, collapsing the step sizing
+this project has kept deliberately small. `commissary.js`'s own sibling
+routes (`GET /commissary/yield-log`, `GET /commissary/daily-audit`)
+already use optional filters — the doc had been pointing at the wrong
+file's convention. Corrected in place, so the next worker reads one
+consistent instruction instead of a prompt contradicting the doc.
+
+**Also found while checking consumers**: `stock-receipts.html` calls
+this route and is not listed in 23c-ii's page list. Flagged in
+`session-status.md` as an open scoping question for 23c-ii, not decided.
+
+**Doc drift fixed**: Round 2 numbered item 2 ("No commissary-meat-
+creation UI either") still read as open, though 23b built the backend
+CRUD and 23c-i built the tab. Marked done with both halves recorded.
+
+---
 
 Two-file fix, exactly the scope dispatched: 23b's rekey of `commissary_conversion_standards` from `commissary_meat_id` to `meat_type_id` had left `POST /api/commissary/conversion-standards` requiring `meat_type_id` while `settings.html`'s Create form still posted `commissary_meat_id`, a 400 on every attempt. `GET` and the inline `PUT` edit on that same section were never affected and stayed untouched.
 

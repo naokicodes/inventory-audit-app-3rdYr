@@ -1651,10 +1651,31 @@ fresh architecture session:**
 **23c-i and 23c-i-b are both done. Dispatch order from here, decided
 2026-08-31:**
 1. ~~**23c-i-b**~~ — done, see its entry above.
-2. **23b-iv** — `commissary_id` filter on `GET /api/commissary/meats`.
-   Smallest of the three backend items and the one 23c-ii most directly
-   needs; mirror the `restaurant_id` convention `GET
-   /api/settings/meats` already uses.
+2. **23b-iv** — an **optional** `commissary_id` filter on `GET
+   /api/commissary/meats`. Smallest of the three backend items and the
+   one 23c-ii most directly needs. **Resolved 2026-08-31 (architect, web
+   session), correcting this line's earlier wording**: an earlier draft
+   said to mirror the `restaurant_id` convention of `GET
+   /api/settings/meats`. **Do not** — that route *requires* the param
+   (400s without it, `settings.js` ~L190), and this route has **six**
+   live consumers that pass nothing today: `commissary.html`,
+   `commissary-shipments.html`, `terminal.html`, `stock-receipts.html`,
+   and `settings.html` in two places (Shipment Presets and Conversion
+   Standards). A required param would break all six in one commit,
+   against rule 17, and would force 23c-ii's selector work to happen
+   simultaneously — collapsing the step sizing this project has
+   deliberately maintained. Follow instead the convention the sibling
+   routes in `commissary.js` already use: `GET /commissary/yield-log`
+   and `GET /commissary/daily-audit` both take optional filters and list
+   everything when the filter is omitted. Omitted `commissary_id` must
+   behave exactly as today; 23c-ii then adds `?commissary_id=N` per page
+   incrementally as each selector lands.
+
+   **Also newly noted here**: `stock-receipts.html` is a consumer of
+   this route and is **not** in 23c-ii's page list below (which names
+   `commissary.html`, `commissary-shipments.html`, Terminal, and the
+   Dashboard drill-down). Whether it needs a selector too is an open
+   question for whoever scopes 23c-ii — flagged, not decided.
 3. **23b-v** — optional `commissary_id` param on
    `computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`,
    and the same filter on `GET /api/commissary/yield-log`.
@@ -1682,10 +1703,17 @@ done. Everything in the numbered list above is not started.
    separate from item 3's Commissary-creation work as designed, and did
    not touch it.
 
-2. **No commissary-meat-creation UI either.** Same story —
-   `commissary_meats` only ever comes from `commissary-seed-data.json`.
-   A new commissary item (raw or processed) can't be added through the
-   app.
+2. **[Done, 2026-08-31] No commissary-meat-creation UI either.** Same
+   story — `commissary_meats` only ever came from
+   `commissary-seed-data.json`. A new commissary item (raw or
+   processed) couldn't be added through the app. Closed in two halves,
+   both under item 3's multi-Commissary work rather than as its own
+   step: **23b** built the backend (`GET`/`POST`/`PUT
+   /api/settings/commissary-meats`, scoped by `commissary_id` the way
+   Meats is scoped by `restaurant_id`), and **23c-i** built the
+   Commissary Meats tab on `settings.html`. Marked done here
+   2026-08-31 by the architect — the entry had drifted, still reading
+   as open after both halves had shipped.
 
 3. **[Done, 2026-08-30] Conversion Standards has no admin UI.** Backend
    CRUD existed already (item 5) but there was no Settings page for it —
