@@ -9,19 +9,23 @@ done: fixed the Settings -> Conversion Standards "Create" form, broken
 since 23b's rekey. 23c-i also done: Commissary + Meat Type tabs and
 commissary-meat creation UI on `settings.html`, frontend-only, pushed to
 `main`. Step 23b is now at all 6 items scoped, 5 of 6 landed — only the
-Dashboard grouped rollup (23b-vi) remains, and it's blocked on an
-architect response-shape decision. See the entries under "Item 3 design"
+Dashboard grouped rollup (23b-vi) remains, and its response shape was
+resolved 2026-08-31, so it is ready to dispatch rather than blocked. See
+the entries under "Item 3 design"
 below, and `changelog.md`'s matching entries, for full detail).
 **Architect recheck, same day (2026-08-31): 23c was found to not be one
 unblocked piece — split into 23c-i (Settings tabs + commissary-meat
 creation UI, fully unblocked, done) and 23c-ii (commissary selector,
-blocked on 3 backend gaps — 2 now closed by 23b-iv/23b-v, 1 still open:
-the Dashboard grouped-rollup shape decision, 23b-vi). See the full "23c"
-entry below for detail.**
+blocked on 3 backend gaps — 2 closed by 23b-iv/23b-v, the third now
+unblocked by 23b-vi's resolved shape). See the full "23c"
+entry below for detail. Also note the LIVE double-count hazard recorded
+in the dispatch-order list below — present in `main` today, untriggerable
+only because one commissary exists.**
 
-**23b-v is done. Next up: 23b-vi** (the Dashboard grouped rollup, still
-blocked on an architect response-shape decision — the last remaining
-piece before 23c-ii can be dispatched) — see the dispatch-order list
+**23b-v is done, and 23b-vi's response shape is now RESOLVED — nothing
+in step 23 is blocked on an architect decision any more.** Next up:
+**23b-vi** (the Dashboard grouped rollup, ready to dispatch, full spec
+in `data-model.md` section 10c), then 23c-ii — see the dispatch-order list
 under the "23c" entry below.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
@@ -1718,14 +1722,60 @@ fresh architecture session:**
    still serves and its exact fetch calls still return the correct
    shape. Pushed to `main` directly. See `changelog.md`'s matching
    entry for full detail.
-4. **23b-vi** — the Dashboard grouped rollup. **Still blocked on an
-   architect response-shape decision** (see the "Flagged, not decided"
-   note above) — the only remaining prerequisite before 23c-ii can be
-   dispatched.
+4. **23b-vi** — the Dashboard grouped rollup. **Response shape RESOLVED
+   2026-08-31 (architect, web session) — no longer blocked, ready to
+   dispatch.** Full spec in `data-model.md` section 10c. Summary of what
+   was decided, and why, so a worker doesn't re-litigate it:
+
+   - **Group by `(meat_type_id, unit)`, with a nested per-commissary
+     breakdown** — chosen over a flat meat-type grouping (loses which
+     commissary holds what, and 23c-ii's drill-down would immediately
+     need it back) and over keeping per-commissary-meat rows plus a
+     separate summary block (two representations of the same numbers
+     that can drift — precisely the failure mode retired in Round 2
+     item 5's two-disagreeing-balance-calculations bug).
+   - **`unit` is part of the grouping key on purpose.** `meat_types` has
+     no `unit` column (`id`/`name`/`active` only) — the unit lives on
+     each `commissary_meats` row, and the existing seed data already
+     uses two (`kg` and `unit`). Nothing prevents two commissaries
+     tagging differently-united meats to one type, which a
+     `meat_type_id`-only grouping would sum into a meaningless number.
+     Including `unit` makes a wrong sum structurally impossible: a
+     mismatch surfaces as two honest rows ("Jowl (kg)", "Jowl (unit)")
+     rather than one wrong one, and the split is itself visible evidence
+     of a miscategorization.
+   - **Untagged meats (`meat_type_id IS NULL`) each get their own
+     ungrouped row**, not omitted. Plenty exist today — the tag is
+     nullable and 23b's migration only tagged meats that had a
+     Conversion Standard. Omitting them would make real stock silently
+     vanish from an audit tool; the row also acts as a visible nudge
+     that the meat needs tagging.
+   - **Drill-down is inline expand/collapse** on `dashboard.html`, not a
+     separate view. The restaurant columns stay on the parent row only —
+     they belong to the meat type, not to any one commissary, which is
+     what makes the double-count below impossible by construction.
+
 5. **23c-ii** — the commissary selector, once 4 has landed.
 
 23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, 23c-i, 23c-i-b,
-23b-iv, and 23b-v are done. 23b-vi and 23c-ii are not started.
+23b-iv, and 23b-v are done. 23b-vi is fully specified and ready to
+dispatch; 23c-ii is not started.
+
+**LIVE HAZARD, present in `main` right now — found 2026-08-31 while
+specifying 23b-vi, fixed by it.** `dashboard.js`'s `/dashboard/stock-rollup`
+returns one row per commissary meat, and each row looks up conversion
+standards with `WHERE meat_type_id = ? AND restaurant_id = ?`. Once two
+commissary meats share a `meat_type_id`, **both rows resolve the same
+standards and count the same restaurant stock**, so restaurant-side
+inventory is double-counted — once per commissary stocking that type,
+tripled with three, and so on. This is not hypothetical or cosmetic; it
+is a live correctness bug. It cannot trigger today only because `COM-A`
+is the sole commissary. **Trigger condition**: the moment anyone creates
+a second commissary through the Settings tab 23c-i shipped and tags one
+of its meats to an already-used meat type, the Dashboard begins
+silently reporting inflated totals with no warning. Anyone doing that
+before 23b-vi lands should be told not to trust the Dashboard's
+restaurant columns or grand total until it does.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading

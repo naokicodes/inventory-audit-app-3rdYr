@@ -13,6 +13,51 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (architect, web session) — 23b-vi's rollup shape resolved; a live double-count bug found while specifying it
+
+No code changed. Resolved the last open architect decision in step 23,
+after verifying 23b-v's landed work independently (real diff read, full
+suite re-run: 14/14 files, **250/250, 0 failures**). Checked the one
+thing in that diff that could have failed silently — it added an INNER
+JOIN to the yield-log query, which would drop rows if
+`commissary_yield_log.commissary_meat_id` were nullable. It is NOT NULL
+(`schema.sql` L292), so the join is safe.
+
+**Found while specifying the shape — a live correctness bug in `main`,
+not a hypothetical**: `/dashboard/stock-rollup` builds one row per
+commissary meat and looks up conversion standards by `meat_type_id`. Two
+commissary meats sharing a type therefore both count the *same*
+restaurant stock, double-counting it (tripling with three commissaries,
+and so on). It cannot fire today only because `COM-A` is the sole
+commissary — but 23c-i shipped the Settings tab that lets anyone create a
+second one, so the trigger is now one admin action away. Recorded in
+`session-status.md` with its trigger condition; 23b-vi fixes it as a side
+effect of grouping, since grouping computes restaurant figures once per
+group rather than once per commissary meat.
+
+**Decided (full shape in `data-model.md` section 10c)**: group by
+`(meat_type_id, unit)` with a nested `by_commissary` array driving an
+inline expand/collapse drill-down, and untagged meats each getting their
+own `kind: "untagged"` row rather than being omitted. Rejected: a flat
+meat-type grouping (discards which commissary holds what, which 23c-ii's
+drill-down immediately needs back) and keeping per-commissary-meat rows
+plus a parallel summary block (two representations of the same numbers
+that can drift — the same failure mode retired in Round 2 item 5).
+
+**Why `unit` is in the grouping key**: `meat_types` is `id`/`name`/
+`active` only — no unit — while `commissary_meats.unit` already varies
+across the seed data (`kg` and `unit`). Grouping on `meat_type_id` alone
+would happily sum 30kg and 20 units into "50". Including `unit` makes
+that impossible; a mismatch surfaces as two honest rows instead.
+
+**Explicitly left open, not scheduled**: whether `meat_types` should gain
+an authoritative `unit` column enforced at tag time. It rests on a
+business assumption nobody has confirmed — that a meat type is always
+measured the same way at every commissary. If it isn't, the grouping-key
+approach is the correct permanent answer rather than a stopgap. Flagged
+for the project owner in section 10c; the two are complementary, not
+competing, so nothing has to be torn out either way.
+
 ## 2026-08-31 (Claude Code session) — Step 23b-v: optional commissary_id filter on the Commissary daily-audit and yield-log read paths
 
 Same optional-filter convention 23b-iv just landed on `GET /api/commissary/meats`, applied to the two remaining commissary-scoped read paths. Omitted, both routes behave exactly as before in every case; no page passes the new param yet — that's 23c-ii's job.

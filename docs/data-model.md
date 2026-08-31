@@ -526,6 +526,88 @@ along with the rekey itself. Needs an idempotent migration helper (not
 just a `schema.sql` edit) per the standing `CREATE TABLE IF NOT EXISTS`
 gotcha in `architect-notes-PRIVATE.md`.
 
+### 10c. Dashboard grouped stock rollup (resolved 2026-08-31, not yet built — step 23b-vi)
+
+Concrete response shape for `GET /api/dashboard/stock-rollup` once
+multiple commissaries can share a `meat_type_id`. `session-status.md`'s
+dispatch-order item 4 has the reasoning and the rejected alternatives;
+this is the shape itself, per rule 7.
+
+**Fixes a live correctness bug, not just a display grouping.** Today each
+per-commissary-meat row resolves conversion standards by `meat_type_id`,
+so two commissary meats sharing a type both count the *same* restaurant
+stock — double-counting it. Grouping is what makes that structurally
+impossible: restaurant figures are computed once per group, on the
+parent, never per commissary.
+
+**Grouping key: `(meat_type_id, unit)`** — not `meat_type_id` alone.
+`meat_types` has no `unit` column; `unit` lives per `commissary_meats`
+row and the seed data already uses both `kg` and `unit`. A type whose
+members disagree on unit yields two internally-correct rows rather than
+one meaningless sum.
+
+**Row kinds.** Rows carry an explicit discriminator so the frontend never
+infers kind from the presence of a field:
+- `kind: "meat_type"` — a group of one or more tagged commissary meats.
+- `kind: "untagged"` — a single commissary meat with `meat_type_id IS
+  NULL`. Not omitted: real stock must not silently vanish from an audit
+  screen, and the row doubles as a visible prompt to tag the meat.
+
+```
+{
+  date, restaurants,                    -- unchanged
+  rows: [
+    {
+      kind: "meat_type",
+      meat_type_id, name, unit,         -- name from meat_types; no code
+                                        --   column exists on that table
+      commissary_balance,               -- summed across by_commissary
+      commissary_has_data,
+      by_commissary: [                  -- NEW; drives the inline
+        { commissary_id, code, name,    --   expand/collapse drill-down
+          commissary_meat_id,           -- the specific catalog row
+          balance, has_data }
+      ],
+      by_restaurant, grand_total,       -- computed ONCE per group, on the
+      row_has_any_data                  --   parent - never per commissary
+    },
+    {
+      kind: "untagged",
+      commissary_meat_id, code, name, unit,
+      commissary_balance, commissary_has_data,
+      by_restaurant: {},                -- an untagged meat can have no
+      grand_total,                      --   standards, so no restaurant
+      row_has_any_data                  --   figures are possible
+    }
+  ]
+}
+```
+
+`by_restaurant` keeps its existing object-keyed-by-restaurant-id shape
+and per-cell `{ total, hasData, standardCount }` — unchanged, so
+`dashboard.html`'s existing cell rendering keeps working. `by_commissary`
+is an array, not an object, since it is ordered display data rather than
+a lookup.
+
+**Sort order** moves from `ORDER BY code` to meat-type name, since a
+grouped row has no single code. Untagged rows sort among them by their
+own name.
+
+**Open question, deliberately NOT resolved here**: whether `meat_types`
+should gain its own authoritative `unit` column, validated when a
+commissary meat is tagged, so a mismatch becomes impossible at write time
+rather than merely visible at read time. That would be a schema +
+migration + backfill step of its own, and it rests on a business
+assumption nobody has confirmed — that one meat type is always measured
+the same way at every commissary. If two commissaries could legitimately
+measure the same meat differently (one weighing, one counting), the
+`unit`-in-the-grouping-key approach above is not a stopgap but the
+correct permanent answer. Ask the project owner before treating this as
+scheduled work. Note the two are not mutually exclusive: if a `unit`
+column ever lands, `(meat_type_id, unit)` grouping simply stops ever
+splitting a row and remains correct as a redundant read-side guard — it
+would not need removing.
+
 ### commissary_balance (calculated, not stored)
 ```
 commissary_balance(commissary_meat) =
