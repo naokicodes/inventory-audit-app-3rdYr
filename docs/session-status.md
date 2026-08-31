@@ -498,6 +498,20 @@ second-guess decisions already made, per rule 3.
 
 ## Known open items (not the next step's problem, just not forgotten)
 
+- **`dashboard.js`'s INNER JOIN to `commissaries` (found 2026-09-01,
+  not yet fixed).** `/dashboard/stock-rollup` (~L103) does `JOIN
+  commissaries c ON c.id = cm.commissary_id`. SQLite only enforces FKs
+  under `PRAGMA foreign_keys = ON`, so a dangling `commissary_id` would
+  make that meat **silently vanish** from the Dashboard — no error, no
+  degraded row, just missing stock. Same hazard class as the
+  `meat_type_id` null guard 23b-vi-b closed, but caught on the
+  commissary side instead, and arguably worse since a missing row is
+  harder to notice than a wrong label. 23c-ii-c specifies a LEFT JOIN for
+  the route *it* touches; this one is a different route and was left
+  alone deliberately rather than bundled, per rule 16. Small enough to
+  ride along with the next Dashboard-touching step, or to dispatch on its
+  own if none comes up soon.
+
 - **A real click-through in an actual browser is still owed** for Stock
   Receipts' Unallocated/Assign flow specifically — the 2026-08-28 session
   had no browser available (no puppeteer/playwright, and the download
@@ -1797,23 +1811,57 @@ the same treatment: one small additive step, cited as precedent.
   different page, neither blocks the other.
 
 - **23c-ii-c — additive commissary identity on `GET
-  /api/commissary/meats`, plus the `stock-receipts.html` label fix.**
-  Backend + one-line frontend, deliberately bundled exactly as 23c-i-b
+  /api/commissary/meats`, plus the label fixes it unblocks.**
+  Backend + small frontend, deliberately bundled exactly as 23c-i-b
   bundled its column addition with the form it unblocked. Add
   `commissary_id`, and the joined commissary's `code` and `name`, to that
   route's SELECT. **Purely additive** — no new filter, no WHERE change,
   no removal of `meat_type_id` (23c-i-b added it; don't drop it). Six
   live consumers pass nothing today and must all keep working unchanged.
-  Then `stock-receipts.html`'s `loadCommissaryMeats()` (~L150) renders
-  the commissary in its option label, so two same-coded meats are
-  distinguishable. **Also in scope, found 2026-09-01 in the architect
-  review of 23c-ii-a**: `commissary.html` has the identical label
-  ambiguity whenever "All commissaries" is selected — both `newMeat` and
-  `filterMeat` render `${m.code} - ${m.name}`, so two commissaries
-  sharing `M05` produce two indistinguishable options. Same cause, same
-  one-line fix, and this step already has the commissary on that route.
-  Neither is a correctness bug — the `<option value>` is `m.id`, so the
-  right row is written either way — but both are unreadable.
+
+  **Three implementation points resolved 2026-09-01 rather than left to
+  be guessed:**
+
+  1. **Alias the joined columns `commissary_code` / `commissary_name`.**
+     The SELECT already returns the *meat's* own `code` and `name`, so
+     unaliased joined columns would collide and silently shadow them.
+     `dashboard.js` (~L101) already uses exactly this aliasing — follow
+     it rather than inventing a second convention.
+  2. **Use a LEFT JOIN, not an INNER JOIN.** SQLite only enforces foreign
+     keys under `PRAGMA foreign_keys = ON`, so a dangling
+     `commissary_id` is reachable. Under an INNER JOIN that meat would
+     **silently disappear** from every one of the six consumers — real
+     stock vanishing from an audit screen, the exact failure mode
+     23b-vi-b's null guard exists to prevent, but worse because there is
+     no error to notice. A LEFT JOIN degrades to null `commissary_code` /
+     `commissary_name` instead. Consumers must tolerate those nulls.
+  3. **Qualify every column once the JOIN exists.** The current WHERE is
+     an unqualified `active = 1`, and `active` exists on **both**
+     `commissary_meats` and `commissaries` — after the join, SQLite
+     raises "ambiguous column name" and the route 500s. `active` and
+     `commissary_id` in the WHERE both need the `cm.` prefix. Note the
+     filter stays on the *meat's* `active`, not the commissary's: whether
+     to hide meats belonging to a deactivated commissary is a separate
+     question nobody has asked, and quietly answering it here would be
+     the same silent-drop mistake as point 2.
+
+  **The label fixes.** `stock-receipts.html`'s `loadCommissaryMeats()`
+  (~L150) renders `${m.code} - ${m.name}`, so two commissaries sharing
+  `M05` produce two indistinguishable options. **Also in scope, found
+  2026-09-01 in the architect review of 23c-ii-a**: `commissary.html` has
+  the identical ambiguity whenever "All commissaries" is selected — both
+  `newMeat` and `filterMeat` render the same way. Neither is a
+  correctness bug (the `<option value>` is `m.id`, so the right row is
+  written either way) — both are simply unreadable.
+
+  **The rule for both, so they don't diverge**: append the commissary
+  suffix only when the fetched list actually spans more than one distinct
+  commissary. Self-adjusting, identical on both pages, and it works on
+  `stock-receipts.html` which has no selector at all — a single-commissary
+  install sees no change anywhere, and the suffix appears exactly when it
+  starts carrying information. Rows with a null `commissary_code` (point
+  2) render without a suffix rather than "undefined".
+
   **Blocks 23c-ii-d — dispatch before it, not after.**
 
 - **23c-ii-d — Terminal qualified-token grammar.** The largest sub-step

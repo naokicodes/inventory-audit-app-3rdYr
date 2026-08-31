@@ -37,6 +37,45 @@ Pushed directly to `main`.
 
 ---
 
+## 2026-09-01 (architect review of 23c-ii-b) — verified clean; 23c-ii-c's three implementation points resolved
+
+Verified 23c-ii-b independently: read the real diff, ran the full suite
+(14 files, **257/257, 0 failures**), `node --check` on the extracted inline
+script. It follows the corrected spec exactly — only `loadCommissaryMeats()`
+threads the filter, and the change handler reloads meats before re-running
+`loadContext()`/`loadPresets()`/`loadStandards()`, which is the part that
+matters since repopulating the dropdown resets its value. No rework.
+
+Resolved three things in 23c-ii-c's spec that would otherwise have been
+guessed, each of which had a wrong answer available:
+
+**Alias the joined columns.** The route already returns the meat's own
+`code`/`name`; unaliased joined columns collide. `dashboard.js` already
+aliases them `commissary_code`/`commissary_name` — follow it.
+
+**LEFT JOIN, not INNER.** A dangling `commissary_id` is reachable (SQLite
+doesn't enforce FKs without `PRAGMA foreign_keys = ON`), and under an INNER
+JOIN that meat silently disappears from all six consumers. Real stock
+vanishing with no error is strictly worse than the wrong label 23b-vi-b's
+null guard prevented.
+
+**Qualify the WHERE.** `active` exists on both `commissary_meats` and
+`commissaries`, so the current unqualified `active = 1` becomes an ambiguous
+column reference the moment the join lands, and the route 500s. Also noted
+explicitly that the filter stays on the *meat's* active flag — whether to
+hide meats under a deactivated commissary is a question nobody has asked,
+and answering it silently here would be the same class of mistake.
+
+**Label rule for both pages**: show the commissary suffix only when the
+fetched list spans more than one distinct commissary. One rule, both pages,
+works on `stock-receipts.html` which has no selector, and a
+single-commissary install sees no change at all.
+
+**Found while specifying this — a second inner-join hazard, not fixed.**
+`dashboard.js`'s own `JOIN commissaries` has exactly the silent-drop problem
+described above. Different route, so it was left out of 23c-ii-c rather than
+bundled (rule 16); recorded under "Known open items."
+
 ## 2026-09-01 (architect review of 23c-ii-a) — verified good; two spec corrections
 
 Verified 23c-ii-a independently before reviewing: read the real diff, ran
