@@ -298,6 +298,65 @@ a code change:
 then `Stop-Process -Id <pid> -Force` (PowerShell), or
 `netstat -ano | findstr :3000` then `taskkill /PID <pid> /F`.
 
+## Rule 22 — Context economy: clear at STEP boundaries, cite sections, query the graph
+
+Added 2026-09-01, from a measured regression: worker sessions that had
+been costing 10k–25k tokens jumped to ~80k. Nothing about the work got
+harder — the dispatch practice changed. Two compounding causes, both
+fixable, and both were the architect conversation's doing rather than any
+worker's.
+
+**Cause 1: `/clear` between sub-steps of the same step.** Clearing before
+23c-ii-a was correct and had specific reasons: that session's context was
+unrelated Dashboard work, and rule 21 had landed *after* it started, so it
+had never read the current rules file. Those reasons were then not
+re-checked, and the instruction was repeated mechanically for 23c-ii-b and
+23c-ii-c — where it was wrong. 23c-ii-b is the direct sibling of 23c-ii-a:
+same pattern, same page family, and its own prompt told it to go read
+23c-ii-a's diff — i.e. to re-acquire, cold and linearly, exactly the
+context that had just been discarded.
+
+**The policy: `/clear` at step boundaries, not sub-step boundaries.**
+Clear when moving to a genuinely different step (23 → 24), when the next
+piece touches unrelated files, or when a rule changed under the running
+session. Not by default, and never just because a piece finished.
+
+The counter-argument is real and worth stating: a carried context makes a
+mid-step usage cutoff likelier, which is what rules 16 and 17 exist for. At
+a 3–5x cost difference that trade is still clearly worth taking — but it
+makes "commit incrementally as pieces land" load-bearing rather than
+advisory. Keep that line in every prompt.
+
+**Cause 2: prompts that instruct a linear read of the biggest files.**
+Every worker prompt opened with "read `docs/rules-for-claude-code.md`, then
+`docs/session-status.md`" — a cold linear read of a ~2,300-line file plus
+this one, on every dispatch. That instruction is more specific and more
+imperative than `CLAUDE.md`'s standing graphify guidance, so it wins, and
+graphify goes unused. **Cite the section, not the file**: "read the
+'23c-ii split into four sub-steps' section," "note rules 16, 21, 22." A
+step's spec still gets read in full — rule 16 requires the step text BE the
+task — but that is one section, not the whole document.
+
+**Also tell workers to use graphify for the code half.** It has been
+installed and committed since 2026-08-31 and no worker prompt has ever
+mentioned it. Codebase navigation questions — who consumes this route,
+where is this defined, what breaks if this changes — should go through
+`graphify query "..."` / `graphify path` / `graphify explain` rather than
+grep or whole-file reads. `graphify update .` after changing code.
+
+**Do NOT switch graphify to `--strict`.** It blocks a raw file read and
+redirects to a graph query. The graph indexes code structure; this
+project's source of truth for *what to build* is prose spec in
+`session-status.md`. Strict mode would block the one read a worker must do
+linearly and push it toward a subgraph that cannot represent "the architect
+chose a LEFT JOIN, here is why." That is not a saving, it is a worker
+building from a partial spec. Soft-nudge stays until the graph is proven
+reliable for this repo, per `web-vs-claude-code.md`'s original note.
+
+**Not on the list of things to trim**: the full-suite runs and the live
+server check. Those are what catch real problems, repeatedly, and they are
+not where the tokens go.
+
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.
 - Suggesting a hosted database or cloud deployment.

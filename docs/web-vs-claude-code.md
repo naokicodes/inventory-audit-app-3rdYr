@@ -141,7 +141,25 @@ chat's fresh-sandbox constraint?
     every commit, and `graphify claude install --project` (start without
     `--strict` — nudge, not block, until it's clear the graph is actually
     reliable for this repo).
-  - **`.gitignore` needs one more line**, per graphify's own team-setup
+  - **Installed and committed 2026-08-31 — and unused by every worker
+    prompt since (found 2026-09-01).** `CLAUDE.md`, `.claudeignore`,
+    `.claude/skills/graphify/` and `graphify-out/` are all in the repo and
+    correct. But every dispatch prompt written between then and 2026-09-01
+    opened by instructing a linear read of `docs/rules-for-claude-code.md`
+    and `docs/session-status.md`, which is both more specific and more
+    imperative than `CLAUDE.md`'s standing guidance — so it won, and the
+    graph was never queried once. Measured cost: worker sessions went from
+    10k–25k tokens to ~80k. Fixed by **rule 22**, which changes the
+    `/clear` cadence, requires prompts to cite a section rather than a
+    file, and tells workers explicitly to use graphify for code navigation.
+    Worth remembering as a general lesson: installing a tool is not
+    adopting it, and a prompt that contradicts a standing instruction
+    silently wins.
+  - **`--strict` is deliberately NOT adopted** (decided 2026-09-01, see
+    rule 22). Strict mode blocks raw file reads and redirects to a graph
+    query. The graph indexes code; this project's source of truth for what
+    to build is prose spec in `session-status.md`. Strict would block
+    exactly the read a worker must do linearly. Soft-nudge stays.
     guidance: `graphify-out/cost.json` (local-only run cost, not shared).
     `graphify-out/` itself (`graph.json`, `GRAPH_REPORT.md`) is meant to
     be **committed** — the whole point is that the next session (Claude

@@ -47,6 +47,62 @@ Pushed directly to `main`.
 
 ---
 
+## 2026-09-01 (architect) — Rule 22 added: context economy; graphify was installed but never used
+
+Project owner flagged a measured regression: worker sessions that had been
+costing 10k–25k tokens jumped to ~80k. The work didn't get harder — the
+dispatch practice changed. Two compounding causes, both the architect
+conversation's doing.
+
+**`/clear` between sub-steps of the same step.** Clearing before 23c-ii-a
+was correct for specific reasons (that session's context was unrelated
+Dashboard work; rule 21 had landed after it started, so it had never read
+the current rules). Those reasons weren't re-checked, and the instruction
+got repeated for 23c-ii-b and 23c-ii-c where it didn't hold. 23c-ii-b is
+23c-ii-a's direct sibling, and its prompt told it to go read 23c-ii-a's
+diff — i.e. to re-acquire cold exactly the context just discarded. Same
+failure mode this project keeps catching elsewhere: following a rule
+mechanically instead of re-checking whether its reason still applies.
+
+**Prompts that instruct a linear read of the two biggest files.** Every
+dispatch opened with "read `rules-for-claude-code.md`, then
+`session-status.md`" — ~2,300 lines cold, every time. graphify has been
+installed, committed and configured since 2026-08-31, with `CLAUDE.md`
+telling every session to query the graph rather than read raw — and no
+worker prompt has ever mentioned it. The prompt's instruction is more
+specific and more imperative than the standing one, so it won silently.
+General lesson worth keeping: installing a tool is not adopting it.
+
+**Resolved as rule 22**: `/clear` at step boundaries only; cite the
+section, not the file; tell workers to use graphify for code navigation.
+The step's own spec still gets read in full — rule 16 requires the step
+text to BE the task — but that's one section.
+
+**`--strict` deliberately not adopted.** It blocks raw file reads and
+redirects to a graph query. The graph indexes code structure; this
+project's source of truth for what to build is prose spec. Strict would
+block the one read a worker must do linearly and substitute a subgraph
+that can't carry "the architect chose a LEFT JOIN, here's why."
+
+**Explicitly not trimmed**: the full-suite runs and the live server check.
+Those catch real problems repeatedly and aren't where the tokens go.
+
+## 2026-09-01 (architect review of 23c-ii-c) — verified, all three points implemented as specified
+
+Read both real diffs and ran the suite: **14 files, 260/260, 0 failures**
+(257 baseline + 3 new). The route uses a LEFT JOIN, aliases the joined
+columns `commissary_code`/`commissary_name` matching `dashboard.js`, and
+qualifies `cm.active` / `cm.commissary_id` in the WHERE — all three points
+resolved in the spec, none re-litigated. The label rule is implemented
+identically on both pages via a `Set` of `commissary_id`, with the null
+guard so a dangling row renders no suffix rather than "undefined".
+
+Worth noting what makes the new test good rather than decorative: it
+asserts the dangling-commissary meat is still **returned**, not merely that
+its `commissary_code` is null. That's the assertion that fails loudly if
+someone later "tidies" the LEFT JOIN into an INNER one — the decision is
+protected, not just documented.
+
 ## 2026-09-01 (architect review of 23c-ii-b) — verified clean; 23c-ii-c's three implementation points resolved
 
 Verified 23c-ii-b independently: read the real diff, ran the full suite

@@ -1,6 +1,16 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-09-01 (**23c-ii-c done** — additive commissary
+Last updated: 2026-09-01 (**rule 22 added — context economy.** Worker
+sessions had jumped from 10k–25k tokens to ~80k, caused by `/clear`
+between sub-steps of the same step plus prompts instructing a cold linear
+read of this file. `/clear` now happens at STEP boundaries only, prompts
+cite a section rather than a file, and workers are told to use graphify
+(installed since 2026-08-31, never once used). `--strict` deliberately not
+adopted. Also: **23c-ii-c verified** by the architect — LEFT JOIN, aliased
+columns and qualified WHERE all implemented as specified, and the
+dangling-commissary test asserts the row is still *returned* rather than
+just checking a null, so the decision is actually protected. Previously:
+**23c-ii-c done** — additive commissary
 identity on `GET /api/commissary/meats` plus the label fixes it unblocks
 on `commissary.html` and `stock-receipts.html`, per the four-way split
 below. 14/14 files, 260/260 assertions, 0 failures (257 baseline + 3 new
