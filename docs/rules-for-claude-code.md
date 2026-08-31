@@ -262,10 +262,14 @@ standing constraints, not suggestions — they exist to keep a solo,
     - **When handing the project owner copy-pasteable terminal
       commands with multiple `-m` flags, put them all on one line,
       each `-m "..."` repeated directly — never a backslash
-      line-continuation across multiple lines.** Confirmed not to work
-      reliably in the project owner's actual terminal, cost real
-      back-and-forth to discover. `git commit -m "subject" -m "body
-      paragraph"` on one line is the format that works.
+    - **Never chain terminal commands with `&&` — hand them over as
+      separate lines, one command per line.** Confirmed 2026-09-01 in the
+      project owner's actual terminal: `&&` is not a valid statement
+      separator in Windows PowerShell 5.1, so a chained `git add ... &&
+      git commit ... && git push` fails outright. Same lesson as the
+      backslash bullet above, and the same fix: hand over exactly what
+      can be pasted and run as-is, rather than the shell syntax that
+      happens to be idiomatic elsewhere.
 
 ## Rule 21 — Stop any server you start
 
