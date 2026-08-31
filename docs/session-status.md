@@ -1,6 +1,18 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-09-01 (**rule 22 added — context economy.** Worker
+Last updated: 2026-09-01 (**23c-ii-d done — step 23 is now fully closed
+out.** Terminal's qualified-token commissary-meat grammar,
+`<commissary-code>/<meat>` (e.g. `com-a/m05`), closing the correctness
+bug where `resolveExact`'s `list.find(...)` silently picked the first
+match when the same meat code existed under two commissaries. 15/15
+files, 273/273 assertions, 0 failures (260 baseline + 13 new tests in a
+new `terminal.test.js`). Live-verified against a real booted server with
+a second commissary and a duplicate-coded meat: a bare ambiguous token
+was refused, both qualified forms resolved correctly, a non-colliding
+meat still resolved bare unchanged. See this session's `changelog.md`
+entry for full detail. Pushed to `main`. **No step is currently queued
+next — project owner's call on what comes after step 23.** Previously:
+**rule 22 added — context economy.** Worker
 sessions had jumped from 10k–25k tokens to ~80k, caused by `/clear`
 between sub-steps of the same step plus prompts instructing a cold linear
 read of this file. `/clear` now happens at STEP boundaries only, prompts
@@ -9,7 +21,7 @@ cite a section rather than a file, and workers are told to use graphify
 adopted. Also: **23c-ii-c verified** by the architect — LEFT JOIN, aliased
 columns and qualified WHERE all implemented as specified, and the
 dangling-commissary test asserts the row is still *returned* rather than
-just checking a null, so the decision is actually protected. Previously:
+just checking a null, so the decision is actually protected. Before that:
 **23c-ii-c done** — additive commissary
 identity on `GET /api/commissary/meats` plus the label fixes it unblocks
 on `commissary.html` and `stock-receipts.html`, per the four-way split
@@ -1888,7 +1900,19 @@ the same treatment: one small additive step, cited as precedent.
 
   **Blocks 23c-ii-d — dispatch before it, not after.**
 
-- **23c-ii-d — Terminal qualified-token grammar.** The largest sub-step
+- **23c-ii-d [Done, 2026-09-01 — Claude Code (CLI) session] — Terminal
+  qualified-token grammar.** Built exactly as scoped below, all eight
+  grammar rules followed as specified. See this session's `changelog.md`
+  entry for full verification detail (15/15 files, baseline 260/260 →
+  273/273 with 13 new tests in a new `terminal.test.js`, 0 failures;
+  live end-to-end check with a real second commissary + a duplicate-coded
+  meat, confirming the bare-ambiguous refusal, both qualified forms, and
+  the unchanged non-colliding bare case; test rows cleaned up; server
+  stopped per rule 21). Pushed directly to `main`. **Step 23 is now fully
+  closed out — all of 23a, 23b (6 items), and 23c (23c-i, 23c-i-b,
+  23c-ii-a through 23c-ii-d) are done.**
+
+  The largest sub-step
   and the only one closing a correctness hole. Depends on 23c-ii-c.
   Grammar, decided here so the worker does not have to invent it:
 
@@ -2073,17 +2097,20 @@ the same treatment: one small additive step, cited as precedent.
      `main` directly. See `changelog.md`'s matching entry for full
      detail.
 
-5. **23c-ii** — **split 2026-09-01 into 23c-ii-a .. 23c-ii-d; see the
+5. **23c-ii — [Done, 2026-09-01] split 2026-09-01 into 23c-ii-a .. 23c-ii-d; see the
    "23c-ii split" section above for the specs and the three
    resolutions.** The three backend gaps listed above are indeed all
    closed — but a fourth, missing commissary identity on `GET
    /api/commissary/meats`, was found on 2026-09-01 and is now 23c-ii-c.
    Dispatch order: **23c-ii-a and 23c-ii-b in either order, then
-   23c-ii-c, then 23c-ii-d** (which 23c-ii-c blocks).
+   23c-ii-c, then 23c-ii-d** (which 23c-ii-c blocks). All four sub-steps
+   are done as of 23c-ii-d landing 2026-09-01.
 
-23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, 23c-i, 23c-i-b,
-23b-iv, 23b-v, 23b-vi-a, and 23b-vi-b are done. 23c-ii's four sub-steps
-are all that remain in step 23.
+**Step 23 is fully done.** 23a, 23b's rekey sub-piece, 23b's 3-item CRUD
+sub-piece, 23c-i, 23c-i-b, 23b-iv, 23b-v, 23b-vi-a, 23b-vi-b, and all
+four 23c-ii sub-steps (23c-ii-a through 23c-ii-d) are done. No step is
+currently queued next — project owner's call on what comes after step
+23.
 
 **LIVE HAZARD, present in `main` from 2026-08-31 until 23b-vi-a fixed it
 the same day — kept here for history, not because it's still open.**
