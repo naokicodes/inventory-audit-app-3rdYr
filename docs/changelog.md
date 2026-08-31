@@ -13,6 +13,20 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (Claude Code session 3) — Step 23b: Commissary/meat-type/commissary_meats admin CRUD
+
+Third Claude Code (CLI) session, continuing 23b's remaining 5-item list. Scoped to 3 of the 5 per rule 16 and stopped there: **Commissary CRUD, meat-type CRUD, and `commissary_meats` CRUD**, each an exact mirror of an existing admin CRUD pattern already in `settings.js` (Restaurants, Adjustment Types, and Meats respectively). Stated and confirmed this boundary before coding.
+
+New `GET`/`POST`/`PUT /api/settings/commissaries`, `/api/settings/meat-types`, `/api/settings/commissary-meats` (the last scoped by `commissary_id` the way Meats is scoped by `restaurant_id`; `meat_type_id` is editable via `PUT` since it's a tag, not an identity field like `code`). Confirmed `meat_types` has no `UNIQUE(name)` in `schema.sql` (unlike `adjustment_types`) before writing a test asserting a duplicate name is currently allowed — checked, not assumed. Deliberately left `commissary.js`'s existing `GET /api/commissary/meats` untouched — a different, already-working active-only read route feeding the Shipment form's dropdown, no overlap with this admin CRUD work.
+
+**Explicitly NOT done this session, per the stated boundary**: the remaining 2 of 23b's 6 items —
+1. Threading an optional `commissary_id` filter through `commissaryAuditEngine.js`'s `computeCommissaryDailyAudit` and `commissaryYieldEngine.js`'s `computeYieldLogForDate` (both currently list across *every* commissary's meats with no per-commissary filter option) plus their two `GET` routes in `commissary.js`.
+2. The fuller Dashboard rollup restructuring (grouping multiple commissaries' same-`meat_type_id` rows into one combined line, per 23b's own item 6 description).
+
+**Flagged rather than decided**: item 5/6's exact grouped-rollup response shape isn't specified anywhere in `data-model.md`/`session-status.md` — they describe the intent (a combined grand total, a future per-location drill-down) but not the concrete API shape once multiple commissaries can share a `meat_type_id`. Left for the architect to resolve before a future session builds it, not guessed here.
+
+**Verified**: 21 new tests in `settings.test.js` (Commissaries: 6, Meat Types: 5, Commissary Meats: 10), full suite **14/14 files, 228/228 assertions, 0 regressions** (was 207). Live end-to-end against a real booted server: created a commissary, a meat type, and a commissary meat over real HTTP; confirmed a duplicate commissary code is rejected; confirmed a duplicate `commissary_meats` code is rejected within one commissary but the identical code is accepted under a second commissary (the exact behavior `UNIQUE(commissary_id, code)` from 23a's schema change exists to allow).
+
 ## 2026-08-31 (Claude Code session 2) — Step 23b sub-piece: commissary_conversion_standards' rekey + its consumers
 
 Second Claude Code (CLI) session on this project, continuing from 23a. Scoped narrowly per rule 16: only item 1 of 23b's 6-item list (the `commissary_conversion_standards` rekey and its direct engine/route consumers), not the other 5 items (Commissary/meat-type/commissary_meats CRUD, per-commissary engine params, the fuller cross-commissary Dashboard grouping). Stated and confirmed this boundary before coding.

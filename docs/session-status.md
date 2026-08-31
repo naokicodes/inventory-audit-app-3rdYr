@@ -1,10 +1,12 @@
 # Session Status — read this first after token reset
 
-Last updated: 2026-08-31 (step 23b, sub-piece 1 of 6: the
-`commissary_conversion_standards` rekey + its direct route/engine
-consumers — see its entry under "Item 3 design" below, and
-`changelog.md`'s matching entry, for full detail). **Next up: the
-remaining 5 items of 23b, or 23c** — project owner's call.
+Last updated: 2026-08-31 (step 23b, 4 of 6 items done: the
+`commissary_conversion_standards` rekey + its consumers, plus Commissary/
+meat-type/`commissary_meats` admin CRUD — see the entries under "Item 3
+design" below, and `changelog.md`'s matching entries, for full detail).
+**Next up: the remaining 2 items of 23b (per-commissary engine params +
+the fuller Dashboard grouping, the latter needing an architect decision
+on response shape first), or 23c** — project owner's call.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1469,15 +1471,44 @@ fresh architecture session:**
   `GET`/`PUT` (edit) on that page are unaffected. Full suite: **14/14
   files, 207/207 assertions, 0 regressions** (was 200). Pushed to `main`
   directly.
+  **[Done, 2026-08-31 — third Claude Code (CLI) session, 3 of the
+  remaining 5 items] Commissary CRUD, meat-type CRUD, and
+  `commissary_meats` CRUD are done.** New `GET`/`POST`/`PUT
+  /api/settings/commissaries` (exact mirror of Restaurants),
+  `/api/settings/meat-types` (mirror of Adjustment Types),
+  `/api/settings/commissary-meats` (mirror of Meats, scoped by
+  `commissary_id` instead of `restaurant_id`; `meat_type_id` editable via
+  `PUT`). Absorbs the "no commissary-meat-creation UI" gap from the
+  numbered list below (item 2). `commissary.js`'s existing `GET
+  /api/commissary/meats` (a different, already-working read route for the
+  Shipment form's dropdown) is untouched. See `changelog.md`'s "Step 23b:
+  Commissary/meat-type/commissary_meats admin CRUD" entry for full detail.
+
+  **Explicitly NOT done — still open for a future session**: the
+  remaining 2 of 23b's 6 items — (a) threading an optional `commissary_id`
+  filter through `commissaryAuditEngine.js`'s `computeCommissaryDailyAudit`
+  and `commissaryYieldEngine.js`'s `computeYieldLogForDate` (both list
+  across every commissary's meats today, no per-commissary filter) plus
+  their two `GET` routes; (b) the fuller Dashboard rollup restructuring
+  (grouping multiple commissaries' same-`meat_type_id` rows into one
+  line). **Flagged, not decided**: (b)'s exact grouped-rollup response
+  shape isn't specified in `data-model.md`/`session-status.md` — they
+  describe intent (combined grand total, a future per-location
+  drill-down) but not the concrete API shape once multiple commissaries
+  can share a `meat_type_id`. Needs an architect decision before a future
+  session builds it. Full suite: **14/14 files, 228/228 assertions, 0
+  regressions** (was 207). Pushed to `main` directly.
 - **23c (UI)**: Commissary + Meat Type tabs in Settings, commissary-meat
   creation UI, a commissary selector everywhere a screen currently
   assumes there's only one (`commissary.html`, `commissary-shipments.html`,
   Terminal, Dashboard drill-down).
 
-**Next up: the remaining 5 items of 23b** (Commissary CRUD, meat-type
-CRUD, `commissary_meats` CRUD, per-commissary engine params, fuller
-Dashboard grouping) **or 23c**, project owner's call on sequencing. 23a
-and 23b's rekey sub-piece are done; nothing else in 23b/23c is started.
+**Next up: the remaining 2 items of 23b** (per-commissary engine params
+for `computeCommissaryDailyAudit`/`computeYieldLogForDate` + their
+routes, and the fuller Dashboard grouping — the latter needs an architect
+decision on response shape first, see above) **or 23c**, project owner's
+call on sequencing. 23a, 23b's rekey sub-piece, and 23b's 3-item CRUD
+sub-piece are done; nothing else in 23b/23c is started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading
