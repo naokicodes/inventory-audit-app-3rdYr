@@ -11,8 +11,15 @@ piece — split into 23c-i (Settings tabs + commissary-meat creation UI,
 fully unblocked, dispatched today, now done) and 23c-ii (commissary
 selector, blocked on 3 backend gaps — 2 previously known, 1 newly found:
 `GET /api/commissary/meats` has zero `commissary_id` filtering). See the
-full "23c" entry below for detail. Next up after 23c-i: the now-3-item
-remaining 23b backend work, then 23c-ii.**
+full "23c" entry below for detail.**
+
+**Next up, decided by the architect conversation 2026-08-31 (second
+recheck, first one run from Claude Code against the local checkout
+rather than a web sandbox): 23c-i-b first** — a tiny, self-contained
+fix for the Settings -> Conversion Standards "Create" form, which 23b's
+rekey broke and which neither 23c-i nor 23c-ii actually owned. Then the
+3-item remaining 23b backend work, then 23c-ii. See 23c-i-b's own entry
+below.
 
 Everything below this point, through the end of the 2026-08-30 Round 2
 summary, predates step 23a/23b and is unchanged by them except where
@@ -1471,12 +1478,21 @@ fresh architecture session:**
   restructuring (grouping multiple commissaries' same-`meat_type_id` rows
   into one combined line — today's fix only kept the existing
   per-commissary-meat rollup correct against the new schema, it did not
-  build that grouping). **Known, flagged gap**: `settings.html`'s "Create
-  Standard" admin form still POSTs `commissary_meat_id` and will fail
-  this route's validation until 23c ships a meat-type-aware picker —
-  `GET`/`PUT` (edit) on that page are unaffected. Full suite: **14/14
-  files, 207/207 assertions, 0 regressions** (was 200). Pushed to `main`
-  directly.
+  build that grouping). **Known, flagged gap — now owned by 23c-i-b, see
+  below**: `settings.html`'s "Create Standard" admin form still POSTs
+  `commissary_meat_id` and fails this route's validation. `GET`/`PUT`
+  (edit) on that page are unaffected. Full suite: **14/14 files, 207/207
+  assertions, 0 regressions** (was 200). Pushed to `main` directly.
+
+  **Correction to that flagged gap, 2026-08-31 second architect
+  recheck**: this entry originally said the gap would close "until 23c
+  ships a meat-type-aware picker." That was wrong on both halves — 23c-i
+  shipped without touching this form, and 23c-ii is a commissary
+  *selector*, an unrelated concern. The gap was orphaned, owned by no
+  step, and blocked on nothing, while being a previously-working admin
+  screen that is broken today. It is now its own step, **23c-i-b**,
+  dispatched ahead of the remaining 23b backend work — see its entry
+  under "23c" below.
   **[Done, 2026-08-31 — third Claude Code (CLI) session, 3 of the
   remaining 5 items] Commissary CRUD, meat-type CRUD, and
   `commissary_meats` CRUD are done.** New `GET`/`POST`/`PUT
@@ -1493,9 +1509,9 @@ fresh architecture session:**
   **Explicitly NOT done — still open for a future session**: the
   remaining 2 of 23b's 6 items — (a) threading an optional `commissary_id`
   filter through `commissaryAuditEngine.js`'s `computeCommissaryDailyAudit`
-  and `commissaryYieldEngine.js`'s `computeYieldLogForDate` (both list
-  across every commissary's meats today, no per-commissary filter) plus
-  their two `GET` routes; (b) the fuller Dashboard rollup restructuring
+  (lists across every commissary's meats today, no per-commissary filter)
+  plus `GET /api/commissary/daily-audit`, and the equivalent filter on
+  `GET /api/commissary/yield-log`; (b) the fuller Dashboard rollup restructuring
   (grouping multiple commissaries' same-`meat_type_id` rows into one
   line). **Flagged, not decided**: (b)'s exact grouped-rollup response
   shape isn't specified in `data-model.md`/`session-status.md` — they
@@ -1537,14 +1553,73 @@ fresh architecture session:**
     afterward. Not verified: an actual browser click-through — same open
     item every frontend step in this project has carried. Pushed to
     `main` directly (`29b3858`).
+  - **23c-i-b [Queued, not started — dispatched 2026-08-31]: fix the
+    broken "Create Standard" form on Settings -> Conversion Standards.**
+    Its own step rather than a rider on the next backend one, per the
+    project owner's explicit call. The reasoning, worth keeping because
+    it is the rule-16 test applied cleanly: this bug is fully
+    independent of the three `commissary_id` backend items — it is a
+    Conversion Standards fix on a different Settings tab, touching
+    nothing the commissary selector touches — so bundling it into the
+    next backend step would mix two unrelated concerns into one worker
+    prompt, exactly what 23a's scope-conflict flag and 23b's own
+    sub-piece splits already established as the thing to avoid. And
+    leaving it (the prior plan) does not survive checking what it is
+    blocked on: nothing. It is small, self-contained, and closes a
+    previously-working admin screen that is broken today.
+
+    **The bug**: 23b's rekey made `POST
+    /api/commissary/conversion-standards` require `meat_type_id`
+    (`server/routes/commissary.js` ~L421), but `public/settings.html`
+    (~L841) still POSTs `commissary_meat_id`. `GET` and the inline
+    `PUT` edit on that same section are unaffected and must stay so.
+
+    **Scope, two changes and nothing else**: (1) add `meat_type_id` to
+    the SELECT column list of `GET /api/commissary/meats` — purely
+    additive, no filter, no WHERE change; (2) in `settings.html`'s
+    Conversion Standards section, carry each meat's `meat_type_id` onto
+    its `<option>`, POST `meat_type_id` instead of `commissary_meat_id`,
+    and refuse client-side with a clear message when the selected
+    commissary meat is untagged. `loadConversionStandards()` is left
+    alone — the `GET` route deliberately keeps its
+    `commissary_meat_id`+`restaurant_id` public contract.
+
+    **Why this is not frontend-only, which is how it was first scoped**:
+    the section's dropdown is populated from `GET
+    /api/commissary/meats`, whose SELECT returns `id, code, name, unit,
+    allowed_leeway_pct, cost_per_unit` — no `meat_type_id`, so the page
+    cannot resolve the selected meat to a meat type. The considered
+    alternative was repointing that dropdown at `GET
+    /api/settings/commissary-meats?commissary_id=N` (which does return
+    `meat_type_id`), which would have been genuinely frontend-only —
+    rejected because that route *requires* a `commissary_id`, forcing a
+    local commissary dropdown into this section, which is 23c-ii scope
+    creeping into a step deliberately sized as tiny. Adding one column
+    to a catalog read route is the smaller and more honest change.
+
+    **Note for whoever picks up 23b-iv**: that step also touches `GET
+    /api/commissary/meats` (adding the `commissary_id` filter). These
+    are sequential dispatches, not parallel, so there is no conflict —
+    but 23b-iv should expect `meat_type_id` to already be in that
+    route's SELECT and must not remove it.
   - **23c-ii: a commissary selector everywhere a screen currently
     assumes there's only one** (`commissary.html`,
     `commissary-shipments.html`, Terminal, Dashboard drill-down).
     **Blocked, do not dispatch yet.** Depends on three backend gaps, only
     two of which were previously flagged:
-    1. `computeCommissaryDailyAudit`/`computeYieldLogForDate` + their
-       `GET` routes need an optional `commissary_id` filter (already
-       flagged below).
+    1. `computeCommissaryDailyAudit` + `GET
+       /api/commissary/daily-audit`, and `GET
+       /api/commissary/yield-log`, all need an optional `commissary_id`
+       filter (already flagged below). **Correction, 2026-08-31 second
+       architect recheck**: earlier versions of this list paired
+       `computeCommissaryDailyAudit` with
+       `commissaryYieldEngine.js`'s `computeYieldLogForDate` and called
+       them "their two `GET` routes." That is wrong and would send a
+       worker to patch dead code: `computeYieldLogForDate` has **no
+       route consumer at all** — only `commissaryYieldEngine.test.js`
+       calls it. The live yield-log route builds its own query inline
+       and calls `computeYieldRow` per id, so that is the thing that
+       actually needs the filter.
     2. The fuller Dashboard grouped-rollup response shape needs an
        architect decision first (already flagged below).
     3. **Newly found, 2026-08-31 architect recheck**: `GET
@@ -1558,14 +1633,24 @@ fresh architecture session:**
        actually filter against. This becomes the third item of 23b's
        remaining backend work, not a 23c-ii frontend task.
 
-**23c-i is done. Next up: the now-3-item remaining 23b backend work**
-(per-commissary engine params for
-`computeCommissaryDailyAudit`/`computeYieldLogForDate` + their routes,
-the `commissary_id` filter on `GET /api/commissary/meats`, and the
-Dashboard grouping needing an architect response-shape decision first)
-must land before 23c-ii can be dispatched. 23a, 23b's rekey sub-piece,
-23b's 3-item CRUD sub-piece, and 23c-i are done; 23c-ii and the rest of
-23b's backend items are not started.
+**23c-i is done. Dispatch order from here, decided 2026-08-31:**
+1. **23c-i-b** — the Conversion Standards Create fix above. Independent
+   of everything else, blocked on nothing, dispatched first.
+2. **23b-iv** — `commissary_id` filter on `GET /api/commissary/meats`.
+   Smallest of the three backend items and the one 23c-ii most directly
+   needs; mirror the `restaurant_id` convention `GET
+   /api/settings/meats` already uses.
+3. **23b-v** — optional `commissary_id` param on
+   `computeCommissaryDailyAudit` + `GET /api/commissary/daily-audit`,
+   and the same filter on `GET /api/commissary/yield-log`.
+4. **23b-vi** — the Dashboard grouped rollup. **Still blocked on an
+   architect response-shape decision** (see the "Flagged, not decided"
+   note above); it gates only itself, so 1-3 can all ship before it is
+   resolved.
+5. **23c-ii** — the commissary selector, once 2-4 have landed.
+
+23a, 23b's rekey sub-piece, 23b's 3-item CRUD sub-piece, and 23c-i are
+done. Everything in the numbered list above is not started.
 
 1. **[Done, 2026-08-30] No restaurant-creation UI at all.** Checked every
    route file — `restaurants` rows only ever came from `seed.js` reading

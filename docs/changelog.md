@@ -13,6 +13,98 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-08-31 (architect recheck #2, first one run from Claude Code) — 23c confirmed incomplete; orphaned Create-Standard bug given its own step
+
+Pure architecture and docs, no code changed. Project owner asked whether
+step 23c was still incomplete, and — separately — whether running the
+architect side from the Claude Code terminal against the local checkout
+is more token-efficient than the web sandbox that every prior architect
+pass used.
+
+**23c is not complete, and the docs were accurate about that.** Verified
+against the real source rather than the doc claims: 23c-i is genuinely
+done (`settings.html` L50-52 has all three tab buttons with matching
+`<section>` panels at L174/185/195, backed by nine routes in
+`settings.js` L64-186), and all three of 23c-ii's stated blockers are
+real —
+`computeCommissaryDailyAudit(db, businessDate, commissaryMeatId = null)`
+has no `commissary_id` parameter and neither engine file mentions one
+outside test fixtures; `GET /api/commissary/meats`
+(`commissary.js` L35-41) is a flat `WHERE active = 1` with no filter
+param at all; and `dashboard.js` L51-76 still iterates per
+commissary-meat, with its own inline comment saying the grouping is not
+built.
+
+**Two real doc defects found in the process, both now fixed in
+`session-status.md`:**
+
+1. **A dead-code pointer in 23b's remaining-items list.** It told a
+   future worker to thread `commissary_id` through
+   `commissaryYieldEngine.js`'s `computeYieldLogForDate` "plus their two
+   `GET` routes." `computeYieldLogForDate` has no route consumer —
+   `grep` confirms only `commissaryYieldEngine.test.js` calls it. The
+   live `GET /api/commissary/yield-log` builds its own query inline and
+   calls `computeYieldRow` per id. A worker following that text would
+   have patched a function nothing uses and left the actual route
+   unfiltered. Corrected in both places it appeared.
+
+2. **An orphaned regression.** 23b's rekey entry said `settings.html`'s
+   broken "Create Standard" form would be fixed "until 23c ships a
+   meat-type-aware picker." Both halves were wrong: 23c-i shipped
+   without touching it, and 23c-ii is a commissary selector, an
+   unrelated concern. The bug belonged to no step and was blocked on
+   nothing, while being a previously-working admin screen that is broken
+   today (rule 17's exact concern).
+
+**Decision, project owner's call:** the Create-Standard fix becomes its
+own tiny step, **23c-i-b**, dispatched ahead of the three backend items
+rather than bundled into the first of them. Reasoning recorded in
+`session-status.md` — it is independent of the `commissary_id` work and
+touches a different tab, so bundling would mix unrelated concerns in one
+worker prompt, which is what rule 16 and 23a/23b's own splits already
+established as the thing to avoid.
+
+**One scoping correction made during that decision:** 23c-i-b was
+initially framed as frontend-only. It cannot be, cheaply — the section's
+dropdown is fed by `GET /api/commissary/meats`, whose SELECT does not
+return `meat_type_id`, so the page has nothing to resolve the selected
+meat to a meat type with. The step now includes adding that one column
+to the route's SELECT (purely additive). The frontend-only alternative
+— repointing the dropdown at `GET
+/api/settings/commissary-meats?commissary_id=N` — was rejected because
+that route requires a `commissary_id`, which would force a local
+commissary dropdown into the section and drag 23c-ii scope into a step
+deliberately sized as tiny.
+
+**Also flagged, not fixed here:** `session-status.md` is now ~1750 lines
+and mixes current truth with fully-resolved Round 1/Round 2 narrative,
+while every worker prompt still says "read this first."
+`web-vs-claude-code.md` already flags the trim as worthwhile; moving
+everything above the step-23 section into a dated archive doc would be
+the single highest-leverage remaining docs cleanup, and it is a
+docs-only change (rule 19: no suite run needed). Not done here — it
+deserves its own pass rather than a rider.
+
+**On the terminal-vs-web question:** the terminal is the better fit for
+the build loop, but not primarily for the clone/`npm install` reason
+`web-vs-claude-code.md` gives — that tax is one-time per session. The
+larger win is `/clear` plus graphify: a fresh worker queries the graph
+instead of re-reading the whole status doc cold. `.claudeignore`
+already excludes `graphify-out/` from context uploads, confirmed, so
+the graph stays query-only. Where the terminal loses is that an
+architect pass spends the stronger model's budget on file reads a web
+sandbox would have spent free-tier budget on — so architect sessions
+should stay short and dispatch-focused.
+
+**Still open, not blocking:** 23b-vi's grouped-rollup response shape.
+Three candidate shapes were put to the project owner (group by
+`meat_type` with nested per-commissary rows; keep flat rows and add a
+`commissary_id` filter; two routes, flat detail plus grouped summary)
+and the decision was deferred. It gates only 23b-vi, so 23c-i-b, 23b-iv,
+and 23b-v can all ship first.
+
+---
+
 ## 2026-08-31 (Claude Code session) — Step 23c-i: Commissary/Meat Type tabs + commissary-meat creation UI
 
 Frontend-only, scoped exactly to the split-off 23c-i piece: three new tabs on `settings.html` (Commissaries, Meat Types, Commissary Meats), no backend or schema changes — all three of 23b session 3's `GET`/`POST`/`PUT /api/settings/commissaries` / `/meat-types` / `/commissary-meats` routes already existed and already had test coverage.
