@@ -384,13 +384,34 @@ seam as rule 20's `&&` and backslash lessons and rule 18's "never paste
 commands into a file's own content" — hand over exactly what can be run as-is,
 at the moment it can be run.
 
-**Worker side — report, don't halt.** At the start of a session, check that the
-step you were given actually appears in `docs/session-status.md`. If it
-doesn't, say so plainly in your first message and CONTINUE — do not stop. Per
+**Worker side — pull first.** Before reading anything, run `git pull`. You work
+from the project owner's local checkout, so an architect commit that hasn't
+been pulled is invisible to you — the docs for your own step may be sitting on
+`origin/main` unread. This is not hypothetical: on 2026-09-02 a dispatch was
+wasted because the step's spec had been pushed minutes earlier and the worker's
+checkout predated it.
+
+**Worker side — report, don't halt.** After pulling, check that the step you
+were given actually appears in `docs/session-status.md`. If it doesn't, say so
+plainly in your first message and CONTINUE — do not stop. Per
 rule 16 a step's prompt IS the whole task by design, so a stale or unsaved doc
 is not a blocker; it's information the architect needs. Flag it again at the
 end, before you write your own `session-status.md` update, so the architect can
 reconcile rather than discover it a commit later.
+
+**Worker side — confirm the push landed, don't assume it.** Running `git push`
+is not evidence that it worked. End the session by running `git status -sb` and
+reading the result: it must say `up to date`, not `ahead N`. Twice on
+2026-09-02 a session finished with its work committed locally and never pushed
+— and the second time, a later session read that local commit, saw real code
+and a real hash, and reported the step as "already done and pushed." From the
+architect's side, who only ever sees `origin/main`, that work did not exist.
+The architect's independent pull is what caught it, but the check belongs here,
+where it costs one command instead of a wasted dispatch and a false report.
+
+Same principle for the architect: `git log origin/main` and a fresh pull, never
+a worker's summary. A session reporting its own state accurately is doing its
+best; it still cannot see what it failed to push.
 
 Why not a hard stop: halting would burn a full dispatch on something the
 architect fixes in seconds, and it would make doc state a hard dependency

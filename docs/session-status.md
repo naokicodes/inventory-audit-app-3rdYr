@@ -18,58 +18,19 @@ suite, and how to keep context costs down.
 
 ## Current state — 2026-09-02
 
-**Step 23 is fully closed.** All of 23a, 23b's six items, and 23c
-(23c-i, 23c-i-b, 23c-ii-a through 23c-ii-d) are done and pushed.
+**Step 23 is fully closed**, and step 24 is four sub-steps in: **24a**
+(`output_commissary_meat_id` + the debit/credit ledger), **24a-b** (test
+isolation), **24b-i** (`input_quantity`), and **24b-ii**
+(`commissary_adjustments` schema + engine) are all DONE and pushed as of
+2026-09-02. Per-step detail is in `changelog.md`; the archived sub-step
+entries are in `session-history.md`.
 
-**Step 24a is DONE (2026-09-02, Claude Code session).**
-`output_commissary_meat_id` (nullable, FK -> `commissary_meats`) is on
-`commissary_yield_log` via an idempotent migration, and
-`commissaryAuditEngine.js` is a debit/credit ledger (`getCommissaryUsage`
-debits `raw_weight_in` for the input meat, `getCommissaryBackedUp` credits
-`backed_weight_out` to the output meat). See `changelog.md` for the full
-writeup. Full suite: **15 files, 0 failures** (run individually via `node
-<file>.test.js` — no test runner script exists yet; includes
-`server/db/activityLog.test.js` and `server/db/migrate.test.js`, easy to
-miss since they live outside `server/routes`/`server/engines`).
-
-**Step 24a-b is DONE (2026-09-02, Claude Code session) — test isolation,
-no source changes.** `commissaryAuditEngine.test.js` shared a single `db`
-across the whole file; several tests silently depended on rows an earlier
-test had inserted (the `getCommissaryUsage` bug named in the dispatch
-prompt, plus the whole day-1→day-4 chain). Every test now creates its own
-dedicated `commissary_meats` row and business dates, generalizing the
-pattern 24a's own `M10`/`M11` tests already used. Verified: reordered two
-independent test blocks and ran two tests each fully alone, both still
-passed. Full suite: **15 files, 279/279 assertions, 0 failures** (same
-count as before — no test added or removed). See `changelog.md` for detail.
-
-**24b is next**, not yet designed as a dispatchable prompt: per-meat
-"next stage" config, `commissary_adjustments` CRUD + balance effects,
-Miscuts destination filtering. 24c (the yield-form UI) follows. The cheap
-contained fixes remain in "Known open items."
-
-The most recent landings, newest first — full detail for each is in
-`changelog.md`:
-
-| Step | What landed |
-|---|---|
-| 24a-b | `commissaryAuditEngine.test.js` test isolation (no source changes) |
-| 24a | `output_commissary_meat_id` column + debit/credit ledger + tests |
-| — | Fixed dashboard.js's dangling-`commissary_id` INNER JOIN silently dropping stock |
-| — | Fixed 23c-ii-d follow-on: qualified-branch silent-first-match in `resolveCommissaryMeat` |
-| 23c-ii-d | Terminal qualified-token grammar (`com-a/m05`); closed a silent-first-match bug |
-| 23c-ii-c | Commissary identity on `GET /api/commissary/meats` (LEFT JOIN) + label fixes on two pages |
-| 23c-ii-b | Commissary selector on `commissary-shipments.html` |
-| 23c-ii-a | Commissary selector on `commissary.html` |
-| 23b-vi-a/b | Grouped stock rollup + inline drill-down; closed a live double-count bug |
-| — | Rules 21 (stop your server) and 22 (context economy) |
+Full suite: **15 files, 286/286 assertions, 0 failures.** Run individually
+via `node <file>.test.js` — there is no test runner script. Two files are
+easy to miss because they live outside `server/routes`/`server/engines`:
+`server/db/activityLog.test.js` and `server/db/migrate.test.js`.
 
 ## Known open items (not the next step's problem, just not forgotten)
-
-- ~~**`dashboard.js`'s INNER JOIN to `commissaries`**~~ — fixed
-  2026-09-01, see `changelog.md`. Changed to `LEFT JOIN` (matching
-  23c-ii-c) with a `(unknown commissary #N)` fallback label on the
-  `by_commissary` entries, mirroring the existing `meat_type_id` guard.
 
 - **A real click-through in an actual browser is still owed** for Stock
   Receipts' Unallocated/Assign flow specifically — the 2026-08-28 session
@@ -78,13 +39,6 @@ The most recent landings, newest first — full detail for each is in
   via live HTTP payload replay instead (see `changelog.md`). Strong
   verification, but not the same as clicking it. Commissary's own
   Edit/Delete UI flows are in the same boat — never fully click-tested.
-- ~~**Live recalculation**~~ — done, step 13 above.
-- ~~**Restaurant B/C still aren't seeded**~~ — Restaurant B (FC) done as
-  of step 19, 2026-08-29. Restaurant C (Likod) is still unseeded — no
-  workbook for it exists yet, unlike FC's real `FC_MasterAudit.xlsx`.
-- ~~**`resolveCommissaryMeat`'s qualified branch takes the first of a
-  multi-match**~~ — fixed 2026-09-01, see `changelog.md`.
-
 - **A preset-*authoring* admin UI is still deferred, not forgotten.**
   Shipment presets can be created and edited via
   `GET`/`POST`/`PUT /api/commissary/shipment-presets` today, but there is
@@ -103,228 +57,14 @@ The most recent landings, newest first — full detail for each is in
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-- ~~**Cross-unit yield rows break the yield engine's loss%**~~ — **RESOLVED
-  2026-09-02, and it dissolved rather than got solved.** The concern was real:
-  `computeYieldMetrics` derives `actual_loss_pct` as `(raw_weight_in -
-  backed_weight_out) / raw_weight_in`, so a `unit in -> kg out` event would
-  reconcile two different units and report a conversion ratio as shrinkage (45
-  units in, 30 kg out reads as 33% loss, flagging Review on every chicken entry
-  forever). **The project owner then supplied the fact that removes the case
-  entirely: every unit-tracked input is ALSO weighed at intake, and always has
-  been — this predates the app.** Management wanted yield rates, mixing units
-  and kilos was confusing, so the real-world paper process records both: the
-  count, and the total kg of that count. The kg figure drives yield; the count
-  drives the stock deduction. So every yield stage is `kg -> kg` after all, and
-  `computeYieldMetrics` needs no branch, no per-stage ratio standard, and no
-  verdict suppression. It stays exactly as built. See the amended "Yield output
-  is always kg" decision below, and 24b-i for the one column this does require.
+## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii DONE)
 
-## Step 24 — multi-stage yield + Commissary-side allocation (designed, NOT started)
-
-
-Raised by the project owner working through two real Commissary
-scenarios that didn't fit the existing single-input/single-output yield
-model. Settled through the same real back-and-forth as item 3's design
-— every fork below was an actual question asked and answered:
-
-- **A real, confirmed bug found and must be fixed as a prerequisite,
-  not a nice-to-have**: `getCommissaryUsage`
-  (`commissaryAuditEngine.js`) only ever sums `commissary_shipments` as
-  usage for a commissary meat. It never counts
-  `commissary_yield_log.raw_weight_in` as an outflow for whichever
-  meat was the *input* to a yield event. Concretely: 20kg raw Jowl
-  received, a yield event consumes 15kg of it — the raw item's
-  calculated balance stays at 20kg forever, since nothing ever
-  subtracts the 15kg that got processed. A real physical count would
-  show a permanent, false SHORTAGE variance. This has been silently
-  wrong since step 20b; harmless so far only because nothing yet
-  depended on a raw/intermediate meat's balance being accurate (every
-  existing commissary meat either doesn't get further processed, or
-  ships out directly, so the bug never had a chance to matter until
-  now). **Fix**: `getCommissaryUsage` also sums `raw_weight_in` for
-  every yield event where the meat in question was the input side.
-  Applies uniformly to a genuinely raw meat *and* to an intermediate
-  stage (below) being consumed by a later stage — same mechanism, no
-  special-casing needed.
-
-- **Multi-stage yield chaining, configured per meat, not a new
-  mechanism.** Most commissary meats have zero extra stages; some have
-  one; a few (Shortplate: sear, then braise) have two. No new schema
-  concept — each stage is a completely normal, existing single-input/
-  single-output `commissary_yield_log` entry. The only difference:
-  stage two's `commissary_meat_id` *input* is stage one's own output
-  meat (e.g. "Seared Shortplate," a real catalog row with its own real
-  balance — confirmed this needs to be real, not transient: it's
-  common to sear a full day's new stock but not finish braising all of
-  it the same day, so intermediate stock genuinely sits around and
-  needs an accurate count). Depends entirely on the usage-formula fix
-  above — without it, a chained intermediate stage's balance would be
-  meaningless.
-
-- **The Chicken → Yaki-portions + Miscuts case turned out not to need
-  a new "multi-output yield" concept at all** — it decomposes into two
-  *already-designed* patterns:
-  1. A normal single-stage yield: Raw Chicken → "Processed Chicken,"
-     one output, real trackable inventory, same as any other yield
-     event (cutting/portioning can legitimately be lossless — 0%
-     `allowed_leeway_pct` for these events, no schema change needed;
-     confirmed searing/braising *do* have real loss, cutting doesn't
-     necessarily).
-  2. A **new Commissary-side allocation mechanism** — a parallel table
-     to the existing restaurant-scoped `adjustments`, not a shared or
-     merged one (keeps Commissary and restaurants structurally
-     separate, consistent with item 3's own "option B" decision, not a
-     new precedent). Two distinct kinds of entry, confirmed as
-     genuinely different, not two names for the same thing: **loss**
-     (no trackable destination — pure shrinkage, conceptually the same
-     as a yield event's own leeway loss) and **allocation** (a
-     trackable destination elsewhere, e.g. redirecting part of
-     Processed Chicken's balance to Miscuts-Chicken).
-  Shipping stays completely untouched either way — once "Processed
-  Chicken" exists as inventory, it ships via the exact same
-  Shipments + Conversion Standards mechanism every other commissary
-  meat already uses, regardless of which stage or allocation path
-  produced it.
-
-- **Miscuts are separate catalog rows per meat** (Miscuts-Chicken,
-  Miscuts-Jowl, Miscuts-Belly, etc. — matches the real xlsx's
-  intent, which the app had been treating as one shared `M14` row
-  without actually tagging them; confirmed this needs fixing, not
-  preserving). Tagged via the same meat-type reference table item 3
-  already designed, not a new tagging mechanism — lets reporting roll
-  up "total Miscuts across everything" while keeping each one tracked
-  separately for real operational use (e.g. staff-meal planning per
-  meat).
-
-**RESOLVED 2026-08-31 — the remaining open questions above, settled in
-the same architecture session as item 3's rekey:**
-
-- **A real, previously-unflagged gap found while checking this against
-  actual code**: `commissary-seed-data.json` already has three raw/
-  backed pairs seeded as *separate catalog rows* — `M01 Whole
-  Chicken`/`M02 Whole Chicken Raw`, `M03 Belly Slab`/`M04 Belly Slab
-  Raw`, `M05 JOWL`/`M06 JOWL Raw` — but `commissary_yield_log` has only
-  one `commissary_meat_id` column, and no route or engine function ever
-  references the "Raw" rows. They're vestigial — seeded for a
-  raw-vs-backed split that was never wired up. **Confirmed by the
-  project owner (2026-08-31): this was intentional, not accidental —
-  "not every meat could be backed up" is a real case, these rows were
-  meant to be tracked, the app just never got that far.** This isn't
-  scoped to Shortplate/Chicken alone — it's the same fix, retroactively
-  covering three existing meats.
-- **`commissary_yield_log` gets one new column**: `output_commissary_meat_id`,
-  nullable FK → `commissary_meats`, **defaulting to "same as input"
-  when NULL** — this is what keeps every existing single-row event
-  (e.g. Belly Slab in, Belly Slab out, just lighter from trim loss)
-  working completely unchanged. Only an event that genuinely produces a
-  *different* catalog row (Raw Shortplate → Seared Shortplate, Raw
-  Chicken → Processed Chicken, and now `M02→M01`/`M04→M03`/`M06→M05`)
-  sets it explicitly. No separate "is this chained" marker needed — the
-  column's presence/absence on a given row already tells you which
-  case it is.
-- **The existing `commissary_meat_id` column stays as-is and means
-  "input"** — no rename. `getCommissaryBackedUp`'s credit target
-  changes from always crediting `commissary_meat_id` to crediting
-  `output_commissary_meat_id` when set, `commissary_meat_id` otherwise.
-- **No stage-count cap in the schema.** Chain length is emergent from
-  however many yield-log rows point at each other, not a declared
-  number — a real 2-stage case (Shortplate) doesn't need the schema to
-  know it's 2 stages, and nothing breaks if a future case needs more.
-- **`commissary_adjustments` — new table, parallel to the existing
-  restaurant-scoped `adjustments`, not shared/merged** (matches item
-  3's "option B" precedent of keeping Commissary structurally
-  separate):
-  ```
-  commissary_adjustments
-    id
-    commissary_meat_id               -- source being drawn down
-    business_date
-    kind                              -- 'LOSS' | 'ALLOCATION' — this
-                                       -- column's value IS the
-                                       -- classifier, no separate flag
-    quantity
-    destination_commissary_meat_id    -- NULL for LOSS, required for
-                                       -- ALLOCATION (e.g. Miscuts-Chicken)
-    notes
-    created_by / created_at
-    deleted_at                        -- soft delete, same pattern as
-                                       -- commissary_yield_log
-  ```
-  `destination_commissary_meat_id` self-references `commissary_meats`
-  (both sides are commissary items, never a restaurant's `meats` row).
-- **Miscuts stay separate catalog rows** (Miscuts-Chicken,
-  Miscuts-Jowl, Miscuts-Belly, ...) **tagged via `meat_types`** — same
-  table item 3's schema (23a) introduces, not a new tagging mechanism.
-  An allocation's destination dropdown should be restricted to
-  `meat_type`-compatible siblings of the source (so Processed Chicken
-  can't accidentally allocate into a Jowl-tagged bucket) — a UI/route
-  concern for 24c, not a schema constraint.
-- **Depends on 23a** (needs `meat_types` to exist for Miscuts tagging) —
-  sequenced after it, not before.
-
+The full design narrative, the 2026-08-31 resolution of its open questions,
+and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, including 24a's
+blast-radius map) are archived in `session-history.md`. The load-bearing
+decisions they produced live in "Things NOT to re-litigate" below — read those,
+not the archive, unless you need the reasoning behind one.
 **Sub-step plan, confirmed:**
-- **24a (schema + coupled engine change + tests) — DONE 2026-09-02 (Claude Code session)**:
-  add `output_commissary_meat_id` to `commissary_yield_log` (nullable FK,
-  NULL ⇒ output = input) via an idempotent migration, and make the audit
-  engine a debit/credit ledger — **debit** `raw_weight_in` from the input
-  (`commissary_meat_id`, into `usage`, excluding soft-deleted rows) **and**
-  **credit** `backed_weight_out` to the output (`output_commissary_meat_id`
-  when set, else `commissary_meat_id`). These two are ONE coupled change:
-  the raw-debit alone, before the output split exists, double-subtracts on
-  same-meat rows and reds 4 existing engine tests (verified 2026-09-01), so
-  the earlier "24a = standalone usage fix, no schema dependency" framing was
-  wrong. Rewrite the affected engine tests to the corrected debit/credit
-  numbers; add cross-row, cross-unit, and soft-delete cases. **Carved OUT of
-  24a into 24b** (rule 16): `commissary_adjustments`, the per-meat
-  default-output config, and the `M02→M01`/`M04→M03`/`M06→M05` pairing — the
-  engine handles whatever input/output a row names, so no pairs need
-  pre-wiring, and there is no historical data to backfill.
-  **Blast radius (mapped 2026-09-01, so the prompt is airtight):** 24a
-  touches only `commissaryAuditEngine.js` (the debit/credit change),
-  `commissaryAuditEngine.test.js` (rewrite the 4 balance tests + add
-  cross-row/cross-unit/soft-delete cases — the ONLY test file that breaks),
-  and `schema.sql` + the idempotent migration for the column. Verified
-  unaffected: `dashboard.test.js` (no yield fixtures);
-  `commissary.test.js`/`history.test.js` (their yield inserts feed
-  loss%/activity-log/CRUD, never a balance); `commissaryYieldEngine.*`
-  (loss%, not balance); `dailyAudit.*`/`history.js` (no balance from yield).
-  Leave the yield-log write route (`commissary.js` INSERT/UPDATE) untouched —
-  new rows default `output_commissary_meat_id` to NULL (same-meat), and 24a's
-  cross-row cases are exercised by direct test inserts, exactly as the
-  existing engine tests already insert yield rows. Creating cross-row events
-  through the UI is 24b (the form).
-- **24a-b (test isolation — small, do BEFORE 24b)**: `commissaryAuditEngine.test.js`
-  shares one `db` across the whole file, and after 24a the usage test's expected
-  7.5 depends on a yield row inserted by a *different, earlier* test. Deleting or
-  reordering a test now silently changes another test's expected balance. This
-  predates 24a but got tighter with it, and 24b adds more balance assertions to
-  the same file — fix the isolation before piling on, not after. The three tests
-  24a added already do it correctly (own meat rows `M10`/`M11`, own unused dates);
-  generalize that pattern to the rest of the file. No engine code changes, no
-  behavior changes, same assertions passing.
-- **24b-i (yield-log input quantity)**: add `input_quantity` to
-  `commissary_yield_log` — nullable, expressed in the INPUT meat's own unit,
-  NULL meaning "same as `raw_weight_in`" (which is the correct default for a
-  kg-tracked input like Belly, where the count and the weight are the same
-  number). Idempotent migration, same ALTER TABLE ADD COLUMN shape as 24a's.
-  The engine's usage debit changes from `raw_weight_in` to
-  `COALESCE(input_quantity, raw_weight_in)` — the same COALESCE shape 24a
-  already uses for the output credit, so existing rows and existing tests are
-  unaffected by construction. `raw_weight_in` keeps its current meaning (the
-  weighed kg) and remains what `computeYieldMetrics` divides by; do NOT
-  repoint the loss math at `input_quantity`.
-- **24b-ii (commissary adjustments — schema + engine)**: the
-  `commissary_adjustments` table as specified in `data-model.md` §10b, its
-  idempotent migration, and the two balance effects, WITHOUT any routes:
-  **ALLOCATION is a real movement** — it debits the source and credits
-  `destination_commissary_meat_id`, landing in `endingCalculated` exactly like
-  a shipment does, because the stock genuinely left one item and arrived at
-  another. **LOSS is an explanation** — it feeds `expectedEnding` and therefore
-  `unexplainedVariance`, mirroring how the restaurant engine already treats its
-  own `adjustments` (`expectedEnding = endingCalculated - adjustments`; status
-  comes from `unexplainedVariance`). A declared loss must NOT make the variance
-  vanish; it moves it from unexplained to explained, and being able to see both
-  is the entire point of declaring it.
 - **24b-iii (adjustment routes)**: CRUD for `commissary_adjustments`, plus the
   destination filter — an ALLOCATION's destination dropdown offers only
   commissary meats sharing the source's `meat_type_id` **and its `unit`**.
@@ -332,46 +72,7 @@ the same architecture session as item 3's rekey:**
   same meat) and the input-count field alongside the weighed input. On the
   commissary balance view, an Allocate and a Write-off action.
 
-**Step 24b-i is DONE (2026-09-02, Claude Code session).** `input_quantity`
-(nullable REAL, input meat's own unit) is on `commissary_yield_log` via an
-idempotent migration (`migrateYieldLogInputQuantityColumn`, same shape as
-24a's), wired into `connection.js` after `migrateYieldLogOutputMeatColumn`.
-`getCommissaryUsage`'s debit is now `COALESCE(input_quantity, raw_weight_in)`.
-`commissaryYieldEngine.js` untouched, as designed - `computeYieldMetrics`
-still divides by `raw_weight_in`. 3 new tests added (own `M12`/`M13` meats,
-own dates). See `changelog.md` for the full writeup. Full 15-file suite:
-**282/282 assertions, 0 failures.**
-
-**Step 24b-ii is DONE (2026-09-02, Claude Code session).** `commissary_adjustments`
-table (schema.sql + idempotent `migrateCommissaryAdjustmentsTable`, wired into
-`connection.js` after `migrateYieldLogInputQuantityColumn`), no routes/CRUD (that's
-24b-iii). In `commissaryAuditEngine.js`: ALLOCATION is folded into the existing
-`getCommissaryUsage` (debits the source) and `getCommissaryBackedUp` (credits
-`destination_commissary_meat_id`) - no new field, same role those two already play
-for shipments/yield debits. LOSS gets a new `getCommissaryAdjustmentsTotal`
-(mirrors `getAdjustmentsTotal` in `auditEngine.js`) feeding a new `adjustments`
-field; `computeCommissaryMeatAudit`'s `expectedEnding` is now `endingCalculated -
-adjustments` (previously always equal to `endingCalculated` - that stale comment
-is replaced). Both kinds exclude soft-deleted rows. 4 new tests (own `M20`/`M21`/
-`M22` meats, own dates 2026-08-20..23). See `changelog.md` for the full writeup.
-Full 15-file suite: **286/286 assertions, 0 failures** (282 baseline + 4 new).
-
 **Next up: 24b-iii (adjustment routes).** 24c (UI) remains after that.
-
-**24b output-targeting — RESOLVED 2026-09-01.** The earlier concern (a yield
-row reusing the single `commissary_meat_id` for both input and output, and
-the cross-unit `unit in → kg out` case needing the output on a different row
-in a different unit) is settled by the debit/credit ledger:
-`output_commissary_meat_id` (nullable, NULL ⇒ input) IS the explicit output
-linkage, and cross-unit needs no engine conversion because `raw_weight_in`
-and `backed_weight_out` are each read in their own row's unit and never
-reconcile. This landed in the **24a** design (the column + coupled engine
-change), so 24b no longer carries any unsettled schema question — see
-`data-model.md` §10b. NOTE the earlier framing that "24a is the standalone
-`raw_weight_in`-as-outflow fix, unaffected" was WRONG: the raw-debit is not
-safe without the output split (it reds 4 engine tests on its own), which is
-exactly why the column + credit-retarget were pulled into 24a with it.
-
 ## Things NOT to re-litigate (already decided, stable)
 
 - Tech stack: Node.js + Express + `node:sqlite` (not better-sqlite3, not
