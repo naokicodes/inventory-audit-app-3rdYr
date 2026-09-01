@@ -366,6 +366,38 @@ reliable for this repo, per `web-vs-claude-code.md`'s original note.
 server check. Those are what catch real problems, repeatedly, and they are
 not where the tokens go.
 
+## Rule 23 — Doc drift is reported, not fatal; hand-offs separate saving from staging
+
+Added 2026-09-02, after a hand-off staged `.gitignore` and
+`docs/session-status.md` with `git add` in the same pasted block that was
+supposed to follow saving them. The files hadn't been written yet, so the add
+silently matched nothing, and the commit landed without the ignore rules that
+were its entire justification. Nothing errored — that's what made it easy to
+miss.
+
+**Architect side — this is where the fix belongs.** Never hand over a single
+pasteable block that both assumes files were saved and stages them. Saving
+files and running git are two steps with a checkpoint between them: hand over
+the files, then a `git status --short <paths>` to confirm they actually show as
+modified, and only then the `git add` / `git commit` / `git push` lines. Same
+seam as rule 20's `&&` and backslash lessons and rule 18's "never paste
+commands into a file's own content" — hand over exactly what can be run as-is,
+at the moment it can be run.
+
+**Worker side — report, don't halt.** At the start of a session, check that the
+step you were given actually appears in `docs/session-status.md`. If it
+doesn't, say so plainly in your first message and CONTINUE — do not stop. Per
+rule 16 a step's prompt IS the whole task by design, so a stale or unsaved doc
+is not a blocker; it's information the architect needs. Flag it again at the
+end, before you write your own `session-status.md` update, so the architect can
+reconcile rather than discover it a commit later.
+
+Why not a hard stop: halting would burn a full dispatch on something the
+architect fixes in seconds, and it would make doc state a hard dependency
+exactly where rule 16 spent real effort removing it. The 2026-09-02 session
+that hit this was correct to proceed — its prompt was self-contained and its
+work landed clean. The only thing missing was the flag.
+
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.
 - Suggesting a hosted database or cloud deployment.

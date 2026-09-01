@@ -312,7 +312,7 @@ the same architecture session as item 3's rekey:**
   same meat when no next-stage is configured), an Allocate/Write-off
   action on the commissary balance view.
 
-**Next up: 24a-b (small test-isolation step), then 24b.** 24a landed 2026-09-02 (see changelog.md) - the column,
+**Next up: 24b.** 24a and 24a-b both landed 2026-09-02 (see changelog.md) - the column,
 the coupled engine debit/credit, and the rewritten/added tests are all
 done and the full 15-file suite is green. 24b/24c are not started.
 
