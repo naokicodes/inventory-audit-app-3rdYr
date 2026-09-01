@@ -26,9 +26,12 @@ test runner script exists yet; includes `server/db/activityLog.test.js`
 and `server/db/migrate.test.js`, easy to miss since they live outside
 `server/routes`/`server/engines`).
 
-**No step is currently queued.** What comes next is the project owner's
-call. The designed-but-unstarted work is step 24 (below); the cheap
-contained fixes are in "Known open items."
+**Step 24a is designed and dispatchable** (re-scoped 2026-09-01 — see the
+"Sub-step plan" and "24b output-targeting — RESOLVED" notes below, and
+`data-model.md` §10b). It's the next step: add `output_commissary_meat_id`
+to `commissary_yield_log` + make the audit engine a debit/credit ledger +
+rewrite the affected tests. 24b/24c follow. The cheap contained fixes remain
+in "Known open items."
 
 The most recent landings, newest first — full detail for each is in
 `changelog.md`:
@@ -217,20 +220,26 @@ the same architecture session as item 3's rekey:**
   sequenced after it, not before.
 
 **Sub-step plan, confirmed:**
-- **24a (usage-formula fix + schema)**: `getCommissaryUsage` also sums
-  `raw_weight_in` for every yield event where the meat in question is
-  the input side (`commissary_meat_id`) — this part has no schema
-  dependency and fixes the standalone bug on its own. Bundled into the
-  same step: `output_commissary_meat_id` added to
-  `commissary_yield_log`, `commissary_adjustments` created, migration
-  wires `M02→M01`/`M04→M03`/`M06→M05` as legitimate explicit-output
-  pairs going forward (no historical data to backfill — these rows
-  have never been referenced by any real event).
-- **24b (engine/routes)**: crediting logic updated to target
-  `output_commissary_meat_id`, per-meat "next stage" config so the
-  yield form can default the output dropdown, `commissary_adjustments`
-  CRUD + balance effects, Miscuts destination filtering via
-  `meat_type_id`.
+- **24a (schema + coupled engine change + tests) — re-scoped 2026-09-01**:
+  add `output_commissary_meat_id` to `commissary_yield_log` (nullable FK,
+  NULL ⇒ output = input) via an idempotent migration, and make the audit
+  engine a debit/credit ledger — **debit** `raw_weight_in` from the input
+  (`commissary_meat_id`, into `usage`, excluding soft-deleted rows) **and**
+  **credit** `backed_weight_out` to the output (`output_commissary_meat_id`
+  when set, else `commissary_meat_id`). These two are ONE coupled change:
+  the raw-debit alone, before the output split exists, double-subtracts on
+  same-meat rows and reds 4 existing engine tests (verified 2026-09-01), so
+  the earlier "24a = standalone usage fix, no schema dependency" framing was
+  wrong. Rewrite the affected engine tests to the corrected debit/credit
+  numbers; add cross-row, cross-unit, and soft-delete cases. **Carved OUT of
+  24a into 24b** (rule 16): `commissary_adjustments`, the per-meat
+  default-output config, and the `M02→M01`/`M04→M03`/`M06→M05` pairing — the
+  engine handles whatever input/output a row names, so no pairs need
+  pre-wiring, and there is no historical data to backfill.
+- **24b (engine/routes)**: per-meat "next stage" config so the yield form
+  can default the output dropdown, `commissary_adjustments` CRUD + balance
+  effects, Miscuts destination filtering via `meat_type_id`. (The
+  output-credit retarget itself moved into 24a — see above.)
 - **24c (UI)**: output-item field on the yield-entry form (defaults to
   same meat when no next-stage is configured), an Allocate/Write-off
   action on the commissary balance view.
@@ -238,16 +247,19 @@ the same architecture session as item 3's rekey:**
 **Next up, after 23a/23b/23c: 24a.** None of the three sub-steps are
 started.
 
-**24b output-targeting must be nailed down before it's built (refined
-2026-09-01).** A yield row today credits `backed_weight_out` back to the
-SAME `commissary_meat_id` it names. The cross-unit case (`unit in → kg
-out`, raw chicken → processed chicken) requires the output to land on a
-DIFFERENT row in a DIFFERENT unit: the raw `unit` meat debited, the
-processed `kg` meat credited. The "no new schema concept" note above
-predates this being made explicit and should be re-examined against it —
-24b likely needs an explicit output-meat linkage, not just reusing the
-single `commissary_meat_id` column. 24a (the `raw_weight_in`-as-outflow
-fix) is unaffected and remains well-defined; this caveat is scoped to 24b.
+**24b output-targeting — RESOLVED 2026-09-01.** The earlier concern (a yield
+row reusing the single `commissary_meat_id` for both input and output, and
+the cross-unit `unit in → kg out` case needing the output on a different row
+in a different unit) is settled by the debit/credit ledger:
+`output_commissary_meat_id` (nullable, NULL ⇒ input) IS the explicit output
+linkage, and cross-unit needs no engine conversion because `raw_weight_in`
+and `backed_weight_out` are each read in their own row's unit and never
+reconcile. This landed in the **24a** design (the column + coupled engine
+change), so 24b no longer carries any unsettled schema question — see
+`data-model.md` §10b. NOTE the earlier framing that "24a is the standalone
+`raw_weight_in`-as-outflow fix, unaffected" was WRONG: the raw-debit is not
+safe without the output split (it reds 4 engine tests on its own), which is
+exactly why the column + credit-retarget were pulled into 24a with it.
 
 ## Things NOT to re-litigate (already decided, stable)
 
@@ -336,6 +348,28 @@ fix) is unaffected and remains well-defined; this caveat is scoped to 24b.
   the "loss" kind of step 24's already-designed Commissary-side allocation
   mechanism, surfaced as a loss input on the Commissary page and accepting
   unit-denominated losses (not only kg). Settled 2026-09-01.
+
+- **Commissary yield is a debit/credit ledger; `commissary_meat_id` is the
+  INPUT (settled 2026-09-01).** Every yield event debits `raw_weight_in` from
+  the input meat and credits `backed_weight_out` to the output
+  (`output_commissary_meat_id`, NULL ⇒ input). Real processing is always a
+  chain of explicit rows (raw shortplate → seared → braised → ship), so the
+  NULL/same-meat path is a back-compat default, not a normal workflow. A
+  same-meat event correctly nets to −loss (it debits its own raw and credits
+  its own backed) — do NOT restore the pre-24a credit-only behavior thinking
+  the debit is a double-count; it IS the fix. See `data-model.md` §10b.
+- **Lifecycle stages that share a `meat_type` + unit stay MERGED in the
+  Dashboard rollup (settled 2026-09-01).** Raw/seared/braised of one meat sum
+  into one total-on-hand row. Per-stage rollup visibility was considered and
+  parked to a future architecture session — the per-row balances already exist
+  (commissary audit + drill-down), so switching the grouping later needs no
+  rework and no schema change. Don't build per-stage rollup granularity
+  speculatively.
+- **On-the-fly output-row creation and cycle-guarding are deferred (settled
+  2026-09-01).** The yield form prompting "create a place for Seared" is a
+  configuration convenience for onboarding a new chain owner, not needed for
+  the core ledger — deferred to that hand-over phase. No operational yield
+  chain forms a cycle, so a cycle-guard is defensive-only and also deferred.
 
 ## End-of-session checklist (every session, no exceptions)
 

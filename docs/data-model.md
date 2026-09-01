@@ -492,15 +492,23 @@ commissary_adjustments              -- step 24, not 23
   job (a Claude Code session starting 23a flagged this correctly per rule 3
   rather than making a "minimal mechanical" fix that would have bled into
   23b's actual route/engine work).
-- `commissary_yield_log` (**step 24**) gains `output_commissary_meat_id`
-  (nullable, FK →
-  `commissary_meats`). NULL means "same as input" (today's behavior,
-  unchanged — a single meat losing weight to trim). Set explicitly when an
-  event produces a genuinely different catalog row (raw → backed, or one
-  processing stage's output feeding the next). `getCommissaryBackedUp`'s
-  credit target becomes `output_commissary_meat_id` when set, else
-  `commissary_meat_id`. No stage-count cap — chain length is emergent from
-  how many rows point at each other, not a declared schema limit.
+- `commissary_yield_log` (**step 24a**) gains `output_commissary_meat_id`
+  (nullable, FK → `commissary_meats`). `commissary_meat_id` means the
+  **input** meat; `output_commissary_meat_id` is the **output** meat, and
+  NULL means output = input. Every yield event is a debit/credit ledger
+  entry: it **debits `raw_weight_in` from the input** and **credits
+  `backed_weight_out` to the output** (`getCommissaryBackedUp` credits
+  `output_commissary_meat_id` when set, else `commissary_meat_id`). A
+  cross-row event (raw → backed, or one stage feeding the next) debits one
+  row and credits another; a NULL/same-meat event hits both sides of the one
+  meat and nets to −(raw − backed), i.e. the trim loss — a **change** from
+  the pre-24a credit-only behavior, which never debited the raw and so left
+  the input balance permanently inflated. No stage-count cap — chain length
+  is emergent from how many rows point at each other, not a declared schema
+  limit. In real commissary operations every processing step creates an
+  explicit next-stage row (raw shortplate → seared → braised → ship), so the
+  NULL/same-meat path is a back-compat default, not a normal workflow
+  (settled 2026-09-01).
 
 **Not new, but newly load-bearing**: `commissary-seed-data.json` already
 seeds three raw/backed pairs (`M01`/`M02` Whole Chicken, `M03`/`M04` Belly
@@ -510,12 +518,30 @@ meats genuinely don't get backed up the same day). `output_commissary_meat_id`
 is what finally wires these up (e.g. a yield event with `commissary_meat_id
 = M02` and `output_commissary_meat_id = M01`), no new seed rows required.
 
-**Also required (step 24)**: `getCommissaryUsage` (`commissaryAuditEngine.js`)
-must also sum `commissary_yield_log.raw_weight_in` for every event where the
-meat in question is the input (`commissary_meat_id`) — today it only counts
-`commissary_shipments`, so a raw/intermediate meat's calculated balance never
-decreases when it's consumed by processing. Confirmed bug, not a new
-feature; a prerequisite for the output-column change to mean anything.
+**Also required (step 24a) — the input-side debit**: `getCommissaryUsage`
+(`commissaryAuditEngine.js`) must also sum `commissary_yield_log.raw_weight_in`
+(excluding soft-deleted rows) for every event where the meat is the input
+(`commissary_meat_id`), folded into `usage` — today it only counts
+`commissary_shipments`, so a raw/intermediate meat's balance never decreases
+when processing consumes it. This debit and the output-side credit-retarget
+above are **one coupled change, not two**: the raw-debit alone, applied before
+the input/output split exists, double-subtracts on same-meat rows and reds 4 of
+the engine's own balance tests (verified 2026-09-01). Confirmed bug, not a new
+feature.
+
+**Settled 2026-09-01** (resolves the "output-targeting must be nailed down"
+caveat in `session-status.md`): the output linkage IS this one nullable column
+— no overload of `commissary_meat_id`, no separate is-chained flag. Cross-unit
+(raw chicken `unit` → processed `kg`) needs no engine conversion: `raw_weight_in`
+is read in the input row's unit and `backed_weight_out` in the output row's unit
+(always `kg`), and the two never reconcile because they land on different rows.
+**24a is scoped to exactly this**: the `output_commissary_meat_id` column (idempotent
+migration) + the coupled engine debit/credit + rewritten tests.
+`commissary_adjustments`, the per-meat default-output config, and the
+yield-entry form move to **24b**. Lifecycle stages that share a `meat_type` and
+unit stay merged in the Dashboard rollup for now (per-stage rollup visibility
+parked to a future architecture session; the per-row balances already exist for
+it).
 
 **Migration**: 23a's piece is just `commissaries` (one row for today's
 single implicit commissary) + backfilling every `commissary_meats.commissary_id`

@@ -11,6 +11,20 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-01 (architecture session) — Decision: commissary yield becomes a debit/credit ledger; step 24 re-scoped
+
+**Context.** Went to dispatch step 24a as the "`getCommissaryUsage` also sums `raw_weight_in`" fix, which both `session-status.md` and `data-model.md` §10b framed as a standalone, no-schema-dependency correctness fix. Verifying against the real engine first (verify, don't assert) showed that framing was wrong.
+
+**Finding.** `commissary_meat_id` on a `commissary_yield_log` row is today the OUTPUT — `getCommissaryBackedUp` credits `backed_weight_out` to it. The proposed fix treats the same column as the INPUT and subtracts its `raw_weight_in`; on every existing same-meat event those collide. Applying the raw-debit alone to a throwaway copy of `commissaryAuditEngine.js` reds 4 existing engine tests, including both hand-verified balance tests (the day-2 case flips `13.3 → 12.3`, OK → a false SHORTAGE). So the raw-debit is not safe standalone: it presupposes an input/output split that only exists once `output_commissary_meat_id` is added and events name the raw as input.
+
+**Decision** (settled with the project owner, who walked through the real Shortplate flow: raw stocked → sear → [new Seared row] → braise → [new Braised row] → ship). Model every yield event as a debit/credit ledger — debit `raw_weight_in` from the input (`commissary_meat_id`), credit `backed_weight_out` to the output (`output_commissary_meat_id`, NULL ⇒ input). Same-meat nets to −loss (the correct trim behavior; the pre-24a credit-only path left balances inflated — that was the bug). Real operations are always cross-row chains, so NULL/same-meat is a back-compat default, not a normal path. Cross-unit (raw chicken `unit` → processed `kg`) needs no engine conversion — each column is read in its own row's unit. This resolves the earlier "24b output-targeting must be nailed down" caveat: the linkage IS the one nullable column.
+
+**Re-scope.** 24a = the `output_commissary_meat_id` column (idempotent migration) + the coupled engine debit/credit + rewritten/added tests, and nothing else. `commissary_adjustments`, the per-meat default-output config, and the yield-entry form (including the on-the-fly "create a place for Seared" convenience) move to 24b/24c (rule 16). Lifecycle stages sharing a `meat_type`+unit stay merged in the Dashboard rollup; per-stage visibility parked to a future architecture session. Cycle-guarding deferred (no operational cycles).
+
+**Docs touched (no code this session).** `data-model.md` §10b (precision fixes: the NULL path is a *change* to −loss, not "unchanged"; the coupled-change note; a settled-2026-09-01 block) and `session-status.md` (24a re-scope, caveat marked RESOLVED, three settled decisions added under "Things NOT to re-litigate"). Also noticed but left alone as out of scope: the `commissary_balance` formula block in `data-model.md` (~L635) is a stale simplified form that doesn't match the real `computeCommissaryMeatAudit` engine — worth reconciling in a later docs pass.
+
+---
+
 ## 2026-09-01 (Claude Code session) — Fix: dangling commissary_id silently dropped stock from the Dashboard rollup
 
 Last member of the "dangling foreign key silently drops data" family, closing the open item raised right after 23c-ii-c/23b-vi-b landed. `server/routes/dashboard.js`'s `GET /dashboard/stock-rollup` (~L103) built its `commissaryMeats` list with `JOIN commissaries c ON c.id = cm.commissary_id` — an INNER JOIN. SQLite doesn't enforce FKs unless `PRAGMA foreign_keys=ON`, so a `commissary_meats` row whose `commissary_id` pointed at a deleted/absent commissary was dropped from the query entirely: its real stock silently vanished from the Dashboard, no error, no row. Inconsistent with the same route's own `meat_type_id` handling (23b-vi-b, ~12 lines below), which degrades a dangling `meat_type_id` to a visible `"(unknown meat type #N)"` row rather than dropping it.
