@@ -109,6 +109,18 @@
   },
   "nodes": [
     {
+      "id": "server_engines_auditengine_adddays",
+      "label": "addDays()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "auditEngine.js",
+      "file_type": "code",
+      "norm_label": "adddays()",
+      "source_file": "server/engines/auditEngine.js",
+      "source_location": "L11"
+    },
+    {
       "id": "server_engines_auditengine_computedailyaudit",
       "label": "computeDailyAudit()",
       "_callable": true,
@@ -625,18 +637,6 @@
       "source_location": "L16"
     },
     {
-      "id": "server_engines_auditengine_adddays",
-      "label": "addDays()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "dashboard.test.js",
-      "file_type": "code",
-      "norm_label": "adddays()",
-      "source_file": "server/engines/auditEngine.js",
-      "source_location": "L11"
-    },
-    {
       "id": "server_engines_commissaryauditengine_computecommissarydailyaudit",
       "label": "computeCommissaryDailyAudit()",
       "_callable": true,
@@ -646,7 +646,7 @@
       "file_type": "code",
       "norm_label": "computecommissarydailyaudit()",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L173"
+      "source_location": "L196"
     },
     {
       "id": "server_engines_commissaryauditengine_computecommissarymeataudit",
@@ -658,7 +658,19 @@
       "file_type": "code",
       "norm_label": "computecommissarymeataudit()",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L126"
+      "source_location": "L150"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_getcommissaryadjustmentstotal",
+      "label": "getCommissaryAdjustmentsTotal()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "dashboard.test.js",
+      "file_type": "code",
+      "norm_label": "getcommissaryadjustmentstotal()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L107"
     },
     {
       "id": "server_engines_commissaryauditengine_getcommissarybackedup",
@@ -670,7 +682,7 @@
       "file_type": "code",
       "norm_label": "getcommissarybackedup()",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L86"
+      "source_location": "L91"
     },
     {
       "id": "server_engines_commissaryauditengine_getcommissarybeginningstock",
@@ -682,7 +694,7 @@
       "file_type": "code",
       "norm_label": "getcommissarybeginningstock()",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L49"
+      "source_location": "L54"
     },
     {
       "id": "server_engines_commissaryauditengine_getcommissaryendingactual",
@@ -694,7 +706,7 @@
       "file_type": "code",
       "norm_label": "getcommissaryendingactual()",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L115"
+      "source_location": "L139"
     },
     {
       "id": "server_engines_commissaryauditengine_getcommissarystockin",
@@ -706,7 +718,7 @@
       "file_type": "code",
       "norm_label": "getcommissarystockin()",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L71"
+      "source_location": "L76"
     },
     {
       "id": "server_engines_commissaryauditengine_getcommissaryusage",
@@ -718,7 +730,7 @@
       "file_type": "code",
       "norm_label": "getcommissaryusage()",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L105"
+      "source_location": "L126"
     },
     {
       "id": "server_engines_commissaryauditengine_test_test",
@@ -730,7 +742,7 @@
       "file_type": "code",
       "norm_label": "test()",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L36"
+      "source_location": "L37"
     },
     {
       "id": "server_routes_dashboard_test_computerestauranttotals",
@@ -995,6 +1007,18 @@
       "norm_label": "patchreceipt()",
       "source_file": "server/routes/stockReceipts.test.js",
       "source_location": "L75"
+    },
+    {
+      "id": "server_db_migrate_migratecommissaryadjustmentstable",
+      "label": "migrateCommissaryAdjustmentsTable()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "connection.js",
+      "file_type": "code",
+      "norm_label": "migratecommissaryadjustmentstable()",
+      "source_file": "server/db/migrate.js",
+      "source_location": "L543"
     },
     {
       "id": "server_db_migrate_migratecommissarymultitenant",
@@ -2511,7 +2535,7 @@
       "file_type": "code",
       "norm_label": "{ adddays }",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L41"
+      "source_location": "L46"
     },
     {
       "id": "server_engines_commissaryauditengine_test",
@@ -2555,7 +2579,7 @@
       "file_type": "code",
       "norm_label": "db",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L55"
+      "source_location": "L56"
     },
     {
       "id": "server_engines_commissaryauditengine_test_fs",
@@ -2569,13 +2593,13 @@
       "source_location": "L23"
     },
     {
-      "id": "server_engines_commissaryauditengine_test_getcommissarystockin_getcommissarybackedup_getcommissaryusage_computecommissarymeataudit_computecommissarydailyaudit",
-      "label": "{\n  getCommissaryStockIn,\n  getCommissaryBackedUp,\n  getCommissaryUsage,\n  computeCommissaryMeatAudit,\n  computeCommissaryDailyAudit\n}",
+      "id": "server_engines_commissaryauditengine_test_getcommissarystockin_getcommissarybackedup_getcommissaryusage_getcommissaryadjustmentstotal_computecommissarymeataudit_computecommissarydailyaudit",
+      "label": "{\n  getCommissaryStockIn,\n  getCommissaryBackedUp,\n  getCommissaryUsage,\n  getCommissaryAdjustmentsTotal,\n  computeCommissaryMeatAudit,\n  computeCommissaryDailyAudit\n}",
       "_origin": "ast",
       "community": 2,
       "community_name": "dashboard.test.js",
       "file_type": "code",
-      "norm_label": "{\n  getcommissarystockin,\n  getcommissarybackedup,\n  getcommissaryusage,\n  computecommissarymeataudit,\n  computecommissarydailyaudit\n}",
+      "norm_label": "{\n  getcommissarystockin,\n  getcommissarybackedup,\n  getcommissaryusage,\n  getcommissaryadjustmentstotal,\n  computecommissarymeataudit,\n  computecommissarydailyaudit\n}",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
       "source_location": "L25"
     },
@@ -2599,7 +2623,7 @@
       "file_type": "code",
       "norm_label": "schema",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L54"
+      "source_location": "L55"
     },
     {
       "id": "server_engines_commissaryauditengine_test_test_db_path",
@@ -2610,7 +2634,7 @@
       "file_type": "code",
       "norm_label": "test_db_path",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L49"
+      "source_location": "L50"
     },
     {
       "id": "server_routes_dashboard_test",
@@ -2987,13 +3011,13 @@
       "source_location": "L12"
     },
     {
-      "id": "server_db_connection_migratestockreceiptsnullabledestination_migratelocationsactivecolumn_migrateconversioncolumns_migratecommissarymultitenant_migrateconversionstandardsmeattype_migrateyieldlogoutputmeatcolumn_migrateyieldloginputquantitycolumn",
-      "label": "{ migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn }",
+      "id": "server_db_connection_migratestockreceiptsnullabledestination_migratelocationsactivecolumn_migrateconversioncolumns_migratecommissarymultitenant_migrateconversionstandardsmeattype_migrateyieldlogoutputmeatcolumn_migrateyieldloginputquantitycolumn_migratecommissaryadjustmentstable",
+      "label": "{ migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateCommissaryAdjustmentsTable }",
       "_origin": "ast",
       "community": 3,
       "community_name": "connection.js",
       "file_type": "code",
-      "norm_label": "{ migratestockreceiptsnullabledestination, migratelocationsactivecolumn, migrateconversioncolumns, migratecommissarymultitenant, migrateconversionstandardsmeattype, migrateyieldlogoutputmeatcolumn, migrateyieldloginputquantitycolumn }",
+      "norm_label": "{ migratestockreceiptsnullabledestination, migratelocationsactivecolumn, migrateconversioncolumns, migratecommissarymultitenant, migrateconversionstandardsmeattype, migrateyieldlogoutputmeatcolumn, migrateyieldloginputquantitycolumn, migratecommissaryadjustmentstable }",
       "source_file": "server/db/connection.js",
       "source_location": "L14"
     },
@@ -3017,7 +3041,7 @@
       "file_type": "code",
       "norm_label": "schema",
       "source_file": "server/db/connection.js",
-      "source_location": "L70"
+      "source_location": "L75"
     },
     {
       "id": "server_db_connection_schema_path",
@@ -3620,7 +3644,7 @@
       "label": "schema.sql",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "schema.sql",
       "source_file": "server/db/schema.sql",
@@ -3631,18 +3655,18 @@
       "label": "activity_log",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "activity_log",
       "source_file": "server/db/schema.sql",
-      "source_location": "L484"
+      "source_location": "L505"
     },
     {
       "id": "server_db_schema_adjustment_types",
       "label": "adjustment_types",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "adjustment_types",
       "source_file": "server/db/schema.sql",
@@ -3653,7 +3677,7 @@
       "label": "adjustments",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "adjustments",
       "source_file": "server/db/schema.sql",
@@ -3664,29 +3688,40 @@
       "label": "commissaries",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissaries",
       "source_file": "server/db/schema.sql",
       "source_location": "L226"
     },
     {
+      "id": "server_db_schema_commissary_adjustments",
+      "label": "commissary_adjustments",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "schema.sql",
+      "file_type": "code",
+      "norm_label": "commissary_adjustments",
+      "source_file": "server/db/schema.sql",
+      "source_location": "L427"
+    },
+    {
       "id": "server_db_schema_commissary_conversion_standards",
       "label": "commissary_conversion_standards",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_conversion_standards",
       "source_file": "server/db/schema.sql",
-      "source_location": "L453"
+      "source_location": "L474"
     },
     {
       "id": "server_db_schema_commissary_ending_actual",
       "label": "commissary_ending_actual",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_ending_actual",
       "source_file": "server/db/schema.sql",
@@ -3697,7 +3732,7 @@
       "label": "commissary_meat_map",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_meat_map",
       "source_file": "server/db/schema.sql",
@@ -3708,7 +3743,7 @@
       "label": "commissary_meats",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_meats",
       "source_file": "server/db/schema.sql",
@@ -3719,7 +3754,7 @@
       "label": "commissary_opening_stock",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_opening_stock",
       "source_file": "server/db/schema.sql",
@@ -3730,7 +3765,7 @@
       "label": "commissary_shipment_lines",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_shipment_lines",
       "source_file": "server/db/schema.sql",
@@ -3741,7 +3776,7 @@
       "label": "commissary_shipment_preset_lines",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_shipment_preset_lines",
       "source_file": "server/db/schema.sql",
@@ -3752,7 +3787,7 @@
       "label": "commissary_shipment_presets",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_shipment_presets",
       "source_file": "server/db/schema.sql",
@@ -3763,7 +3798,7 @@
       "label": "commissary_shipments",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_shipments",
       "source_file": "server/db/schema.sql",
@@ -3774,7 +3809,7 @@
       "label": "commissary_stock_receipts",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_stock_receipts",
       "source_file": "server/db/schema.sql",
@@ -3785,7 +3820,7 @@
       "label": "commissary_yield_log",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "commissary_yield_log",
       "source_file": "server/db/schema.sql",
@@ -3796,7 +3831,7 @@
       "label": "dishes",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "dishes",
       "source_file": "server/db/schema.sql",
@@ -3807,7 +3842,7 @@
       "label": "ending_actual",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "ending_actual",
       "source_file": "server/db/schema.sql",
@@ -3818,7 +3853,7 @@
       "label": "locations",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "locations",
       "source_file": "server/db/schema.sql",
@@ -3829,18 +3864,18 @@
       "label": "loyverse_name_map",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "loyverse_name_map",
       "source_file": "server/db/schema.sql",
-      "source_location": "L470"
+      "source_location": "L491"
     },
     {
       "id": "server_db_schema_meat_types",
       "label": "meat_types",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "meat_types",
       "source_file": "server/db/schema.sql",
@@ -3851,7 +3886,7 @@
       "label": "meats",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "meats",
       "source_file": "server/db/schema.sql",
@@ -3862,7 +3897,7 @@
       "label": "opening_stock",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "opening_stock",
       "source_file": "server/db/schema.sql",
@@ -3873,7 +3908,7 @@
       "label": "portion_ending_actual",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "portion_ending_actual",
       "source_file": "server/db/schema.sql",
@@ -3884,7 +3919,7 @@
       "label": "prepped",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "prepped",
       "source_file": "server/db/schema.sql",
@@ -3895,7 +3930,7 @@
       "label": "recipe_bom",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "recipe_bom",
       "source_file": "server/db/schema.sql",
@@ -3906,7 +3941,7 @@
       "label": "restaurants",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "restaurants",
       "source_file": "server/db/schema.sql",
@@ -3917,7 +3952,7 @@
       "label": "sales",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "sales",
       "source_file": "server/db/schema.sql",
@@ -3928,7 +3963,7 @@
       "label": "stock_receipts",
       "_origin": "ast",
       "community": 5,
-      "community_name": "Schema: Commissary Tables",
+      "community_name": "schema.sql",
       "file_type": "code",
       "norm_label": "stock_receipts",
       "source_file": "server/db/schema.sql",
@@ -6305,7 +6340,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L188",
+      "source_location": "L211",
       "weight": 1.0
     },
     {
@@ -6317,7 +6352,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L127",
+      "source_location": "L151",
       "weight": 1.0
     },
     {
@@ -6329,7 +6364,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L128",
+      "source_location": "L152",
       "weight": 1.0
     },
     {
@@ -6341,7 +6376,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L129",
+      "source_location": "L153",
       "weight": 1.0
     },
     {
@@ -6353,7 +6388,19 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L130",
+      "source_location": "L154",
+      "weight": 1.0
+    },
+    {
+      "source": "server_engines_commissaryauditengine_computecommissarymeataudit",
+      "target": "server_engines_commissaryauditengine_getcommissaryadjustmentstotal",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L155",
       "weight": 1.0
     },
     {
@@ -6365,7 +6412,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L131",
+      "source_location": "L156",
       "weight": 1.0
     },
     {
@@ -6377,7 +6424,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L50",
+      "source_location": "L55",
       "weight": 1.0
     },
     {
@@ -6850,6 +6897,18 @@
     },
     {
       "source": "server_db_connection",
+      "target": "server_db_migrate_migratecommissaryadjustmentstable",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "server/db/connection.js",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "server_db_connection",
       "target": "server_db_migrate_migratecommissarymultitenant",
       "relation": "imports",
       "_origin": "ast",
@@ -7037,7 +7096,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L41",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -7055,6 +7114,18 @@
     {
       "source": "server_engines_commissaryauditengine_test",
       "target": "server_engines_commissaryauditengine_computecommissarymeataudit",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "server_engines_commissaryauditengine_test",
+      "target": "server_engines_commissaryauditengine_getcommissaryadjustmentstotal",
       "relation": "imports",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -7589,7 +7660,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L41",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -8481,7 +8552,7 @@
     },
     {
       "source": "server_db_connection",
-      "target": "server_db_connection_migratestockreceiptsnullabledestination_migratelocationsactivecolumn_migrateconversioncolumns_migratecommissarymultitenant_migrateconversionstandardsmeattype_migrateyieldlogoutputmeatcolumn_migrateyieldloginputquantitycolumn",
+      "target": "server_db_connection_migratestockreceiptsnullabledestination_migratelocationsactivecolumn_migrateconversioncolumns_migratecommissarymultitenant_migrateconversionstandardsmeattype_migrateyieldlogoutputmeatcolumn_migrateyieldloginputquantitycolumn_migratecommissaryadjustmentstable",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -8531,7 +8602,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/connection.js",
-      "source_location": "L70",
+      "source_location": "L75",
       "weight": 1.0
     },
     {
@@ -8598,6 +8669,17 @@
       "confidence_score": 1.0,
       "source_file": "server/db/migrate.js",
       "source_location": "L508",
+      "weight": 1.0
+    },
+    {
+      "source": "server_db_migrate",
+      "target": "server_db_migrate_migratecommissaryadjustmentstable",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/db/migrate.js",
+      "source_location": "L543",
       "weight": 1.0
     },
     {
@@ -8932,13 +9014,13 @@
     },
     {
       "source": "server_db_schema",
-      "target": "server_db_schema_commissary_conversion_standards",
+      "target": "server_db_schema_commissary_adjustments",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/schema.sql",
-      "source_location": "L453",
+      "source_location": "L427",
       "weight": 1.0
     },
     {
@@ -8954,13 +9036,24 @@
     },
     {
       "source": "server_db_schema",
+      "target": "server_db_schema_commissary_conversion_standards",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/db/schema.sql",
+      "source_location": "L474",
+      "weight": 1.0
+    },
+    {
+      "source": "server_db_schema",
       "target": "server_db_schema_loyverse_name_map",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/schema.sql",
-      "source_location": "L470",
+      "source_location": "L491",
       "weight": 1.0
     },
     {
@@ -8971,7 +9064,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/schema.sql",
-      "source_location": "L484",
+      "source_location": "L505",
       "weight": 1.0
     },
     {
@@ -9180,7 +9273,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L41",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -9229,7 +9322,7 @@
     },
     {
       "source": "server_engines_commissaryauditengine_test",
-      "target": "server_engines_commissaryauditengine_test_getcommissarystockin_getcommissarybackedup_getcommissaryusage_computecommissarymeataudit_computecommissarydailyaudit",
+      "target": "server_engines_commissaryauditengine_test_getcommissarystockin_getcommissarybackedup_getcommissaryusage_getcommissaryadjustmentstotal_computecommissarymeataudit_computecommissarydailyaudit",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -9246,7 +9339,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L36",
+      "source_location": "L37",
       "weight": 1.0
     },
     {
@@ -9257,7 +9350,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L49",
+      "source_location": "L50",
       "weight": 1.0
     },
     {
@@ -9268,7 +9361,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L54",
+      "source_location": "L55",
       "weight": 1.0
     },
     {
@@ -9279,7 +9372,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L55",
+      "source_location": "L56",
       "weight": 1.0
     },
     {
@@ -11492,6 +11585,17 @@
       "weight": 1.0
     },
     {
+      "source": "server_db_schema_commissary_adjustments",
+      "target": "server_db_schema_commissary_meats",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/db/schema.sql",
+      "source_location": "L427",
+      "weight": 1.0
+    },
+    {
       "source": "server_db_schema_commissary_conversion_standards",
       "target": "server_db_schema_meat_types",
       "relation": "references",
@@ -11499,7 +11603,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/schema.sql",
-      "source_location": "L453",
+      "source_location": "L474",
       "weight": 1.0
     },
     {
@@ -11510,7 +11614,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/schema.sql",
-      "source_location": "L453",
+      "source_location": "L474",
       "weight": 1.0
     },
     {
@@ -11521,7 +11625,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/schema.sql",
-      "source_location": "L453",
+      "source_location": "L474",
       "weight": 1.0
     },
     {
@@ -11763,7 +11867,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/schema.sql",
-      "source_location": "L470",
+      "source_location": "L491",
       "weight": 1.0
     },
     {
@@ -11774,7 +11878,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/db/schema.sql",
-      "source_location": "L470",
+      "source_location": "L491",
       "weight": 1.0
     },
     {
@@ -12144,7 +12248,7 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L193",
+      "source_location": "L216",
       "weight": 1.0
     },
     {
@@ -12156,7 +12260,7 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L194",
+      "source_location": "L217",
       "weight": 1.0
     },
     {
@@ -12168,7 +12272,7 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L195",
+      "source_location": "L218",
       "weight": 1.0
     },
     {
@@ -12180,7 +12284,19 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L196",
+      "source_location": "L219",
+      "weight": 1.0
+    },
+    {
+      "source": "server_engines_commissaryauditengine",
+      "target": "server_engines_commissaryauditengine_getcommissaryadjustmentstotal",
+      "relation": "indirect_call",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "context": "collection",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -12192,7 +12308,7 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L197",
+      "source_location": "L221",
       "weight": 1.0
     },
     {
@@ -12204,7 +12320,7 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L198",
+      "source_location": "L222",
       "weight": 1.0
     },
     {
@@ -12216,7 +12332,7 @@
       "confidence_score": 0.85,
       "context": "collection",
       "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L199",
+      "source_location": "L223",
       "weight": 1.0
     },
     {
@@ -14454,5 +14570,5 @@
       "source_file": "public/commissary-shipments.html"
     }
   ],
-  "built_at_commit": "755cf0b0eedcd2c86940fd982df46c43259f81e7"
+  "built_at_commit": "714ab81af8e4ccebedd463af3db11c174f74bab1"
 }

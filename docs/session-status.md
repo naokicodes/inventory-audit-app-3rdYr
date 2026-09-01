@@ -342,8 +342,21 @@ still divides by `raw_weight_in`. 3 new tests added (own `M12`/`M13` meats,
 own dates). See `changelog.md` for the full writeup. Full 15-file suite:
 **282/282 assertions, 0 failures.**
 
-**Next up: 24b-ii (commissary adjustments).** 24b/24c's remaining pieces
-(24b-ii, 24b-iii, 24c) are not started.
+**Step 24b-ii is DONE (2026-09-02, Claude Code session).** `commissary_adjustments`
+table (schema.sql + idempotent `migrateCommissaryAdjustmentsTable`, wired into
+`connection.js` after `migrateYieldLogInputQuantityColumn`), no routes/CRUD (that's
+24b-iii). In `commissaryAuditEngine.js`: ALLOCATION is folded into the existing
+`getCommissaryUsage` (debits the source) and `getCommissaryBackedUp` (credits
+`destination_commissary_meat_id`) - no new field, same role those two already play
+for shipments/yield debits. LOSS gets a new `getCommissaryAdjustmentsTotal`
+(mirrors `getAdjustmentsTotal` in `auditEngine.js`) feeding a new `adjustments`
+field; `computeCommissaryMeatAudit`'s `expectedEnding` is now `endingCalculated -
+adjustments` (previously always equal to `endingCalculated` - that stale comment
+is replaced). Both kinds exclude soft-deleted rows. 4 new tests (own `M20`/`M21`/
+`M22` meats, own dates 2026-08-20..23). See `changelog.md` for the full writeup.
+Full 15-file suite: **286/286 assertions, 0 failures** (282 baseline + 4 new).
+
+**Next up: 24b-iii (adjustment routes).** 24c (UI) remains after that.
 
 **24b output-targeting — RESOLVED 2026-09-01.** The earlier concern (a yield
 row reusing the single `commissary_meat_id` for both input and output, and

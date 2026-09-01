@@ -418,6 +418,27 @@ CREATE TABLE IF NOT EXISTS commissary_shipment_preset_lines (
   FOREIGN KEY (meat_id) REFERENCES meats(id)
 );
 
+-- commissary_adjustments: step 24b-ii (data-model.md section 10b).
+-- LOSS is an explanation (feeds expectedEnding/unexplainedVariance, like
+-- the restaurant adjustments table) - destination_commissary_meat_id is
+-- NULL. ALLOCATION is a real movement (debits commissary_meat_id, credits
+-- destination_commissary_meat_id) - destination_commissary_meat_id is
+-- required. Soft delete only, no hard DELETE.
+CREATE TABLE IF NOT EXISTS commissary_adjustments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  commissary_meat_id INTEGER NOT NULL,   -- source
+  business_date TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('LOSS', 'ALLOCATION')),
+  quantity REAL NOT NULL,
+  destination_commissary_meat_id INTEGER,   -- NULL for LOSS, required for ALLOCATION
+  notes TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT,                -- soft delete only, no hard DELETE
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  FOREIGN KEY (destination_commissary_meat_id) REFERENCES commissary_meats(id)
+);
+
 -- commissary_conversion_standards: item 5 of the 2026-08-29 "Future
 -- considerations" list, design settled through discussion - see
 -- session-status.md's item 5 entry for the full reasoning.

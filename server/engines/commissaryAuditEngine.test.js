@@ -26,6 +26,7 @@ const {
   getCommissaryStockIn,
   getCommissaryBackedUp,
   getCommissaryUsage,
+  getCommissaryAdjustmentsTotal,
   computeCommissaryMeatAudit,
   computeCommissaryDailyAudit
 } = require('./commissaryAuditEngine.js');
@@ -391,6 +392,86 @@ test('unit-in/kg-out row debits the count from the input while crediting the wei
 
   assert.ok(Math.abs(inputUsage - 40) < 0.0001, `expected input count=40 debited, got ${inputUsage}`);
   assert.ok(Math.abs(outputBackedUp - 30.0) < 0.0001, `expected weighed output=30.0 credited, got ${outputBackedUp}`);
+});
+
+// Step 24b-ii: commissary_adjustments (LOSS/ALLOCATION). New commissary
+// meats + an unused business_date range, same self-contained pattern as
+// 24a/24b-i above.
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M20', 'Allocation Source', 'kg', 0.20);
+const allocSourceId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'M20').id;
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M21', 'Allocation Destination', 'kg', 0.20);
+const allocDestId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'M21').id;
+
+test('an ALLOCATION debits the source and credits the destination - both balances reflect it', () => {
+  db.prepare(`INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity, destination_commissary_meat_id) VALUES (?, ?, 'ALLOCATION', ?, ?)`)
+    .run(allocSourceId, '2026-08-20', 5.0, allocDestId);
+
+  const sourceUsage = getCommissaryUsage(db, allocSourceId, '2026-08-20');
+  const destBackedUp = getCommissaryBackedUp(db, allocDestId, '2026-08-20');
+  assert.ok(Math.abs(sourceUsage - 5.0) < 0.0001, `source debit expected 5.0, got ${sourceUsage}`);
+  assert.ok(Math.abs(destBackedUp - 5.0) < 0.0001, `destination credit expected 5.0, got ${destBackedUp}`);
+
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(allocSourceId, '2026-08-20', 20.0);
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(allocSourceId, '2026-08-20', 15.0);
+  const sourceAudit = computeCommissaryMeatAudit(db, allocSourceId, '2026-08-20');
+  // beginning=20, usage=5 (the allocation debit) -> endingCalculated=15, matches actual=15
+  assert.ok(Math.abs(sourceAudit.endingCalculated - 15.0) < 0.0001, `expected 15.0, got ${sourceAudit.endingCalculated}`);
+  assert.strictEqual(sourceAudit.status, 'OK');
+
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(allocDestId, '2026-08-20', 0.0);
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(allocDestId, '2026-08-20', 5.0);
+  const destAudit = computeCommissaryMeatAudit(db, allocDestId, '2026-08-20');
+  // beginning=0, backedUp=5 (the allocation credit) -> endingCalculated=5, matches actual=5
+  assert.ok(Math.abs(destAudit.endingCalculated - 5.0) < 0.0001, `expected 5.0, got ${destAudit.endingCalculated}`);
+  assert.strictEqual(destAudit.status, 'OK');
+});
+
+test('a soft-deleted ALLOCATION affects neither the source debit nor the destination credit', () => {
+  db.prepare(`INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity, destination_commissary_meat_id, deleted_at) VALUES (?, ?, 'ALLOCATION', ?, ?, ?)`)
+    .run(allocSourceId, '2026-08-21', 100.0, allocDestId, '2026-08-21T09:00:00Z');
+
+  const sourceUsage = getCommissaryUsage(db, allocSourceId, '2026-08-21');
+  const destBackedUp = getCommissaryBackedUp(db, allocDestId, '2026-08-21');
+  assert.strictEqual(sourceUsage, 0, 'soft-deleted allocation must not debit the source');
+  assert.strictEqual(destBackedUp, 0, 'soft-deleted allocation must not credit the destination');
+});
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M22', 'Loss Test Meat', 'kg', 0.20);
+const lossMeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'M22').id;
+
+test('a LOSS leaves variance unchanged but drives unexplainedVariance to zero', () => {
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(lossMeatId, '2026-08-22', 10.0);
+  db.prepare(`INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity) VALUES (?, ?, 'LOSS', ?)`)
+    .run(lossMeatId, '2026-08-22', 3.0);
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(lossMeatId, '2026-08-22', 7.0);
+
+  const result = computeCommissaryMeatAudit(db, lossMeatId, '2026-08-22');
+  // beginning=10, no other movement -> endingCalculated=10. actual=7.
+  // variance = 10 - 7 = 3 (unaffected by the declared loss - stays visible).
+  // expectedEnding = 10 - 3 (adjustments) = 7 -> unexplainedVariance = 0.
+  assert.strictEqual(result.endingCalculated, 10.0);
+  assert.strictEqual(result.adjustments, 3.0);
+  assert.ok(Math.abs(result.variance - 3.0) < 0.0001, `variance expected 3.0 (unchanged), got ${result.variance}`);
+  assert.ok(Math.abs(result.expectedEnding - 7.0) < 0.0001, `expectedEnding expected 7.0, got ${result.expectedEnding}`);
+  assert.ok(Math.abs(result.unexplainedVariance) < 0.0001, `unexplainedVariance expected 0, got ${result.unexplainedVariance}`);
+  assert.strictEqual(result.status, 'OK');
+});
+
+test('a soft-deleted LOSS does not reduce expectedEnding', () => {
+  db.prepare(`INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity, deleted_at) VALUES (?, ?, 'LOSS', ?, ?)`)
+    .run(lossMeatId, '2026-08-23', 50.0, '2026-08-23T09:00:00Z');
+
+  const adjustments = getCommissaryAdjustmentsTotal(db, lossMeatId, '2026-08-23');
+  assert.strictEqual(adjustments, 0, 'soft-deleted loss must not count toward adjustments');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

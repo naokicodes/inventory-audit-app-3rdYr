@@ -526,3 +526,45 @@ function migrateYieldLogInputQuantityColumn(db) {
 }
 
 module.exports.migrateYieldLogInputQuantityColumn = migrateYieldLogInputQuantityColumn;
+
+// ----------------------------------------------------------------------
+// Step 24b-ii (2026-09-02): commissary_adjustments - see
+// docs/data-model.md section 10b and docs/session-status.md's 24b-ii
+// bullet. Brand-new table, so CREATE TABLE IF NOT EXISTS covers a fresh
+// install on its own via schema.sql; this migration only needs to handle
+// a pre-existing database that predates the table, matching it exactly.
+//
+// Must run BEFORE schema.sql - see connection.js.
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ ran: boolean }}
+ */
+function migrateCommissaryAdjustmentsTable(db) {
+  const tableExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'commissary_adjustments'`
+  ).get();
+  if (tableExists) {
+    return { ran: false };
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS commissary_adjustments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commissary_meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('LOSS', 'ALLOCATION')),
+      quantity REAL NOT NULL,
+      destination_commissary_meat_id INTEGER,
+      notes TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT,
+      FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+      FOREIGN KEY (destination_commissary_meat_id) REFERENCES commissary_meats(id)
+    )
+  `);
+  return { ran: true };
+}
+
+module.exports.migrateCommissaryAdjustmentsTable = migrateCommissaryAdjustmentsTable;

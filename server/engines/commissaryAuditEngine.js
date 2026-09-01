@@ -25,18 +25,23 @@
 // Ending is the real physical count from commissary_ending_actual, same as
 // every other actual-vs-calculated comparison in this app.
 //
-// FLAGGED (not silently resolved - see rules-for-claude-code.md rule 3/7):
-// computeMeatAudit has an `adjustments` layer (expectedEnding =
-// endingCalculated - adjustments, from the `adjustments` table). None of
-// step 20a's six commissary tables is an adjustments-equivalent - there is
-// no commissary adjustments/waste-log table yet. So here `expectedEnding`
-// always equals `endingCalculated`, and `unexplainedVariance` always
-// equals `variance`. Both fields are still returned (for shape parity with
-// computeMeatAudit and so a future commissary adjustments concept doesn't
-// need a field rename), but right now they're redundant. If the architect
-// conversation wants a real adjustments layer for Commissary (e.g. a
-// commissary_adjustments table), that's new scope, not something to infer
-// here.
+// Step 24b-ii (data-model.md section 10b): commissary_adjustments gives
+// Commissary its own adjustments layer, with two balance effects that are
+// NOT the same:
+//   - kind='ALLOCATION' is a REAL MOVEMENT: it debits commissary_meat_id
+//     (the source) and credits destination_commissary_meat_id, landing in
+//     endingCalculated exactly like a shipment/yield-debit does. Folded
+//     into getCommissaryUsage (debit side) and getCommissaryBackedUp
+//     (credit side) below, rather than a separate pair of functions,
+//     because that's exactly the role those two already play for every
+//     other real movement.
+//   - kind='LOSS' is an EXPLANATION: it feeds expectedEnding and therefore
+//     unexplainedVariance, mirroring getAdjustmentsTotal/computeMeatAudit
+//     in auditEngine.js (expectedEnding = endingCalculated - adjustments).
+//     A declared loss does not make the variance disappear - it moves it
+//     from unexplained to explained, and both stay visible via `variance`
+//     vs `unexplainedVariance`.
+// Both kinds exclude soft-deleted rows (deleted_at IS NULL).
 
 const { addDays } = require('./auditEngine.js');
 
@@ -87,6 +92,22 @@ function getCommissaryBackedUp(db, commissaryMeatId, businessDate) {
   const row = db.prepare(
     `SELECT SUM(backed_weight_out) as qty FROM commissary_yield_log WHERE COALESCE(output_commissary_meat_id, commissary_meat_id) = ? AND business_date = ? AND deleted_at IS NULL`
   ).get(commissaryMeatId, businessDate);
+  const allocatedIn = db.prepare(
+    `SELECT SUM(quantity) as qty FROM commissary_adjustments WHERE kind = 'ALLOCATION' AND destination_commissary_meat_id = ? AND business_date = ? AND deleted_at IS NULL`
+  ).get(commissaryMeatId, businessDate);
+  return (row.qty || 0) + (allocatedIn.qty || 0);
+}
+
+/**
+ * Sum of declared LOSS adjustments for this commissary meat/date - the
+ * commissary equivalent of getAdjustmentsTotal in auditEngine.js. Excludes
+ * soft-deleted rows and ALLOCATION rows (those are a real movement, folded
+ * into getCommissaryUsage/getCommissaryBackedUp above, not an explanation).
+ */
+function getCommissaryAdjustmentsTotal(db, commissaryMeatId, businessDate) {
+  const row = db.prepare(
+    `SELECT SUM(quantity) as qty FROM commissary_adjustments WHERE kind = 'LOSS' AND commissary_meat_id = ? AND business_date = ? AND deleted_at IS NULL`
+  ).get(commissaryMeatId, businessDate);
   return row.qty || 0;
 }
 
@@ -109,7 +130,10 @@ function getCommissaryUsage(db, commissaryMeatId, businessDate) {
   const processed = db.prepare(
     `SELECT SUM(COALESCE(input_quantity, raw_weight_in)) as qty FROM commissary_yield_log WHERE commissary_meat_id = ? AND business_date = ? AND deleted_at IS NULL`
   ).get(commissaryMeatId, businessDate);
-  return (shipped.qty || 0) + (processed.qty || 0);
+  const allocatedOut = db.prepare(
+    `SELECT SUM(quantity) as qty FROM commissary_adjustments WHERE kind = 'ALLOCATION' AND commissary_meat_id = ? AND business_date = ? AND deleted_at IS NULL`
+  ).get(commissaryMeatId, businessDate);
+  return (shipped.qty || 0) + (processed.qty || 0) + (allocatedOut.qty || 0);
 }
 
 function getCommissaryEndingActual(db, commissaryMeatId, businessDate) {
@@ -128,23 +152,22 @@ function computeCommissaryMeatAudit(db, commissaryMeatId, businessDate) {
   const stockIn = getCommissaryStockIn(db, commissaryMeatId, businessDate);
   const backedUp = getCommissaryBackedUp(db, commissaryMeatId, businessDate);
   const usage = getCommissaryUsage(db, commissaryMeatId, businessDate);
+  const adjustments = getCommissaryAdjustmentsTotal(db, commissaryMeatId, businessDate);
   const actual = getCommissaryEndingActual(db, commissaryMeatId, businessDate);
 
   if (beginning === null) {
-    return { beginning: null, stockIn, backedUp, usage, actual, endingCalculated: null, expectedEnding: null, variance: null, unexplainedVariance: null, status: 'MISSING_BEGINNING_STOCK' };
+    return { beginning: null, stockIn, backedUp, usage, adjustments, actual, endingCalculated: null, expectedEnding: null, variance: null, unexplainedVariance: null, status: 'MISSING_BEGINNING_STOCK' };
   }
 
   const endingCalculated = beginning + stockIn + backedUp - usage;
-  // No commissary adjustments table exists yet - see the module-level note
-  // above. expectedEnding is always endingCalculated for now.
-  const expectedEnding = endingCalculated;
+  const expectedEnding = endingCalculated - adjustments;
 
   if (actual === null) {
-    return { beginning, stockIn, backedUp, usage, actual: null, endingCalculated, expectedEnding, variance: null, unexplainedVariance: null, status: 'MISSING_ACTUAL_COUNT' };
+    return { beginning, stockIn, backedUp, usage, adjustments, actual: null, endingCalculated, expectedEnding, variance: null, unexplainedVariance: null, status: 'MISSING_ACTUAL_COUNT' };
   }
 
-  const variance = endingCalculated - actual;
-  const unexplainedVariance = expectedEnding - actual; // == variance today, see note above
+  const variance = endingCalculated - actual;               // raw, before adjustments
+  const unexplainedVariance = expectedEnding - actual;       // after known adjustments
 
   const EPSILON = 0.01; // float rounding tolerance, matches auditEngine.js
   let status;
@@ -152,7 +175,7 @@ function computeCommissaryMeatAudit(db, commissaryMeatId, businessDate) {
   else if (unexplainedVariance > 0) status = 'SHORTAGE';
   else status = 'SURPLUS';
 
-  return { beginning, stockIn, backedUp, usage, actual, endingCalculated, expectedEnding, variance, unexplainedVariance, status };
+  return { beginning, stockIn, backedUp, usage, adjustments, actual, endingCalculated, expectedEnding, variance, unexplainedVariance, status };
 }
 
 /**
@@ -194,6 +217,7 @@ module.exports = {
   getCommissaryStockIn,
   getCommissaryBackedUp,
   getCommissaryUsage,
+  getCommissaryAdjustmentsTotal,
   getCommissaryEndingActual,
   computeCommissaryMeatAudit,
   computeCommissaryDailyAudit

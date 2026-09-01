@@ -11,6 +11,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-02 (Claude Code session) — Step 24b-ii: commissary_adjustments (schema + engine)
+
+New `commissary_adjustments` table (`schema.sql`), plus an idempotent `migrateCommissaryAdjustmentsTable` in `server/db/migrate.js` (a plain `CREATE TABLE IF NOT EXISTS`, matching the schema exactly — no rebuild needed since it's a brand-new table, not a column add) wired into `connection.js` right after `migrateYieldLogInputQuantityColumn`. Columns per `data-model.md` §10b: `kind` CHECK IN ('LOSS','ALLOCATION')`, `destination_commissary_meat_id` (nullable, required only for ALLOCATION), `deleted_at` for soft delete.
+
+Two balance effects in `commissaryAuditEngine.js`, deliberately not the same: **ALLOCATION is a real movement** — folded directly into the existing `getCommissaryUsage` (debits `commissary_meat_id`, the source) and `getCommissaryBackedUp` (credits `destination_commissary_meat_id`), the same role those two functions already play for shipments/yield debits, so it lands in `endingCalculated` with no new field. **LOSS is an explanation** — a new `getCommissaryAdjustmentsTotal` (mirroring `getAdjustmentsTotal` in `auditEngine.js`) feeds a new `adjustments` return field, and `computeCommissaryMeatAudit`'s `expectedEnding` is now `endingCalculated - adjustments` instead of always equalling `endingCalculated`. The stale "no commissary adjustments table exists yet" module comment is replaced. Both kinds exclude soft-deleted rows.
+
+4 new tests in `commissaryAuditEngine.test.js`, own dedicated meats (`M20`/`M21`/`M22`) and unused business dates (2026-08-20/21/22/23), same self-contained pattern as 24a/24b-i: an ALLOCATION moves quantity from source to destination with both balances (and both meats' full audits) reflecting it; a soft-deleted ALLOCATION affects neither side; a LOSS leaves the raw `variance` unchanged while driving `unexplainedVariance` to zero (moves it from unexplained to explained, doesn't erase it); a soft-deleted LOSS doesn't reduce `expectedEnding`.
+
+Full 15-file suite: 286/286 assertions, 0 failures (282 baseline + 4 new). Out of scope, untouched per the step's own boundary: routes/CRUD for `commissary_adjustments` (24b-iii), the destination dropdown's `meat_type_id`+`unit` filter (24b-iii), and any UI (24c). No `activity_log` writes — rule 9 scopes that pattern to `stock_receipts`/`commissary_yield_log` only; `commissary_adjustments` gets the same soft-delete-only, no-activity-log treatment as the restaurant `adjustments` table (deliberate future work per rule 9, not silently extended here).
+
+---
+
 ## 2026-09-02 (Claude Code session) — Step 24b-i: commissary_yield_log.input_quantity
 
 `commissary_yield_log` gains a nullable `input_quantity` column (REAL, no FK), expressed in the INPUT meat's own unit, added via `schema.sql` plus a new idempotent `migrateYieldLogInputQuantityColumn` in `server/db/migrate.js` — same detect-then-no-op `ALTER TABLE ADD COLUMN` shape as `migrateYieldLogOutputMeatColumn` (24a), wired into `connection.js` right after it.

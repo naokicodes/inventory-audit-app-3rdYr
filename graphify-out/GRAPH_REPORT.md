@@ -1,16 +1,16 @@
 # Graph Report - inventory-audit-app-3rdYr  (2026-09-02)
 
 ## Corpus Check
-- 64 files · ~155,677 words
+- 64 files · ~157,017 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 491 nodes · 732 edges · 31 communities
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 40 edges (avg confidence: 0.83)
+- 494 nodes · 739 edges · 31 communities
+- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `755cf0b0`
+- Built from commit: `714ab81a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -20,7 +20,7 @@
 - dashboard.test.js
 - connection.js
 - commissary.js
-- Schema: Commissary Tables
+- schema.sql
 - index.js
 - Settings Admin: Conversion Standards
 - commissary.test.js
@@ -55,7 +55,7 @@
 7. `Data Model doc` - 14 edges
 8. `Rules for Claude Code` - 13 edges
 9. `Commissary Shipments Page` - 13 edges
-10. `Stock Receipts Page` - 12 edges
+10. `commissary_meats` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `recalcMeatRow (client-side live recalculation)` --references--> `computeMeatAudit()`  [EXTRACTED]
@@ -83,8 +83,8 @@
 ## Communities (31 total, 0 thin omitted)
 
 ### Community 0 - "auditEngine.js"
-Cohesion: 0.05
-Nodes (44): recalcDishRow (client-side live recalculation), computeDailyAudit(), computeDishAudit(), computeMeatAudit(), computeMixedDailyAudit(), getAdjustmentsTotal(), getBeginningStock(), getEndingActual() (+36 more)
+Cohesion: 0.06
+Nodes (45): recalcDishRow (client-side live recalculation), addDays(), computeDailyAudit(), computeDishAudit(), computeMeatAudit(), computeMixedDailyAudit(), getAdjustmentsTotal(), getBeginningStock() (+37 more)
 
 ### Community 1 - "Data Model doc"
 Cohesion: 0.08
@@ -92,19 +92,19 @@ Nodes (44): .claude/CLAUDE.md (graphify router), graphify add & watch reference,
 
 ### Community 2 - "dashboard.test.js"
 Cohesion: 0.09
-Nodes (28): addDays(), { addDays }, computeCommissaryDailyAudit(), computeCommissaryMeatAudit(), getCommissaryBackedUp(), getCommissaryBeginningStock(), getCommissaryEndingActual(), getCommissaryStockIn() (+20 more)
+Nodes (28): { addDays }, computeCommissaryDailyAudit(), computeCommissaryMeatAudit(), getCommissaryAdjustmentsTotal(), getCommissaryBackedUp(), getCommissaryBeginningStock(), getCommissaryEndingActual(), getCommissaryStockIn() (+20 more)
 
 ### Community 3 - "connection.js"
 Cohesion: 0.07
-Nodes (25): { DatabaseSync }, db, DB_PATH, fs, { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn }, path, schema, SCHEMA_PATH (+17 more)
+Nodes (26): { DatabaseSync }, db, DB_PATH, fs, { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateCommissaryAdjustmentsTable }, path, schema, SCHEMA_PATH (+18 more)
 
 ### Community 4 - "commissary.js"
 Cohesion: 0.09
 Nodes (23): computeActualLossPct(), computeExcessLoss(), computeYieldLogForDate(), computeYieldMetrics(), computeYieldRow(), computeYieldStatus(), getAllowedLeewayPct(), assert (+15 more)
 
-### Community 5 - "Schema: Commissary Tables"
-Cohesion: 0.18
-Nodes (28): activity_log, adjustment_types, adjustments, commissaries, commissary_conversion_standards, commissary_ending_actual, commissary_meat_map, commissary_meats (+20 more)
+### Community 5 - "schema.sql"
+Cohesion: 0.17
+Nodes (29): activity_log, adjustment_types, adjustments, commissaries, commissary_adjustments, commissary_conversion_standards, commissary_ending_actual, commissary_meat_map (+21 more)
 
 ### Community 6 - "index.js"
 Cohesion: 0.07
@@ -206,16 +206,16 @@ Nodes (12): 23c-ii split into four sub-steps — resolved 2026-09-01 (architect)
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `computeMeatAudit()` connect `auditEngine.js` to `Data Model doc`, `dashboard.test.js`?**
-  _High betweenness centrality (0.260) - this node is a cross-community bridge._
+  _High betweenness centrality (0.259) - this node is a cross-community bridge._
 - **Why does `Unallocated Commissary Receipt` connect `Data Model doc` to `Stock Receipts Page`?**
-  _High betweenness centrality (0.251) - this node is a cross-community bridge._
-- **Why does `recalcMeatRow (client-side live recalculation)` connect `Data Model doc` to `auditEngine.js`?**
   _High betweenness centrality (0.250) - this node is a cross-community bridge._
+- **Why does `recalcMeatRow (client-side live recalculation)` connect `Data Model doc` to `auditEngine.js`?**
+  _High betweenness centrality (0.249) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `description` to the rest of the system?**
   _240 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `auditEngine.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.05450733752620545 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.055218855218855216 - nodes in this community are weakly interconnected._
 - **Should `Data Model doc` be split into smaller, more focused modules?**
   _Cohesion score 0.08139534883720931 - nodes in this community are weakly interconnected._
 - **Should `dashboard.test.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.08912655971479501 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09090909090909091 - nodes in this community are weakly interconnected._
