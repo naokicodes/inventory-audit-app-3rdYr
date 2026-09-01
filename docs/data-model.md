@@ -410,7 +410,8 @@ restaurant — this happens before allocation.
 | id | integer, PK | |
 | commissary_meat_id | integer, FK | |
 | business_date | date | |
-| raw_weight_in | decimal | |
+| input_quantity | decimal | step 24b-i: how much of the INPUT meat was consumed, in the input meat's own unit. NULL = same as raw_weight_in (correct for a kg-tracked input). For a unit-tracked input this is the COUNT (40 chickens) while raw_weight_in is the measured weight of that count (32.5 kg) — both are recorded on the real paper process. The audit engine debits COALESCE(input_quantity, raw_weight_in); computeYieldMetrics keeps dividing by raw_weight_in, so loss% stays kg-to-kg. |
+| raw_weight_in | decimal | the weighed kg going in — see input_quantity above |
 | backed_weight_out | decimal | |
 | notes | text, nullable | |
 | created_by | text | |

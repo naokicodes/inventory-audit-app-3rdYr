@@ -103,23 +103,21 @@ The most recent landings, newest first — full detail for each is in
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-- **Cross-unit yield rows break the yield engine's loss%, not its balance
-  (found 2026-09-02, scoped to 24b/24c).** `computeYieldMetrics`
-  (`commissaryYieldEngine.js`) derives `actual_loss_pct` as
-  `(raw_weight_in - backed_weight_out) / raw_weight_in`, and a Pass/Review
-  status from it. For a `unit in -> kg out` event (raw chicken -> processed
-  chicken) that subtraction reconciles two different units and reports a
-  conversion ratio as shrinkage — e.g. 45 units in, 30 kg out reads as a 33%
-  loss and may flag Review. This is the same "never reconcile" principle the
-  audit engine already respects, applied to the one engine that doesn't.
-  Harmless through 24a, which leaves the yield-log write route untouched so
-  no cross-unit row can exist outside a direct test insert; it goes live the
-  moment 24c adds the output field to the yield form. **Needs a decision
-  before 24b**: either suppress loss%/status when the output meat's unit
-  differs from the input's, or define a per-pair expected conversion standard
-  and measure the realized ratio against that instead (the latter is what
-  makes the ratio visible and checkable, per the "don't pre-convert to kg at
-  input" decision below).
+- ~~**Cross-unit yield rows break the yield engine's loss%**~~ — **RESOLVED
+  2026-09-02, and it dissolved rather than got solved.** The concern was real:
+  `computeYieldMetrics` derives `actual_loss_pct` as `(raw_weight_in -
+  backed_weight_out) / raw_weight_in`, so a `unit in -> kg out` event would
+  reconcile two different units and report a conversion ratio as shrinkage (45
+  units in, 30 kg out reads as 33% loss, flagging Review on every chicken entry
+  forever). **The project owner then supplied the fact that removes the case
+  entirely: every unit-tracked input is ALSO weighed at intake, and always has
+  been — this predates the app.** Management wanted yield rates, mixing units
+  and kilos was confusing, so the real-world paper process records both: the
+  count, and the total kg of that count. The kg figure drives yield; the count
+  drives the stock deduction. So every yield stage is `kg -> kg` after all, and
+  `computeYieldMetrics` needs no branch, no per-stage ratio standard, and no
+  verdict suppression. It stays exactly as built. See the amended "Yield output
+  is always kg" decision below, and 24b-i for the one column this does require.
 
 ## Step 24 — multi-stage yield + Commissary-side allocation (designed, NOT started)
 
@@ -304,15 +302,37 @@ the same architecture session as item 3's rekey:**
   24a added already do it correctly (own meat rows `M10`/`M11`, own unused dates);
   generalize that pattern to the rest of the file. No engine code changes, no
   behavior changes, same assertions passing.
-- **24b (engine/routes)**: per-meat "next stage" config so the yield form
-  can default the output dropdown, `commissary_adjustments` CRUD + balance
-  effects, Miscuts destination filtering via `meat_type_id`. (The
-  output-credit retarget itself moved into 24a — see above.)
-- **24c (UI)**: output-item field on the yield-entry form (defaults to
-  same meat when no next-stage is configured), an Allocate/Write-off
-  action on the commissary balance view.
+- **24b-i (yield-log input quantity)**: add `input_quantity` to
+  `commissary_yield_log` — nullable, expressed in the INPUT meat's own unit,
+  NULL meaning "same as `raw_weight_in`" (which is the correct default for a
+  kg-tracked input like Belly, where the count and the weight are the same
+  number). Idempotent migration, same ALTER TABLE ADD COLUMN shape as 24a's.
+  The engine's usage debit changes from `raw_weight_in` to
+  `COALESCE(input_quantity, raw_weight_in)` — the same COALESCE shape 24a
+  already uses for the output credit, so existing rows and existing tests are
+  unaffected by construction. `raw_weight_in` keeps its current meaning (the
+  weighed kg) and remains what `computeYieldMetrics` divides by; do NOT
+  repoint the loss math at `input_quantity`.
+- **24b-ii (commissary adjustments — schema + engine)**: the
+  `commissary_adjustments` table as specified in `data-model.md` §10b, its
+  idempotent migration, and the two balance effects, WITHOUT any routes:
+  **ALLOCATION is a real movement** — it debits the source and credits
+  `destination_commissary_meat_id`, landing in `endingCalculated` exactly like
+  a shipment does, because the stock genuinely left one item and arrived at
+  another. **LOSS is an explanation** — it feeds `expectedEnding` and therefore
+  `unexplainedVariance`, mirroring how the restaurant engine already treats its
+  own `adjustments` (`expectedEnding = endingCalculated - adjustments`; status
+  comes from `unexplainedVariance`). A declared loss must NOT make the variance
+  vanish; it moves it from unexplained to explained, and being able to see both
+  is the entire point of declaring it.
+- **24b-iii (adjustment routes)**: CRUD for `commissary_adjustments`, plus the
+  destination filter — an ALLOCATION's destination dropdown offers only
+  commissary meats sharing the source's `meat_type_id` **and its `unit`**.
+- **24c (UI)**: on the yield-entry form, the output-item field (defaults to the
+  same meat) and the input-count field alongside the weighed input. On the
+  commissary balance view, an Allocate and a Write-off action.
 
-**Next up: 24b.** 24a and 24a-b both landed 2026-09-02 (see changelog.md) - the column,
+**Next up: 24b-i.** 24a and 24a-b both landed 2026-09-02 (see changelog.md) - the column,
 the coupled engine debit/credit, and the rewritten/added tests are all
 done and the full 15-file suite is green. 24b/24c are not started.
 
@@ -407,8 +427,24 @@ exactly why the column + credit-retarget were pulled into 24a with it.
   own unit is what makes the realized ratio (kg out per unit in) visible
   and checkable against the standard. (An earlier "pre-convert to kg at
   input" idea was considered and rejected for exactly this reason; do not
-  revive it.) Step 24 therefore KEEPS its cross-unit output mechanism (24b)
-  — it does not collapse to same-unit-only. Settled 2026-09-01.
+  revive it.) Settled 2026-09-01.
+  - **AMENDED 2026-09-02 — a unit-tracked input is weighed as well as
+    counted, so yield math is `kg -> kg` everywhere.** The operator records
+    BOTH numbers for every unit-tracked input, and has done since before the
+    app existed: the count (40 chickens) and the measured total weight of
+    that count (32.5 kg). This is a real weigh-in on a real scale, NOT the
+    rejected "pre-convert to kg using a standard" idea above — that one
+    *estimated* kilos from a count and hid the true ratio behind an
+    assumption; this one *measures* them. The distinction is the whole point:
+    do not read this amendment as the rejected idea returning. Consequences:
+    (a) yield loss% compares kg to kg on every stage, so no cross-unit branch
+    is ever needed in `commissaryYieldEngine.js`; (b) the stock deduction
+    still needs the COUNT, since Raw Chicken's balance is in `unit` — debiting
+    kg from a balance measured in birds would silently corrupt it, which is
+    the exact failure 24a existed to close, arriving from the other side;
+    (c) the two input numbers together expose kg-per-bird as a supplier
+    control, which nothing in the system surfaces today. This is why 24b-i
+    adds `input_quantity` rather than treating the weigh-in as free.
 - **Commissary shrinkage that isn't a yield is a distinct loss
   declaration, not forced through the yield log.** A direct-ship unit-meat
   (e.g. 45 stocked in, 44 shipped, 1 lost to the portioning/wastage
@@ -460,6 +496,27 @@ exactly why the column + credit-retarget were pulled into 24a with it.
   growing by roughly 1.3MB per session against a 1.8MB baseline — a real cost
   on the standard flow, where every worker clones fresh. Don't re-add the
   ignored paths thinking they're missing output; they regenerate locally.
+
+- **`commissary_adjustments` is NOT activity-logged — settled 2026-09-02 by
+  precedent, not by preference.** Rule 9 scopes the before/after-snapshot
+  pattern to `stock_receipts` and `commissary_yield_log`, and explicitly names
+  the restaurant-side `adjustments` table as deliberate future work rather than
+  something to extend into silently. `commissary_adjustments` is that table's
+  direct commissary counterpart, so it follows the same treatment: soft delete
+  via `deleted_at` (as the §10b schema already specifies), no `activity_log`
+  writes. If adjustment logging is ever wanted, it should land for both tables
+  together as its own deliberate step — don't add it to one side only.
+
+- **Per-meat "next stage" config is DEFERRED pending soft-launch — settled
+  2026-09-02.** It was originally scoped into 24b so the yield form could
+  pre-select the right output meat. It isn't needed for correctness: 24c's form
+  can default the output to the same meat and let the operator pick, which is
+  exactly what a NULL `output_commissary_meat_id` already means. The project
+  owner's stated plan is a soft launch against real output to see what actually
+  needs improving, and pre-selection is precisely the kind of convenience that
+  should be justified by real use rather than guessed at. If picking the output
+  proves annoying in practice, add the config then — no schema rework is
+  required to do so later.
 
 ## End-of-session checklist (every session, no exceptions)
 
