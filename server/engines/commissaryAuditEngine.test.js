@@ -81,13 +81,16 @@ test('getCommissaryBackedUp sums commissary_yield_log.backed_weight_out, exclude
   assert.strictEqual(backedUp, 3.0);
 });
 
-test('getCommissaryUsage sums commissary_shipments.total_quantity across every destination restaurant', () => {
+test('getCommissaryUsage sums commissary_shipments AND debits commissary_yield_log.raw_weight_in for this meat as input', () => {
   db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
     .run(jowlId, restaurantA, '2026-08-01', 2.0);
   db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
     .run(jowlId, restaurantB, '2026-08-01', 1.5);
   const usage = getCommissaryUsage(db, jowlId, '2026-08-01');
-  assert.ok(Math.abs(usage - 3.5) < 0.0001, `expected 2.0 + 1.5 = 3.5, got ${usage}`);
+  // shipments 2.0 + 1.5 = 3.5, plus the getCommissaryBackedUp test above's
+  // non-deleted yield row (raw_weight_in=4.0; the soft-deleted row's
+  // raw_weight_in=100.0 is excluded) => 3.5 + 4.0 = 7.5
+  assert.ok(Math.abs(usage - 7.5) < 0.0001, `expected 3.5 + 4.0 = 7.5, got ${usage}`);
 });
 
 test('day 1: beginning stock comes from commissary_opening_stock, not a prior commissary_ending_actual', () => {
@@ -97,18 +100,24 @@ test('day 1: beginning stock comes from commissary_opening_stock, not a prior co
     .run(jowlId, '2026-08-01', 14.5);
 
   const result = computeCommissaryMeatAudit(db, jowlId, '2026-08-01');
-  // Hand-calculated: beginning=10, stockIn=5, backedUp=3, usage=3.5
-  // -> endingCalculated = 10 + 5 + 3 - 3.5 = 14.5. actual=14.5 -> OK.
+  // Hand-calculated: beginning=10, stockIn=5, backedUp=3,
+  // usage = shipments(3.5) + yield debit(4.0, the non-deleted yield row's
+  // raw_weight_in from the getCommissaryBackedUp test above) = 7.5
+  // -> endingCalculated = 10 + 5 + 3 - 7.5 = 10.5. actual=14.5 -> surplus
+  // (calculated is now less than actual, per rule 12 that's negative
+  // variance = surplus - this meat's real balance is 4.0 higher than the
+  // old credit-only formula reported, because that formula never debited
+  // the raw meat consumed by processing it).
   assert.strictEqual(result.beginning, 10.0);
   assert.strictEqual(result.stockIn, 5.0);
   assert.strictEqual(result.backedUp, 3.0);
-  assert.ok(Math.abs(result.usage - 3.5) < 0.0001);
-  assert.ok(Math.abs(result.endingCalculated - 14.5) < 0.0001, `expected ~14.5, got ${result.endingCalculated}`);
+  assert.ok(Math.abs(result.usage - 7.5) < 0.0001);
+  assert.ok(Math.abs(result.endingCalculated - 10.5) < 0.0001, `expected ~10.5, got ${result.endingCalculated}`);
   assert.strictEqual(result.expectedEnding, result.endingCalculated); // no commissary adjustments layer yet
   assert.strictEqual(result.actual, 14.5);
-  assert.ok(Math.abs(result.variance) < 0.0001);
+  assert.ok(Math.abs(result.variance - (-4.0)) < 0.0001, `expected ~-4.0, got ${result.variance}`);
   assert.strictEqual(result.unexplainedVariance, result.variance);
-  assert.strictEqual(result.status, 'OK');
+  assert.strictEqual(result.status, 'SURPLUS');
 });
 
 test('day 2: beginning stock carries forward from day 1 actual ending automatically', () => {
@@ -118,20 +127,21 @@ test('day 2: beginning stock carries forward from day 1 actual ending automatica
     .run(jowlId, '2026-08-02', 1.0, 0.8);
   db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
     .run(jowlId, restaurantA, '2026-08-02', 4.0);
-  // beginning=14.5 (day1 actual), stockIn=2.0, backedUp=0.8, usage=4.0
-  // -> endingCalculated = 14.5 + 2.0 + 0.8 - 4.0 = 13.3
+  // beginning=14.5 (day1 actual), stockIn=2.0, backedUp=0.8,
+  // usage = shipments(4.0) + yield debit(1.0, this day's raw_weight_in) = 5.0
+  // -> endingCalculated = 14.5 + 2.0 + 0.8 - 5.0 = 12.3
   db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(jowlId, '2026-08-02', 13.0); // actual slightly under -> shortage
+    .run(jowlId, '2026-08-02', 13.0);
 
   const result = computeCommissaryMeatAudit(db, jowlId, '2026-08-02');
   assert.strictEqual(result.beginning, 14.5); // day 1's ACTUAL ending, not calculated
   assert.strictEqual(result.stockIn, 2.0);
   assert.ok(Math.abs(result.backedUp - 0.8) < 0.0001);
-  assert.strictEqual(result.usage, 4.0);
-  assert.ok(Math.abs(result.endingCalculated - 13.3) < 0.0001, `expected ~13.3, got ${result.endingCalculated}`);
+  assert.ok(Math.abs(result.usage - 5.0) < 0.0001, `expected 4.0 + 1.0 = 5.0, got ${result.usage}`);
+  assert.ok(Math.abs(result.endingCalculated - 12.3) < 0.0001, `expected ~12.3, got ${result.endingCalculated}`);
   assert.strictEqual(result.actual, 13.0);
-  assert.ok(Math.abs(result.variance - 0.3) < 0.0001, `expected ~0.3, got ${result.variance}`);
-  assert.strictEqual(result.status, 'SHORTAGE'); // positive variance = shortage (rule 12)
+  assert.ok(Math.abs(result.variance - (-0.7)) < 0.0001, `expected ~-0.7, got ${result.variance}`);
+  assert.strictEqual(result.status, 'SURPLUS'); // negative variance = surplus (rule 12)
 });
 
 test('surplus case: actual higher than expected gives negative variance', () => {
@@ -174,7 +184,7 @@ test('computeCommissaryDailyAudit lists every active commissary meat for a date'
   const bellyRow = rows.find(r => r.code === 'M03');
   assert.ok(jowlRow, 'expected a JOWL row');
   assert.ok(bellyRow, 'expected a Belly Slab row');
-  assert.strictEqual(jowlRow.status, 'OK'); // reuses day-1 scenario above
+  assert.strictEqual(jowlRow.status, 'SURPLUS'); // reuses day-1 scenario above (now debits yield raw input too)
   assert.strictEqual(bellyRow.status, 'MISSING_BEGINNING_STOCK');
 });
 
@@ -228,6 +238,55 @@ test('combining commissaryMeatId with the commissaryId it actually belongs to re
   const rows = computeCommissaryDailyAudit(db, '2026-08-01', jowlId, commissaryId);
   assert.strictEqual(rows.length, 1);
   assert.strictEqual(rows[0].commissary_meat_id, jowlId);
+});
+
+// Step 24a: output_commissary_meat_id debit/credit ledger cases. New
+// commissary meats + an unused business_date range, so these don't shift
+// any row-count/status assertion above.
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M10', 'Raw Test Input', 'unit', 0.20);
+const rawInputId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'M10').id;
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M11', 'Processed Test Output', 'kg', 0.20);
+const processedOutputId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'M11').id;
+
+test('cross-row yield event debits the input meat and credits the output meat, not the same row', () => {
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, output_commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?, ?)')
+    .run(rawInputId, processedOutputId, '2026-08-10', 6.0, 4.5);
+
+  const inputUsage = getCommissaryUsage(db, rawInputId, '2026-08-10');
+  const inputBackedUp = getCommissaryBackedUp(db, rawInputId, '2026-08-10');
+  const outputUsage = getCommissaryUsage(db, processedOutputId, '2026-08-10');
+  const outputBackedUp = getCommissaryBackedUp(db, processedOutputId, '2026-08-10');
+
+  assert.ok(Math.abs(inputUsage - 6.0) < 0.0001, `input debit expected 6.0, got ${inputUsage}`);
+  assert.strictEqual(inputBackedUp, 0, 'input meat gets no credit - output_commissary_meat_id redirected it');
+  assert.strictEqual(outputUsage, 0, 'output meat is not itself debited by this row');
+  assert.ok(Math.abs(outputBackedUp - 4.5) < 0.0001, `output credit expected 4.5, got ${outputBackedUp}`);
+});
+
+test('cross-unit yield event: unit in, kg out - each side reads its own row unit and never reconciles', () => {
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, output_commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?, ?)')
+    .run(rawInputId, processedOutputId, '2026-08-11', 10.0, 7.2);
+
+  const inputUsage = getCommissaryUsage(db, rawInputId, '2026-08-11');       // read as "unit"
+  const outputBackedUp = getCommissaryBackedUp(db, processedOutputId, '2026-08-11'); // read as "kg"
+
+  assert.ok(Math.abs(inputUsage - 10.0) < 0.0001, `expected raw_weight_in=10.0 read as-is, got ${inputUsage}`);
+  assert.ok(Math.abs(outputBackedUp - 7.2) < 0.0001, `expected backed_weight_out=7.2 read as-is, got ${outputBackedUp}`);
+  // No conversion between the two units happens anywhere in the engine -
+  // each side is just its own row's column, summed in its own row's unit.
+});
+
+test('a soft-deleted yield row is excluded from both the input debit and the output credit', () => {
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, output_commissary_meat_id, business_date, raw_weight_in, backed_weight_out, deleted_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(rawInputId, processedOutputId, '2026-08-12', 50.0, 40.0, '2026-08-12T09:00:00Z');
+
+  const inputUsage = getCommissaryUsage(db, rawInputId, '2026-08-12');
+  const outputBackedUp = getCommissaryBackedUp(db, processedOutputId, '2026-08-12');
+
+  assert.strictEqual(inputUsage, 0, 'soft-deleted row must not debit the input meat');
+  assert.strictEqual(outputBackedUp, 0, 'soft-deleted row must not credit the output meat');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

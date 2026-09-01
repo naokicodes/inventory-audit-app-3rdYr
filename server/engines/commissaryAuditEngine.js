@@ -4,12 +4,16 @@
 // from every existing usage source in this app:
 //   1. Two separate inflows, not one "new stock": Stock In (raw meat
 //      arriving from an outside supplier, commissary_stock_receipts) and
-//      Backed Up (the existing yield engine's output, commissary_yield_log
-//      .backed_weight_out - unchanged, just read here).
+//      Backed Up (commissary_yield_log.backed_weight_out, credited to
+//      output_commissary_meat_id when set, else to commissary_meat_id).
 //   2. Usage is the SUM of commissary_shipments.total_quantity across every
-//      destination restaurant for that commissary meat/date - not
-//      sales x recipe, not prepped-portions. Commissary doesn't sell to end
-//      customers; its "usage" is everything shipped out to restaurants.
+//      destination restaurant for that commissary meat/date, PLUS the
+//      commissary_yield_log.raw_weight_in debited from this meat as input.
+//      Commissary doesn't sell to end customers; its "usage" is everything
+//      shipped out to restaurants and everything consumed by processing it
+//      into a yield output. Step 24a (data-model.md section 10b) made this
+//      a debit/credit ledger: every yield row debits raw_weight_in from its
+//      input and credits backed_weight_out to its output.
 //
 // Beginning derives from the prior day's commissary_ending_actual, falling
 // back to commissary_opening_stock only on the very first day a meat is
@@ -73,26 +77,38 @@ function getCommissaryStockIn(db, commissaryMeatId, businessDate) {
 
 /**
  * Backed Up = SUM of commissary_yield_log.backed_weight_out for this
- * commissary meat/date - the existing yield engine's output, unchanged.
- * Excludes soft-deleted yield rows.
+ * commissary meat/date, credited to output_commissary_meat_id when a row
+ * sets it (a cross-row/cross-stage event), else to commissary_meat_id
+ * (NULL = output is the same meat as the input). Excludes soft-deleted
+ * yield rows. Step 24a (data-model.md section 10b): the credit half of the
+ * debit/credit ledger.
  */
 function getCommissaryBackedUp(db, commissaryMeatId, businessDate) {
   const row = db.prepare(
-    `SELECT SUM(backed_weight_out) as qty FROM commissary_yield_log WHERE commissary_meat_id = ? AND business_date = ? AND deleted_at IS NULL`
+    `SELECT SUM(backed_weight_out) as qty FROM commissary_yield_log WHERE COALESCE(output_commissary_meat_id, commissary_meat_id) = ? AND business_date = ? AND deleted_at IS NULL`
   ).get(commissaryMeatId, businessDate);
   return row.qty || 0;
 }
 
 /**
  * Usage = SUM of commissary_shipments.total_quantity across every
- * destination restaurant for this commissary meat/date. Not sales x
- * recipe, not prepped-portions - Commissary doesn't sell to end customers.
+ * destination restaurant for this commissary meat/date (Commissary doesn't
+ * sell to end customers, so shipments out are its usage), PLUS SUM of
+ * commissary_yield_log.raw_weight_in for every non-soft-deleted yield row
+ * where this meat is the input (commissary_meat_id). Step 24a
+ * (data-model.md section 10b): the debit half of the debit/credit ledger -
+ * processing a meat into an output consumes the input's balance, whether
+ * the output is itself (NULL output_commissary_meat_id) or a different
+ * meat entirely.
  */
 function getCommissaryUsage(db, commissaryMeatId, businessDate) {
-  const row = db.prepare(
+  const shipped = db.prepare(
     `SELECT SUM(total_quantity) as qty FROM commissary_shipments WHERE commissary_meat_id = ? AND business_date = ?`
   ).get(commissaryMeatId, businessDate);
-  return row.qty || 0;
+  const processed = db.prepare(
+    `SELECT SUM(raw_weight_in) as qty FROM commissary_yield_log WHERE commissary_meat_id = ? AND business_date = ? AND deleted_at IS NULL`
+  ).get(commissaryMeatId, businessDate);
+  return (shipped.qty || 0) + (processed.qty || 0);
 }
 
 function getCommissaryEndingActual(db, commissaryMeatId, businessDate) {

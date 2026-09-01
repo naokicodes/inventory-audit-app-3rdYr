@@ -290,6 +290,7 @@ CREATE TABLE IF NOT EXISTS commissary_meat_map (
 CREATE TABLE IF NOT EXISTS commissary_yield_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   commissary_meat_id INTEGER NOT NULL,
+  output_commissary_meat_id INTEGER,  -- step 24a: output meat. NULL = output is the same meat as the input.
   business_date TEXT NOT NULL,    -- ISO format YYYY-MM-DD
   raw_weight_in REAL NOT NULL,
   backed_weight_out REAL NOT NULL,
@@ -297,7 +298,8 @@ CREATE TABLE IF NOT EXISTS commissary_yield_log (
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT,                -- soft delete only, no hard DELETE
-  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id)
+  FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+  FOREIGN KEY (output_commissary_meat_id) REFERENCES commissary_meats(id)
 );
 
 -- Step 20a (2026-08-29, schema only - see docs/session-status.md step 20):

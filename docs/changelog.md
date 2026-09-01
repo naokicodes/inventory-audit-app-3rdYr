@@ -11,6 +11,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-02 (Claude Code session) — Step 24a: output_commissary_meat_id + debit/credit ledger
+
+Implements the design settled in the 2026-09-01 architecture session below. `commissary_yield_log` gains a nullable `output_commissary_meat_id` FK → `commissary_meats(id)` (NULL = output is the same meat as the input), added via `schema.sql` plus a new idempotent `migrateYieldLogOutputMeatColumn` in `server/db/migrate.js` (plain `ALTER TABLE ADD COLUMN`, same detect-then-no-op shape as `migrateLocationsActiveColumn` — no rebuild needed since it's a nullable column with no constraint change).
+
+`commissaryAuditEngine.js`'s `getCommissaryUsage` now also sums `commissary_yield_log.raw_weight_in` (excluding soft-deleted rows) for every row where the meat is the input — the debit. `getCommissaryBackedUp`'s credit target is now `COALESCE(output_commissary_meat_id, commissary_meat_id)` instead of always `commissary_meat_id` — the credit. Landed together, as required: the raw-debit alone (without the output split) double-subtracts on same-meat rows.
+
+Rewrote the 4 `commissaryAuditEngine.test.js` assertions this reddened (`getCommissaryUsage`'s own unit test, the day-1 and day-2 audit scenarios, and the daily-list status check — all cascade from the same jowlId fixture rows now also debiting usage). Day 1 and day 2 both now compute as SURPLUS rather than OK/SHORTAGE — the corrected math, not a regression; the old credit-only formula never debited the raw meat consumed by processing it, so it overstated the balance by exactly the amount processed. Added 3 new tests: a cross-row event (input meat A, output meat B — A gets debited/not credited, B gets credited/not debited), a cross-unit event (`unit` in, `kg` out — each side reads its own row's unit, no reconciliation happens anywhere in the engine), and a soft-deleted yield row (credits/debits neither side).
+
+Full 15-file suite green (0 failures) before committing. Out of scope, untouched: `commissary_adjustments`, per-meat next-stage config, the M02→M01/M04→M03/M06→M05 pairings, and the yield-log write route in `server/routes/commissary.js` (new rows default the column to NULL).
+
+---
+
 ## 2026-09-01 (architecture session) — Decision: commissary yield becomes a debit/credit ledger; step 24 re-scoped
 
 **Context.** Went to dispatch step 24a as the "`getCommissaryUsage` also sums `raw_weight_in`" fix, which both `session-status.md` and `data-model.md` §10b framed as a standalone, no-schema-dependency correctness fix. Verifying against the real engine first (verify, don't assert) showed that framing was wrong.

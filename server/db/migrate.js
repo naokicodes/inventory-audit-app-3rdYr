@@ -456,3 +456,38 @@ function migrateConversionStandardsMeatType(db) {
 }
 
 module.exports.migrateConversionStandardsMeatType = migrateConversionStandardsMeatType;
+
+// ----------------------------------------------------------------------
+// Step 24a (2026-09-02): commissary_yield_log.output_commissary_meat_id -
+// see docs/data-model.md section 10b and docs/session-status.md's 24a
+// bullet. NULL means the output is the same meat as the input (back-compat
+// default). Adding a plain nullable column is a simple ALTER TABLE ADD
+// COLUMN, same as migrateLocationsActiveColumn above - no rebuild needed.
+//
+// Must run BEFORE schema.sql - see connection.js.
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ ran: boolean }}
+ */
+function migrateYieldLogOutputMeatColumn(db) {
+  const tableExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'commissary_yield_log'`
+  ).get();
+  if (!tableExists) {
+    // Fresh install - schema.sql creates it with the column already
+    // present. Nothing to migrate.
+    return { ran: false };
+  }
+
+  const columns = db.prepare(`PRAGMA table_info(commissary_yield_log)`).all();
+  const hasColumn = columns.some(c => c.name === 'output_commissary_meat_id');
+  if (hasColumn) {
+    return { ran: false };
+  }
+
+  db.exec(`ALTER TABLE commissary_yield_log ADD COLUMN output_commissary_meat_id INTEGER REFERENCES commissary_meats(id)`);
+  return { ran: true };
+}
+
+module.exports.migrateYieldLogOutputMeatColumn = migrateYieldLogOutputMeatColumn;

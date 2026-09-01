@@ -16,28 +16,33 @@ If you are a fresh session with no memory of prior work, also read rules
 between coder workers and the architect conversation, when to re-run the
 suite, and how to keep context costs down.
 
-## Current state — 2026-09-01
+## Current state — 2026-09-02
 
 **Step 23 is fully closed.** All of 23a, 23b's six items, and 23c
-(23c-i, 23c-i-b, 23c-ii-a through 23c-ii-d) are done and pushed. Full
-suite (as of this session's dashboard fix): **15 files, 276/276
-assertions, 0 failures** (`node <file>.test.js` run individually — no
-test runner script exists yet; includes `server/db/activityLog.test.js`
-and `server/db/migrate.test.js`, easy to miss since they live outside
-`server/routes`/`server/engines`).
+(23c-i, 23c-i-b, 23c-ii-a through 23c-ii-d) are done and pushed.
 
-**Step 24a is designed and dispatchable** (re-scoped 2026-09-01 — see the
-"Sub-step plan" and "24b output-targeting — RESOLVED" notes below, and
-`data-model.md` §10b). It's the next step: add `output_commissary_meat_id`
-to `commissary_yield_log` + make the audit engine a debit/credit ledger +
-rewrite the affected tests. 24b/24c follow. The cheap contained fixes remain
-in "Known open items."
+**Step 24a is DONE (2026-09-02, Claude Code session).**
+`output_commissary_meat_id` (nullable, FK -> `commissary_meats`) is on
+`commissary_yield_log` via an idempotent migration, and
+`commissaryAuditEngine.js` is a debit/credit ledger (`getCommissaryUsage`
+debits `raw_weight_in` for the input meat, `getCommissaryBackedUp` credits
+`backed_weight_out` to the output meat). See `changelog.md` for the full
+writeup. Full suite: **15 files, 0 failures** (run individually via `node
+<file>.test.js` — no test runner script exists yet; includes
+`server/db/activityLog.test.js` and `server/db/migrate.test.js`, easy to
+miss since they live outside `server/routes`/`server/engines`).
+
+**24b is next**, not yet designed as a dispatchable prompt: per-meat
+"next stage" config, `commissary_adjustments` CRUD + balance effects,
+Miscuts destination filtering. 24c (the yield-form UI) follows. The cheap
+contained fixes remain in "Known open items."
 
 The most recent landings, newest first — full detail for each is in
 `changelog.md`:
 
 | Step | What landed |
 |---|---|
+| 24a | `output_commissary_meat_id` column + debit/credit ledger + tests |
 | — | Fixed dashboard.js's dangling-`commissary_id` INNER JOIN silently dropping stock |
 | — | Fixed 23c-ii-d follow-on: qualified-branch silent-first-match in `resolveCommissaryMeat` |
 | 23c-ii-d | Terminal qualified-token grammar (`com-a/m05`); closed a silent-first-match bug |
@@ -248,7 +253,7 @@ the same architecture session as item 3's rekey:**
   sequenced after it, not before.
 
 **Sub-step plan, confirmed:**
-- **24a (schema + coupled engine change + tests) — re-scoped 2026-09-01**:
+- **24a (schema + coupled engine change + tests) — DONE 2026-09-02 (Claude Code session)**:
   add `output_commissary_meat_id` to `commissary_yield_log` (nullable FK,
   NULL ⇒ output = input) via an idempotent migration, and make the audit
   engine a debit/credit ledger — **debit** `raw_weight_in` from the input
@@ -286,8 +291,9 @@ the same architecture session as item 3's rekey:**
   same meat when no next-stage is configured), an Allocate/Write-off
   action on the commissary balance view.
 
-**Next up, after 23a/23b/23c: 24a.** None of the three sub-steps are
-started.
+**Next up: 24b.** 24a landed 2026-09-02 (see changelog.md) - the column,
+the coupled engine debit/credit, and the rewritten/added tests are all
+done and the full 15-file suite is green. 24b/24c are not started.
 
 **24b output-targeting — RESOLVED 2026-09-01.** The earlier concern (a yield
 row reusing the single `commissary_meat_id` for both input and output, and
