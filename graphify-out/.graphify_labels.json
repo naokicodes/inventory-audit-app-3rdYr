@@ -8,9 +8,9 @@
   "6": "index.js",
   "7": "Settings Admin: Conversion Standards",
   "8": "commissary.test.js",
-  "9": "commands.js",
-  "10": "history.test.js",
-  "11": "Landing/Dashboard/Sales Pages",
+  "9": "withTransaction",
+  "10": "logActivity",
+  "11": "Landing (Daily Audit) Page",
   "12": "Package Manifest",
   "13": "stockReceipts.test.js",
   "14": "Allocations Page & Command Panel Widgets",
@@ -26,8 +26,7 @@
   "24": "Command Panel Widget Core",
   "25": "Oversold-Check Command",
   "26": "Sync-Batch-Stock Command",
-  "27": "withTransaction",
-  "28": "activityLog.js",
+  "27": "commissaryAdjustments.test.js",
   "30": "terminal.test.js",
   "31": "Session History — resolved, kept for \"why\", not \"what's next\""
 }

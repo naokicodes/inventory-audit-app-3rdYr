@@ -645,4 +645,212 @@ router.delete('/commissary/yield-log/:id', (req, res) => {
   }
 });
 
+// ---------- ADJUSTMENTS (LOSS / ALLOCATION) ----------
+// Step 24b-iii: HTTP surface on top of the commissary_adjustments table
+// (data-model.md section 10b, landed by 24b-ii in commit 837c3ab, along with
+// its two balance effects in commissaryAuditEngine.js). Not activity_log
+// scoped - rule 9 names only stock_receipts/commissary_yield_log;
+// commissary_adjustments gets the restaurant adjustments table's treatment
+// (soft delete via deleted_at, nothing more), same as commissary_shipment_lines.
+
+function getAdjustmentRow(id) {
+  return db.prepare('SELECT * FROM commissary_adjustments WHERE id = ?').get(id);
+}
+
+// ALLOCATION's destination must share the source meat's meat_type_id AND its
+// unit (session-status.md's 24b-iii bullet) - this is what keeps every
+// allocation 1-for-1, so the yield log stays the only place a unit ever
+// changes. destMeat.meat_type_id === null would make this pass by accident
+// (null === null in JS) if sourceMeat were also untagged - guarded explicitly.
+function isValidDestination(sourceMeat, destMeat) {
+  return !!destMeat && destMeat.meat_type_id !== null
+    && destMeat.meat_type_id === sourceMeat.meat_type_id
+    && destMeat.unit === sourceMeat.unit;
+}
+
+// GET /api/commissary/adjustments?business_date=&commissary_meat_id=&commissary_id=&kind=
+// Filterable list, newest first, excluding soft-deleted rows. Same optional-
+// filter convention as GET /commissary/yield-log above, including the join
+// to commissary_meats for the commissary_id filter (the row itself has no
+// commissary_id column).
+router.get('/commissary/adjustments', (req, res) => {
+  const { business_date, commissary_meat_id, commissary_id, kind } = req.query;
+
+  const clauses = ['ca.deleted_at IS NULL'];
+  const params = [];
+  if (business_date) { clauses.push('ca.business_date = ?'); params.push(business_date); }
+  if (commissary_meat_id) { clauses.push('ca.commissary_meat_id = ?'); params.push(Number(commissary_meat_id)); }
+  if (commissary_id) { clauses.push('cm.commissary_id = ?'); params.push(Number(commissary_id)); }
+  if (kind) { clauses.push('ca.kind = ?'); params.push(kind); }
+
+  const rows = db.prepare(`
+    SELECT ca.*, cm.code as commissary_meat_code, cm.name as commissary_meat_name, cm.unit,
+           dcm.code as destination_code, dcm.name as destination_name
+    FROM commissary_adjustments ca
+    JOIN commissary_meats cm ON cm.id = ca.commissary_meat_id
+    LEFT JOIN commissary_meats dcm ON dcm.id = ca.destination_commissary_meat_id
+    WHERE ${clauses.join(' AND ')}
+    ORDER BY ca.created_at DESC, ca.id DESC
+  `).all(...params);
+
+  res.json(rows);
+});
+
+// GET /api/commissary/adjustments/destinations?commissary_meat_id=
+// The natural shape for 24c's Allocate form: valid destinations for one
+// source meat, i.e. every OTHER active commissary meat sharing its
+// meat_type_id and unit. An untagged source (no meat_type_id) has no valid
+// destinations - returns [], same as conversion-standards' untagged case.
+router.get('/commissary/adjustments/destinations', (req, res) => {
+  const commissaryMeatId = Number(req.query.commissary_meat_id);
+  if (!commissaryMeatId) {
+    return res.status(400).json({ error: 'commissary_meat_id is required' });
+  }
+
+  const sourceMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ?').get(commissaryMeatId);
+  if (!sourceMeat || sourceMeat.meat_type_id === null) {
+    return res.json([]);
+  }
+
+  const rows = db.prepare(`
+    SELECT id, code, name, unit, commissary_id, meat_type_id
+    FROM commissary_meats
+    WHERE active = 1 AND meat_type_id = ? AND unit = ? AND id != ?
+    ORDER BY code
+  `).all(sourceMeat.meat_type_id, sourceMeat.unit, commissaryMeatId);
+
+  res.json(rows);
+});
+
+// POST /api/commissary/adjustments
+// Body: { commissary_meat_id, business_date, kind, quantity, destination_commissary_meat_id, notes, actor }
+// quantity is in the source meat's own unit - never converted here.
+router.post('/commissary/adjustments', (req, res) => {
+  const { commissary_meat_id, business_date, kind, quantity, destination_commissary_meat_id, notes, actor } = req.body;
+
+  if (!commissary_meat_id || !business_date || !kind
+      || quantity === undefined || quantity === null || quantity === '') {
+    return res.status(400).json({ error: 'commissary_meat_id, business_date, kind, and quantity are required' });
+  }
+  if (kind !== 'LOSS' && kind !== 'ALLOCATION') {
+    return res.status(400).json({ error: "kind must be 'LOSS' or 'ALLOCATION'" });
+  }
+  if (Number(quantity) <= 0) {
+    return res.status(400).json({ error: 'quantity must be positive' });
+  }
+
+  const sourceMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(commissary_meat_id);
+  if (!sourceMeat) {
+    return res.status(400).json({ error: 'Unknown or inactive commissary_meat_id' });
+  }
+
+  const hasDestination = destination_commissary_meat_id !== undefined && destination_commissary_meat_id !== null && destination_commissary_meat_id !== '';
+  if (kind === 'LOSS' && hasDestination) {
+    return res.status(400).json({ error: 'LOSS must not have a destination_commissary_meat_id' });
+  }
+  if (kind === 'ALLOCATION' && !hasDestination) {
+    return res.status(400).json({ error: 'ALLOCATION requires a destination_commissary_meat_id' });
+  }
+
+  if (kind === 'ALLOCATION') {
+    const destMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(destination_commissary_meat_id);
+    if (!destMeat) {
+      return res.status(400).json({ error: 'Unknown or inactive destination_commissary_meat_id' });
+    }
+    if (!isValidDestination(sourceMeat, destMeat)) {
+      return res.status(400).json({ error: "destination_commissary_meat_id must share the source meat's meat_type_id and unit" });
+    }
+  }
+
+  try {
+    const result = db.prepare(`
+      INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity, destination_commissary_meat_id, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(commissary_meat_id, business_date, kind, Number(quantity), kind === 'ALLOCATION' ? destination_commissary_meat_id : null, notes || null, actor || null);
+
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save adjustment: ' + err.message });
+  }
+});
+
+// PATCH /api/commissary/adjustments/:id
+// Body: { business_date?, kind?, quantity?, destination_commissary_meat_id?, notes?, actor }
+// commissary_meat_id (the source) is not editable here - a different source
+// is a different adjustment, same reasoning yield-log's PATCH already uses.
+router.patch('/commissary/adjustments/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const { business_date, kind, quantity, destination_commissary_meat_id, notes } = req.body;
+
+  const existing = getAdjustmentRow(id);
+  if (!existing || existing.deleted_at) {
+    return res.status(404).json({ error: 'Adjustment not found' });
+  }
+
+  const nextKind = kind !== undefined ? kind : existing.kind;
+  if (nextKind !== 'LOSS' && nextKind !== 'ALLOCATION') {
+    return res.status(400).json({ error: "kind must be 'LOSS' or 'ALLOCATION'" });
+  }
+  const nextQuantity = quantity !== undefined && quantity !== null && quantity !== '' ? Number(quantity) : existing.quantity;
+  if (nextQuantity <= 0) {
+    return res.status(400).json({ error: 'quantity must be positive' });
+  }
+  const nextDate = business_date || existing.business_date;
+  const nextNotes = notes !== undefined ? (notes || null) : existing.notes;
+  const nextDestinationId = destination_commissary_meat_id !== undefined
+    ? (destination_commissary_meat_id === null || destination_commissary_meat_id === '' ? null : destination_commissary_meat_id)
+    : existing.destination_commissary_meat_id;
+
+  if (nextKind === 'LOSS' && nextDestinationId) {
+    return res.status(400).json({ error: 'LOSS must not have a destination_commissary_meat_id' });
+  }
+  if (nextKind === 'ALLOCATION' && !nextDestinationId) {
+    return res.status(400).json({ error: 'ALLOCATION requires a destination_commissary_meat_id' });
+  }
+
+  if (nextKind === 'ALLOCATION') {
+    // Source's own row - looked up without the active=1 filter used at
+    // create time, since the source isn't being changed here and shouldn't
+    // block an otherwise-valid edit just because it went inactive since.
+    const sourceMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ?').get(existing.commissary_meat_id);
+    const destMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(nextDestinationId);
+    if (!destMeat) {
+      return res.status(400).json({ error: 'Unknown or inactive destination_commissary_meat_id' });
+    }
+    if (!isValidDestination(sourceMeat, destMeat)) {
+      return res.status(400).json({ error: "destination_commissary_meat_id must share the source meat's meat_type_id and unit" });
+    }
+  }
+
+  try {
+    db.prepare(`
+      UPDATE commissary_adjustments SET business_date = ?, kind = ?, quantity = ?, destination_commissary_meat_id = ?, notes = ?
+      WHERE id = ?
+    `).run(nextDate, nextKind, nextQuantity, nextDestinationId, nextNotes, id);
+
+    res.json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update adjustment: ' + err.message });
+  }
+});
+
+// DELETE /api/commissary/adjustments/:id
+// Soft delete only - sets deleted_at, never a hard DELETE. Body may include
+// { actor } but it's unused (no activity_log entry - see module note above).
+router.delete('/commissary/adjustments/:id', (req, res) => {
+  const id = Number(req.params.id);
+
+  const existing = getAdjustmentRow(id);
+  if (!existing || existing.deleted_at) {
+    return res.status(404).json({ error: 'Adjustment not found' });
+  }
+
+  try {
+    db.prepare(`UPDATE commissary_adjustments SET deleted_at = datetime('now') WHERE id = ?`).run(id);
+    res.json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete adjustment: ' + err.message });
+  }
+});
+
 module.exports = router;

@@ -1,16 +1,16 @@
 # Graph Report - inventory-audit-app-3rdYr  (2026-09-02)
 
 ## Corpus Check
-- 64 files · ~157,017 words
+- 65 files · ~160,462 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 494 nodes · 739 edges · 31 communities
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.83)
+- 511 nodes · 759 edges · 30 communities
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `714ab81a`
+- Built from commit: `f048c371`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,9 +24,9 @@
 - index.js
 - Settings Admin: Conversion Standards
 - commissary.test.js
-- commands.js
-- history.test.js
-- Landing/Dashboard/Sales Pages
+- withTransaction
+- logActivity
+- Landing (Daily Audit) Page
 - Package Manifest
 - stockReceipts.test.js
 - Allocations Page & Command Panel Widgets
@@ -40,8 +40,7 @@
 - Commissary Page
 - Stock Receipts Route
 - Command Panel Widget Core
-- withTransaction
-- activityLog.js
+- commissaryAdjustments.test.js
 - terminal.test.js
 - Session History — resolved, kept for "why", not "what's next"
 
@@ -66,8 +65,8 @@
   public/daily-audit.html → server/engines/auditEngine.js
 - `Rule 17: WIP hand-offs allowed` --semantically_similar_to--> `graphify update/cluster-only reference`  [INFERRED] [semantically similar]
   docs/rules-for-claude-code.md → .claude/skills/graphify/references/update.md
-- `CLAUDE.md (project graphify rules)` --conceptually_related_to--> `/graphify Skill`  [INFERRED]
-  CLAUDE.md → .claude/skills/graphify/SKILL.md
+- `Settings Shipment Presets Admin Section` --cites--> `Session Status doc`  [EXTRACTED]
+  public/settings.html → docs/session-status.md
 
 ## Import Cycles
 - None detected.
@@ -80,15 +79,15 @@
 - **graphify's Claude Code routing chain** — _claude_claude, _claude_skills_graphify_skill, claude [INFERRED 0.85]
 - **Commissary-meat/restaurant pairing flow: Shipments, Terminal, and Settings' Presets/Conversion Standards** — public_commissary_shipments, public_terminal, public_settings_shipment_presets_section, public_settings_conversion_standards_section, server_routes_commissary_get_api_commissary_shipment_presets, server_routes_commissary_get_api_commissary_conversion_standards [INFERRED 0.85]
 
-## Communities (31 total, 0 thin omitted)
+## Communities (30 total, 0 thin omitted)
 
 ### Community 0 - "auditEngine.js"
 Cohesion: 0.06
 Nodes (45): recalcDishRow (client-side live recalculation), addDays(), computeDailyAudit(), computeDishAudit(), computeMeatAudit(), computeMixedDailyAudit(), getAdjustmentsTotal(), getBeginningStock() (+37 more)
 
 ### Community 1 - "Data Model doc"
-Cohesion: 0.08
-Nodes (44): .claude/CLAUDE.md (graphify router), graphify add & watch reference, graphify exports & benchmark reference, graphify extraction subagent prompt spec, graphify GitHub clone & cross-repo merge reference, graphify commit hook & CLAUDE.md integration reference, graphify query/path/explain reference, graphify transcribe reference (+36 more)
+Cohesion: 0.09
+Nodes (41): .claude/CLAUDE.md (graphify router), graphify add & watch reference, graphify exports & benchmark reference, graphify extraction subagent prompt spec, graphify GitHub clone & cross-repo merge reference, graphify commit hook & CLAUDE.md integration reference, graphify query/path/explain reference, graphify transcribe reference (+33 more)
 
 ### Community 2 - "dashboard.test.js"
 Cohesion: 0.09
@@ -107,36 +106,36 @@ Cohesion: 0.17
 Nodes (29): activity_log, adjustment_types, adjustments, commissaries, commissary_adjustments, commissary_conversion_standards, commissary_ending_actual, commissary_meat_map (+21 more)
 
 ### Community 6 - "index.js"
-Cohesion: 0.07
-Nodes (21): allocationsRoutes, app, commandsRoutes, commissaryRoutes, dailyAuditRoutes, dashboardRoutes, express, historyRoutes (+13 more)
+Cohesion: 0.06
+Nodes (25): allocationsRoutes, app, commandsRoutes, commissaryRoutes, dailyAuditRoutes, dashboardRoutes, express, historyRoutes (+17 more)
 
 ### Community 7 - "Settings Admin: Conversion Standards"
 Cohesion: 0.09
 Nodes (22): Settings Page, POST /api/commissary/conversion-standards, POST /api/commissary/shipment-presets, PUT /api/commissary/conversion-standards/:id, PUT /api/commissary/shipment-presets/:id, DELETE /api/settings/recipes/:id, GET /api/settings/dishes, GET /api/settings/meats (+14 more)
 
 ### Community 8 - "commissary.test.js"
-Cohesion: 0.10
-Nodes (15): assert, { computeCommissaryDailyAudit }, { computeYieldRow }, createPreset(), createShipment(), { DatabaseSync }, db, fs (+7 more)
+Cohesion: 0.11
+Nodes (13): assert, { computeCommissaryDailyAudit }, { computeYieldRow }, createShipment(), { DatabaseSync }, db, fs, getPresetWithLines() (+5 more)
 
-### Community 9 - "commands.js"
-Cohesion: 0.40
-Nodes (4): db, express, router, { withTransaction, logActivity }
+### Community 9 - "withTransaction"
+Cohesion: 0.25
+Nodes (7): withTransaction(), db, express, router, { withTransaction, logActivity }, createPreset(), updatePreset()
 
-### Community 10 - "history.test.js"
-Cohesion: 0.18
-Nodes (8): assert, { DatabaseSync }, db, fs, path, receiptId, schema, { withTransaction, logActivity }
+### Community 10 - "logActivity"
+Cohesion: 0.16
+Nodes (11): logActivity(), assert, { DatabaseSync }, db, fs, insertReceiptCreateThenUpdate(), insertYieldEntry(), path (+3 more)
 
-### Community 11 - "Landing/Dashboard/Sales Pages"
-Cohesion: 0.18
-Nodes (13): Landing (Daily Audit) Page, Dashboard Page, Dashboard Reverse-Conversion Rollup, Home/Index Page, Sales Page, Settings Conversion Standards Admin Section, GET /api/daily-audit/mixed, POST /api/daily-audit (+5 more)
+### Community 11 - "Landing (Daily Audit) Page"
+Cohesion: 0.25
+Nodes (8): Landing (Daily Audit) Page, Sales Page, GET /api/daily-audit/mixed, POST /api/daily-audit, POST /api/daily-audit/portions, GET /api/restaurants, GET /api/sales, PATCH /api/sales
 
 ### Community 12 - "Package Manifest"
 Cohesion: 0.17
 Nodes (11): express, dependencies, express, description, engines, node, main, name (+3 more)
 
 ### Community 13 - "stockReceipts.test.js"
-Cohesion: 0.22
-Nodes (7): assert, { DatabaseSync }, db, fs, path, schema, { withTransaction, logActivity }
+Cohesion: 0.20
+Nodes (10): assert, createReceipt(), { DatabaseSync }, db, fs, getReceiptRow(), patchReceipt(), path (+2 more)
 
 ### Community 14 - "Allocations Page & Command Panel Widgets"
 Cohesion: 0.18
@@ -151,28 +150,28 @@ Cohesion: 0.20
 Nodes (6): assert, { DatabaseSync }, db, fs, path, schema
 
 ### Community 17 - "Commissary Shipments Page"
-Cohesion: 0.39
-Nodes (9): Commissary Shipments Page, Implied Input from Conversion Standards (Line-Sum Hint), Terminal Page, Terminal 'ship' Command Grammar, GET /api/commissary/conversion-standards, GET /api/commissary/meats, GET /api/commissary/shipment-presets, POST /api/commissary/shipments (+1 more)
+Cohesion: 0.33
+Nodes (10): Commissary Shipments Page, Implied Input from Conversion Standards (Line-Sum Hint), Settings Shipment Presets Admin Section, Terminal Page, Terminal 'ship' Command Grammar, GET /api/commissary/conversion-standards, GET /api/commissary/meats, GET /api/commissary/shipment-presets (+2 more)
 
 ### Community 18 - "Activity Log Tests"
 Cohesion: 0.22
 Nodes (7): assert, { DatabaseSync }, db, fs, path, schema, { withTransaction, logActivity }
 
 ### Community 19 - "commands.test.js"
-Cohesion: 0.25
-Nodes (5): assert, { DatabaseSync }, fs, path, { withTransaction, logActivity }
+Cohesion: 0.22
+Nodes (6): assert, { DatabaseSync }, fs, path, runSync(), { withTransaction, logActivity }
 
 ### Community 20 - "Sales Route Tests"
 Cohesion: 0.25
 Nodes (6): assert, { DatabaseSync }, fs, patchSales(), path, test()
 
 ### Community 21 - "Stock Receipts Page"
-Cohesion: 0.25
-Nodes (8): Admin History Page, Stock Receipts Page, GET /api/history, GET /api/history/filters, DELETE /api/stock-receipts/:id, GET /api/stock-receipts, PATCH /api/stock-receipts/:id, POST /api/stock-receipts
+Cohesion: 0.29
+Nodes (7): recalcMeatRow (client-side live recalculation), Stock Receipts Page, Unallocated Commissary Receipt, DELETE /api/stock-receipts/:id, GET /api/stock-receipts, PATCH /api/stock-receipts/:id, POST /api/stock-receipts
 
 ### Community 22 - "Commissary Page"
-Cohesion: 0.29
-Nodes (7): Commissary Page, currentOnHand (Prefer Actual over Calculated), DELETE /api/commissary/yield-log/:id, GET /api/commissary/daily-audit, GET /api/commissary/yield-log, PATCH /api/commissary/yield-log/:id, POST /api/commissary/yield-log
+Cohesion: 0.15
+Nodes (15): Commissary Page, currentOnHand (Prefer Actual over Calculated), Dashboard Page, Dashboard Reverse-Conversion Rollup, Admin History Page, Home/Index Page, Settings Conversion Standards Admin Section, DELETE /api/commissary/yield-log/:id (+7 more)
 
 ### Community 23 - "Stock Receipts Route"
 Cohesion: 0.33
@@ -182,40 +181,36 @@ Nodes (4): db, express, router, { withTransaction, logActivity }
 Cohesion: 0.60
 Nodes (3): register(), renderList(), runCommand()
 
-### Community 27 - "withTransaction"
-Cohesion: 0.43
-Nodes (8): logActivity(), withTransaction(), runSync(), insertReceiptCreateThenUpdate(), insertYieldEntry(), createReceipt(), getReceiptRow(), patchReceipt()
-
-### Community 28 - "activityLog.js"
-Cohesion: 0.33
-Nodes (4): db, express, router, { withTransaction }
+### Community 27 - "commissaryAdjustments.test.js"
+Cohesion: 0.19
+Nodes (11): assert, createAdjustment(), { DatabaseSync }, db, deleteAdjustment(), fs, getAdjustmentRow(), isValidDestination() (+3 more)
 
 ### Community 30 - "terminal.test.js"
 Cohesion: 0.21
 Nodes (10): assert, comAJowl, comAJowl2, comAPata, comBJowl, commissaryMeats, commissaryMeatToken(), ghostMeat (+2 more)
 
 ### Community 31 - "Session History — resolved, kept for "why", not "what's next""
-Cohesion: 0.15
-Nodes (12): 23c-ii split into four sub-steps — resolved 2026-09-01 (architect), Item 3 design — RESOLVED 2026-08-30, ready to build, none of it started yet, Original five items, raised 2026-08-29, Original five items, raised 2026-08-29 — all resolved, Remaining scope (steps 10–19), Remaining scope (steps 10–19) — all complete, Round 2 findings (2026-08-30) — the plate refilled, UI explicitly delayed, Round 2, item 3's design, and step 23 in full (+4 more)
+Cohesion: 0.14
+Nodes (13): 23c-ii split into four sub-steps — resolved 2026-09-01 (architect), Archived 2026-09-02 — step 24 design narrative and completed sub-steps, Item 3 design — RESOLVED 2026-08-30, ready to build, none of it started yet, Original five items, raised 2026-08-29, Original five items, raised 2026-08-29 — all resolved, Remaining scope (steps 10–19), Remaining scope (steps 10–19) — all complete, Round 2 findings (2026-08-30) — the plate refilled, UI explicitly delayed (+5 more)
 
 ## Knowledge Gaps
-- **240 isolated node(s):** `name`, `version`, `description`, `main`, `dev` (+235 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 301 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **247 isolated node(s):** `name`, `version`, `description`, `main`, `dev` (+242 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 312 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `computeMeatAudit()` connect `auditEngine.js` to `Data Model doc`, `dashboard.test.js`?**
-  _High betweenness centrality (0.259) - this node is a cross-community bridge._
-- **Why does `Unallocated Commissary Receipt` connect `Data Model doc` to `Stock Receipts Page`?**
-  _High betweenness centrality (0.250) - this node is a cross-community bridge._
-- **Why does `recalcMeatRow (client-side live recalculation)` connect `Data Model doc` to `auditEngine.js`?**
-  _High betweenness centrality (0.249) - this node is a cross-community bridge._
+- **Why does `computeMeatAudit()` connect `auditEngine.js` to `dashboard.test.js`, `Stock Receipts Page`?**
+  _High betweenness centrality (0.244) - this node is a cross-community bridge._
+- **Why does `Unallocated Commissary Receipt` connect `Stock Receipts Page` to `Data Model doc`?**
+  _High betweenness centrality (0.235) - this node is a cross-community bridge._
+- **Why does `recalcMeatRow (client-side live recalculation)` connect `Stock Receipts Page` to `auditEngine.js`?**
+  _High betweenness centrality (0.234) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `description` to the rest of the system?**
-  _240 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _247 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `auditEngine.js` be split into smaller, more focused modules?**
   _Cohesion score 0.055218855218855216 - nodes in this community are weakly interconnected._
 - **Should `Data Model doc` be split into smaller, more focused modules?**
-  _Cohesion score 0.08139534883720931 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09024390243902439 - nodes in this community are weakly interconnected._
 - **Should `dashboard.test.js` be split into smaller, more focused modules?**
   _Cohesion score 0.09090909090909091 - nodes in this community are weakly interconnected._

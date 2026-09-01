@@ -11,6 +11,20 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-02 (Claude Code session) — Step 24b-iii: commissary_adjustments routes
+
+CRUD routes for `commissary_adjustments` in `server/routes/commissary.js`, on top of the table/engine work 24b-ii already landed (commit 837c3ab) — `commissaryAuditEngine.js` untouched, as instructed. `GET /commissary/adjustments` (filterable by `business_date`/`commissary_meat_id`/`commissary_id`/`kind`, joined to `commissary_meats` for both the source and destination display names, same optional-filter convention as `GET /commissary/yield-log`), `POST`, `PATCH /:id`, and `DELETE /:id` (soft delete only — sets `deleted_at`, no `activity_log` write, same treatment as `commissary_shipment_lines`; rule 9 scopes the activity-log pattern to `stock_receipts`/`commissary_yield_log` only).
+
+Validation, enforced on both create and update: `kind` must be exactly `'LOSS'` or `'ALLOCATION'`; `quantity` must be positive and is never converted (read in the source meat's own unit); `destination_commissary_meat_id` must be absent for LOSS and present for ALLOCATION, rejected explicitly either way. The destination filter itself — an ALLOCATION's destination must share the source's `meat_type_id` **and** `unit` — is a new `isValidDestination` helper, guarded against the `null === null` JS footgun (an untagged source must not accidentally validate against an untagged destination). `commissary_meat_id` (the source) is not editable via PATCH, same non-editable-identity pattern `yield-log`'s PATCH already uses.
+
+New `GET /commissary/adjustments/destinations?commissary_meat_id=` for 24c's Allocate-form dropdown: every other active commissary meat sharing the source's `meat_type_id` and `unit`; an untagged source returns `[]`, same shape as `GET /commissary/conversion-standards`' untagged case.
+
+12 new tests in a new `server/routes/commissaryAdjustments.test.js` (own fixtures — 5 commissary meats spanning matching/mismatched type and unit, own business dates), mirrored-logic style matching `commissary.test.js`. Live-verified against a real booted server too (LOSS create/list/patch/delete, all four rejection paths, the untagged-source destinations call) — throwaway row physically deleted from `inventory.db` afterward, server process killed (rule 21).
+
+Full 16-file suite: 298/298 assertions, 0 failures (286 baseline + 12 new). Out of scope, per the step's own boundary: any UI (24c) and the per-meat next-stage config (deferred pending soft-launch).
+
+---
+
 ## 2026-09-02 (Claude Code session) — Step 24b-ii: commissary_adjustments (schema + engine)
 
 New `commissary_adjustments` table (`schema.sql`), plus an idempotent `migrateCommissaryAdjustmentsTable` in `server/db/migrate.js` (a plain `CREATE TABLE IF NOT EXISTS`, matching the schema exactly — no rebuild needed since it's a brand-new table, not a column add) wired into `connection.js` right after `migrateYieldLogInputQuantityColumn`. Columns per `data-model.md` §10b: `kind` CHECK IN ('LOSS','ALLOCATION')`, `destination_commissary_meat_id` (nullable, required only for ALLOCATION), `deleted_at` for soft delete.

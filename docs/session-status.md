@@ -18,17 +18,18 @@ suite, and how to keep context costs down.
 
 ## Current state — 2026-09-02
 
-**Step 23 is fully closed**, and step 24 is four sub-steps in: **24a**
+**Step 23 is fully closed**, and step 24 is five sub-steps in: **24a**
 (`output_commissary_meat_id` + the debit/credit ledger), **24a-b** (test
-isolation), **24b-i** (`input_quantity`), and **24b-ii**
-(`commissary_adjustments` schema + engine) are all DONE and pushed as of
-2026-09-02. Per-step detail is in `changelog.md`; the archived sub-step
-entries are in `session-history.md`.
+isolation), **24b-i** (`input_quantity`), **24b-ii**
+(`commissary_adjustments` schema + engine), and **24b-iii** (adjustment
+routes) are all DONE and pushed as of 2026-09-02. Per-step detail is in
+`changelog.md`; the archived sub-step entries are in `session-history.md`.
 
-Full suite: **15 files, 286/286 assertions, 0 failures.** Run individually
+Full suite: **16 files, 298/298 assertions, 0 failures.** Run individually
 via `node <file>.test.js` — there is no test runner script. Two files are
 easy to miss because they live outside `server/routes`/`server/engines`:
-`server/db/activityLog.test.js` and `server/db/migrate.test.js`.
+`server/db/activityLog.test.js` and `server/db/migrate.test.js`. The newest
+file is `server/routes/commissaryAdjustments.test.js`.
 
 ## Known open items (not the next step's problem, just not forgotten)
 
@@ -57,22 +58,28 @@ easy to miss because they live outside `server/routes`/`server/engines`:
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii DONE)
+## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii, 24b-iii DONE)
 
 The full design narrative, the 2026-08-31 resolution of its open questions,
-and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, including 24a's
-blast-radius map) are archived in `session-history.md`. The load-bearing
-decisions they produced live in "Things NOT to re-litigate" below — read those,
-not the archive, unless you need the reasoning behind one.
-**Sub-step plan, confirmed:**
-- **24b-iii (adjustment routes)**: CRUD for `commissary_adjustments`, plus the
-  destination filter — an ALLOCATION's destination dropdown offers only
-  commissary meats sharing the source's `meat_type_id` **and its `unit`**.
-- **24c (UI)**: on the yield-entry form, the output-item field (defaults to the
-  same meat) and the input-count field alongside the weighed input. On the
-  commissary balance view, an Allocate and a Write-off action.
+and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, 24b-iii,
+including 24a's blast-radius map) are archived in `session-history.md`. The
+load-bearing decisions they produced live in "Things NOT to re-litigate"
+below — read those, not the archive, unless you need the reasoning behind one.
 
-**Next up: 24b-iii (adjustment routes).** 24c (UI) remains after that.
+**24b-iii landed 2026-09-02**: CRUD routes for `commissary_adjustments` in
+`server/routes/commissary.js` (`GET`/`POST`/`PATCH /:id`/`DELETE /:id`), plus
+`GET /commissary/adjustments/destinations?commissary_meat_id=` — the
+destination filter an ALLOCATION's dropdown needs, returning only commissary
+meats sharing the source's `meat_type_id` **and its `unit`**. No live data has
+any `meat_type_id` tagged yet, so the live-server check exercised LOSS
+create/list/patch/delete and every rejection path, not an accepted ALLOCATION
+end to end — that's covered by the mirrored-logic test file instead. See
+`changelog.md` for full detail.
+
+**24c (UI), confirmed, remains — next up:** on the yield-entry form, the
+output-item field (defaults to the same meat) and the input-count field
+alongside the weighed input. On the commissary balance view, an Allocate and a
+Write-off action, backed by the routes 24b-iii just added.
 ## Things NOT to re-litigate (already decided, stable)
 
 - Tech stack: Node.js + Express + `node:sqlite` (not better-sqlite3, not
