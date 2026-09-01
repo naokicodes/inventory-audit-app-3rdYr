@@ -1,7 +1,7 @@
 # Graph Report - inventory-audit-app-3rdYr  (2026-09-02)
 
 ## Corpus Check
-- 64 files · ~152,456 words
+- 64 files · ~153,666 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `de9a8e7e`
+- Built from commit: `e57ef4f7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -66,8 +66,8 @@
   public/daily-audit.html → server/engines/auditEngine.js
 - `Rule 17: WIP hand-offs allowed` --semantically_similar_to--> `graphify update/cluster-only reference`  [INFERRED] [semantically similar]
   docs/rules-for-claude-code.md → .claude/skills/graphify/references/update.md
-- `Settings Shipment Presets Admin Section` --cites--> `Session Status doc`  [EXTRACTED]
-  public/settings.html → docs/session-status.md
+- `CLAUDE.md (project graphify rules)` --conceptually_related_to--> `/graphify Skill`  [INFERRED]
+  CLAUDE.md → .claude/skills/graphify/SKILL.md
 
 ## Import Cycles
 - None detected.

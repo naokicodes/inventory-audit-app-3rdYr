@@ -11,6 +11,20 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-02 (Claude Code session) — Step 24a-b: commissaryAuditEngine.test.js test isolation
+
+Test-hygiene-only follow-up to 24a, no source file changes. `commissaryAuditEngine.test.js` shared a single `db` across the whole file, so several tests silently depended on rows an *earlier* test had inserted onto the same commissary meat/date rather than creating their own — `getCommissaryUsage`'s expected `7.5` only held because the `getCommissaryBackedUp` test above it had already inserted a `raw_weight_in=4.0` yield row on the same meat/date; deleting or reordering that earlier test would have silently changed this one's expected number. Same problem, more severely, in the day-1→day-2→day-3→day-4 chain: each "day" reused the previous day's `commissary_ending_actual` as its own `beginning`, so the chain only produced its documented numbers in file order.
+
+Generalized the pattern 24a's own three new tests (cross-row/cross-unit/soft-delete, using dedicated `M10`/`M11` meats) already used correctly: every test now creates its own dedicated `commissary_meats` row (`T01`–`T05`) and uses business dates no other test touches, including inserting its own "prior day" `commissary_ending_actual` directly where a test's whole point is carry-forward behavior — rather than relying on a previous test's side effect. New dedicated meats are positioned after every row-count assertion in the file (same reasoning 24a already used for `M10`/`M11`'s placement), since `computeCommissaryDailyAudit`'s unfiltered listing counts every active `commissary_meats` row and has no test-scoping mechanism of its own.
+
+Where a test's expected number changed because it no longer inherited another test's rows, the new number was hand-derived and the arithmetic is in a comment next to the assertion, same as 24a's own rewritten tests — most numbers came out identical to before (only the *source* of the inputs moved, not the math), since the self-contained versions were built by copying each test's exact original scenario onto its own dedicated meat.
+
+**Verified isolation, not just asserted it**: reordered two independent test blocks (swapped the getter-tests block with the day-1/day-2 block) in a scratch copy and confirmed 19/19 still passed; ran the day-2 test and the `getCommissaryUsage` test each completely alone (every other `test()` call disabled) via scratch copies and confirmed both still passed with their documented numbers. Scratch copies lived outside the repo/in a throwaway file deleted before finishing, never committed.
+
+Full 15-file suite: 279/279 assertions, 0 failures (unchanged from the pre-existing baseline — same assert count, no test removed or added beyond this file's own restructuring).
+
+---
+
 ## 2026-09-02 (Claude Code session) — Step 24a: output_commissary_meat_id + debit/credit ledger
 
 Implements the design settled in the 2026-09-01 architecture session below. `commissary_yield_log` gains a nullable `output_commissary_meat_id` FK → `commissary_meats(id)` (NULL = output is the same meat as the input), added via `schema.sql` plus a new idempotent `migrateYieldLogOutputMeatColumn` in `server/db/migrate.js` (plain `ALTER TABLE ADD COLUMN`, same detect-then-no-op shape as `migrateLocationsActiveColumn` — no rebuild needed since it's a nullable column with no constraint change).

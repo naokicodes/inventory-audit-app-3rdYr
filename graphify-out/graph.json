@@ -730,7 +730,7 @@
       "file_type": "code",
       "norm_label": "test()",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L24"
+      "source_location": "L36"
     },
     {
       "id": "server_routes_dashboard_test_computerestauranttotals",
@@ -2521,7 +2521,7 @@
       "file_type": "code",
       "norm_label": "assert",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L9"
+      "source_location": "L21"
     },
     {
       "id": "server_engines_commissaryauditengine_test_databasesync",
@@ -2532,7 +2532,7 @@
       "file_type": "code",
       "norm_label": "{ databasesync }",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L12"
+      "source_location": "L24"
     },
     {
       "id": "server_engines_commissaryauditengine_test_db",
@@ -2543,7 +2543,7 @@
       "file_type": "code",
       "norm_label": "db",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L43"
+      "source_location": "L55"
     },
     {
       "id": "server_engines_commissaryauditengine_test_fs",
@@ -2554,7 +2554,7 @@
       "file_type": "code",
       "norm_label": "fs",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L11"
+      "source_location": "L23"
     },
     {
       "id": "server_engines_commissaryauditengine_test_getcommissarystockin_getcommissarybackedup_getcommissaryusage_computecommissarymeataudit_computecommissarydailyaudit",
@@ -2565,7 +2565,7 @@
       "file_type": "code",
       "norm_label": "{\n  getcommissarystockin,\n  getcommissarybackedup,\n  getcommissaryusage,\n  computecommissarymeataudit,\n  computecommissarydailyaudit\n}",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L13"
+      "source_location": "L25"
     },
     {
       "id": "server_engines_commissaryauditengine_test_path",
@@ -2576,7 +2576,7 @@
       "file_type": "code",
       "norm_label": "path",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L10"
+      "source_location": "L22"
     },
     {
       "id": "server_engines_commissaryauditengine_test_schema",
@@ -2587,7 +2587,7 @@
       "file_type": "code",
       "norm_label": "schema",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L42"
+      "source_location": "L54"
     },
     {
       "id": "server_engines_commissaryauditengine_test_test_db_path",
@@ -2598,7 +2598,7 @@
       "file_type": "code",
       "norm_label": "test_db_path",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L37"
+      "source_location": "L49"
     },
     {
       "id": "server_routes_dashboard_test",
@@ -7025,7 +7025,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L13",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -7037,7 +7037,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L13",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -7049,7 +7049,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L13",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -7061,7 +7061,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L13",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -7073,7 +7073,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L13",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -7577,7 +7577,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L13",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -9150,13 +9150,24 @@
     },
     {
       "source": "server_engines_commissaryauditengine_test",
+      "target": "server_engines_commissaryauditengine_test_assert",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "server_engines_commissaryauditengine_test",
       "target": "server_engines_commissaryauditengine_test_path",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L10",
+      "source_location": "L22",
       "weight": 1.0
     },
     {
@@ -9167,7 +9178,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L11",
+      "source_location": "L23",
       "weight": 1.0
     },
     {
@@ -9178,7 +9189,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L12",
+      "source_location": "L24",
       "weight": 1.0
     },
     {
@@ -9189,7 +9200,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L13",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -9200,7 +9211,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L24",
+      "source_location": "L36",
       "weight": 1.0
     },
     {
@@ -9211,7 +9222,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L37",
+      "source_location": "L49",
       "weight": 1.0
     },
     {
@@ -9222,7 +9233,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L42",
+      "source_location": "L54",
       "weight": 1.0
     },
     {
@@ -9233,18 +9244,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L43",
-      "weight": 1.0
-    },
-    {
-      "source": "server_engines_commissaryauditengine_test",
-      "target": "server_engines_commissaryauditengine_test_assert",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L9",
+      "source_location": "L55",
       "weight": 1.0
     },
     {
@@ -14419,5 +14419,5 @@
       "source_file": "public/commissary-shipments.html"
     }
   ],
-  "built_at_commit": "de9a8e7ea4808cad775e633b2ff9ada028ba24f9"
+  "built_at_commit": "e57ef4f7b37a8cb7e9f242e3128c7837f7d99446"
 }

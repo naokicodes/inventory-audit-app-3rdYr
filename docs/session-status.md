@@ -32,6 +32,17 @@ writeup. Full suite: **15 files, 0 failures** (run individually via `node
 `server/db/activityLog.test.js` and `server/db/migrate.test.js`, easy to
 miss since they live outside `server/routes`/`server/engines`).
 
+**Step 24a-b is DONE (2026-09-02, Claude Code session) — test isolation,
+no source changes.** `commissaryAuditEngine.test.js` shared a single `db`
+across the whole file; several tests silently depended on rows an earlier
+test had inserted (the `getCommissaryUsage` bug named in the dispatch
+prompt, plus the whole day-1→day-4 chain). Every test now creates its own
+dedicated `commissary_meats` row and business dates, generalizing the
+pattern 24a's own `M10`/`M11` tests already used. Verified: reordered two
+independent test blocks and ran two tests each fully alone, both still
+passed. Full suite: **15 files, 279/279 assertions, 0 failures** (same
+count as before — no test added or removed). See `changelog.md` for detail.
+
 **24b is next**, not yet designed as a dispatchable prompt: per-meat
 "next stage" config, `commissary_adjustments` CRUD + balance effects,
 Miscuts destination filtering. 24c (the yield-form UI) follows. The cheap
@@ -42,6 +53,7 @@ The most recent landings, newest first — full detail for each is in
 
 | Step | What landed |
 |---|---|
+| 24a-b | `commissaryAuditEngine.test.js` test isolation (no source changes) |
 | 24a | `output_commissary_meat_id` column + debit/credit ledger + tests |
 | — | Fixed dashboard.js's dangling-`commissary_id` INNER JOIN silently dropping stock |
 | — | Fixed 23c-ii-d follow-on: qualified-branch silent-first-match in `resolveCommissaryMeat` |
@@ -283,6 +295,15 @@ the same architecture session as item 3's rekey:**
   cross-row cases are exercised by direct test inserts, exactly as the
   existing engine tests already insert yield rows. Creating cross-row events
   through the UI is 24b (the form).
+- **24a-b (test isolation — small, do BEFORE 24b)**: `commissaryAuditEngine.test.js`
+  shares one `db` across the whole file, and after 24a the usage test's expected
+  7.5 depends on a yield row inserted by a *different, earlier* test. Deleting or
+  reordering a test now silently changes another test's expected balance. This
+  predates 24a but got tighter with it, and 24b adds more balance assertions to
+  the same file — fix the isolation before piling on, not after. The three tests
+  24a added already do it correctly (own meat rows `M10`/`M11`, own unused dates);
+  generalize that pattern to the rest of the file. No engine code changes, no
+  behavior changes, same assertions passing.
 - **24b (engine/routes)**: per-meat "next stage" config so the yield form
   can default the output dropdown, `commissary_adjustments` CRUD + balance
   effects, Miscuts destination filtering via `meat_type_id`. (The
@@ -291,7 +312,7 @@ the same architecture session as item 3's rekey:**
   same meat when no next-stage is configured), an Allocate/Write-off
   action on the commissary balance view.
 
-**Next up: 24b.** 24a landed 2026-09-02 (see changelog.md) - the column,
+**Next up: 24a-b (small test-isolation step), then 24b.** 24a landed 2026-09-02 (see changelog.md) - the column,
 the coupled engine debit/credit, and the rewritten/added tests are all
 done and the full 15-file suite is green. 24b/24c are not started.
 
@@ -418,6 +439,27 @@ exactly why the column + credit-retarget were pulled into 24a with it.
   configuration convenience for onboarding a new chain owner, not needed for
   the core ledger — deferred to that hand-over phase. No operational yield
   chain forms a cycle, so a cycle-guard is defensive-only and also deferred.
+
+- **`graphify-out/` commit policy — settled 2026-09-02.** `graphify-out/` IS
+  committed (it's how a worker gets the graph without regenerating it), but
+  only the parts that are *content*. Committed: `graph.json`, `manifest.json`,
+  `GRAPH_REPORT.md`, `.graphify_labels.json` + its `.sig`, `.graphify_root`,
+  and `cache/ast/` + `cache/semantic/` (content-hashed extraction results —
+  append-only, never rewritten, and the expensive part to regenerate).
+  Gitignored: `cost.json` and `cache/last_query_stamp` (per-run usage
+  metadata), `cache/stat-index.json` (machine-local file-stat cache),
+  `.graphify_python` (an absolute Windows path to the local interpreter — this
+  repo is public), `graph.html` (~390KB rendered viewer, fully rewritten every
+  run, derived entirely from `graph.json`, regenerates locally via the
+  post-commit hook), and the dated snapshot directories
+  `graphify-out/YYYY-MM-DD/` (a near-duplicate of the top-level output written
+  on every run — git already versions those files, so the snapshots are
+  redundant history at ~490KB per session). This closes the three previously
+  undecided `graphify-out/` paths. **Why it mattered**: before this, a single
+  session's commit swept in ~17,000 lines of graphify churn, and `.git` was
+  growing by roughly 1.3MB per session against a 1.8MB baseline — a real cost
+  on the standard flow, where every worker clones fresh. Don't re-add the
+  ignored paths thinking they're missing output; they regenerate locally.
 
 ## End-of-session checklist (every session, no exceptions)
 

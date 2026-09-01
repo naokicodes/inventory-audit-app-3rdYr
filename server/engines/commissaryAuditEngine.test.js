@@ -3,6 +3,18 @@
 // restaurants) and hand-calculated expected values. Same approach as
 // auditEngine.test.js - plain script, real node:sqlite DB, no framework.
 //
+// Step 24a-b (test isolation, 2026-09-02): every test below is
+// self-contained - it creates its own dedicated commissary_meat (or, for
+// the pure catalog/listing tests, reuses only the shared restaurants/
+// commissaries/jowlId/bellyId fixtures that no test writes balance data
+// onto by default) and uses business dates no other test touches.
+// Deleting, reordering, or running any single test alone must not change
+// another test's expected numbers. Restaurants/commissaries/commissary
+// catalog rows are shared read-only reference data, not balance state, so
+// reusing them across tests is fine - the isolation problem this fixes is
+// specifically about shared *balance* rows (stock receipts, yield log,
+// shipments, ending_actual/opening_stock).
+//
 // Run with: node server/engines/commissaryAuditEngine.test.js
 // Exits with code 0 if all pass, 1 if anything fails.
 
@@ -44,8 +56,10 @@ const db = new DatabaseSync(TEST_DB_PATH);
 db.exec('PRAGMA foreign_keys = ON');
 db.exec(schema);
 
-// --- Set up a real scenario: commissary JOWL (M05), shipped to two ---
-// --- destination restaurants (RA, RB). ---
+// --- Shared reference fixtures: restaurants, one commissary, and the two ---
+// --- catalog meats used by the listing/filtering tests below. No test ---
+// --- writes stock/yield/shipment/actual rows onto jowlId or bellyId ---
+// --- except the one test that explicitly says so, self-contained. ---
 db.prepare('INSERT INTO restaurants (name, code) VALUES (?, ?)').run('Restaurant A', 'RA');
 db.prepare('INSERT INTO restaurants (name, code) VALUES (?, ?)').run('Restaurant B', 'RB');
 const restaurantA = db.prepare('SELECT id FROM restaurants WHERE code = ?').get('RA').id;
@@ -58,117 +72,12 @@ db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allow
   .run(commissaryId, 'M05', 'JOWL', 'kg', 0.20);
 const jowlId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M05').id;
 
-// A second commissary meat, used only for the daily-audit list/filter test
+// A second commissary meat, used only for the daily-audit list/filter tests
 db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
   .run(commissaryId, 'M03', 'Belly Slab', 'kg', 0.25);
 const bellyId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M03').id;
 
 console.log('Commissary Audit Engine Tests\n');
-
-test('getCommissaryStockIn sums commissary_stock_receipts for the meat/date', () => {
-  db.prepare('INSERT INTO commissary_stock_receipts (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(jowlId, '2026-08-01', 5.0);
-  const stockIn = getCommissaryStockIn(db, jowlId, '2026-08-01');
-  assert.strictEqual(stockIn, 5.0);
-});
-
-test('getCommissaryBackedUp sums commissary_yield_log.backed_weight_out, excludes soft-deleted rows', () => {
-  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?)')
-    .run(jowlId, '2026-08-01', 4.0, 3.0);
-  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, deleted_at) VALUES (?, ?, ?, ?, ?)')
-    .run(jowlId, '2026-08-01', 100.0, 90.0, '2026-08-01T12:00:00Z');
-  const backedUp = getCommissaryBackedUp(db, jowlId, '2026-08-01');
-  assert.strictEqual(backedUp, 3.0);
-});
-
-test('getCommissaryUsage sums commissary_shipments AND debits commissary_yield_log.raw_weight_in for this meat as input', () => {
-  db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
-    .run(jowlId, restaurantA, '2026-08-01', 2.0);
-  db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
-    .run(jowlId, restaurantB, '2026-08-01', 1.5);
-  const usage = getCommissaryUsage(db, jowlId, '2026-08-01');
-  // shipments 2.0 + 1.5 = 3.5, plus the getCommissaryBackedUp test above's
-  // non-deleted yield row (raw_weight_in=4.0; the soft-deleted row's
-  // raw_weight_in=100.0 is excluded) => 3.5 + 4.0 = 7.5
-  assert.ok(Math.abs(usage - 7.5) < 0.0001, `expected 3.5 + 4.0 = 7.5, got ${usage}`);
-});
-
-test('day 1: beginning stock comes from commissary_opening_stock, not a prior commissary_ending_actual', () => {
-  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(jowlId, '2026-08-01', 10.0);
-  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(jowlId, '2026-08-01', 14.5);
-
-  const result = computeCommissaryMeatAudit(db, jowlId, '2026-08-01');
-  // Hand-calculated: beginning=10, stockIn=5, backedUp=3,
-  // usage = shipments(3.5) + yield debit(4.0, the non-deleted yield row's
-  // raw_weight_in from the getCommissaryBackedUp test above) = 7.5
-  // -> endingCalculated = 10 + 5 + 3 - 7.5 = 10.5. actual=14.5 -> surplus
-  // (calculated is now less than actual, per rule 12 that's negative
-  // variance = surplus - this meat's real balance is 4.0 higher than the
-  // old credit-only formula reported, because that formula never debited
-  // the raw meat consumed by processing it).
-  assert.strictEqual(result.beginning, 10.0);
-  assert.strictEqual(result.stockIn, 5.0);
-  assert.strictEqual(result.backedUp, 3.0);
-  assert.ok(Math.abs(result.usage - 7.5) < 0.0001);
-  assert.ok(Math.abs(result.endingCalculated - 10.5) < 0.0001, `expected ~10.5, got ${result.endingCalculated}`);
-  assert.strictEqual(result.expectedEnding, result.endingCalculated); // no commissary adjustments layer yet
-  assert.strictEqual(result.actual, 14.5);
-  assert.ok(Math.abs(result.variance - (-4.0)) < 0.0001, `expected ~-4.0, got ${result.variance}`);
-  assert.strictEqual(result.unexplainedVariance, result.variance);
-  assert.strictEqual(result.status, 'SURPLUS');
-});
-
-test('day 2: beginning stock carries forward from day 1 actual ending automatically', () => {
-  db.prepare('INSERT INTO commissary_stock_receipts (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(jowlId, '2026-08-02', 2.0);
-  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?)')
-    .run(jowlId, '2026-08-02', 1.0, 0.8);
-  db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
-    .run(jowlId, restaurantA, '2026-08-02', 4.0);
-  // beginning=14.5 (day1 actual), stockIn=2.0, backedUp=0.8,
-  // usage = shipments(4.0) + yield debit(1.0, this day's raw_weight_in) = 5.0
-  // -> endingCalculated = 14.5 + 2.0 + 0.8 - 5.0 = 12.3
-  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(jowlId, '2026-08-02', 13.0);
-
-  const result = computeCommissaryMeatAudit(db, jowlId, '2026-08-02');
-  assert.strictEqual(result.beginning, 14.5); // day 1's ACTUAL ending, not calculated
-  assert.strictEqual(result.stockIn, 2.0);
-  assert.ok(Math.abs(result.backedUp - 0.8) < 0.0001);
-  assert.ok(Math.abs(result.usage - 5.0) < 0.0001, `expected 4.0 + 1.0 = 5.0, got ${result.usage}`);
-  assert.ok(Math.abs(result.endingCalculated - 12.3) < 0.0001, `expected ~12.3, got ${result.endingCalculated}`);
-  assert.strictEqual(result.actual, 13.0);
-  assert.ok(Math.abs(result.variance - (-0.7)) < 0.0001, `expected ~-0.7, got ${result.variance}`);
-  assert.strictEqual(result.status, 'SURPLUS'); // negative variance = surplus (rule 12)
-});
-
-test('surplus case: actual higher than expected gives negative variance', () => {
-  // No inflows/usage today - beginning=13.0 (day 2 actual) carries as-is.
-  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(jowlId, '2026-08-03', 15.0);
-
-  const result = computeCommissaryMeatAudit(db, jowlId, '2026-08-03');
-  assert.strictEqual(result.beginning, 13.0);
-  assert.strictEqual(result.stockIn, 0);
-  assert.strictEqual(result.backedUp, 0);
-  assert.strictEqual(result.usage, 0);
-  assert.strictEqual(result.endingCalculated, 13.0);
-  assert.ok(result.variance < 0, 'surplus should be negative');
-  assert.strictEqual(result.status, 'SURPLUS');
-});
-
-test('missing actual count is flagged, not silently treated as zero variance', () => {
-  db.prepare('INSERT INTO commissary_stock_receipts (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(jowlId, '2026-08-04', 3.0);
-  const result = computeCommissaryMeatAudit(db, jowlId, '2026-08-04');
-  assert.strictEqual(result.beginning, 15.0); // carried from 08-03 actual
-  assert.strictEqual(result.stockIn, 3.0);
-  assert.strictEqual(result.actual, null);
-  assert.strictEqual(result.status, 'MISSING_ACTUAL_COUNT');
-  assert.strictEqual(result.variance, null);
-});
 
 test('a meat with no opening_stock and no prior ending_actual -> MISSING_BEGINNING_STOCK', () => {
   const result = computeCommissaryMeatAudit(db, bellyId, '2026-08-01');
@@ -178,13 +87,22 @@ test('a meat with no opening_stock and no prior ending_actual -> MISSING_BEGINNI
 });
 
 test('computeCommissaryDailyAudit lists every active commissary meat for a date', () => {
+  // Self-contained: gives jowlId its own opening_stock/ending_actual right
+  // here rather than relying on any other test to have computed a status
+  // for it. beginning=10 (opening), no other inflow/outflow, actual=10
+  // -> endingCalculated=10, variance=0 -> OK.
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(jowlId, '2026-08-01', 10.0);
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(jowlId, '2026-08-01', 10.0);
+
   const rows = computeCommissaryDailyAudit(db, '2026-08-01');
   assert.strictEqual(rows.length, 2); // JOWL + Belly Slab
   const jowlRow = rows.find(r => r.code === 'M05');
   const bellyRow = rows.find(r => r.code === 'M03');
   assert.ok(jowlRow, 'expected a JOWL row');
   assert.ok(bellyRow, 'expected a Belly Slab row');
-  assert.strictEqual(jowlRow.status, 'SURPLUS'); // reuses day-1 scenario above (now debits yield raw input too)
+  assert.strictEqual(jowlRow.status, 'OK');
   assert.strictEqual(bellyRow.status, 'MISSING_BEGINNING_STOCK');
 });
 
@@ -240,9 +158,159 @@ test('combining commissaryMeatId with the commissaryId it actually belongs to re
   assert.strictEqual(rows[0].commissary_meat_id, jowlId);
 });
 
+// --- Step 24a-b: standalone balance/getter tests below this point each ---
+// --- get their own dedicated commissary_meat, positioned after every ---
+// --- row-count assertion above (same placement reasoning as the M10/M11 ---
+// --- block further down) so these new active commissary_meats rows can't ---
+// --- shift an already-asserted catalog count. ---
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'T01', 'Getter Test Meat', 'kg', 0.20);
+const getterTestMeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'T01').id;
+
+test('getCommissaryStockIn sums commissary_stock_receipts for the meat/date', () => {
+  db.prepare('INSERT INTO commissary_stock_receipts (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(getterTestMeatId, '2026-09-01', 5.0);
+  const stockIn = getCommissaryStockIn(db, getterTestMeatId, '2026-09-01');
+  assert.strictEqual(stockIn, 5.0);
+});
+
+test('getCommissaryBackedUp sums commissary_yield_log.backed_weight_out, excludes soft-deleted rows', () => {
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?)')
+    .run(getterTestMeatId, '2026-09-02', 4.0, 3.0);
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, deleted_at) VALUES (?, ?, ?, ?, ?)')
+    .run(getterTestMeatId, '2026-09-02', 100.0, 90.0, '2026-09-02T12:00:00Z');
+  const backedUp = getCommissaryBackedUp(db, getterTestMeatId, '2026-09-02');
+  assert.strictEqual(backedUp, 3.0);
+});
+
+test('getCommissaryUsage sums commissary_shipments AND debits commissary_yield_log.raw_weight_in for this meat as input', () => {
+  db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
+    .run(getterTestMeatId, restaurantA, '2026-09-03', 2.0);
+  db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
+    .run(getterTestMeatId, restaurantB, '2026-09-03', 1.5);
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?)')
+    .run(getterTestMeatId, '2026-09-03', 4.0, 3.0);
+  const usage = getCommissaryUsage(db, getterTestMeatId, '2026-09-03');
+  // shipments 2.0 + 1.5 = 3.5, plus this test's own yield row's
+  // raw_weight_in = 4.0 (its own insert, not borrowed from another test)
+  // => 3.5 + 4.0 = 7.5
+  assert.ok(Math.abs(usage - 7.5) < 0.0001, `expected 3.5 + 4.0 = 7.5, got ${usage}`);
+});
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'T02', 'Day 1 Test Meat', 'kg', 0.20);
+const day1MeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'T02').id;
+
+test('day 1: beginning stock comes from commissary_opening_stock, not a prior commissary_ending_actual', () => {
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day1MeatId, '2026-09-10', 10.0);
+  db.prepare('INSERT INTO commissary_stock_receipts (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day1MeatId, '2026-09-10', 5.0);
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?)')
+    .run(day1MeatId, '2026-09-10', 4.0, 3.0);
+  db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
+    .run(day1MeatId, restaurantA, '2026-09-10', 3.5);
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day1MeatId, '2026-09-10', 14.5);
+
+  const result = computeCommissaryMeatAudit(db, day1MeatId, '2026-09-10');
+  // Hand-calculated: beginning=10 (opening stock, no prior actual exists
+  // for this brand-new meat), stockIn=5, backedUp=3 (this test's own yield
+  // row's backed_weight_out), usage = shipments(3.5) + yield debit(4.0,
+  // the same row's raw_weight_in) = 7.5
+  // -> endingCalculated = 10 + 5 + 3 - 7.5 = 10.5. actual=14.5 -> surplus
+  // (calculated is 4.0 less than actual - negative variance, rule 12).
+  assert.strictEqual(result.beginning, 10.0);
+  assert.strictEqual(result.stockIn, 5.0);
+  assert.strictEqual(result.backedUp, 3.0);
+  assert.ok(Math.abs(result.usage - 7.5) < 0.0001);
+  assert.ok(Math.abs(result.endingCalculated - 10.5) < 0.0001, `expected ~10.5, got ${result.endingCalculated}`);
+  assert.strictEqual(result.expectedEnding, result.endingCalculated); // no commissary adjustments layer yet
+  assert.strictEqual(result.actual, 14.5);
+  assert.ok(Math.abs(result.variance - (-4.0)) < 0.0001, `expected ~-4.0, got ${result.variance}`);
+  assert.strictEqual(result.unexplainedVariance, result.variance);
+  assert.strictEqual(result.status, 'SURPLUS');
+});
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'T03', 'Day 2 Test Meat', 'kg', 0.20);
+const day2MeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'T03').id;
+
+test('day 2: beginning stock carries forward from a prior day\'s actual ending automatically', () => {
+  // The "prior day" actual is inserted directly, right here - self
+  // contained, not dependent on any other test having computed/written it.
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day2MeatId, '2026-09-10', 14.5);
+
+  db.prepare('INSERT INTO commissary_stock_receipts (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day2MeatId, '2026-09-11', 2.0);
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?)')
+    .run(day2MeatId, '2026-09-11', 1.0, 0.8);
+  db.prepare('INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity) VALUES (?, ?, ?, ?)')
+    .run(day2MeatId, restaurantA, '2026-09-11', 4.0);
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day2MeatId, '2026-09-11', 13.0);
+
+  const result = computeCommissaryMeatAudit(db, day2MeatId, '2026-09-11');
+  // beginning=14.5 (the prior day's actual inserted above), stockIn=2.0,
+  // backedUp=0.8, usage = shipments(4.0) + yield debit(1.0) = 5.0
+  // -> endingCalculated = 14.5 + 2.0 + 0.8 - 5.0 = 12.3
+  assert.strictEqual(result.beginning, 14.5);
+  assert.strictEqual(result.stockIn, 2.0);
+  assert.ok(Math.abs(result.backedUp - 0.8) < 0.0001);
+  assert.ok(Math.abs(result.usage - 5.0) < 0.0001, `expected 4.0 + 1.0 = 5.0, got ${result.usage}`);
+  assert.ok(Math.abs(result.endingCalculated - 12.3) < 0.0001, `expected ~12.3, got ${result.endingCalculated}`);
+  assert.strictEqual(result.actual, 13.0);
+  assert.ok(Math.abs(result.variance - (-0.7)) < 0.0001, `expected ~-0.7, got ${result.variance}`);
+  assert.strictEqual(result.status, 'SURPLUS'); // negative variance = surplus (rule 12)
+});
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'T04', 'Day 3 Test Meat', 'kg', 0.20);
+const day3MeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'T04').id;
+
+test('surplus case: actual higher than expected gives negative variance', () => {
+  // Prior day's actual, inserted directly (self-contained).
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day3MeatId, '2026-09-10', 13.0);
+  // No inflows/usage today - beginning=13.0 carries as-is.
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day3MeatId, '2026-09-11', 15.0);
+
+  const result = computeCommissaryMeatAudit(db, day3MeatId, '2026-09-11');
+  assert.strictEqual(result.beginning, 13.0);
+  assert.strictEqual(result.stockIn, 0);
+  assert.strictEqual(result.backedUp, 0);
+  assert.strictEqual(result.usage, 0);
+  assert.strictEqual(result.endingCalculated, 13.0);
+  assert.ok(result.variance < 0, 'surplus should be negative');
+  assert.strictEqual(result.status, 'SURPLUS');
+});
+
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'T05', 'Day 4 Test Meat', 'kg', 0.20);
+const day4MeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'T05').id;
+
+test('missing actual count is flagged, not silently treated as zero variance', () => {
+  // Prior day's actual, inserted directly (self-contained).
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day4MeatId, '2026-09-10', 15.0);
+  db.prepare('INSERT INTO commissary_stock_receipts (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(day4MeatId, '2026-09-11', 3.0);
+
+  const result = computeCommissaryMeatAudit(db, day4MeatId, '2026-09-11');
+  assert.strictEqual(result.beginning, 15.0); // carried from the prior day's actual above
+  assert.strictEqual(result.stockIn, 3.0);
+  assert.strictEqual(result.actual, null);
+  assert.strictEqual(result.status, 'MISSING_ACTUAL_COUNT');
+  assert.strictEqual(result.variance, null);
+});
+
 // Step 24a: output_commissary_meat_id debit/credit ledger cases. New
 // commissary meats + an unused business_date range, so these don't shift
-// any row-count/status assertion above.
+// any row-count/status assertion above. Already self-contained per test
+// (the pattern generalized to the rest of the file above, in 24a-b).
 db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
   .run(commissaryId, 'M10', 'Raw Test Input', 'unit', 0.20);
 const rawInputId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'M10').id;
