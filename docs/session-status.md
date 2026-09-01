@@ -86,6 +86,24 @@ The most recent landings, newest first — full detail for each is in
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
+- **Cross-unit yield rows break the yield engine's loss%, not its balance
+  (found 2026-09-02, scoped to 24b/24c).** `computeYieldMetrics`
+  (`commissaryYieldEngine.js`) derives `actual_loss_pct` as
+  `(raw_weight_in - backed_weight_out) / raw_weight_in`, and a Pass/Review
+  status from it. For a `unit in -> kg out` event (raw chicken -> processed
+  chicken) that subtraction reconciles two different units and reports a
+  conversion ratio as shrinkage — e.g. 45 units in, 30 kg out reads as a 33%
+  loss and may flag Review. This is the same "never reconcile" principle the
+  audit engine already respects, applied to the one engine that doesn't.
+  Harmless through 24a, which leaves the yield-log write route untouched so
+  no cross-unit row can exist outside a direct test insert; it goes live the
+  moment 24c adds the output field to the yield form. **Needs a decision
+  before 24b**: either suppress loss%/status when the output meat's unit
+  differs from the input's, or define a per-pair expected conversion standard
+  and measure the realized ratio against that instead (the latter is what
+  makes the ratio visible and checkable, per the "don't pre-convert to kg at
+  input" decision below).
+
 ## Step 24 — multi-stage yield + Commissary-side allocation (designed, NOT started)
 
 
