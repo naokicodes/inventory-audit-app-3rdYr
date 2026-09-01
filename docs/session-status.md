@@ -332,9 +332,18 @@ the same architecture session as item 3's rekey:**
   same meat) and the input-count field alongside the weighed input. On the
   commissary balance view, an Allocate and a Write-off action.
 
-**Next up: 24b-i.** 24a and 24a-b both landed 2026-09-02 (see changelog.md) - the column,
-the coupled engine debit/credit, and the rewritten/added tests are all
-done and the full 15-file suite is green. 24b/24c are not started.
+**Step 24b-i is DONE (2026-09-02, Claude Code session).** `input_quantity`
+(nullable REAL, input meat's own unit) is on `commissary_yield_log` via an
+idempotent migration (`migrateYieldLogInputQuantityColumn`, same shape as
+24a's), wired into `connection.js` after `migrateYieldLogOutputMeatColumn`.
+`getCommissaryUsage`'s debit is now `COALESCE(input_quantity, raw_weight_in)`.
+`commissaryYieldEngine.js` untouched, as designed - `computeYieldMetrics`
+still divides by `raw_weight_in`. 3 new tests added (own `M12`/`M13` meats,
+own dates). See `changelog.md` for the full writeup. Full 15-file suite:
+**282/282 assertions, 0 failures.**
+
+**Next up: 24b-ii (commissary adjustments).** 24b/24c's remaining pieces
+(24b-ii, 24b-iii, 24c) are not started.
 
 **24b output-targeting — RESOLVED 2026-09-01.** The earlier concern (a yield
 row reusing the single `commissary_meat_id` for both input and output, and

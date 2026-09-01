@@ -1,16 +1,16 @@
 # Graph Report - inventory-audit-app-3rdYr  (2026-09-02)
 
 ## Corpus Check
-- 64 files · ~153,666 words
+- 64 files · ~155,677 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 490 nodes · 730 edges · 31 communities
+- 491 nodes · 732 edges · 31 communities
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 40 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e57ef4f7`
+- Built from commit: `755cf0b0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -88,7 +88,7 @@ Nodes (44): recalcDishRow (client-side live recalculation), computeDailyAudit(),
 
 ### Community 1 - "Data Model doc"
 Cohesion: 0.08
-Nodes (43): .claude/CLAUDE.md (graphify router), graphify add & watch reference, graphify exports & benchmark reference, graphify extraction subagent prompt spec, graphify GitHub clone & cross-repo merge reference, graphify commit hook & CLAUDE.md integration reference, graphify query/path/explain reference, graphify transcribe reference (+35 more)
+Nodes (44): .claude/CLAUDE.md (graphify router), graphify add & watch reference, graphify exports & benchmark reference, graphify extraction subagent prompt spec, graphify GitHub clone & cross-repo merge reference, graphify commit hook & CLAUDE.md integration reference, graphify query/path/explain reference, graphify transcribe reference (+36 more)
 
 ### Community 2 - "dashboard.test.js"
 Cohesion: 0.09
@@ -96,7 +96,7 @@ Nodes (28): addDays(), { addDays }, computeCommissaryDailyAudit(), computeCommis
 
 ### Community 3 - "connection.js"
 Cohesion: 0.07
-Nodes (24): { DatabaseSync }, db, DB_PATH, fs, { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn }, path, schema, SCHEMA_PATH (+16 more)
+Nodes (25): { DatabaseSync }, db, DB_PATH, fs, { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn }, path, schema, SCHEMA_PATH (+17 more)
 
 ### Community 4 - "commissary.js"
 Cohesion: 0.09
@@ -115,8 +115,8 @@ Cohesion: 0.09
 Nodes (22): Settings Page, POST /api/commissary/conversion-standards, POST /api/commissary/shipment-presets, PUT /api/commissary/conversion-standards/:id, PUT /api/commissary/shipment-presets/:id, DELETE /api/settings/recipes/:id, GET /api/settings/dishes, GET /api/settings/meats (+14 more)
 
 ### Community 8 - "commissary.test.js"
-Cohesion: 0.11
-Nodes (13): assert, { computeCommissaryDailyAudit }, { computeYieldRow }, createShipment(), { DatabaseSync }, db, fs, getPresetWithLines() (+5 more)
+Cohesion: 0.10
+Nodes (15): assert, { computeCommissaryDailyAudit }, { computeYieldRow }, createPreset(), createShipment(), { DatabaseSync }, db, fs (+7 more)
 
 ### Community 9 - "commands.js"
 Cohesion: 0.40
@@ -151,8 +151,8 @@ Cohesion: 0.20
 Nodes (6): assert, { DatabaseSync }, db, fs, path, schema
 
 ### Community 17 - "Commissary Shipments Page"
-Cohesion: 0.29
-Nodes (10): currentOnHand (Prefer Actual over Calculated), Commissary Shipments Page, Implied Input from Conversion Standards (Line-Sum Hint), Settings Shipment Presets Admin Section, Terminal Page, Terminal 'ship' Command Grammar, GET /api/commissary/conversion-standards, GET /api/commissary/daily-audit (+2 more)
+Cohesion: 0.39
+Nodes (9): Commissary Shipments Page, Implied Input from Conversion Standards (Line-Sum Hint), Terminal Page, Terminal 'ship' Command Grammar, GET /api/commissary/conversion-standards, GET /api/commissary/meats, GET /api/commissary/shipment-presets, POST /api/commissary/shipments (+1 more)
 
 ### Community 18 - "Activity Log Tests"
 Cohesion: 0.22
@@ -167,12 +167,12 @@ Cohesion: 0.25
 Nodes (6): assert, { DatabaseSync }, fs, patchSales(), path, test()
 
 ### Community 21 - "Stock Receipts Page"
-Cohesion: 0.33
-Nodes (6): Stock Receipts Page, DELETE /api/stock-receipts/:id, GET /api/stock-receipts, GET /api/stock-receipts/meats, PATCH /api/stock-receipts/:id, POST /api/stock-receipts
+Cohesion: 0.25
+Nodes (8): Admin History Page, Stock Receipts Page, GET /api/history, GET /api/history/filters, DELETE /api/stock-receipts/:id, GET /api/stock-receipts, PATCH /api/stock-receipts/:id, POST /api/stock-receipts
 
 ### Community 22 - "Commissary Page"
-Cohesion: 0.22
-Nodes (9): Commissary Page, Admin History Page, DELETE /api/commissary/yield-log/:id, GET /api/commissary/meats, GET /api/commissary/yield-log, PATCH /api/commissary/yield-log/:id, POST /api/commissary/yield-log, GET /api/history (+1 more)
+Cohesion: 0.29
+Nodes (7): Commissary Page, currentOnHand (Prefer Actual over Calculated), DELETE /api/commissary/yield-log/:id, GET /api/commissary/daily-audit, GET /api/commissary/yield-log, PATCH /api/commissary/yield-log/:id, POST /api/commissary/yield-log
 
 ### Community 23 - "Stock Receipts Route"
 Cohesion: 0.33
@@ -183,8 +183,8 @@ Cohesion: 0.60
 Nodes (3): register(), renderList(), runCommand()
 
 ### Community 27 - "withTransaction"
-Cohesion: 0.31
-Nodes (10): logActivity(), withTransaction(), runSync(), createPreset(), updatePreset(), insertReceiptCreateThenUpdate(), insertYieldEntry(), createReceipt() (+2 more)
+Cohesion: 0.43
+Nodes (8): logActivity(), withTransaction(), runSync(), insertReceiptCreateThenUpdate(), insertYieldEntry(), createReceipt(), getReceiptRow(), patchReceipt()
 
 ### Community 28 - "activityLog.js"
 Cohesion: 0.33
@@ -216,6 +216,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `auditEngine.js` be split into smaller, more focused modules?**
   _Cohesion score 0.05450733752620545 - nodes in this community are weakly interconnected._
 - **Should `Data Model doc` be split into smaller, more focused modules?**
-  _Cohesion score 0.08416389811738649 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08139534883720931 - nodes in this community are weakly interconnected._
 - **Should `dashboard.test.js` be split into smaller, more focused modules?**
   _Cohesion score 0.08912655971479501 - nodes in this community are weakly interconnected._

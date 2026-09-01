@@ -292,6 +292,7 @@ CREATE TABLE IF NOT EXISTS commissary_yield_log (
   commissary_meat_id INTEGER NOT NULL,
   output_commissary_meat_id INTEGER,  -- step 24a: output meat. NULL = output is the same meat as the input.
   business_date TEXT NOT NULL,    -- ISO format YYYY-MM-DD
+  input_quantity REAL,             -- step 24b-i: input meat's own unit (e.g. count). NULL = same as raw_weight_in.
   raw_weight_in REAL NOT NULL,
   backed_weight_out REAL NOT NULL,
   notes TEXT,

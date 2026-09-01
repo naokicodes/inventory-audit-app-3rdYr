@@ -11,6 +11,18 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-02 (Claude Code session) — Step 24b-i: commissary_yield_log.input_quantity
+
+`commissary_yield_log` gains a nullable `input_quantity` column (REAL, no FK), expressed in the INPUT meat's own unit, added via `schema.sql` plus a new idempotent `migrateYieldLogInputQuantityColumn` in `server/db/migrate.js` — same detect-then-no-op `ALTER TABLE ADD COLUMN` shape as `migrateYieldLogOutputMeatColumn` (24a), wired into `connection.js` right after it.
+
+Closes the gap the "yield output is always kg" amendment (2026-09-02, see `session-status.md`) surfaced: a unit-tracked commissary input like Raw Chicken is both counted (40) and weighed (32.5 kg) at intake, but the yield log only had `raw_weight_in`, so `getCommissaryUsage`'s debit was pulling kilos out of a balance measured in birds. `commissaryAuditEngine.js`'s usage debit changed from `raw_weight_in` to `COALESCE(input_quantity, raw_weight_in)` — the same COALESCE shape `getCommissaryBackedUp` already uses for the output credit, so a NULL `input_quantity` (the correct default for a kg-tracked input like Belly, where the two numbers are identical) reproduces the prior behavior exactly. `commissaryYieldEngine.js` is untouched by design: `computeYieldMetrics` keeps dividing by `raw_weight_in`, so loss% stays kg-to-kg — repointing it at `input_quantity` would compare a count to a weight.
+
+Added 3 tests to `commissaryAuditEngine.test.js`, own dedicated meats (`M12` kg, `M13` unit) and unused business dates (2026-08-13/14/15), same self-contained pattern 24a/24a-b established: NULL `input_quantity` falls back to `raw_weight_in` (back-compat), a set `input_quantity` is debited instead, and a unit-in/kg-out row debits the input's count while crediting the output's weighed kg.
+
+Full 15-file suite: 282/282 assertions, 0 failures (279 baseline + 3 new). Out of scope, untouched: `commissary_adjustments` (24b-ii), any routes, and the yield-log write route in `server/routes/commissary.js` (new rows default `input_quantity` to NULL).
+
+---
+
 ## 2026-09-02 (Claude Code session) — Step 24a-b: commissaryAuditEngine.test.js test isolation
 
 Test-hygiene-only follow-up to 24a, no source file changes. `commissaryAuditEngine.test.js` shared a single `db` across the whole file, so several tests silently depended on rows an *earlier* test had inserted onto the same commissary meat/date rather than creating their own — `getCommissaryUsage`'s expected `7.5` only held because the `getCommissaryBackedUp` test above it had already inserted a `raw_weight_in=4.0` yield row on the same meat/date; deleting or reordering that earlier test would have silently changed this one's expected number. Same problem, more severely, in the day-1→day-2→day-3→day-4 chain: each "day" reused the previous day's `commissary_ending_actual` as its own `beginning`, so the chain only produced its documented numbers in file order.

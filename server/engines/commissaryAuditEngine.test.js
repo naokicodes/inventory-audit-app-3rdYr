@@ -357,6 +357,42 @@ test('a soft-deleted yield row is excluded from both the input debit and the out
   assert.strictEqual(outputBackedUp, 0, 'soft-deleted row must not credit the output meat');
 });
 
+// Step 24b-i: input_quantity debit cases. New commissary meats + an unused
+// business_date range, same self-contained pattern as 24a above.
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M12', 'Belly Test Input', 'kg', 0.20);
+const bellyInputId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'M12').id;
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M13', 'Chicken Test Input', 'unit', 0.20);
+const chickenInputId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_id = ? AND code = ?').get(commissaryId, 'M13').id;
+
+test('NULL input_quantity debits raw_weight_in exactly as before (back-compat)', () => {
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?)')
+    .run(bellyInputId, '2026-08-13', 32.5, 30.0);
+
+  const usage = getCommissaryUsage(db, bellyInputId, '2026-08-13');
+  assert.ok(Math.abs(usage - 32.5) < 0.0001, `expected raw_weight_in=32.5 fallback, got ${usage}`);
+});
+
+test('a set input_quantity debits that instead of raw_weight_in', () => {
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, input_quantity, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?, ?)')
+    .run(chickenInputId, '2026-08-14', 40, 32.5, 30.0);
+
+  const usage = getCommissaryUsage(db, chickenInputId, '2026-08-14');
+  assert.ok(Math.abs(usage - 40) < 0.0001, `expected input_quantity=40, got ${usage}`);
+});
+
+test('unit-in/kg-out row debits the count from the input while crediting the weighed output to the output meat', () => {
+  db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, output_commissary_meat_id, business_date, input_quantity, raw_weight_in, backed_weight_out) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(chickenInputId, bellyInputId, '2026-08-15', 40, 32.5, 30.0);
+
+  const inputUsage = getCommissaryUsage(db, chickenInputId, '2026-08-15');
+  const outputBackedUp = getCommissaryBackedUp(db, bellyInputId, '2026-08-15');
+
+  assert.ok(Math.abs(inputUsage - 40) < 0.0001, `expected input count=40 debited, got ${inputUsage}`);
+  assert.ok(Math.abs(outputBackedUp - 30.0) < 0.0001, `expected weighed output=30.0 credited, got ${outputBackedUp}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 
 db.close();

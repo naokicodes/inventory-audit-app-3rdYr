@@ -94,19 +94,20 @@ function getCommissaryBackedUp(db, commissaryMeatId, businessDate) {
  * Usage = SUM of commissary_shipments.total_quantity across every
  * destination restaurant for this commissary meat/date (Commissary doesn't
  * sell to end customers, so shipments out are its usage), PLUS SUM of
- * commissary_yield_log.raw_weight_in for every non-soft-deleted yield row
- * where this meat is the input (commissary_meat_id). Step 24a
+ * COALESCE(input_quantity, raw_weight_in) for every non-soft-deleted yield
+ * row where this meat is the input (commissary_meat_id). Step 24a
  * (data-model.md section 10b): the debit half of the debit/credit ledger -
  * processing a meat into an output consumes the input's balance, whether
  * the output is itself (NULL output_commissary_meat_id) or a different
- * meat entirely.
+ * meat entirely. Step 24b-i: input_quantity lets a unit-tracked input debit
+ * its own count instead of the weighed raw_weight_in kg.
  */
 function getCommissaryUsage(db, commissaryMeatId, businessDate) {
   const shipped = db.prepare(
     `SELECT SUM(total_quantity) as qty FROM commissary_shipments WHERE commissary_meat_id = ? AND business_date = ?`
   ).get(commissaryMeatId, businessDate);
   const processed = db.prepare(
-    `SELECT SUM(raw_weight_in) as qty FROM commissary_yield_log WHERE commissary_meat_id = ? AND business_date = ? AND deleted_at IS NULL`
+    `SELECT SUM(COALESCE(input_quantity, raw_weight_in)) as qty FROM commissary_yield_log WHERE commissary_meat_id = ? AND business_date = ? AND deleted_at IS NULL`
   ).get(commissaryMeatId, businessDate);
   return (shipped.qty || 0) + (processed.qty || 0);
 }

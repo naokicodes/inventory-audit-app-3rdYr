@@ -491,3 +491,38 @@ function migrateYieldLogOutputMeatColumn(db) {
 }
 
 module.exports.migrateYieldLogOutputMeatColumn = migrateYieldLogOutputMeatColumn;
+
+// ----------------------------------------------------------------------
+// Step 24b-i (2026-09-02): commissary_yield_log.input_quantity - see
+// docs/data-model.md section 10b and docs/session-status.md's 24b-i
+// bullet. NULL means the input quantity is the same as raw_weight_in
+// (back-compat default). Same plain ALTER TABLE ADD COLUMN shape as
+// migrateYieldLogOutputMeatColumn above - no rebuild needed.
+//
+// Must run BEFORE schema.sql - see connection.js.
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ ran: boolean }}
+ */
+function migrateYieldLogInputQuantityColumn(db) {
+  const tableExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'commissary_yield_log'`
+  ).get();
+  if (!tableExists) {
+    // Fresh install - schema.sql creates it with the column already
+    // present. Nothing to migrate.
+    return { ran: false };
+  }
+
+  const columns = db.prepare(`PRAGMA table_info(commissary_yield_log)`).all();
+  const hasColumn = columns.some(c => c.name === 'input_quantity');
+  if (hasColumn) {
+    return { ran: false };
+  }
+
+  db.exec(`ALTER TABLE commissary_yield_log ADD COLUMN input_quantity REAL`);
+  return { ran: true };
+}
+
+module.exports.migrateYieldLogInputQuantityColumn = migrateYieldLogInputQuantityColumn;

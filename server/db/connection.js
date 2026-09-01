@@ -11,7 +11,7 @@
 const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
-const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn } = require('./migrate.js');
+const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn } = require('./migrate.js');
 
 const DB_PATH = path.join(__dirname, 'inventory.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
@@ -57,6 +57,11 @@ migrateConversionStandardsMeatType(db);
 // adds the nullable output-meat column for anyone with a pre-existing
 // local database from before this feature. See server/db/migrate.js.
 migrateYieldLogOutputMeatColumn(db);
+
+// Step 24b-i (2026-09-02): commissary_yield_log.input_quantity - adds
+// the nullable input-quantity column for anyone with a pre-existing
+// local database from before this feature. See server/db/migrate.js.
+migrateYieldLogInputQuantityColumn(db);
 
 // Run schema.sql on every startup. All statements use "CREATE TABLE IF
 // NOT EXISTS" and "INSERT OR IGNORE", so this is safe to re-run every
