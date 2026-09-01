@@ -11,13 +11,31 @@
 # install) and CLAUDE.md are shared project config and ARE committed.
 .claude/settings.local.json
 
-# graphify's local-only run cost - graphify-out/ itself IS committed
-# (graph.json, GRAPH_REPORT.md are meant to be shared, see web-vs-claude-code.md)
+# graphify — graphify-out/ IS committed, but only the parts worth sharing.
+# See docs/session-status.md's "graphify-out commit policy" note for why each
+# line below is here. Rule of thumb: content is committed, per-run and
+# per-machine artifacts are not.
+#
+# Per-run cost/usage metadata — not content, dirty on nearly every session.
 graphify-out/cost.json
-# per-session usage metadata, not shareable content - changes on nearly every
-# session and would otherwise show as dirty every time. graphify-out/cache/semantic/
-# (the actual extraction results) stays committed - that's the part worth sharing.
 graphify-out/cache/last_query_stamp
+# Machine-local incremental-build state (file stat cache), not content.
+graphify-out/cache/stat-index.json
+# Absolute path to the local Python interpreter — machine-specific, and this
+# repo is public.
+graphify-out/.graphify_python
+# Rendered viewer, ~390KB rewritten in full every run, derived entirely from
+# graph.json. Regenerates locally via the post-commit hook.
+graphify-out/graph.html
+# Per-run dated snapshots (graphify-out/2026-09-02/ etc) — a near-duplicate of
+# the top-level output on every single run. Git already versions the top-level
+# files, so these are redundant history at ~490KB per session.
+graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+#
+# Deliberately NOT ignored: graph.json, manifest.json, GRAPH_REPORT.md,
+# .graphify_labels.json(.sig), .graphify_root, and cache/ast/ + cache/semantic/
+# (content-hashed extraction results — append-only, never rewritten, and the
+# expensive part to regenerate).
 
 # Secrets
 .env
