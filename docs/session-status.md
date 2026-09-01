@@ -76,6 +76,16 @@ The most recent landings, newest first — full detail for each is in
   20c deliberately and re-confirmed as deferred several times since;
   lifted here on 2026-09-01 so it survives the archive split.
 
+- **Latent, NOT a live bug — restaurant-side INNER JOINs.**
+  `commands.js`/`settings.js`/`allocations.js`/`auditEngine.js` INNER JOIN
+  sales/recipe/allocations to `dishes`/`meats`/`restaurants`/`adjustment_types`,
+  which would silently drop rows if a parent were ever deleted. Confirmed
+  2026-09-01 that none of those parents are ever hard- or soft-deleted, so
+  nothing can drop today — dormant, not broken. The commissary-side family
+  (`commissary_id`, `meat_type_id`) is already fully closed (LEFT JOIN +
+  guards). If a delete feature is ever added for dishes/meats/restaurants,
+  revisit these joins first.
+
 ## Step 24 — multi-stage yield + Commissary-side allocation (designed, NOT started)
 
 
@@ -236,6 +246,20 @@ the same architecture session as item 3's rekey:**
   default-output config, and the `M02→M01`/`M04→M03`/`M06→M05` pairing — the
   engine handles whatever input/output a row names, so no pairs need
   pre-wiring, and there is no historical data to backfill.
+  **Blast radius (mapped 2026-09-01, so the prompt is airtight):** 24a
+  touches only `commissaryAuditEngine.js` (the debit/credit change),
+  `commissaryAuditEngine.test.js` (rewrite the 4 balance tests + add
+  cross-row/cross-unit/soft-delete cases — the ONLY test file that breaks),
+  and `schema.sql` + the idempotent migration for the column. Verified
+  unaffected: `dashboard.test.js` (no yield fixtures);
+  `commissary.test.js`/`history.test.js` (their yield inserts feed
+  loss%/activity-log/CRUD, never a balance); `commissaryYieldEngine.*`
+  (loss%, not balance); `dailyAudit.*`/`history.js` (no balance from yield).
+  Leave the yield-log write route (`commissary.js` INSERT/UPDATE) untouched —
+  new rows default `output_commissary_meat_id` to NULL (same-meat), and 24a's
+  cross-row cases are exercised by direct test inserts, exactly as the
+  existing engine tests already insert yield rows. Creating cross-row events
+  through the UI is 24b (the form).
 - **24b (engine/routes)**: per-meat "next stage" config so the yield form
   can default the output dropdown, `commissary_adjustments` CRUD + balance
   effects, Miscuts destination filtering via `meat_type_id`. (The
