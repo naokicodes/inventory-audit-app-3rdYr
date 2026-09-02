@@ -24,9 +24,12 @@ not taken from a worker's report. Per-step detail is in `changelog.md`; the
 archived sub-step entries and the full step-24 narrative are in
 `session-history.md`.
 
-**Next coding step: 24b-v** — a live data-corruption bug found 2026-09-02
-*after* step 24 closed, written up in its own section below. Fix it before
-soft-launch. Beyond that, no further step is defined, deliberately.
+**Next coding step: 25b**, then 25a, then 24b-v — all three written up in
+their own sections below. 25a/25b close a gap found 2026-09-02: the commissary
+ledger has no way to enter opening stock, a physical count, or supplier
+receipts, so every commissary balance is currently null. 24b-v is a
+data-corruption guard that only matters once balances work. All three land
+before soft-launch.
 The plan after 24b-v is to soft-launch against real output and let actual use
 decide what gets built next, rather than guessing at features — the same
 reasoning that deferred the per-meat next-stage config. The open architectural
@@ -117,6 +120,32 @@ balance ledger crediting and debiting both sides correctly, and the UI to enter
 all of it.
 
 ## Things NOT to re-litigate (already decided, stable)
+
+- **Every intake records BOTH a count and a weight when the meat is
+  unit-tracked.** Confirmed by NaokiiVT 2026-09-02 for purchasing, and it is
+  the same measurement pattern already settled for processing. This has now
+  surfaced three times in three different places, so treat it as a general rule
+  rather than a yield-log quirk: **the count drives the stock balance, the
+  weight drives the money and the yield percentage, and both are real
+  measurements of one event.** Any table recording meat entering or being
+  consumed needs somewhere to put both numbers. Where only one column exists,
+  that is a bug waiting to happen — either the purchase weight is lost, or kg
+  get debited against a count, which is the 24b-v corruption arriving through a
+  different door. `commissary_yield_log` has this (`input_quantity` /
+  `raw_weight_in`); `commissary_stock_receipts` does NOT, and step 25a fixes
+  that.
+
+- **FC does not need its own commissary.** Considered and rejected 2026-09-02.
+  A commissary exists to *convert* meat — that is what yield events are. FC only
+  ever receives and sells, and meat reaching a restaurant without passing
+  through a commissary is already fully modelled by
+  `stock_receipts.source = 'DIRECT'`. A second commissary there would add a
+  catalog to maintain and buy nothing `DIRECT` receipts don't already give.
+  Note this is a decision about FC specifically, not about multi-commissary
+  support, which is built, working, and verified. Adding a commissary later is a
+  data operation — `POST /api/settings/commissaries` plus tagging its catalog —
+  not a code change. Revisit only if FC ever starts converting meat rather than
+  just receiving it.
 
 - **Commissary-to-commissary movement is an ALLOCATION, not a shipment.**
   Asked and settled 2026-09-02. A shipment cannot express it:
@@ -337,6 +366,66 @@ the step it was working on is fully finished — should, before ending:
    new parallel "handoff" doc; extend this file instead, so there's never
    again a second doc that can silently drift out of sync with the real
    one.
+
+## Steps 25a / 25b — the commissary ledger has no way in
+
+**Found 2026-09-02 by an architect audit of every write path into the
+commissary ledger. Confirmed against NaokiiVT's live database: all three tables
+below are empty, and nothing in the codebase can write them.**
+
+`commissary_opening_stock`, `commissary_ending_actual`, and
+`commissary_stock_receipts` are defined in `schema.sql`, read correctly by
+`commissaryAuditEngine.js`, and referenced in comments — but **no route, no
+seed, and no script inserts into any of them.** Verified by grep across the
+whole repo and by running the engine on a realistic fresh install:
+
+```
+status:           MISSING_BEGINNING_STOCK
+beginning:        null
+endingCalculated: null
+actual:           null
+variance:         null
+```
+
+So today every commissary balance card renders `-`, and variance and
+`unexplainedVariance` can never compute — the audit half of an audit app. The
+debit/credit ledger built across all of step 24 is correct and unreachable, and
+24c-ii's Allocate/Write-off buttons sit on cards that cannot show a number.
+
+**The restaurant side is NOT affected and is not missing anything.**
+`dailyAudit.js` writes `opening_stock` and `ending_actual`, `stockReceipts.js`
+writes `stock_receipts`, `sales.js` writes `sales`. Those tables read as empty
+only because no day has been entered yet. The gap is commissary-only, and each
+piece has a working restaurant-side equivalent to mirror.
+
+### 25b — commissary opening stock + physical count. DO THIS FIRST.
+The commissary equivalent of `daily-audit.html`, writing
+`commissary_opening_stock` and `commissary_ending_actual`. Unblocks every
+balance card in the app at once, and turns the commissary from a ledger into an
+audit: no beginning means no `endingCalculated`, no counted actual means no
+variance. Mirror the restaurant daily-audit page's shape.
+
+### 25a — commissary stock receipts. Raw meat arriving from suppliers.
+Bigger than a route-and-UI mirror of `stockReceipts.js`, because
+**`commissary_stock_receipts` has a single `quantity` column and cannot record
+what is actually measured.** Raw meat arrives directly at the commissary; for a
+unit-tracked meat the crew records both the count that arrived and the weight
+paid for. One column forces losing one of them (see the count-and-weight rule
+above). So 25a needs a nullable weight column alongside `quantity`, mirroring
+the `input_quantity`/`raw_weight_in` split — which means an idempotent
+migration in `server/db/migrate.js` (follow
+`migrateYieldLogInputQuantityColumn`), not just routes and a form.
+
+**Sequence: 25b, then 25a, then 24b-v.** 24b-v is correctly last — it guards a
+corruption case that cannot occur until the balances work, and NaokiiVT's
+database confirms zero existing bad rows.
+
+**Before soft-launch, wipe and reseed `server/db/inventory.db`.** There is no
+real data anywhere (every ledger table is 0 rows), but there is test residue:
+5 yield rows and 2 adjustments, likely soft-deleted worker verification rows,
+plus two retired test meat types. A reseed gives a clean catalog and an empty
+ledger with nothing to mistake for real rows later. Do it before real entry
+starts, not after.
 
 ## Step 24b-v — REQUIRED: the effective yield output must be kg-tracked
 
