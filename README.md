@@ -107,6 +107,73 @@ This repo is **public**. Never put real supplier names, staff names, live
 yield figures, or photos into code, docs, commit messages, issues, or
 pull requests.
 
+## Verifying your environment
+
+One command proves the whole setup. From the repo root, in PowerShell:
+
+```
+Get-ChildItem -Path server -Recurse -Filter *.test.js | ForEach-Object { $o = node $_.FullName 2>&1 | Select-String "passed" | Select-Object -Last 1; "$($_.Name) :: $o" }
+```
+
+You should get 16 lines and **325 passed, 0 failed** in total, with
+`commissary.test.js` the largest at 94. Anything else means the
+environment is wrong, not the app.
+
+Verified working on Node 22 and Node 24.19.0 — identical results on both,
+so `OpenJS.NodeJS.LTS` resolving to a newer major is fine.
+
+## Troubleshooting a fresh Windows setup
+
+All six of these were hit in one real setup session. None are app bugs;
+they are all environment.
+
+**`npm : File ...\npm.ps1 cannot be loaded because running scripts is
+disabled`**
+PowerShell blocks the `.ps1` shim. Either allow scripts for this window
+only —
+```
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+— or sidestep it entirely by calling the `.cmd` directly: `npm.cmd`,
+`claude.cmd`, `graphify.cmd`. Prefer `-Scope Process` on a shared
+machine; it dies with the window and leaves nothing relaxed behind you.
+
+**The execution-policy fix stopped working**
+It is process-scoped, so it does not survive a new terminal. Re-run it
+each session.
+
+**`fatal: could not create work tree dir ... Permission denied`**
+The clone path isn't writable. Use `cd $env:TEMP` and clone there, or
+create `C:\Temp`. Treat anything in `$env:TEMP` as disposable — shared
+machines often wipe it on reboot.
+
+**`setup-dev-environment.bat` step 5 fails with "not recognized"**
+Expected on a first run: winget installed Git/Node/uv but this window's
+PATH predates them. Close the window, open a new one, run the script
+again — it skips what's already installed. To fix just that step without
+a full re-run:
+```
+npm.cmd install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code
+```
+```
+uv tool install graphifyy
+```
+
+**Claude Code installed but `claude` misbehaves**
+Recent npm blocks install scripts by default and prints an
+`allow-scripts` warning, so the package lands but its postinstall never
+runs. Reinstall with the `--allow-scripts` form above.
+
+**`graphify` not recognized even after `uv tool update-shell` says PATH
+is updated**
+A PATH change does not reach VS Code's integrated terminal until **VS
+Code itself** restarts — closing the terminal panel is not enough. Fix
+the current window with:
+```
+$env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+```
+or close VS Code entirely and reopen it.
+
 ## Working on this project
 - `docs/engineer-role.md` — what a collaborator may change unilaterally,
   and what must be parked for an architect. Read this first.
