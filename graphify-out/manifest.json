@@ -6,10 +6,10 @@
     "semantic_hash": "8d0b8cd2cddeeba6ace4d2fd1e77577b"
   },
   "package.json": {
-    "mtime": 1787633425.382626,
-    "seen": 1788131184.5477054,
-    "ast_hash": "d312694de4a4281c3000b0d391503be7",
-    "semantic_hash": "d312694de4a4281c3000b0d391503be7"
+    "mtime": 1788392411.8520145,
+    "seen": 1788392667.92544,
+    "ast_hash": "ca177977433dad4432fff843e767183c",
+    "semantic_hash": ""
   },
   "public/command-panel.js": {
     "mtime": 1787995438.3601122,
@@ -42,10 +42,10 @@
     "semantic_hash": "d946cd77731e4f0deea113ec9b765eb1"
   },
   "server/db/commissary-seed-data.json": {
-    "mtime": 1788031020.7290118,
-    "seen": 1788131184.5477054,
-    "ast_hash": "a60f98dafd451fa3c92635741b903866",
-    "semantic_hash": "a60f98dafd451fa3c92635741b903866"
+    "mtime": 1788387875.5656707,
+    "seen": 1788388112.4205575,
+    "ast_hash": "63483a1e2771c3ee3bf44c25cee64fd3",
+    "semantic_hash": ""
   },
   "server/db/connection.js": {
     "mtime": 1788291613.8196566,
@@ -84,10 +84,10 @@
     "semantic_hash": "17e6e65d489f5e9d8c00b2f768e5255d"
   },
   "server/db/seed.js": {
-    "mtime": 1788129900.0210452,
-    "seen": 1788131184.5477054,
-    "ast_hash": "ceff811715da5b6130deb997d20235ce",
-    "semantic_hash": "ceff811715da5b6130deb997d20235ce"
+    "mtime": 1788387893.9093232,
+    "seen": 1788388112.4205575,
+    "ast_hash": "b2b14c937eb0d53f29e3cceb34facfd5",
+    "semantic_hash": ""
   },
   "server/engines/auditEngine.js": {
     "mtime": 1787954231.6500127,
@@ -306,10 +306,10 @@
     "semantic_hash": "8a6643a420fdad6bfb583523bc6cef16"
   },
   "README.md": {
-    "mtime": 1787635540.243958,
-    "seen": 1788131184.5477054,
-    "ast_hash": "8ada7f262bc5e354a3dce4e7bc0fc4b7",
-    "semantic_hash": "8ada7f262bc5e354a3dce4e7bc0fc4b7"
+    "mtime": 1788392225.4326353,
+    "seen": 1788392667.92544,
+    "ast_hash": "067bdf7c8f50ad16557dbb057f104dff",
+    "semantic_hash": ""
   },
   "docs/changelog.md": {
     "mtime": 1788359540.6434205,
@@ -342,9 +342,9 @@
     "semantic_hash": "68cbe0c8309ba56510b956089f8148ac"
   },
   "docs/rules-for-claude-code.md": {
-    "mtime": 1788350720.482402,
-    "seen": 1788359594.4210277,
-    "ast_hash": "897b902b1267e161def3945820e49f76",
+    "mtime": 1788392225.4456356,
+    "seen": 1788392667.92544,
+    "ast_hash": "ae45175d8e078a1c097460d928347d5a",
     "semantic_hash": ""
   },
   "docs/scope.md": {
@@ -354,9 +354,9 @@
     "semantic_hash": "f2736eab89f5430d53d7b481697d1a96"
   },
   "docs/session-status.md": {
-    "mtime": 1788359565.077849,
-    "seen": 1788359594.4210277,
-    "ast_hash": "027db0ba31c7802431f431a2a96701ea",
+    "mtime": 1788392225.4526742,
+    "seen": 1788392667.92544,
+    "ast_hash": "70b18b558fc337165cd4509bf0ea928c",
     "semantic_hash": ""
   },
   "docs/tech-stack.md": {
@@ -459,6 +459,78 @@
     "mtime": 1788351359.2543025,
     "seen": 1788359594.4210277,
     "ast_hash": "f804cb67383a6c3bd9f251a54930ebba",
+    "semantic_hash": ""
+  },
+  ".github/ISSUE_TEMPLATE/needs-architect.md": {
+    "mtime": 1788392225.4256384,
+    "seen": 1788392667.92544,
+    "ast_hash": "10a11b46d6b8543b9272eb44ee005f86",
+    "semantic_hash": ""
+  },
+  ".github/pull_request_template.md": {
+    "mtime": 1788392225.4186397,
+    "seen": 1788392667.92544,
+    "ast_hash": "a68d7166cddd36bfa27264b4406149a0",
+    "semantic_hash": ""
+  },
+  "docs/dispatch-queue.md": {
+    "mtime": 1788383478.656995,
+    "seen": 1788383525.895568,
+    "ast_hash": "73f20aea572a4e55946caec0b3e2cc73",
+    "semantic_hash": ""
+  },
+  "docs/engineer-role.md": {
+    "mtime": 1788392225.4396365,
+    "seen": 1788392667.92544,
+    "ast_hash": "5f33cec5b9415e0c9d3b9b309fc454de",
+    "semantic_hash": ""
+  },
+  "scripts/audit-write-paths.js": {
+    "mtime": 1788392411.8077788,
+    "seen": 1788392667.92544,
+    "ast_hash": "5630e0719fe45e6a0c949cc517ff4c0f",
+    "semantic_hash": ""
+  },
+  "scripts/run-tests.js": {
+    "mtime": 1788392411.8207955,
+    "seen": 1788392667.92544,
+    "ast_hash": "b7439e5181d3ec29e44054eecc805072",
+    "semantic_hash": ""
+  },
+  "scripts/write-path-allowlist.json": {
+    "mtime": 1788392411.8280387,
+    "seen": 1788392667.92544,
+    "ast_hash": "9e227e5014ace0eccb64574cf82a6708",
+    "semantic_hash": ""
+  },
+  ".claude/commands/step.md": {
+    "mtime": 1788392225.4042952,
+    "seen": 1788392667.92544,
+    "ast_hash": "3e1ba661ed9227f499f4a694f7384a01",
+    "semantic_hash": ""
+  },
+  ".claude/commands/verify.md": {
+    "mtime": 1788392225.4113836,
+    "seen": 1788392667.92544,
+    "ast_hash": "9f849c1eee60aabfed5a24040ce84f74",
+    "semantic_hash": ""
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1788392411.8411527,
+    "seen": 1788392667.92544,
+    "ast_hash": "4081c22e8be8ff4072686144ba1b21d5",
+    "semantic_hash": ""
+  },
+  "docs/decision-authority.md": {
+    "mtime": 1788392411.8346443,
+    "seen": 1788392667.92544,
+    "ast_hash": "f84b2937d5f5abbcc5e11f87d5900969",
+    "semantic_hash": ""
+  },
+  "docs/workflow-guide.md": {
+    "mtime": 1788392225.3917086,
+    "seen": 1788392667.92544,
+    "ast_hash": "da994ae348a4927e073bd8feb1678f77",
     "semantic_hash": ""
   }
 }
