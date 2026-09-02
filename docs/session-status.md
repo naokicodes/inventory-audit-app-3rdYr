@@ -562,18 +562,34 @@ case the moment a second commissary exists, and tagging in seed data costs
 nothing versus a second manual pass later.
 
 **3. `server/db/seed.js`** — seed `meat_types` before commissary meats, then set
-`meat_type_id` when inserting each commissary meat. Must stay re-runnable in the
-existing style: `INSERT OR IGNORE` keyed on the natural unique, matching how
-`restaurants`, `meats` and `commissary_meats` are already handled. Re-running on
-a populated DB must remain a no-op.
+`meat_type_id` when inserting each commissary meat. Re-running on a populated DB
+must remain a no-op.
 
-Note `INSERT OR IGNORE` means the tag is applied **only on insert**. It will not
-retro-tag the fourteen rows in an existing `inventory.db` — that is fine and
-expected, because the reseed is preceded by a wipe. Do not add an UPDATE path to
-force it; that would silently overwrite hand tagging.
+**`meat_types` has NO UNIQUE constraint** — the table is `id / name / active`
+only. `INSERT OR IGNORE` therefore does NOT dedupe it and would insert eleven
+fresh duplicate types on every run. Use a lookup-then-insert instead: SELECT the
+id by name, INSERT only when absent, and reuse the id either way. Do NOT add a
+UNIQUE constraint — `schema.sql` is `CREATE TABLE IF NOT EXISTS` and could not
+apply it to an existing `inventory.db` anyway, which would drag a migration into
+a step scoped to have none.
 
-Because type names are the natural key, renaming a type later creates a new row
+`commissary_meats` is different and its existing `INSERT OR IGNORE` is correct —
+it has `UNIQUE (commissary_id, code)`. Only the new `meat_types` insert needs
+the lookup pattern.
+
+That `INSERT OR IGNORE` on `commissary_meats` also means the tag is applied
+**only on insert**. It will not retro-tag the fourteen rows in an existing
+`inventory.db` — that is fine and expected, because the reseed is preceded by a
+wipe. Do not add an UPDATE path to force it; that would silently overwrite hand
+tagging.
+
+Because type names are matched by name, renaming a type later creates a new row
 rather than editing the old one. Acceptable pre-soft-launch; worth knowing.
+
+**M15 is confirmed free.** The real `Commi_Audit_Master.xlsx` `Meats` sheet has
+16 rows, and M15 is a genuinely empty one — no name, unit or cost. `seed.js`'s
+comment currently reads "M15 blank in the source sheet, skipped"; that comment
+must be updated, since it stops being true.
 
 ### Out of scope
 - No schema change. `meat_types` and `commissary_meats.meat_type_id` both
