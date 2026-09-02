@@ -117,18 +117,37 @@ for (const filename of restaurantSeedFiles) {
 db.prepare(`INSERT OR IGNORE INTO commissaries (code, name) VALUES ('COM-A', 'Commissary A')`).run();
 const commissaryId = db.prepare(`SELECT id FROM commissaries WHERE code = 'COM-A'`).get().id;
 
-// Full real 14-row M01-M14 set (M15 blank in the source sheet, skipped) -
-// see docs/changelog.md's step-9 entry for the verification history; the
-// "only 3 hand-verified meats" state this comment used to describe was
-// resolved before step 10 ever landed.
+// Full real 15-row M01-M15 set - see docs/changelog.md's step-9 entry for
+// the verification history; the "only 3 hand-verified meats" state this
+// comment used to describe was resolved before step 10 ever landed.
 const commissaryDataPath = path.join(__dirname, 'commissary-seed-data.json');
 const commissaryData = JSON.parse(fs.readFileSync(commissaryDataPath, 'utf8'));
+
+// meat_types has no UNIQUE constraint on name, so INSERT OR IGNORE would
+// insert a fresh duplicate row every run - look up by name first, only
+// insert when absent, and reuse the id either way.
+const getMeatTypeId = db.prepare('SELECT id FROM meat_types WHERE name = ?');
+const insertMeatType = db.prepare('INSERT INTO meat_types (name) VALUES (?)');
+const meatTypeIds = {};
+let meatTypesInserted = 0;
+for (const typeName of commissaryData.meat_types) {
+  const existing = getMeatTypeId.get(typeName);
+  if (existing) {
+    meatTypeIds[typeName] = existing.id;
+  } else {
+    const result = insertMeatType.run(typeName);
+    meatTypeIds[typeName] = result.lastInsertRowid;
+    meatTypesInserted++;
+  }
+}
+console.log(`Meat types: ${meatTypesInserted} inserted (of ${commissaryData.meat_types.length} in file)`);
+
 const insertCommissaryMeat = db.prepare(
-  'INSERT OR IGNORE INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?)'
+  'INSERT OR IGNORE INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
 );
 let commissaryMeatsInserted = 0;
 for (const cm of commissaryData.commissary_meats) {
-  const result = insertCommissaryMeat.run(commissaryId, cm.code, cm.name, cm.unit, cm.allowed_leeway_pct, cm.cost_per_unit ?? null);
+  const result = insertCommissaryMeat.run(commissaryId, cm.code, cm.name, cm.unit, cm.allowed_leeway_pct, cm.cost_per_unit ?? null, meatTypeIds[cm.meat_type]);
   if (result.changes > 0) commissaryMeatsInserted++;
 }
-console.log(`Commissary meats: ${commissaryMeatsInserted} inserted (of ${commissaryData.commissary_meats.length} in file - full real Meats sheet, M01-M14)`);
+console.log(`Commissary meats: ${commissaryMeatsInserted} inserted (of ${commissaryData.commissary_meats.length} in file - full real Meats sheet, M01-M15)`);
