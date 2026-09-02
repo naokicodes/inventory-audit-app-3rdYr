@@ -126,6 +126,19 @@ all of it.
 
 ## Things NOT to re-litigate (already decided, stable)
 
+- **The app records what is physically on hand, not what was invoiced.**
+  Confirmed by NaokiiVT 2026-09-02. On a delivery the commissary weigh-checks
+  against the supplier's figure; where they disagree, **our own scale wins** and
+  the difference is absorbed as a small loss rather than modelled. Do not add an
+  invoice-weight column, a supplier-discrepancy field, or a shortage variance to
+  the receipts flow. If short deliveries ever become large or frequent this can
+  be revisited, but it is deliberately out of scope, and a balance that reflects
+  what was billed rather than what arrived would defeat the purpose of the app.
+- **Box tare is already netted out by everyone involved and must never be
+  modelled.** Meat arrives boxed; the box is weighed, the tare is already
+  accounted for by all parties, then the box is opened and the contents counted.
+  A future "box weight" or tare field is not a missing feature.
+
 - **Every intake records BOTH a count and a weight when the meat is
   unit-tracked.** Confirmed by NaokiiVT 2026-09-02 for purchasing, and it is
   the same measurement pattern already settled for processing. This has now
@@ -411,16 +424,42 @@ upsert), plus the "Opening stock & physical count" section on
 a real booted server. Full detail in `changelog.md`'s 25b entry - don't
 re-derive it here.
 
-### 25a — commissary stock receipts. Raw meat arriving from suppliers.
+### 25a — commissary stock receipts. Raw meat arriving from suppliers. NEXT.
 Bigger than a route-and-UI mirror of `stockReceipts.js`, because
 **`commissary_stock_receipts` has a single `quantity` column and cannot record
-what is actually measured.** Raw meat arrives directly at the commissary; for a
-unit-tracked meat the crew records both the count that arrived and the weight
-paid for. One column forces losing one of them (see the count-and-weight rule
-above). So 25a needs a nullable weight column alongside `quantity`, mirroring
-the `input_quantity`/`raw_weight_in` split — which means an idempotent
-migration in `server/db/migrate.js` (follow
-`migrateYieldLogInputQuantityColumn`), not just routes and a form.
+what is actually measured.**
+
+How a delivery really works, confirmed by NaokiiVT 2026-09-02: meat arrives
+boxed and is paid for on total kg. The commissary weighs the box (tare already
+netted out by all parties — never model it), then opens it and counts the
+contents. So a countable meat always yields **both** numbers, every time; there
+is no weight-only delivery for a meat that is normally counted.
+
+**Schema change:** add a nullable `weight_kg REAL` to
+`commissary_stock_receipts` via an idempotent migration in
+`server/db/migrate.js` (follow `migrateYieldLogInputQuantityColumn`).
+`schema.sql` uses `CREATE TABLE IF NOT EXISTS` and cannot alter an existing
+local `inventory.db`.
+
+**Which column means what.** `getCommissaryStockIn` sums `quantity` and credits
+it straight to the balance, so `quantity` must stay in the meat's **own unit** —
+a count for a counted meat, kg for a weighed one. `weight_kg` is the total
+delivered weight for the whole delivery, and it is the *additional* number. This
+is the mirror image of the yield log: there kg was already present and the count
+was added; here the count is the balance figure and the weight is added. Same
+count-and-weight rule, opposite column.
+
+- 40 chickens arriving: `quantity = 40`, `weight_kg = 32.5`
+- 18 kg of belly arriving: `quantity = 18`, `weight_kg` 18 or NULL — for a
+  kg-tracked meat the two are the same number
+
+**`weight_kg` is REQUIRED when the meat's unit is `unit`**, for the same reason
+`input_quantity` is required on yield events: both numbers genuinely exist at
+every intake, so requiring it matches reality rather than imposing on it. It
+stays optional for a `kg` meat.
+
+Do **not** add an invoice-weight or discrepancy column — see "Things NOT to
+re-litigate".
 
 **Sequence: 25b, then 25a, then 24b-v.** 24b-v is correctly last — it guards a
 corruption case that cannot occur until the balances work, and NaokiiVT's
