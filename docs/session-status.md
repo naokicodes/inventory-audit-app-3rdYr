@@ -33,6 +33,18 @@ file is `server/routes/commissaryAdjustments.test.js`.
 
 ## Known open items (not the next step's problem, just not forgotten)
 
+- **Commissary meats are untagged — `meat_type_id` is NULL on live data.**
+  This is a data-entry prerequisite for allocations, not a build task: an
+  untagged source has no valid destinations, so
+  `GET /commissary/adjustments/destinations` correctly returns `[]` and every
+  Allocate dropdown will be empty until the tagging is done. Everything needed
+  is already shipped — `GET`/`POST`/`PUT /api/settings/meat-types` and the
+  `meat_type_id` field on `POST`/`PUT /api/settings/commissary-meats/:id`,
+  both wired into `settings.html`. Tag every commissary meat that could ever
+  move or be allocated, on both sides, before soft-launch. Note that a
+  destination must match on `unit` as well, so two sides of the same meat type
+  tracked in different units still won't pair.
+
 - **A real click-through in an actual browser is still owed** for Stock
   Receipts' Unallocated/Assign flow specifically — the 2026-08-28 session
   had no browser available (no puppeteer/playwright, and the download
@@ -58,7 +70,7 @@ file is `server/routes/commissaryAdjustments.test.js`.
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii, 24b-iii DONE)
+## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii, 24b-iii DONE; 24c-ii NEXT, then 24b-iv, then 24c-i)
 
 The full design narrative, the 2026-08-31 resolution of its open questions,
 and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, 24b-iii,
@@ -76,15 +88,77 @@ create/list/patch/delete and every rejection path, not an accepted ALLOCATION
 end to end — that's covered by the mirrored-logic test file instead. See
 `changelog.md` for full detail.
 
-**24c (UI), confirmed, remains — next up:** on the yield-entry form, the
-output-item field (defaults to the same meat) and the input-count field
-alongside the weighed input. On the commissary balance view, an Allocate and a
-Write-off action, backed by the routes 24b-iii just added.
+**Gap found 2026-09-02 (architect verification pass), before dispatching 24c:**
+`output_commissary_meat_id` (24a) and `input_quantity` (24b-i) exist in
+`schema.sql`, have idempotent migrations, and are fully consumed by
+`commissaryAuditEngine.js` — `getCommissaryBackedUp` credits
+`COALESCE(output_commissary_meat_id, commissary_meat_id)` and
+`getCommissaryUsage` debits `COALESCE(input_quantity, raw_weight_in)`. But
+**nothing writes either column.** `grep` across `server/routes/*.js` returns
+zero hits for both. The yield-log `POST` destructures six fields and neither is
+among them; `PATCH` likewise, so an existing event can't be corrected either.
+
+This was correct scoping at the time, not a slip — 24b-i's `changelog.md` entry
+names the write route as explicitly out of scope. It simply never got
+scheduled afterwards, and the sub-step list ran straight from 24b-iii to
+"24c — UI" as though the write path existed.
+
+Why this matters: a worker given "24c — UI" as previously worded would add the
+output-item and input-count fields, POST them, receive `{ok: true}`, and have
+both values silently discarded. The form would look like it worked and the
+balance math would never move. The engine reading these columns *correctly* is
+what makes the failure silent.
+
+**Remaining sub-steps, re-sequenced:**
+
+- **24c-ii — Allocate / Write-off UI on the commissary balance view. NEXT, and
+  dispatchable now.** Fully unblocked: 24b-ii's engine folds ALLOCATION into
+  `endingCalculated` and LOSS into `expectedEnding`, and 24b-iii's routes
+  (`GET`/`POST`/`PATCH`/`DELETE /commissary/adjustments`, plus
+  `GET /commissary/adjustments/destinations`) are in place and tested. Purely
+  additive to `public/commissary.html`; touches no engine and no route.
+- **24b-iv — yield-log write path.** Extend `POST` and `PATCH
+  /commissary/yield-log` to accept `output_commissary_meat_id` and
+  `input_quantity`. The output meat must be active and must belong to the
+  **same `commissary_id` as the input** (see "Things NOT to re-litigate");
+  it is otherwise unconstrained — no `meat_type_id` or `unit` match, because
+  the yield log is the one place a unit legitimately changes. Numbered in the
+  24b tier because it is route work, not UI. Blocks 24c-i.
+- **24c-i — yield-entry form UI.** The output-item field (defaults to the same
+  meat, i.e. NULL) and the input-count field alongside the weighed input.
+  Requires 24b-iv first.
+
+24c-ii is deliberately dispatched ahead of 24b-iv even though it sorts later:
+the two are independent, and running them in this order keeps two workers off
+`public/commissary.html` at the same time — that file is the only real
+collision risk between them.
 ## Things NOT to re-litigate (already decided, stable)
 
+- **Commissary-to-commissary movement is an ALLOCATION, not a shipment.**
+  Asked and settled 2026-09-02. A shipment cannot express it:
+  `commissary_shipments.restaurant_id` is `NOT NULL` with an FK to
+  `restaurants`, and more importantly a shipment row only *debits* —
+  `getCommissaryUsage` counts it as usage, and the receiving side is credited
+  by a separate record entirely (`stock_receipts` for a restaurant,
+  `commissary_stock_receipts` for supplier arrivals). Routing a
+  commissary-to-commissary move through shipments would therefore need a schema
+  change *and* produce two unlinked rows for one physical movement, where
+  deleting one makes the meat duplicate or evaporate. ALLOCATION already does
+  both halves from a single soft-deletable row. **Allocation destinations are
+  therefore deliberately NOT restricted by `commissary_id`** — crossing
+  locations is the point. Do not "fix" this.
+  Verified numerically 2026-09-02 against a real `node:sqlite` DB with two
+  separate commissaries: 100/100 → 70/130 on a single 30 kg ALLOCATION row,
+  total conserved at 200, and a soft delete of that one row returned both
+  sides to 100/100.
+- **Yield output IS restricted to the input's own commissary** (24b-iv). The
+  opposite rule from allocations, on purpose: an allocation is a movement, a
+  yield event is a conversion, and meat cannot be processed in one building
+  into another building's inventory. Without the guard a misclick in the output
+  dropdown silently books stock to the wrong location. Crossing locations is
+  two events — a yield, then an allocation.
 - Tech stack: Node.js + Express + `node:sqlite` (not better-sqlite3, not
-  Postgres) — see `changelog.md` for why.
-- Single local machine, one SQLite file, no hosting/multi-user — see
+  Postgres) — see `changelog.md` for why.- Single local machine, one SQLite file, no hosting/multi-user — see
   `scope.md`.
 - Docs-first workflow: update the relevant `docs/*.md` file whenever a
   real decision changes, before or alongside the code. Architecture
