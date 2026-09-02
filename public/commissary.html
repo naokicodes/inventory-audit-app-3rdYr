@@ -60,6 +60,21 @@
   </div>
   <div id="balances">Loading...</div>
 
+  <div id="adjust-panel" class="add-form" style="display:none;">
+    <strong id="adjust-title"></strong>
+    <label>Date <input type="date" id="adjust-date"></label>
+    <label>Quantity <input type="number" step="0.01" id="adjust-qty" placeholder="0"></label>
+    <label id="adjust-dest-wrap" style="display:none;">Destination <select id="adjust-dest"></select></label>
+    <label>Notes <input type="text" id="adjust-notes" placeholder="optional"></label>
+    <button id="adjust-submit">Save</button>
+    <button id="adjust-cancel">Cancel</button>
+  </div>
+  <div id="adjust-status" class="status-message"></div>
+
+  <h2>Adjustments (allocations &amp; write-offs)</h2>
+  <p class="hint">Allocation moves stock between two commissary meats (debits the source, credits the destination). Write-off (LOSS) explains a variance without moving stock anywhere - it reduces expected ending, so it stays visible, reclassified from unexplained to explained.</p>
+  <div id="adjustments-table">Loading...</div>
+
   <h2>Log a yield event</h2>
   <div class="add-form">
     <label>Date <input type="date" id="new-date"></label>
@@ -165,9 +180,188 @@
         <div class="balance-card">
           <div class="code">${r.code} - ${r.name}</div>
           <div class="qty${onHand !== null && onHand < 0 ? ' negative' : ''}">${fmt(onHand)} <span class="hint">${r.unit}</span></div>
+          <div class="row-actions">
+            <button class="allocate-btn" data-id="${r.commissary_meat_id}" data-code="${r.code}" data-name="${r.name}" data-unit="${r.unit}">Allocate</button>
+            <button class="writeoff-btn" data-id="${r.commissary_meat_id}" data-code="${r.code}" data-name="${r.name}" data-unit="${r.unit}">Write-off</button>
+          </div>
         </div>
       `;
       }).join('')}</div>`;
+
+      document.querySelectorAll('#balances .allocate-btn').forEach(btn => {
+        btn.addEventListener('click', () => openAdjustForm('ALLOCATION', btn.dataset));
+      });
+      document.querySelectorAll('#balances .writeoff-btn').forEach(btn => {
+        btn.addEventListener('click', () => openAdjustForm('LOSS', btn.dataset));
+      });
+    }
+
+    // ---------- Adjustments (Allocate / Write-off) ----------
+    const adjustPanel = document.getElementById('adjust-panel');
+    const adjustTitle = document.getElementById('adjust-title');
+    const adjustDate = document.getElementById('adjust-date');
+    const adjustQty = document.getElementById('adjust-qty');
+    const adjustDestWrap = document.getElementById('adjust-dest-wrap');
+    const adjustDest = document.getElementById('adjust-dest');
+    const adjustNotes = document.getElementById('adjust-notes');
+    const adjustSubmit = document.getElementById('adjust-submit');
+    const adjustStatus = document.getElementById('adjust-status');
+
+    let adjustState = null; // { meatId, kind, editId }
+    let lastAdjustmentRows = [];
+
+    async function openAdjustForm(kind, meat, editRow) {
+      adjustState = { meatId: Number(meat.id), kind, editId: editRow ? editRow.id : null };
+      adjustTitle.textContent = `${kind === 'ALLOCATION' ? 'Allocate' : 'Write-off'}: ${meat.code} - ${meat.name} (${meat.unit})`;
+      adjustDate.value = editRow ? editRow.business_date : balanceDate.value;
+      adjustQty.value = editRow ? editRow.quantity : '';
+      adjustNotes.value = editRow ? (editRow.notes || '') : '';
+      adjustStatus.textContent = '';
+      adjustStatus.className = 'status-message';
+      adjustSubmit.disabled = false;
+
+      if (kind === 'ALLOCATION') {
+        adjustDestWrap.style.display = '';
+        adjustDest.innerHTML = '<option value="">Loading...</option>';
+        const res = await fetch(`/api/commissary/adjustments/destinations?commissary_meat_id=${adjustState.meatId}`);
+        const destinations = await res.json();
+        if (destinations.length === 0) {
+          adjustDest.innerHTML = '<option value="">No valid destinations</option>';
+          adjustSubmit.disabled = true;
+          adjustStatus.textContent = 'This meat has no meat type set yet, so it has no valid allocation destinations. Meat types are set in Settings.';
+          adjustStatus.className = 'status-message error';
+        } else {
+          adjustDest.innerHTML = destinations.map(d => `<option value="${d.id}">${d.code} - ${d.name} (${d.unit})</option>`).join('');
+          if (editRow && editRow.destination_commissary_meat_id) adjustDest.value = editRow.destination_commissary_meat_id;
+        }
+      } else {
+        adjustDestWrap.style.display = 'none';
+        adjustDest.innerHTML = '';
+      }
+
+      adjustPanel.style.display = '';
+    }
+
+    function closeAdjustForm() {
+      adjustState = null;
+      adjustPanel.style.display = 'none';
+      adjustStatus.textContent = '';
+      adjustStatus.className = 'status-message';
+    }
+
+    adjustSubmit.addEventListener('click', async () => {
+      if (!adjustState) return;
+      const { meatId, kind, editId } = adjustState;
+      const business_date = adjustDate.value;
+      const quantity = adjustQty.value;
+      const destination_commissary_meat_id = kind === 'ALLOCATION' ? adjustDest.value : null;
+      const notes = adjustNotes.value.trim();
+
+      if (!business_date || quantity === '') {
+        adjustStatus.textContent = 'Date and quantity are required.';
+        adjustStatus.className = 'status-message error';
+        return;
+      }
+      if (kind === 'ALLOCATION' && !destination_commissary_meat_id) {
+        adjustStatus.textContent = 'A destination is required for an allocation.';
+        adjustStatus.className = 'status-message error';
+        return;
+      }
+
+      adjustStatus.textContent = 'Saving...';
+      adjustStatus.className = 'status-message';
+
+      try {
+        const body = { business_date, kind, quantity, destination_commissary_meat_id, notes: notes || null, actor: actor() };
+        const url = editId ? `/api/commissary/adjustments/${editId}` : '/api/commissary/adjustments';
+        const method = editId ? 'PATCH' : 'POST';
+        if (!editId) body.commissary_meat_id = meatId;
+
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+
+        closeAdjustForm();
+        await Promise.all([loadBalances(), loadAdjustments()]);
+      } catch (err) {
+        adjustStatus.textContent = 'Error: ' + err.message;
+        adjustStatus.className = 'status-message error';
+      }
+    });
+
+    document.getElementById('adjust-cancel').addEventListener('click', closeAdjustForm);
+
+    function renderAdjustmentRow(r) {
+      return `
+        <tr data-id="${r.id}">
+          <td class="cell-date">${r.business_date}</td>
+          <td>${r.commissary_meat_code} - ${r.commissary_meat_name} <span class="hint">(${r.unit})</span></td>
+          <td>${r.kind}</td>
+          <td>${fmt(r.quantity)} <span class="hint">${r.unit}</span></td>
+          <td>${r.destination_code ? `${r.destination_code} - ${r.destination_name}` : ''}</td>
+          <td class="cell-notes">${r.notes || ''}</td>
+          <td class="row-actions">
+            <button class="adj-edit-btn">Edit</button>
+            <button class="adj-delete-btn">Delete</button>
+          </td>
+        </tr>
+      `;
+    }
+
+    async function loadAdjustments() {
+      const params = new URLSearchParams();
+      if (commissarySelect.value) params.set('commissary_id', commissarySelect.value);
+      if (balanceDate.value) params.set('business_date', balanceDate.value);
+
+      const el = document.getElementById('adjustments-table');
+      el.innerHTML = 'Loading...';
+      const res = await fetch(`/api/commissary/adjustments?${params.toString()}`);
+      lastAdjustmentRows = await res.json();
+
+      if (lastAdjustmentRows.length === 0) {
+        el.innerHTML = '<p class="hint">No adjustments for this date/commissary yet.</p>';
+        return;
+      }
+
+      el.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Source meat</th><th>Kind</th><th>Quantity</th><th>Destination</th><th>Notes</th><th></th></tr>
+          </thead>
+          <tbody>${lastAdjustmentRows.map(renderAdjustmentRow).join('')}</tbody>
+        </table>
+      `;
+
+      document.querySelectorAll('#adjustments-table .adj-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tr = btn.closest('tr');
+          const row = lastAdjustmentRows.find(r => String(r.id) === tr.dataset.id);
+          if (!row) return;
+          openAdjustForm(row.kind, { id: row.commissary_meat_id, code: row.commissary_meat_code, name: row.commissary_meat_name, unit: row.unit }, row);
+        });
+      });
+      document.querySelectorAll('#adjustments-table .adj-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const tr = btn.closest('tr');
+          if (!confirm('Delete this adjustment? It stays soft-deleted, but drops out of the balance and every calculation.')) return;
+          try {
+            const res = await fetch(`/api/commissary/adjustments/${tr.dataset.id}`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ actor: actor() })
+            });
+            const result = await res.json();
+            if (!result.ok) throw new Error(result.error || 'Unknown error');
+            await Promise.all([loadBalances(), loadAdjustments()]);
+          } catch (err) {
+            alert('Error deleting: ' + err.message);
+          }
+        });
+      });
     }
 
     function renderRow(r) {
@@ -322,7 +516,7 @@
       }
     });
 
-    balanceDate.addEventListener('change', loadBalances);
+    balanceDate.addEventListener('change', () => { loadBalances(); loadAdjustments(); });
 
     [filterMeat, filterDate].forEach(el => el.addEventListener('change', loadYieldLog));
     document.getElementById('clear-filters').addEventListener('click', () => {
@@ -334,6 +528,7 @@
       loadMeats().then(() => {
         loadBalances();
         loadYieldLog();
+        loadAdjustments();
       });
     });
 
@@ -341,6 +536,7 @@
       loadMeats().then(() => {
         loadBalances();
         loadYieldLog();
+        loadAdjustments();
       });
     });
   </script>

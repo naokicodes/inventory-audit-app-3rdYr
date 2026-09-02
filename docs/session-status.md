@@ -18,18 +18,24 @@ suite, and how to keep context costs down.
 
 ## Current state — 2026-09-02
 
-**Step 23 is fully closed**, and step 24 is five sub-steps in: **24a**
+**Step 23 is fully closed**, and step 24 is six sub-steps in: **24a**
 (`output_commissary_meat_id` + the debit/credit ledger), **24a-b** (test
 isolation), **24b-i** (`input_quantity`), **24b-ii**
-(`commissary_adjustments` schema + engine), and **24b-iii** (adjustment
-routes) are all DONE and pushed as of 2026-09-02. Per-step detail is in
-`changelog.md`; the archived sub-step entries are in `session-history.md`.
+(`commissary_adjustments` schema + engine), **24b-iii** (adjustment
+routes), and **24c-ii** (Allocate/Write-off UI on `commissary.html`) are all
+DONE as of 2026-09-02. 24c-ii's commit is intentionally **not pushed** — this
+worker prompt said "Do not push, NaokiiVT applies every push manually,"
+unlike the git-push-by-default flow rule 18 describes for other workers.
+Per-step detail is in `changelog.md`; the archived sub-step entries are in
+`session-history.md`.
 
 Full suite: **16 files, 298/298 assertions, 0 failures.** Run individually
 via `node <file>.test.js` — there is no test runner script. Two files are
 easy to miss because they live outside `server/routes`/`server/engines`:
 `server/db/activityLog.test.js` and `server/db/migrate.test.js`. The newest
-file is `server/routes/commissaryAdjustments.test.js`.
+test file is still `server/routes/commissaryAdjustments.test.js` (24c-ii
+touched only `public/commissary.html`, which has no test file — verified by
+a live click-through instead, see `changelog.md`).
 
 ## Known open items (not the next step's problem, just not forgotten)
 
@@ -50,8 +56,10 @@ file is `server/routes/commissaryAdjustments.test.js`.
   had no browser available (no puppeteer/playwright, and the download
   host for one isn't in the sandbox's network allowlist), so it verified
   via live HTTP payload replay instead (see `changelog.md`). Strong
-  verification, but not the same as clicking it. Commissary's own
-  Edit/Delete UI flows are in the same boat — never fully click-tested.
+  verification, but not the same as clicking it. **Commissary's own
+  Edit/Delete UI flows (yield log AND the new adjustments list) were
+  click-tested 2026-09-02** during 24c-ii, closing that half of this item —
+  see `changelog.md`'s 24c-ii entry for what was clicked.
 - **A preset-*authoring* admin UI is still deferred, not forgotten.**
   Shipment presets can be created and edited via
   `GET`/`POST`/`PUT /api/commissary/shipment-presets` today, but there is
@@ -111,13 +119,10 @@ what makes the failure silent.
 
 **Remaining sub-steps, re-sequenced:**
 
-- **24c-ii — Allocate / Write-off UI on the commissary balance view. NEXT, and
-  dispatchable now.** Fully unblocked: 24b-ii's engine folds ALLOCATION into
-  `endingCalculated` and LOSS into `expectedEnding`, and 24b-iii's routes
-  (`GET`/`POST`/`PATCH`/`DELETE /commissary/adjustments`, plus
-  `GET /commissary/adjustments/destinations`) are in place and tested. Purely
-  additive to `public/commissary.html`; touches no engine and no route.
-- **24b-iv — yield-log write path.** Extend `POST` and `PATCH
+- **24c-ii — Allocate / Write-off UI on the commissary balance view. DONE
+  2026-09-02**, committed locally, not pushed (see above). Full done/not-done
+  breakdown is in `changelog.md`'s 2026-09-02 24c-ii entry.
+- **24b-iv — yield-log write path. NEXT.** Extend `POST` and `PATCH
   /commissary/yield-log` to accept `output_commissary_meat_id` and
   `input_quantity`. The output meat must be active and must belong to the
   **same `commissary_id` as the input** (see "Things NOT to re-litigate");
