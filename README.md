@@ -10,7 +10,8 @@ to wait for an architect.
 ## Requirements
 - Node.js 22.13.0 or newer (this project uses Node's built-in SQLite
   support — see `docs/tech-stack.md` for why).
-- Git - Claude Code — the CLI used for implementation work. Installed globally
+- Git
+- Claude Code — the CLI used for implementation work. Installed globally
   via npm; see `docs/engineer-role.md` for how work is scoped.
 - graphify — the knowledge-graph tool this project uses for code
   navigation. `CLAUDE.md` instructs Claude Code to query it *first* on any
