@@ -99,10 +99,27 @@ router.get('/commissary/yield-log', (req, res) => {
     ORDER BY cyl.created_at DESC, cyl.id DESC
   `).all(...params);
 
+  // computeYieldRow (commissaryYieldEngine.js) only selects the columns its
+  // own math needs, not output_commissary_meat_id/input_quantity - pulled
+  // separately here via getYieldLogRow (SELECT *) rather than touching the
+  // engine (24b-iv scope: routes only).
   const rows = ids.map(({ id }) => {
     const computed = computeYieldRow(db, id);
+    const raw = getYieldLogRow(id);
     const meat = db.prepare('SELECT code, name, unit FROM commissary_meats WHERE id = ?').get(computed.commissary_meat_id);
-    return { ...computed, commissary_meat_code: meat.code, commissary_meat_name: meat.name, unit: meat.unit };
+    const outputMeat = raw.output_commissary_meat_id
+      ? db.prepare('SELECT code, name FROM commissary_meats WHERE id = ?').get(raw.output_commissary_meat_id)
+      : null;
+    return {
+      ...computed,
+      commissary_meat_code: meat.code,
+      commissary_meat_name: meat.name,
+      unit: meat.unit,
+      output_commissary_meat_id: raw.output_commissary_meat_id,
+      input_quantity: raw.input_quantity,
+      output_code: outputMeat ? outputMeat.code : null,
+      output_name: outputMeat ? outputMeat.name : null
+    };
   });
 
   res.json(rows);
@@ -529,27 +546,77 @@ router.put('/commissary/conversion-standards/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Shared validation for output_commissary_meat_id / input_quantity, used by
+// both POST and PATCH below (24b-iv). sourceMeat is the INPUT commissary
+// meat's own row (needs .commissary_id and .unit).
+//
+// - output, if given, must be an active commissary meat in the SAME
+//   commissary_id as the input - a yield event is a conversion, not a
+//   movement (crossing locations is a yield then an ALLOCATION). No
+//   meat_type_id/unit match, unlike ALLOCATION's destination rule - the
+//   yield log is the one place a unit legitimately changes. An output equal
+//   to the input is accepted (identical to NULL via the engine's COALESCE).
+// - input_quantity is REQUIRED for a unit-tracked source (every counted
+//   input is also weighed at intake, so it's always available) and optional
+//   otherwise; when given it must be positive.
+// Returns an error string, or null if valid.
+function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inputQuantity) {
+  if (outputCommissaryMeatId !== null) {
+    const outputMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(outputCommissaryMeatId);
+    if (!outputMeat) {
+      return 'Unknown or inactive output_commissary_meat_id';
+    }
+    if (outputMeat.commissary_id !== sourceMeat.commissary_id) {
+      return "output_commissary_meat_id must belong to the same commissary as the input meat";
+    }
+  }
+
+  if (inputQuantity === null) {
+    if (sourceMeat.unit === 'unit') {
+      return 'input_quantity is required when the source meat is unit-tracked (unit)';
+    }
+  } else if (inputQuantity <= 0) {
+    return 'input_quantity must be positive';
+  }
+
+  return null;
+}
+
 // POST /api/commissary/yield-log
-// Body: { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes, actor }
+// Body: { commissary_meat_id, business_date, raw_weight_in, backed_weight_out,
+//         output_commissary_meat_id?, input_quantity?, notes, actor }
+// output_commissary_meat_id/input_quantity are both optional and default to
+// NULL, preserving prior behavior exactly - see validateYieldOutputAndInputQty
+// above for their rules.
 router.post('/commissary/yield-log', (req, res) => {
-  const { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes, actor } = req.body;
+  const { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, notes, actor } = req.body;
 
   if (!commissary_meat_id || !business_date || raw_weight_in === undefined || raw_weight_in === null || raw_weight_in === ''
       || backed_weight_out === undefined || backed_weight_out === null || backed_weight_out === '') {
     return res.status(400).json({ error: 'commissary_meat_id, business_date, raw_weight_in, and backed_weight_out are required' });
   }
 
-  const meat = db.prepare('SELECT id FROM commissary_meats WHERE id = ?').get(commissary_meat_id);
+  const meat = db.prepare('SELECT * FROM commissary_meats WHERE id = ?').get(commissary_meat_id);
   if (!meat) {
     return res.status(400).json({ error: 'Unknown commissary_meat_id' });
+  }
+
+  const outputId = (output_commissary_meat_id !== undefined && output_commissary_meat_id !== null && output_commissary_meat_id !== '')
+    ? output_commissary_meat_id : null;
+  const inputQty = (input_quantity !== undefined && input_quantity !== null && input_quantity !== '')
+    ? Number(input_quantity) : null;
+
+  const validationError = validateYieldOutputAndInputQty(meat, outputId, inputQty);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   try {
     const id = withTransaction(db, () => {
       const result = db.prepare(`
-        INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), notes || null, actor || null);
+        INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), outputId, inputQty, notes || null, actor || null);
 
       const after = getYieldLogRow(result.lastInsertRowid);
       logActivity(db, {
@@ -571,12 +638,19 @@ router.post('/commissary/yield-log', (req, res) => {
 });
 
 // PATCH /api/commissary/yield-log/:id
-// Body: { raw_weight_in?, backed_weight_out?, business_date?, notes?, actor }
+// Body: { raw_weight_in?, backed_weight_out?, business_date?,
+//         output_commissary_meat_id?, input_quantity?, notes?, actor }
 // commissary_meat_id is not editable here - a different meat is a
 // different event; delete + re-create instead.
+//
+// output_commissary_meat_id/input_quantity: NULL is a MEANINGFUL value for
+// both ("output is the same meat" / "input qty equals raw_weight_in"), so
+// this can't reuse the undefined/null/''-all-mean-"keep" pattern the other
+// fields use. Convention: an ABSENT key keeps the current value; an
+// explicit `null` (or `''`) CLEARS it to NULL.
 router.patch('/commissary/yield-log/:id', (req, res) => {
   const id = Number(req.params.id);
-  const { raw_weight_in, backed_weight_out, business_date, notes, actor } = req.body;
+  const { raw_weight_in, backed_weight_out, business_date, output_commissary_meat_id, input_quantity, notes, actor } = req.body;
 
   const existing = getYieldLogRow(id);
   if (!existing || existing.deleted_at) {
@@ -588,12 +662,28 @@ router.patch('/commissary/yield-log/:id', (req, res) => {
   const nextDate = business_date || existing.business_date;
   const nextNotes = notes !== undefined ? (notes || null) : existing.notes;
 
+  const nextOutputId = output_commissary_meat_id !== undefined
+    ? (output_commissary_meat_id === null || output_commissary_meat_id === '' ? null : output_commissary_meat_id)
+    : existing.output_commissary_meat_id;
+  const nextInputQty = input_quantity !== undefined
+    ? (input_quantity === null || input_quantity === '' ? null : Number(input_quantity))
+    : existing.input_quantity;
+
+  // Re-validated against the resulting values, not just what was sent - a
+  // PATCH that clears input_quantity on a unit-tracked source must be
+  // rejected exactly like omitting it at creation.
+  const meat = db.prepare('SELECT * FROM commissary_meats WHERE id = ?').get(existing.commissary_meat_id);
+  const validationError = validateYieldOutputAndInputQty(meat, nextOutputId, nextInputQty);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
+
   try {
     withTransaction(db, () => {
       db.prepare(`
-        UPDATE commissary_yield_log SET raw_weight_in = ?, backed_weight_out = ?, business_date = ?, notes = ?
+        UPDATE commissary_yield_log SET raw_weight_in = ?, backed_weight_out = ?, business_date = ?, output_commissary_meat_id = ?, input_quantity = ?, notes = ?
         WHERE id = ?
-      `).run(nextRawIn, nextBackedOut, nextDate, nextNotes, id);
+      `).run(nextRawIn, nextBackedOut, nextDate, nextOutputId, nextInputQty, nextNotes, id);
 
       const after = getYieldLogRow(id);
       logActivity(db, {

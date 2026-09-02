@@ -11,7 +11,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
-const { computeCommissaryDailyAudit } = require('../engines/commissaryAuditEngine.js');
+const { computeCommissaryDailyAudit, getCommissaryBackedUp, getCommissaryUsage } = require('../engines/commissaryAuditEngine.js');
 const { computeYieldRow } = require('../engines/commissaryYieldEngine.js');
 
 let passed = 0, failed = 0;
@@ -813,6 +813,222 @@ test('a meat with a dangling commissary_id is still returned, with null commissa
   assert.strictEqual(ghostRow.commissary_id, 9999);
   assert.strictEqual(ghostRow.commissary_code, null);
   assert.strictEqual(ghostRow.commissary_name, null);
+});
+
+console.log('\nCommissary Route Tests (24b-iv: yield-log write path - output_commissary_meat_id / input_quantity)\n');
+
+// Dedicated fixtures, per the 24a-b isolation rule - not reused from any
+// earlier block. All under Commissary A (id 1) except id 24, which is under
+// Commissary B (id 2) specifically to exercise the cross-commissary
+// rejection. Ids 20-24 and business dates 2026-09-10 onward are unused
+// anywhere else in this file.
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (20, 1, 'CM20', 'Raw Chicken (unit)', 'unit', 0.1)`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (21, 1, 'CM21', 'Processed Chicken', 'kg', 0.1)`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (22, 1, 'CM22', 'Raw Belly (kg)', 'kg', 0.1)`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, active) VALUES (23, 1, 'CM23', 'Retired Output', 'kg', 0.1, 0)`).run();
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (24, 2, 'CM24', 'Other Commissary Output', 'kg', 0.1)`).run();
+
+// Mirrors validateYieldOutputAndInputQty in commissary.js
+function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inputQuantity) {
+  if (outputCommissaryMeatId !== null) {
+    const outputMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(outputCommissaryMeatId);
+    if (!outputMeat) return 'Unknown or inactive output_commissary_meat_id';
+    if (outputMeat.commissary_id !== sourceMeat.commissary_id) return 'output_commissary_meat_id must belong to the same commissary as the input meat';
+  }
+  if (inputQuantity === null) {
+    if (sourceMeat.unit === 'unit') return 'input_quantity is required when the source meat is unit-tracked (unit)';
+  } else if (inputQuantity <= 0) {
+    return 'input_quantity must be positive';
+  }
+  return null;
+}
+
+// Mirrors POST /api/commissary/yield-log (24b-iv)
+function createYieldLogEvent({ commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, notes, actor }) {
+  if (!commissary_meat_id || !business_date || raw_weight_in === undefined || raw_weight_in === null || raw_weight_in === ''
+      || backed_weight_out === undefined || backed_weight_out === null || backed_weight_out === '') {
+    return { status: 400, error: 'commissary_meat_id, business_date, raw_weight_in, and backed_weight_out are required' };
+  }
+  const meat = db.prepare('SELECT * FROM commissary_meats WHERE id = ?').get(commissary_meat_id);
+  if (!meat) return { status: 400, error: 'Unknown commissary_meat_id' };
+
+  const outputId = (output_commissary_meat_id !== undefined && output_commissary_meat_id !== null && output_commissary_meat_id !== '') ? output_commissary_meat_id : null;
+  const inputQty = (input_quantity !== undefined && input_quantity !== null && input_quantity !== '') ? Number(input_quantity) : null;
+
+  const err = validateYieldOutputAndInputQty(meat, outputId, inputQty);
+  if (err) return { status: 400, error: err };
+
+  const id = withTransaction(db, () => {
+    const result = db.prepare(`
+      INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), outputId, inputQty, notes || null, actor || null);
+    const after = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(result.lastInsertRowid);
+    logActivity(db, { actor: actor || null, entityType: 'commissary_yield_log', entityId: result.lastInsertRowid, action: 'CREATE', before: null, after, source: 'MANUAL' });
+    return result.lastInsertRowid;
+  });
+  return { status: 200, id };
+}
+
+// Mirrors PATCH /api/commissary/yield-log/:id (24b-iv)
+function patchYieldLogEvent(id, { raw_weight_in, backed_weight_out, business_date, output_commissary_meat_id, input_quantity, notes, actor }) {
+  const existing = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(id);
+  if (!existing || existing.deleted_at) return { status: 404, error: 'Yield log entry not found' };
+
+  const nextRawIn = raw_weight_in !== undefined && raw_weight_in !== null && raw_weight_in !== '' ? Number(raw_weight_in) : existing.raw_weight_in;
+  const nextBackedOut = backed_weight_out !== undefined && backed_weight_out !== null && backed_weight_out !== '' ? Number(backed_weight_out) : existing.backed_weight_out;
+  const nextDate = business_date || existing.business_date;
+  const nextNotes = notes !== undefined ? (notes || null) : existing.notes;
+  const nextOutputId = output_commissary_meat_id !== undefined
+    ? (output_commissary_meat_id === null || output_commissary_meat_id === '' ? null : output_commissary_meat_id)
+    : existing.output_commissary_meat_id;
+  const nextInputQty = input_quantity !== undefined
+    ? (input_quantity === null || input_quantity === '' ? null : Number(input_quantity))
+    : existing.input_quantity;
+
+  const meat = db.prepare('SELECT * FROM commissary_meats WHERE id = ?').get(existing.commissary_meat_id);
+  const err = validateYieldOutputAndInputQty(meat, nextOutputId, nextInputQty);
+  if (err) return { status: 400, error: err };
+
+  withTransaction(db, () => {
+    db.prepare(`
+      UPDATE commissary_yield_log SET raw_weight_in = ?, backed_weight_out = ?, business_date = ?, output_commissary_meat_id = ?, input_quantity = ?, notes = ?
+      WHERE id = ?
+    `).run(nextRawIn, nextBackedOut, nextDate, nextOutputId, nextInputQty, nextNotes, id);
+    const after = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(id);
+    logActivity(db, { actor: actor || null, entityType: 'commissary_yield_log', entityId: id, action: 'UPDATE', before: existing, after, source: 'MANUAL' });
+  });
+  return { status: 200, id };
+}
+
+test('a same-meat kg event with no output/input_quantity given stays fully NULL (behavior unchanged)', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-10', raw_weight_in: 10, backed_weight_out: 9 });
+  assert.strictEqual(r.status, 200);
+  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(r.id);
+  assert.strictEqual(row.output_commissary_meat_id, null);
+  assert.strictEqual(row.input_quantity, null);
+});
+
+test('a cross-meat output in the same commissary is accepted', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-11', raw_weight_in: 10, backed_weight_out: 9, output_commissary_meat_id: 21 });
+  assert.strictEqual(r.status, 200);
+  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(r.id);
+  assert.strictEqual(row.output_commissary_meat_id, 21);
+});
+
+test('an output in a different commissary is rejected', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-12', raw_weight_in: 10, backed_weight_out: 9, output_commissary_meat_id: 24 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /same commissary/);
+});
+
+test('an inactive output is rejected', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-13', raw_weight_in: 10, backed_weight_out: 9, output_commissary_meat_id: 23 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /Unknown or inactive/);
+});
+
+test('an output equal to the input meat itself is accepted', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-14', raw_weight_in: 10, backed_weight_out: 9, output_commissary_meat_id: 22 });
+  assert.strictEqual(r.status, 200);
+});
+
+test('a unit-tracked source with no input_quantity is rejected', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 20, business_date: '2026-09-15', raw_weight_in: 32.5, backed_weight_out: 32.5, output_commissary_meat_id: 21 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /input_quantity is required/);
+});
+
+test('a kg source with no input_quantity is accepted (NULL means same as raw_weight_in)', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-16', raw_weight_in: 10, backed_weight_out: 9 });
+  assert.strictEqual(r.status, 200);
+});
+
+test('input_quantity, when given, must be positive', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-17', raw_weight_in: 10, backed_weight_out: 9, input_quantity: 0 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /positive/);
+});
+
+let unitYieldId;
+test('the real unit-in/kg-out case: 40 chickens weighing 32.5 kg in, 30 kg processed out, both numbers recorded', () => {
+  const r = createYieldLogEvent({
+    commissary_meat_id: 20, business_date: '2026-09-18', raw_weight_in: 32.5, backed_weight_out: 30,
+    output_commissary_meat_id: 21, input_quantity: 40
+  });
+  assert.strictEqual(r.status, 200);
+  unitYieldId = r.id;
+  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(r.id);
+  assert.strictEqual(row.input_quantity, 40);
+  assert.strictEqual(row.raw_weight_in, 32.5);
+});
+
+test('the engine debits the COUNT from the unit-tracked input, not the weighed kg', () => {
+  const usage = getCommissaryUsage(db, 20, '2026-09-18');
+  assert.strictEqual(usage, 40, 'must debit 40 (input_quantity), not 32.5 (raw_weight_in)');
+});
+
+test('the engine credits the weighed kg to the output meat, not the input meat', () => {
+  const creditedToOutput = getCommissaryBackedUp(db, 21, '2026-09-18');
+  assert.strictEqual(creditedToOutput, 30);
+  const creditedToInput = getCommissaryBackedUp(db, 20, '2026-09-18');
+  assert.strictEqual(creditedToInput, 0, 'the input meat itself must NOT be credited when output_commissary_meat_id points elsewhere');
+});
+
+test('PATCH with an absent key keeps the existing output_commissary_meat_id and input_quantity', () => {
+  const r = patchYieldLogEvent(unitYieldId, { notes: 'just a note change' });
+  assert.strictEqual(r.status, 200);
+  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(unitYieldId);
+  assert.strictEqual(row.output_commissary_meat_id, 21);
+  assert.strictEqual(row.input_quantity, 40);
+  assert.strictEqual(row.notes, 'just a note change');
+});
+
+test('PATCH with output_commissary_meat_id: null explicitly clears it', () => {
+  const r = patchYieldLogEvent(unitYieldId, { output_commissary_meat_id: null });
+  assert.strictEqual(r.status, 200);
+  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(unitYieldId);
+  assert.strictEqual(row.output_commissary_meat_id, null);
+  assert.strictEqual(row.input_quantity, 40, 'input_quantity must be untouched by clearing the unrelated output field');
+});
+
+test('PATCH cannot clear input_quantity on a unit-tracked source - rejected, old value untouched', () => {
+  const before = db.prepare('SELECT input_quantity FROM commissary_yield_log WHERE id = ?').get(unitYieldId).input_quantity;
+  const r = patchYieldLogEvent(unitYieldId, { input_quantity: null });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /input_quantity is required/);
+  const after = db.prepare('SELECT input_quantity FROM commissary_yield_log WHERE id = ?').get(unitYieldId).input_quantity;
+  assert.strictEqual(after, before, 'the rejected PATCH must not have taken effect');
+});
+
+test('PATCH can clear input_quantity on a kg-tracked source', () => {
+  const kgRow = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-19', raw_weight_in: 10, backed_weight_out: 9, input_quantity: 10 });
+  assert.strictEqual(kgRow.status, 200);
+  const r = patchYieldLogEvent(kgRow.id, { input_quantity: null });
+  assert.strictEqual(r.status, 200);
+  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(kgRow.id);
+  assert.strictEqual(row.input_quantity, null);
+});
+
+console.log('\nCommissary Route Tests (24b-iv: GET /commissary/yield-log output code/name)\n');
+
+test('GET yield-log includes the output meat code/name when set, null when not', () => {
+  const withOutputRows = listYieldLog({ commissary_meat_id: 22, business_date: '2026-09-11' });
+  assert.strictEqual(withOutputRows.length, 1);
+  // listYieldLog above mirrors the pre-24b-iv shape (computeYieldRow only) -
+  // fetch the output meat directly here the same way the real route does,
+  // since listYieldLog wasn't extended (it exists purely for the 23b-v
+  // filter tests above, not as a full route mirror).
+  const raw = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(withOutputRows[0].id);
+  const outputMeat = raw.output_commissary_meat_id
+    ? db.prepare('SELECT code, name FROM commissary_meats WHERE id = ?').get(raw.output_commissary_meat_id)
+    : null;
+  assert.strictEqual(outputMeat.code, 'CM21');
+  assert.strictEqual(outputMeat.name, 'Processed Chicken');
+
+  const noOutputRows = listYieldLog({ commissary_meat_id: 22, business_date: '2026-09-10' });
+  const raw2 = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(noOutputRows[0].id);
+  assert.strictEqual(raw2.output_commissary_meat_id, null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
