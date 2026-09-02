@@ -15,7 +15,20 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ## Queue
 
-### 1. Step 25a — commissary stock receipts (supplier intake)
+### 1. Step 25c — seed and tag the meat-type catalog
+**Lane: DISPATCH only. Needs an architect-written prompt.**
+
+Small and self-contained, but it edits `seed.js` and the commissary seed
+data, so it is not engineer-lane. Adds one meat (M15 Processed Chicken,
+kg) and seeds/tags eleven meat types. No schema change.
+
+Must be built and verified against a scratch DB **before** the live
+`inventory.db` is wiped and reseeded — otherwise the hand-tagging pass
+gets done and then immediately made redundant.
+
+Spec: `session-status.md`, section "Step 25c".
+
+### 2. Step 25a — commissary stock receipts (supplier intake)
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
 Not startable on engineer initiative. It adds a weight column alongside
@@ -26,7 +39,7 @@ not the decision.
 Spec: `session-status.md`, section "Steps 25a / 25b — the commissary
 ledger has no way in".
 
-### 2. Step 24b-v — the effective yield output must be kg-tracked
+### 3. Step 24b-v — the effective yield output must be kg-tracked
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
 A live data-corruption guard. It changes what the code rejects, which is
@@ -34,7 +47,7 @@ red by default. Must land before soft-launch.
 
 Spec: `session-status.md`, section "Step 24b-v".
 
-### 3. Nothing.
+### 4. Nothing.
 **This is deliberate. Do not invent a step 25.**
 
 After 24b-v the plan is a soft launch against real output, so that actual
@@ -64,9 +77,11 @@ are genuinely useful and genuinely safe.
 
 ## Not in the queue, and not a task
 
-- **The meat-type tagging pass.** Live commissary meats have
-  `meat_type_id` NULL, which is why every Allocate dropdown is empty.
-  This is on-site data entry through the existing Settings UI, not a
+- **The meat-type tagging pass on the LIVE database.** Live commissary
+  meats have `meat_type_id` NULL, which is why every Allocate dropdown is
+  empty. Step 25c fixes this for a freshly seeded DB, but it does not
+  retro-tag existing rows and deliberately must not. Tagging an existing
+  live DB is on-site data entry through the existing Settings UI, not a
   build task, and not a bug. Do not "fix" it in code.
 - **Restaurant C (Likod) onboarding.** No workbook exists yet. Blocked on
   real-world data, not on code.

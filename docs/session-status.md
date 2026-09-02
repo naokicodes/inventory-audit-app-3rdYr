@@ -29,8 +29,9 @@ archived sub-step entries and the full step-24 narrative are in
 `commissary_ending_actual` (real upsert, per-day recount overwrites), plus the
 UI section on `commissary.html`. Full detail in `changelog.md`'s 25b entry.
 
-**Next coding step: 25a**, then 24b-v — both written up in their own sections
-below. 25a closes the remaining half of the gap found 2026-09-02: the
+**Next coding step: 25c**, then 25a, then 24b-v — all three written up in their
+own sections below. 25c seeds and tags the meat-type catalog so the tagging
+pass stops being manual data entry repeated after every reseed. 25a closes the remaining half of the gap found 2026-09-02: the
 commissary ledger still has no way to record supplier receipts arriving at
 the commissary (`commissary_stock_receipts` is still unwritten). 24b-v is a
 data-corruption guard that only matters once balances work - both land before
@@ -77,7 +78,10 @@ line — read the count, not the last line.
   is already shipped — `GET`/`POST`/`PUT /api/settings/meat-types` and the
   `meat_type_id` field on `POST`/`PUT /api/settings/commissary-meats/:id`,
   both wired into `settings.html`. Tag every commissary meat that could ever
-  move or be allocated, on both sides, before soft-launch. Note that a
+  move or be allocated, on both sides, before soft-launch. **Step 25c closes
+  this for any freshly seeded DB** — it seeds the eleven meat types and tags
+  all fifteen commissary meats, so a wipe-and-reseed comes back fully tagged
+  and no hand entry is needed. Note that a
   destination must match on `unit` as well, so two sides of the same meat type
   tracked in different units still won't pair.
 
@@ -353,6 +357,40 @@ all of it.
   proves annoying in practice, add the config then — no schema rework is
   required to do so later.
 
+- **Seven unit-tracked meats have no kg output, and that is correct — settled
+  2026-09-03.** M07 PATA, M09 Pork Steak, M10 French Cut, M11 Pompano and M12
+  Salmon Belly are **received and shipped only**. They are never yield sources,
+  so 24b-v rejects nothing for them and they need no kg counterpart. Confirmed
+  by NaokiiVT.
+
+  These meats *are* prepped — searing, for example — but searing is a
+  unit-to-unit operation that changes no quantity: a seared PATA is still one
+  PATA, and it ships as one. Prep that does not change the count is **not a
+  yield event and must never be recorded as one**, because a unit-to-unit yield
+  is precisely the corruption 24b-v exists to reject.
+
+  If searing ever *costs* stock — burnt, dropped, damaged — that is a **LOSS
+  declaration** on the commissary page (built in 24b-ii/24b-iii, currently
+  unused), not a yield with a smaller output. Anyone looking at seven
+  unit-tracked meats and no kg outputs will read it as the 24b-v gap and try to
+  add counterparts. It is not. Do not add them.
+
+- **Pork Belly and Jowl already satisfy 24b-v and need no new rows — settled
+  2026-09-03.** M04 Belly Slab Raw -> M03 Belly Slab, and M06 JOWL Raw -> M05
+  JOWL, are both kg-to-kg, which 24b-v leaves accepted and unchanged. An
+  architect pass nearly added duplicate "Processed Belly" and "Processed Jowl"
+  rows on the assumption that every Raw meat needed a processed counterpart;
+  the duplicates would have split each meat's stock across two competing rows.
+  **Whole Chicken was the only real gap.**
+
+- **The `Whole Chicken` meat type includes a kg member, deliberately — settled
+  2026-09-03.** M15 Processed Chicken (kg) is tagged `Whole Chicken` even though
+  it is not a whole chicken. The type is a grouping key, not a display name —
+  each meat keeps its own `name`. M15 is the only kg member, so the
+  same-type-same-unit destination filter never pairs it with M01/M02 today; it
+  is tagged so a future kg-tracked chicken in a second commissary can pair with
+  it. Naming chosen by NaokiiVT. Do not "correct" it to a separate type.
+
 ## End-of-session checklist (every session, no exceptions)
 
 Since each session starts with zero memory of prior conversations and
@@ -471,6 +509,94 @@ real data anywhere (every ledger table is 0 rows), but there is test residue:
 plus two retired test meat types. A reseed gives a clean catalog and an empty
 ledger with nothing to mistake for real rows later. Do it before real entry
 starts, not after.
+
+## Step 25c — seed the meat-type catalog and tag it. NEXT.
+
+**Lane: DISPATCH. Small, self-contained, no schema change.**
+
+Turns the meat-type tagging pass from recurring manual data entry into a
+property of a fresh seed. Independent of 25a — it shares no table with
+`commissary_stock_receipts` and was deliberately NOT folded into 25a's prompt
+(rule 16: mixed concerns).
+
+### Why it exists
+`seed.js` contains zero references to `meat_type` and neither do any of the
+three seed data files, so a wipe-and-reseed returns an **empty** `meat_types`
+table and **fourteen untagged** commissary meats. Tagging is what
+`GET /commissary/adjustments/destinations` reads; untagged means every Allocate
+dropdown is correctly empty. Today that pass is hand entry through Settings,
+repeated in full after every reseed — and a reseed is expected after 25a's
+migration.
+
+### Scope
+**1. `server/db/commissary-seed-data.json` — add one meat:**
+`M15 | Processed Chicken | unit kg | allowed_leeway_pct 0 | cost_per_unit null`
+
+This is the yield output for M01/M02, whose absence would make every chicken
+yield event fail once 24b-v lands (a unit source needs a kg-tracked effective
+output). It is the **only** new meat.
+
+**2. Add a `meat_types` list and a `meat_type` key per meat.** Eleven types:
+
+| code | meat | unit | meat_type |
+|---|---|---|---|
+| M01 | Whole Chicken | unit | Whole Chicken |
+| M02 | Whole Chicken Raw | unit | Whole Chicken |
+| M03 | Belly Slab | kg | Pork Belly |
+| M04 | Belly Slab Raw | kg | Pork Belly |
+| M05 | JOWL | kg | Jowl |
+| M06 | JOWL Raw | kg | Jowl |
+| M07 | PATA | unit | Pata |
+| M08 | Shortplate | kg | Shortplate |
+| M09 | Pork Steak | unit | Pork Steak |
+| M10 | French Cut | unit | French Cut |
+| M11 | Pompano | unit | Pompano |
+| M12 | Salmon Belly | unit | Salmon Belly |
+| M13 | Ground Beef | kg | Ground Beef |
+| M14 | Miscuts | kg | Miscuts |
+| M15 | Processed Chicken | kg | Whole Chicken |
+
+Eight of the eleven types have a single member and so produce no allocation
+pair today. They are tagged anyway: cross-commissary allocation is the main use
+case the moment a second commissary exists, and tagging in seed data costs
+nothing versus a second manual pass later.
+
+**3. `server/db/seed.js`** — seed `meat_types` before commissary meats, then set
+`meat_type_id` when inserting each commissary meat. Must stay re-runnable in the
+existing style: `INSERT OR IGNORE` keyed on the natural unique, matching how
+`restaurants`, `meats` and `commissary_meats` are already handled. Re-running on
+a populated DB must remain a no-op.
+
+Note `INSERT OR IGNORE` means the tag is applied **only on insert**. It will not
+retro-tag the fourteen rows in an existing `inventory.db` — that is fine and
+expected, because the reseed is preceded by a wipe. Do not add an UPDATE path to
+force it; that would silently overwrite hand tagging.
+
+Because type names are the natural key, renaming a type later creates a new row
+rather than editing the old one. Acceptable pre-soft-launch; worth knowing.
+
+### Out of scope
+- No schema change. `meat_types` and `commissary_meats.meat_type_id` both
+  already exist. If a migration seems necessary, stop and flag it.
+- No route changes, no UI. Settings already exposes everything.
+- Do not touch `seed-data.json` or `seed-data-B.json` — restaurant-side meats
+  are a different numbering system entirely and are not tagged.
+- Do not add processed counterparts for any meat other than chicken. See
+  "Things NOT to re-litigate".
+
+### Verification
+- Full suite green. Current baseline: **16 files, 325/325, 0 failures.**
+- Delete a scratch DB, run `node server/db/seed.js`, confirm 11 `meat_types`
+  rows and 15 `commissary_meats` rows with no NULL `meat_type_id`.
+- Run `seed.js` a second time and confirm zero new rows.
+- Confirm `GET /commissary/adjustments/destinations?commissary_meat_id=` for M01
+  returns M02 (same type, same unit) and does **not** return M15 (same type,
+  different unit).
+
+### Sequencing
+25c is built and verified against a scratch DB **before** NaokiiVT wipes and
+reseeds `inventory.db`. Wiping first would mean hand-tagging that 25c
+immediately makes redundant.
 
 ## Step 24b-v — REQUIRED: the effective yield output must be kg-tracked
 
