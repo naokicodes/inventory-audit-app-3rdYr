@@ -10,6 +10,11 @@ worker and the reviewer. A collaborator does not push to `main` — branch
 and pull request, always. Everything else in
 `docs/rules-for-claude-code.md` still applies to you in full.
 
+**This file says which *work* you may start. `docs/decision-authority.md`
+says which *decisions* you may make once you have started.** Read both.
+The second one exists so that small, reversible choices inside an
+already-approved task stop coming back to an architect.
+
 ## The two lanes
 
 Work reaches you in one of two ways, and they have different rules. Know

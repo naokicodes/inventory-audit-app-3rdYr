@@ -14,19 +14,19 @@ A guess presented as a check is not.
 ## What changed and why
 
 
-## Test suite
-<!-- Paste the real per-file counts. All 16 *.test.js files under server/,
-     each run directly with `node <file>.test.js`. Don't summarise.
-
-     Remember: commands.test.js and sales.test.js print a SQLite
-     ExperimentalWarning AFTER their count line — read the count, not the
-     last line. -->
+## `npm run verify`
+<!-- Paste the real output — the suite plus the write-path audit.
+     Not a summary, not a retyped total. CI runs the same command, so a
+     mismatch between this and the check on the PR is itself a finding. -->
 
 ```
 
 ```
 
-Total: ___ / ___ assertions, ___ failures
+- [ ] SUITE GREEN
+- [ ] AUDIT CLEAN
+<!-- If you added an allowlist entry to make the audit pass, say so under
+     "Anything I wasn't sure about" — that is an architect decision. -->
 
 ## Did this touch `public/`?
 <!-- If yes, a green suite is NOT sufficient evidence. Several real bugs
@@ -44,6 +44,15 @@ Total: ___ / ___ assertions, ___ failures
 <!-- Required for the ENGINEER lane. Which "Things NOT to re-litigate"
      entries in session-status.md did you check this against?
      For the DISPATCH lane, write "n/a — dispatched". -->
+
+
+## Decisions I made myself
+<!-- Class A only — see docs/decision-authority.md. Reversible and
+     invisible to an operator: naming, file placement, test shape, refactor
+     shape, migration mechanics. One line each. This is a record, not a
+     request for approval; you do not need permission for anything here.
+
+     "None" is a normal answer on a small step. -->
 
 
 ## Anything I wasn't sure about

@@ -4,6 +4,11 @@ Read this at the start of any session touching this project. These are
 standing constraints, not suggestions — they exist to keep a solo,
 2-hours-a-day project from drifting into something unmaintainable.
 
+Two companions to this file: `docs/engineer-role.md` (which work you may
+start) and `docs/decision-authority.md` (which decisions you may make
+inside work you have started). Where any of the three disagree, the more
+specific file wins for a collaborator.
+
 ## Before writing code
 1. **Read the relevant docs first** (`data-model.md`, `scope.md`,
    `daily-workflow.md`, `tech-stack.md`, `loyverse-sync.md` if touching

@@ -19,6 +19,20 @@ No supplier names, staff names, live yield figures, or photos.
 <!-- The specific thing that stopped you. Paste real output, not a summary. -->
 
 
+## Both readings
+<!-- State the two (or more) ways this could go, and what each would mean
+     in practice. State them evenly.
+
+     Do NOT recommend one. A recommendation is what a hurried person will
+     treat as permission, which defeats the point of stopping. If one
+     reading is obviously wrong, say why it is wrong — that is analysis,
+     not a recommendation. -->
+
+**Reading A:**
+
+**Reading B:**
+
+
 ## Which doc section is silent or contradictory
 <!-- Name it: file + section heading. If two sections disagree, name both.
      If you genuinely couldn't find anything relevant, say that instead —

@@ -1,0 +1,36 @@
+{
+  "_README": [
+    "Schema tables and columns that are deliberately not written yet.",
+    "Every entry needs a reason. Delete an entry the moment its write path",
+    "lands - that deletion is how the audit stays useful instead of becoming",
+    "a list everyone scrolls past.",
+    "Adding an entry is an architect decision, not an engineer-lane fix.",
+    "Baselined 2026-09-03 against commit 1790463."
+  ],
+
+  "tables": {
+    "commissary_meat_map": "Open architectural question - possibly vestigial. Listed in session-status.md's open questions. Do not build a writer to satisfy this audit; the question is whether the table should exist at all.",
+    "commissary_stock_receipts": "Step 25a builds the supplier intake write path. DELETE THIS ENTRY when 25a lands.",
+    "loyverse_name_map": "Rule 14 - the Loyverse sync is a later phase and deliberately unbuilt."
+  },
+
+  "columns": {
+    "stock_receipts": {
+      "photo_path": "Rule 13 - photo attachments are references only. No upload path is built anywhere, by design."
+    },
+    "ending_actual": {
+      "photo_path": "Rule 13 - photo attachments are references only.",
+      "created_by": "UNVERIFIED. The restaurant-side physical count does not record who entered it, while the commissary side does. Flagged to the architect 2026-09-03; allowlisted so it does not block CI, not because it is known-correct."
+    },
+    "portion_ending_actual": {
+      "photo_path": "Rule 13 - photo attachments are references only.",
+      "created_by": "UNVERIFIED. Same gap as ending_actual.created_by. Flagged 2026-09-03."
+    },
+    "commissary_ending_actual": {
+      "photo_path": "Rule 13 - photo attachments are references only."
+    },
+    "activity_log": {
+      "timestamp": "Declared DEFAULT (datetime('now')) in schema.sql - written by SQLite, correctly never named by a route."
+    }
+  }
+}

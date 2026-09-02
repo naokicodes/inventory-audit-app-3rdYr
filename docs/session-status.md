@@ -510,7 +510,7 @@ plus two retired test meat types. A reseed gives a clean catalog and an empty
 ledger with nothing to mistake for real rows later. Do it before real entry
 starts, not after.
 
-## Step 25c — seed the meat-type catalog and tag it. NEXT.
+## Step 25c — seed the meat-type catalog and tag it (CLOSED 2026-09-03, `1790463`)
 
 **Lane: DISPATCH. Small, self-contained, no schema change.**
 

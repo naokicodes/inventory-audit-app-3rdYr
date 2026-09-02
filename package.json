@@ -4,7 +4,10 @@
   "description": "Meat inventory audit tool - local, single-user, 3-restaurant scope. See docs/ for full spec.",
   "main": "server/index.js",
   "scripts": {
-    "dev": "node server/index.js"
+    "dev": "node server/index.js",
+    "test": "node scripts/run-tests.js",
+    "audit:write-paths": "node scripts/audit-write-paths.js",
+    "verify": "node scripts/run-tests.js && node scripts/audit-write-paths.js"
   },
   "engines": {
     "node": ">=22.13.0"

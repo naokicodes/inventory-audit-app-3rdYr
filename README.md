@@ -106,18 +106,31 @@ If you ran `setup-dev-environment.bat`, all four are already handled.
   for a normal work session.
 
 ## Running the tests
-There is no test runner script. Run each file directly:
+```
+npm test
+```
+Runs every `*.test.js` under `server/` and prints one aggregate line.
+Exits non-zero if any file fails or produces no count, so CI and your
+own eyes agree on what green means.
+
+```
+npm run verify
+```
+The suite plus the write-path audit. This is what CI runs on every push
+and pull request, and what you should run before opening one.
+
+```
+npm run audit:write-paths
+```
+The audit alone. It flags schema tables and columns that are read but
+never written — the bug class that has hit this project twice. Expected
+gaps live in `scripts/write-path-allowlist.json` with a reason each;
+delete an entry when its write path lands.
+
+You can still run a single file directly while working on it:
 ```
 node server/routes/commissary.test.js
 ```
-The full suite is 16 files — everything matching `*.test.js` under
-`server/`. Two are easy to miss because they sit outside
-`server/routes/` and `server/engines/`: `server/db/activityLog.test.js`
-and `server/db/migrate.test.js`.
-
-`commands.test.js` and `sales.test.js` print a SQLite
-`ExperimentalWarning` *after* their count line — read the count, not the
-last line of output.
 
 A green suite is necessary but not sufficient on UI work. Several real
 bugs have shipped past a fully green suite; anything touching `public/`
@@ -227,6 +240,10 @@ $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
 or close VS Code entirely and reopen it.
 
 ## Working on this project
+See `docs/workflow-guide.md` for how the whole loop runs — setup, the
+`/step` and `/verify` commands, the merge gate, and how to pick the
+project back up after time away.
+
 - `docs/engineer-role.md` — what a collaborator may change unilaterally,
   and what must be parked for an architect. Read this first.
 - `docs/session-status.md` — the current state of the project and what's
