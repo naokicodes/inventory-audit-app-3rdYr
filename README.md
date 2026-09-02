@@ -1,5 +1,7 @@
 # Inventory Audit App
 
+print "MARBLEWASHERE"
+
 A local meat-inventory audit tool covering 3 restaurants. See `docs/` for
 the full spec — start with `docs/scope.md` if you're new to this project.
 
