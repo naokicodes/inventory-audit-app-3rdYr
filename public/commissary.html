@@ -16,6 +16,10 @@
     .hint { color: #888; font-size: 0.8rem; }
     .status-Pass { color: #0a7d0a; font-weight: bold; }
     .status-Review { color: crimson; font-weight: bold; }
+    td.calculated { background: #f7f7f7; color: #555; }
+    .status-MISSING_BEGINNING_STOCK { color: #999; font-style: italic; }
+    #count-entry input[type="number"] { width: 5rem; padding: 0.3rem; }
+    #count-entry input[type="text"] { width: 8rem; padding: 0.3rem; }
     .balance-cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
     .balance-card { border: 1px solid #ddd; border-radius: 6px; padding: 0.75rem 1rem; min-width: 9rem; }
     .balance-card .code { color: #888; font-size: 0.8rem; }
@@ -59,6 +63,11 @@
     <label>Date <input type="date" id="balance-date"></label>
   </div>
   <div id="balances">Loading...</div>
+
+  <h2>Opening stock &amp; physical count</h2>
+  <p class="hint">Opening stock is one-time per meat - set once, then never editable again (a meat already showing a beginning value has nothing to change here). Physical count is per day and can be recounted - saving again for the same date overwrites the prior count. Select a specific commissary above (not "All commissaries") to enter counts.</p>
+  <div id="count-entry">Loading...</div>
+  <div id="count-status" class="status-message"></div>
 
   <div id="adjust-panel" class="add-form" style="display:none;">
     <strong id="adjust-title"></strong>
@@ -234,6 +243,82 @@
       document.querySelectorAll('#balances .writeoff-btn').forEach(btn => {
         btn.addEventListener('click', () => openAdjustForm('LOSS', btn.dataset));
       });
+
+      renderCountEntry(rows);
+    }
+
+    // ---------- Opening stock & physical count (step 25b) ----------
+    // Reuses the same rows GET /commissary/daily-audit already returned for
+    // the balance cards above, rather than a second fetch - the two states
+    // an operator needs to tell apart map directly onto r.beginning: null
+    // means MISSING_BEGINNING_STOCK (no write yet, show an editable opening
+    // count), anything else means it's already established (show it as
+    // read-only so a typed number can't be silently discarded - see
+    // schema.sql's UNIQUE(commissary_meat_id), no date in the key).
+    function renderCountEntry(rows) {
+      const el = document.getElementById('count-entry');
+      if (!commissarySelect.value) {
+        el.innerHTML = '<p class="hint">Select a specific commissary above to enter opening stock or physical counts.</p>';
+        return;
+      }
+      if (rows.length === 0) {
+        el.innerHTML = '<p class="hint">No commissary meats seeded yet.</p>';
+        return;
+      }
+      el.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>Meat</th><th>Opening stock</th><th>Physical count</th><th>Notes</th><th>Status</th></tr>
+          </thead>
+          <tbody>${rows.map(r => `
+            <tr data-id="${r.commissary_meat_id}">
+              <td>${r.code} - ${r.name} <span class="hint">(${r.unit})</span></td>
+              <td class="${r.beginning === null ? '' : 'calculated'}">${r.beginning === null
+                ? `<input type="number" step="0.01" class="count-opening" placeholder="opening count">`
+                : fmt(r.beginning)}</td>
+              <td><input type="number" step="0.01" class="count-actual" value="${r.actual ?? ''}" placeholder="0"></td>
+              <td><input type="text" class="count-notes" placeholder="optional"></td>
+              <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+        <button id="save-counts">Save counts</button>
+      `;
+      document.getElementById('save-counts').addEventListener('click', saveCounts);
+    }
+
+    async function saveCounts() {
+      const countStatus = document.getElementById('count-status');
+      const commissaryId = Number(commissarySelect.value);
+      const date = balanceDate.value;
+      if (!commissaryId || !date) return;
+
+      const rows = Array.from(document.querySelectorAll('#count-entry tbody tr')).map(tr => ({
+        commissary_meat_id: Number(tr.dataset.id),
+        opening_stock: tr.querySelector('.count-opening') ? tr.querySelector('.count-opening').value : undefined,
+        ending_actual: tr.querySelector('.count-actual').value,
+        notes: tr.querySelector('.count-notes').value.trim() || null
+      }));
+
+      countStatus.textContent = 'Saving...';
+      countStatus.className = 'status-message';
+
+      try {
+        const res = await fetch('/api/commissary/daily-audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commissary_id: commissaryId, business_date: date, actor: actor(), rows })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || 'Unknown error');
+
+        countStatus.textContent = `Saved.`;
+        countStatus.className = 'status-message success';
+        await loadBalances();
+      } catch (err) {
+        countStatus.textContent = 'Error: ' + err.message;
+        countStatus.className = 'status-message error';
+      }
     }
 
     // ---------- Adjustments (Allocate / Write-off) ----------

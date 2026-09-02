@@ -156,15 +156,15 @@
     "semantic_hash": "096967b5649396ae4a54ecddb214a58a"
   },
   "server/routes/commissary.js": {
-    "mtime": 1788347559.2367253,
-    "seen": 1788347989.2852037,
-    "ast_hash": "543338210c90f84149c6b2cd5d0d2cf2",
+    "mtime": 1788358961.2171159,
+    "seen": 1788359594.4210277,
+    "ast_hash": "411c7ccb3f639ea6350c5596221dd711",
     "semantic_hash": ""
   },
   "server/routes/commissary.test.js": {
-    "mtime": 1788347648.4111593,
-    "seen": 1788347989.2852037,
-    "ast_hash": "9682a734a9275d31551dd5d27c7b94a7",
+    "mtime": 1788359044.6246803,
+    "seen": 1788359594.4210277,
+    "ast_hash": "6e11e69a8cc81a39e016219f99b1cb20",
     "semantic_hash": ""
   },
   "server/routes/dailyAudit.js": {
@@ -312,9 +312,9 @@
     "semantic_hash": "8ada7f262bc5e354a3dce4e7bc0fc4b7"
   },
   "docs/changelog.md": {
-    "mtime": 1788347863.6077492,
-    "seen": 1788347989.2852037,
-    "ast_hash": "db343505212e0c40ddbac42da5a4de36",
+    "mtime": 1788359540.6434205,
+    "seen": 1788359594.4210277,
+    "ast_hash": "e2971ba1b5ac96c7b095da06166007db",
     "semantic_hash": ""
   },
   "docs/commissary-and-stock-receipts.md": {
@@ -342,9 +342,9 @@
     "semantic_hash": "68cbe0c8309ba56510b956089f8148ac"
   },
   "docs/rules-for-claude-code.md": {
-    "mtime": 1788292606.6482666,
-    "seen": 1788292626.9123642,
-    "ast_hash": "9d4e291423e98e29801da20425466de9",
+    "mtime": 1788350720.482402,
+    "seen": 1788359594.4210277,
+    "ast_hash": "897b902b1267e161def3945820e49f76",
     "semantic_hash": ""
   },
   "docs/scope.md": {
@@ -354,9 +354,9 @@
     "semantic_hash": "f2736eab89f5430d53d7b481697d1a96"
   },
   "docs/session-status.md": {
-    "mtime": 1788347965.3603225,
-    "seen": 1788347989.2852037,
-    "ast_hash": "76fd333333e537c1f69aabadb12f5a29",
+    "mtime": 1788359565.077849,
+    "seen": 1788359594.4210277,
+    "ast_hash": "027db0ba31c7802431f431a2a96701ea",
     "semantic_hash": ""
   },
   "docs/tech-stack.md": {
@@ -384,9 +384,9 @@
     "semantic_hash": ""
   },
   "public/commissary.html": {
-    "mtime": 1788343464.059553,
-    "seen": 1788344558.7591097,
-    "ast_hash": "7c37a18198612e6ec57d5fecf20121db",
+    "mtime": 1788358995.8402011,
+    "seen": 1788359594.4210277,
+    "ast_hash": "6750b060c7a0f584e7b61082d385fab2",
     "semantic_hash": ""
   },
   "public/daily-audit.html": {
@@ -444,15 +444,21 @@
     "semantic_hash": ""
   },
   "docs/session-history.md": {
-    "mtime": 1788292606.640267,
-    "seen": 1788292626.9123642,
-    "ast_hash": "08b198f2bb092fc1a4f477d515683b81",
+    "mtime": 1788349469.8745399,
+    "seen": 1788349500.9305255,
+    "ast_hash": "a30317d432753d6cc6e953b0c6fa8c65",
     "semantic_hash": ""
   },
   "server/routes/commissaryAdjustments.test.js": {
     "mtime": 1788293159.6268234,
     "seen": 1788293263.1967478,
     "ast_hash": "233e0c13a2eda429e0c2d8294af40357",
+    "semantic_hash": ""
+  },
+  "check-ledger.js": {
+    "mtime": 1788351359.2543025,
+    "seen": 1788359594.4210277,
+    "ast_hash": "f804cb67383a6c3bd9f251a54930ebba",
     "semantic_hash": ""
   }
 }

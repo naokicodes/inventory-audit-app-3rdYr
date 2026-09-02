@@ -24,12 +24,17 @@ not taken from a worker's report. Per-step detail is in `changelog.md`; the
 archived sub-step entries and the full step-24 narrative are in
 `session-history.md`.
 
-**Next coding step: 25b**, then 25a, then 24b-v — all three written up in
-their own sections below. 25a/25b close a gap found 2026-09-02: the commissary
-ledger has no way to enter opening stock, a physical count, or supplier
-receipts, so every commissary balance is currently null. 24b-v is a
-data-corruption guard that only matters once balances work. All three land
-before soft-launch.
+**Step 25b is CLOSED (2026-09-02).** `POST /commissary/daily-audit` writes
+`commissary_opening_stock` (INSERT OR IGNORE, write-once) and
+`commissary_ending_actual` (real upsert, per-day recount overwrites), plus the
+UI section on `commissary.html`. Full detail in `changelog.md`'s 25b entry.
+
+**Next coding step: 25a**, then 24b-v — both written up in their own sections
+below. 25a closes the remaining half of the gap found 2026-09-02: the
+commissary ledger still has no way to record supplier receipts arriving at
+the commissary (`commissary_stock_receipts` is still unwritten). 24b-v is a
+data-corruption guard that only matters once balances work - both land before
+soft-launch.
 The plan after 24b-v is to soft-launch against real output and let actual use
 decide what gets built next, rather than guessing at features — the same
 reasoning that deferred the per-meat next-stage config. The open architectural
@@ -45,8 +50,8 @@ output verbatim rather than summarising it. The architect still records push
 state from `origin/main` and a fresh pull, never from the report — a worker's
 claim is a claim until the pull confirms it.
 
-Full suite: **16 files, 314/314 assertions, 0 failures** (up from 298 — 24b-iv
-added 16 net, `commissary.test.js` alone rose from 47 to 83). Run individually
+Full suite: **16 files, 325/325 assertions, 0 failures** (up from 314 — 25b
+added 11 net, `commissary.test.js` alone rose from 83 to 94). Run individually
 via `node <file>.test.js` — there is no test runner script. Two files are
 easy to miss because they live outside `server/routes`/`server/engines`:
 `server/db/activityLog.test.js` and `server/db/migrate.test.js`. `commands.test.js`
@@ -398,12 +403,13 @@ writes `stock_receipts`, `sales.js` writes `sales`. Those tables read as empty
 only because no day has been entered yet. The gap is commissary-only, and each
 piece has a working restaurant-side equivalent to mirror.
 
-### 25b — commissary opening stock + physical count. DO THIS FIRST.
-The commissary equivalent of `daily-audit.html`, writing
-`commissary_opening_stock` and `commissary_ending_actual`. Unblocks every
-balance card in the app at once, and turns the commissary from a ledger into an
-audit: no beginning means no `endingCalculated`, no counted actual means no
-variance. Mirror the restaurant daily-audit page's shape.
+### 25b — commissary opening stock + physical count. CLOSED 2026-09-02.
+Done: `POST /commissary/daily-audit` (writes `commissary_opening_stock` via
+INSERT OR IGNORE, write-once; `commissary_ending_actual` via a real per-date
+upsert), plus the "Opening stock & physical count" section on
+`commissary.html`. Tests added to `commissary.test.js`. Live-verified against
+a real booted server. Full detail in `changelog.md`'s 25b entry - don't
+re-derive it here.
 
 ### 25a — commissary stock receipts. Raw meat arriving from suppliers.
 Bigger than a route-and-UI mirror of `stockReceipts.js`, because

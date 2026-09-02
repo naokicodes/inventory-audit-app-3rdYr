@@ -154,6 +154,66 @@ router.get('/commissary/daily-audit', (req, res) => {
   res.json(rows);
 });
 
+// POST /api/commissary/daily-audit
+// Body: { commissary_id, business_date, actor?, rows: [{ commissary_meat_id, opening_stock, ending_actual, notes }] }
+// Step 25b (session-status.md): the write side of GET /commissary/daily-audit
+// above, mirroring POST /api/daily-audit (dailyAudit.js) closely - same
+// "only write fields actually provided" convention (null/undefined/'' means
+// skip, never write a zero), same { ok, saved } response. commissary_id is
+// required here for request-shape symmetry with the restaurant route, but
+// neither target table has a commissary_id column (each commissary_meat_id
+// already identifies its own commissary via commissary_meats.commissary_id)
+// - it is validated as present, never written.
+//
+// The two tables get deliberately different treatment, exactly like their
+// restaurant-side twins:
+// - commissary_opening_stock: INSERT OR IGNORE. UNIQUE(commissary_meat_id)
+//   has no date in the key (schema.sql) - opening stock is a one-time
+//   "where we started tracking this meat" figure, set once and never
+//   revised. First write wins; a later attempt is silently a no-op, never
+//   an upsert and never per-date.
+// - commissary_ending_actual: real upsert, ON CONFLICT (commissary_meat_id,
+//   business_date) DO UPDATE - a physical count is per-day and corrigible,
+//   so a same-day recount overwrites rather than duplicating or failing.
+//   Carries notes (per row, like ending_actual's remarks) and created_by
+//   (from the top-level actor, matching this file's existing convention for
+//   yield-log/adjustments) through; photo_path is left alone - nothing else
+//   in the app writes it, and this step doesn't introduce that.
+//
+// Deliberately not activity_log-scoped, same reasoning as opening_stock's
+// restaurant-side twin (rule 9 scopes that pattern to stock_receipts/
+// commissary_yield_log only).
+router.post('/commissary/daily-audit', (req, res) => {
+  const { commissary_id, business_date, rows, actor } = req.body;
+  if (!commissary_id || !business_date || !Array.isArray(rows)) {
+    return res.status(400).json({ error: 'commissary_id, business_date, and rows[] are required' });
+  }
+
+  const insertOpeningStock = db.prepare(`
+    INSERT OR IGNORE INTO commissary_opening_stock (commissary_meat_id, business_date, quantity)
+    VALUES (?, ?, ?)
+  `);
+
+  const upsertEndingActual = db.prepare(`
+    INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity, notes, created_by)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(commissary_meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes, created_by = excluded.created_by
+  `);
+
+  let saved = 0;
+  for (const row of rows) {
+    if (row.opening_stock !== null && row.opening_stock !== undefined && row.opening_stock !== '') {
+      insertOpeningStock.run(row.commissary_meat_id, business_date, Number(row.opening_stock));
+    }
+    if (row.ending_actual !== null && row.ending_actual !== undefined && row.ending_actual !== '') {
+      upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), row.notes || null, actor || null);
+    }
+    saved++;
+  }
+
+  res.json({ ok: true, saved });
+});
+
 // POST /api/commissary/shipments
 // Step 20c (session-status.md): logs one outbound batch from the
 // Commissary to a destination restaurant, with its named-portion

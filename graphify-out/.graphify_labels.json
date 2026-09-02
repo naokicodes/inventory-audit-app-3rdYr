@@ -1,18 +1,18 @@
 {
   "0": "auditEngine.js",
   "1": "Data Model doc",
-  "2": "dashboard.test.js",
+  "2": "commissary.test.js",
   "3": "connection.js",
-  "4": "commissaryYieldEngine.test.js",
+  "4": "commissary.js",
   "5": "schema.sql",
   "6": "index.js",
   "7": "Settings Admin: Conversion Standards",
-  "8": "commissary.test.js",
+  "8": "dashboard.test.js",
   "9": "activityLog.js",
   "10": "history.test.js",
   "11": "Home/Index Page",
   "12": "Package Manifest",
-  "13": "withTransaction",
+  "13": "stockReceipts.test.js",
   "14": "Allocations Page & Command Panel Widgets",
   "15": "Settings Route Tests",
   "16": "Allocations Route Tests",
@@ -27,6 +27,9 @@
   "25": "Oversold-Check Command",
   "26": "Sync-Batch-Stock Command",
   "27": "commissaryAdjustments.test.js",
+  "28": "withTransaction",
+  "29": "check-ledger.js",
   "30": "terminal.test.js",
-  "31": "Session History — resolved, kept for \"why\", not \"what's next\""
+  "31": "Session History — resolved, kept for \"why\", not \"what's next\"",
+  "32": "commands.js"
 }
