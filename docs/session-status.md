@@ -18,14 +18,16 @@ suite, and how to keep context costs down.
 
 ## Current state — 2026-09-02
 
-**Step 23 is fully closed**, and step 24 is seven sub-steps in: **24a**
+**Step 23 is fully closed**, and step 24 is eight sub-steps in: **24a**
 (`output_commissary_meat_id` + the debit/credit ledger), **24a-b** (test
 isolation), **24b-i** (`input_quantity`), **24b-ii**
 (`commissary_adjustments` schema + engine), **24b-iii** (adjustment
-routes), **24c-ii** (Allocate/Write-off UI on `commissary.html`), and **24d**
-(meat type retirement fix) are all DONE and **pushed** as of 2026-09-02,
-verified against `origin/main` at `df8fec5`. Per-step detail is in
-`changelog.md`; the archived sub-step entries are in `session-history.md`.
+routes), **24c-ii** (Allocate/Write-off UI on `commissary.html`), **24d**
+(meat type retirement fix), and **24b-iv** (yield-log write path) are all
+DONE as of 2026-09-02. 24b-iv is committed locally by this session but NOT
+YET verified against `origin/main` — the architect's next pull will confirm.
+Per-step detail is in `changelog.md`; the archived sub-step entries are in
+`session-history.md`.
 
 Workers are told not to push; NaokiiVT applies every push himself afterwards.
 Earlier revisions of this file described 24c-ii and 24d as "not pushed" — that
@@ -39,13 +41,13 @@ reconciled. It is now listed below. Numbering a step in a worker prompt does
 not put it in this file; the architect writes it here in the same conversation
 where the decision is made.
 
-Full suite: **16 files, 298/298 assertions, 0 failures.** Run individually
+Full suite: **16 files, 314/314 assertions, 0 failures** (up from 298 — 24b-iv
+added 16 net, `commissary.test.js` alone rose from 47 to 83). Run individually
 via `node <file>.test.js` — there is no test runner script. Two files are
 easy to miss because they live outside `server/routes`/`server/engines`:
-`server/db/activityLog.test.js` and `server/db/migrate.test.js`. The newest
-test file is still `server/routes/commissaryAdjustments.test.js` (24c-ii
-touched only `public/commissary.html`, which has no test file — verified by
-a live click-through instead, see `changelog.md`).
+`server/db/activityLog.test.js` and `server/db/migrate.test.js`. `commands.test.js`
+and `sales.test.js` print a SQLite `ExperimentalWarning` after their count
+line — read the count, not the last line.
 
 ## Known open items (not the next step's problem, just not forgotten)
 
@@ -97,7 +99,7 @@ a live click-through instead, see `changelog.md`).
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii, 24b-iii, 24c-ii, 24d DONE; 24b-iv NEXT, then 24c-i)
+## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii, 24b-iii, 24c-ii, 24d, 24b-iv DONE; 24c-i NEXT)
 
 The full design narrative, the 2026-08-31 resolution of its open questions,
 and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, 24b-iii,
@@ -115,26 +117,13 @@ create/list/patch/delete and every rejection path, not an accepted ALLOCATION
 end to end — that's covered by the mirrored-logic test file instead. See
 `changelog.md` for full detail.
 
-**Gap found 2026-09-02 (architect verification pass), before dispatching 24c:**
-`output_commissary_meat_id` (24a) and `input_quantity` (24b-i) exist in
-`schema.sql`, have idempotent migrations, and are fully consumed by
-`commissaryAuditEngine.js` — `getCommissaryBackedUp` credits
-`COALESCE(output_commissary_meat_id, commissary_meat_id)` and
-`getCommissaryUsage` debits `COALESCE(input_quantity, raw_weight_in)`. But
-**nothing writes either column.** `grep` across `server/routes/*.js` returns
-zero hits for both. The yield-log `POST` destructures six fields and neither is
-among them; `PATCH` likewise, so an existing event can't be corrected either.
-
-This was correct scoping at the time, not a slip — 24b-i's `changelog.md` entry
-names the write route as explicitly out of scope. It simply never got
-scheduled afterwards, and the sub-step list ran straight from 24b-iii to
-"24c — UI" as though the write path existed.
-
-Why this matters: a worker given "24c — UI" as previously worded would add the
-output-item and input-count fields, POST them, receive `{ok: true}`, and have
-both values silently discarded. The form would look like it worked and the
-balance math would never move. The engine reading these columns *correctly* is
-what makes the failure silent.
+**Gap found 2026-09-02 (architect verification pass), closed the same day by
+24b-iv below:** `output_commissary_meat_id` (24a) and `input_quantity`
+(24b-i) existed in `schema.sql` and were fully consumed by
+`commissaryAuditEngine.js`, but nothing wrote either column yet — correct
+scoping at the time (24b-i's `changelog.md` entry named the write route as
+explicitly out of scope), just never rescheduled afterwards. Recorded here so
+a future session doesn't rediscover the same gap.
 
 **Remaining sub-steps, re-sequenced:**
 
@@ -151,12 +140,21 @@ what makes the failure silent.
   `(none)` so that the next edit-and-save on any field silently blanked the
   meat's real `meat_type_id`, since `saveCommissaryMeatRow` posts every field
   at once. Verified against that exact case live.
-- **24b-iv — yield-log write path. NEXT.** Extend `POST` and `PATCH
-  /commissary/yield-log` to accept `output_commissary_meat_id` and
-  `input_quantity`, and add the output meat's code/name to
-  `GET /commissary/yield-log` (it currently joins only the source meat, so a
-  yield row has no output name to display — the same shape of gap that blocked
-  24c). Settled rules, decided 2026-09-02:
+- **24b-iv — yield-log write path. DONE, 2026-09-02, committed locally by
+  this session (not yet confirmed against `origin/main`).** `POST`/`PATCH
+  /commissary/yield-log` now accept `output_commissary_meat_id` and
+  `input_quantity`, validated per the rules below (shared helper
+  `validateYieldOutputAndInputQty` in `server/routes/commissary.js`); `GET
+  /commissary/yield-log` now also returns `output_commissary_meat_id`,
+  `input_quantity`, `output_code`, `output_name` (null when unset, same
+  convention `GET /commissary/adjustments` uses for its destination fields).
+  `commissaryYieldEngine.js` and `commissaryAuditEngine.js` untouched, as
+  instructed. Full suite 16 files / 314 assertions / 0 failures (up from 298).
+  Live-verified against a real booted server (throwaway commissary meats,
+  cleaned up afterward — see `changelog.md`'s 24b-iv entry, including the one
+  thing NOT live-tested: cross-commissary output rejection, which needs a
+  second live commissary and is already covered exhaustively by the mirrored
+  test suite instead).
   - **Output meat** must exist, be active, and belong to the **same
     `commissary_id` as the input**. Otherwise unconstrained — no `meat_type_id`
     or `unit` match, because the yield log is the one place a unit legitimately
@@ -173,16 +171,13 @@ what makes the failure silent.
     `raw_weight_in`".
   - **PATCH needs an explicit clear.** The existing PATCH coalesce treats
     `undefined`/`null`/`''` alike as "keep existing", but NULL is a *meaningful*
-    value for both new columns. Convention: an **absent key keeps** the current
-    value, an explicit **`null` clears** to NULL. Without this, an output meat
-    set by mistake could never be unset.
-  - `commissaryYieldEngine.js` stays untouched. `computeYieldMetrics` keeps
-    dividing by `raw_weight_in` so loss% stays kg-to-kg; repointing it at
-    `input_quantity` would compare a count to a weight.
-  Numbered in the 24b tier because it is route work, not UI. Blocks 24c-i.
-- **24c-i — yield-entry form UI.** The output-item field (defaults to the same
-  meat, i.e. NULL) and the input-count field alongside the weighed input.
-  Requires 24b-iv first.
+    value for both new columns. Convention (implemented): an **absent key
+    keeps** the current value, an explicit **`null` (or `''`) clears** to
+    NULL, re-validated against the resulting row.
+- **24c-i — yield-entry form UI. NEXT.** The output-item field (defaults to
+  the same meat, i.e. NULL) and the input-count field alongside the weighed
+  input, in `public/commissary.html`'s yield-entry form. 24b-iv's write path
+  is ready to receive both fields.
 
 24c-ii is deliberately dispatched ahead of 24b-iv even though it sorts later:
 the two are independent, and running them in this order keeps two workers off
