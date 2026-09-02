@@ -18,28 +18,26 @@ suite, and how to keep context costs down.
 
 ## Current state — 2026-09-02
 
-**Step 23 is fully closed**, and step 24 is six sub-steps in: **24a**
+**Step 23 is fully closed**, and step 24 is seven sub-steps in: **24a**
 (`output_commissary_meat_id` + the debit/credit ledger), **24a-b** (test
 isolation), **24b-i** (`input_quantity`), **24b-ii**
 (`commissary_adjustments` schema + engine), **24b-iii** (adjustment
-routes), and **24c-ii** (Allocate/Write-off UI on `commissary.html`) are all
-DONE as of 2026-09-02. 24c-ii's commit is intentionally **not pushed** — this
-worker prompt said "Do not push, NaokiiVT applies every push manually,"
-unlike the git-push-by-default flow rule 18 describes for other workers.
-Per-step detail is in `changelog.md`; the archived sub-step entries are in
-`session-history.md`.
+routes), **24c-ii** (Allocate/Write-off UI on `commissary.html`), and **24d**
+(meat type retirement fix) are all DONE and **pushed** as of 2026-09-02,
+verified against `origin/main` at `df8fec5`. Per-step detail is in
+`changelog.md`; the archived sub-step entries are in `session-history.md`.
 
-**Step 24d (meat type retirement fix) also landed 2026-09-02**, same session
-as this dispatch — a small, contained bug fix outside the 24-series
-numbering (the dispatch was labeled 24d in the worker prompt itself, but this
-file's step-24 sub-step list above predates that prompt and never listed it;
-flagged here per rule 23 rather than silently reconciled). Fixed
-`typeOptionsFor` in `public/settings.html`'s Commissary Meats edit dropdown to
-filter to active types plus the row's own currently-selected type (labeled
-`(retired)` if inactive) — previously it had no active filter at all, unlike
-the create form. See `changelog.md` for the full before/after and the
-trap-case verification (a tagged-then-retired type surviving an unrelated
-field's edit-and-save). Also not pushed, same reason as 24c-ii above.
+Workers are told not to push; NaokiiVT applies every push himself afterwards.
+Earlier revisions of this file described 24c-ii and 24d as "not pushed" — that
+was true at the moment each worker finished and stale within the hour. Record
+push state as verified against `origin/main`, not as reported by a worker who
+by design cannot push.
+
+**24d was dispatched without being written into the sub-step list first** —
+an architect error, correctly flagged by the worker rather than silently
+reconciled. It is now listed below. Numbering a step in a worker prompt does
+not put it in this file; the architect writes it here in the same conversation
+where the decision is made.
 
 Full suite: **16 files, 298/298 assertions, 0 failures.** Run individually
 via `node <file>.test.js` — there is no test runner script. Two files are
@@ -50,6 +48,15 @@ touched only `public/commissary.html`, which has no test file — verified by
 a live click-through instead, see `changelog.md`).
 
 ## Known open items (not the next step's problem, just not forgotten)
+
+- **Two retired test meat types sit in live `inventory.db`:** id 5
+  `Test Meat Type` and id 6 `24d Test Type`, both `active = 0`. Harmless now
+  that 24d filters them out of both dropdowns, and `meat_types` has no DELETE
+  route by design (soft delete only, and the table is referenced by two FKs).
+  Left deliberately rather than hard-deleted. Worth knowing they are there so
+  nobody mistakes them for real catalog entries, and worth not adding more —
+  a worker verifying meat-type behavior should reuse one of these rather than
+  creating a third.
 
 - **Commissary meats are untagged — `meat_type_id` is NULL on live data.**
   This is a data-entry prerequisite for allocations, not a build task: an
@@ -90,7 +97,7 @@ a live click-through instead, see `changelog.md`).
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii, 24b-iii DONE; 24c-ii NEXT, then 24b-iv, then 24c-i)
+## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii, 24b-iii, 24c-ii, 24d DONE; 24b-iv NEXT, then 24c-i)
 
 The full design narrative, the 2026-08-31 resolution of its open questions,
 and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, 24b-iii,
@@ -131,9 +138,19 @@ what makes the failure silent.
 
 **Remaining sub-steps, re-sequenced:**
 
-- **24c-ii — Allocate / Write-off UI on the commissary balance view. DONE
-  2026-09-02**, committed locally, not pushed (see above). Full done/not-done
-  breakdown is in `changelog.md`'s 2026-09-02 24c-ii entry.
+- **24c-ii — Allocate / Write-off UI on the commissary balance view. DONE and
+  pushed 2026-09-02** (`8d67d59`). Full done/not-done breakdown is in
+  `changelog.md`'s 2026-09-02 24c-ii entry.
+- **24d — meat type retirement fix. DONE and pushed 2026-09-02** (`df8fec5`).
+  `typeOptionsFor` in `public/settings.html`'s Commissary Meats edit dropdown
+  had no `active` filter, unlike the create form's dropdown, so a retired meat
+  type stayed pickable forever beside the real ones. Now filters to active
+  types **plus the row's own currently-selected type**, labeled `(retired)`
+  when inactive — the naive active-only filter would have dropped a
+  tagged-then-retired type from its own row, falling the `<select>` back to
+  `(none)` so that the next edit-and-save on any field silently blanked the
+  meat's real `meat_type_id`, since `saveCommissaryMeatRow` posts every field
+  at once. Verified against that exact case live.
 - **24b-iv — yield-log write path. NEXT.** Extend `POST` and `PATCH
   /commissary/yield-log` to accept `output_commissary_meat_id` and
   `input_quantity`. The output meat must be active and must belong to the
