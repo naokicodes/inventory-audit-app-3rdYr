@@ -1009,8 +1009,16 @@
       const meats = await res.json();
       const typesRes = await fetch('/api/settings/meat-types');
       const types = await typesRes.json();
+      // Active types, plus the row's own currently-selected type even if it's
+      // since been retired - dropping a tagged-but-retired type from its own
+      // row's options would fall the <select> back to (none), and the next
+      // edit-and-save (even to an unrelated field) would silently blank the
+      // real meat_type_id, since saveCommissaryMeatRow posts every field at
+      // once. Retired-but-retained options are labeled so they're obviously
+      // not for new tagging.
       const typeOptionsFor = selectedId => '<option value="">(none)</option>' +
-        types.map(t => `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.name}</option>`).join('');
+        types.filter(t => t.active || t.id === selectedId)
+          .map(t => `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.name}${t.active ? '' : ' (retired)'}</option>`).join('');
       document.getElementById('commissary-meats-table').innerHTML = `
         <table>
           <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Leeway %</th><th>Cost/unit</th><th>Meat Type</th><th>Active</th></tr></thead>

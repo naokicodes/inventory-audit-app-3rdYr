@@ -11,6 +11,20 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-09-02 (Claude Code session) — Step 24d: meat type retirement fix
+
+`public/settings.html`'s Commissary Meats edit dropdown (`typeOptionsFor`, ~line 1012) offered every meat type with no `active` filter, unlike the create form's `loadCommissaryMeatTypeDropdown` which correctly filters to active only. A retired meat type therefore stayed selectable forever in the edit dropdown, right next to real, current types — exactly where it could be mis-picked during the pre-soft-launch tagging pass.
+
+The naive fix (`types.filter(t => t.active)`) would have introduced silent data loss: if a commissary meat was already tagged with a type later retired, that type would vanish from its own row's options, the `<select>` would fall back to `(none)`, and the next edit-and-save on that row — even to an unrelated field — would silently blank the real `meat_type_id`, because `saveCommissaryMeatRow` posts every field at once. Fixed instead by filtering to `t.active || t.id === selectedId`, so a row keeps its own currently-selected type even when inactive, labeled `${t.name} (retired)` so it reads as clearly not for new tagging.
+
+Live-verified against a real booted server, via the UI (not direct SQL) throughout: created a fresh "24d Test Type" meat type, tagged M01 (Whole Chicken) with it through the Commissary Meats edit dropdown, retired the type via the Meat Types tab, reloaded the page, and confirmed (a) the create-form dropdown no longer offered it, (b) an untagged meat's (M02) edit dropdown no longer offered it either, (c) M01's own edit dropdown still showed and kept it selected, labeled "24d Test Type (retired)". Then edited M01's name (an unrelated field) and saved twice — `meat_type_id` stayed `6` both times, confirmed via `GET /api/commissary/meats`, proving the trap case does not fire. Also reactivated the type briefly to confirm an untagged meat's dropdown offers it normally (no "(retired)" suffix) and can be selected — then re-retired it and untagged M01 back to `(none)`, restoring the exact pre-session state.
+
+Retired the leftover "Test Meat Type" (id 5) per the task — it was already `active: 0` from the prior (24c-ii) session's own test cleanup, so this session's action was to confirm that state, not change it. Full `meat_types` table at the end of this session: `[{"id":6,"name":"24d Test Type","active":0},{"id":5,"name":"Test Meat Type","active":0}]` — both retired, neither hard-deleted (no DELETE route exists or was added, per the task's explicit instruction; `meat_types.active` is this table's soft-delete and the row is FK-referenced by `commissary_meats.meat_type_id` and the conversion-standards table). `GET /api/commissary/meats` confirms every commissary meat reads `meat_type_id: null` at session end, same as it started.
+
+Full 16-file suite: 298/298 assertions, 0 failures, unchanged (no server-side file touched — `public/settings.html` only). Server stopped, port 3000 confirmed free afterward.
+
+---
+
 ## 2026-09-02 (Claude Code session) — Step 24c-ii: Allocate/Write-off UI on commissary.html
 
 Added Allocate and Write-off buttons to each balance card in `public/commissary.html` (`loadBalances()`), plus a shared inline adjustment form and an "Adjustments (allocations & write-offs)" list section, filtered by the page's existing commissary/date controls. No server/engine/schema file touched, per the step's own boundary. Real bug caught by the live click-through, not by the mirrored routes tests (which don't exercise this HTML at all): `loadBalances()`'s rows come from `GET /commissary/daily-audit`, whose field is `commissary_meat_id`, not `id` — the card buttons' `data-id` initially read `r.id` (undefined), which sent `commissary_meat_id=undefined` to the destinations endpoint and threw `destinations.map is not a function` in the console, silently breaking Allocate/Write-off entirely with no visible error on the page. Fixed to `r.commissary_meat_id`.

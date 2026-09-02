@@ -29,6 +29,18 @@ unlike the git-push-by-default flow rule 18 describes for other workers.
 Per-step detail is in `changelog.md`; the archived sub-step entries are in
 `session-history.md`.
 
+**Step 24d (meat type retirement fix) also landed 2026-09-02**, same session
+as this dispatch — a small, contained bug fix outside the 24-series
+numbering (the dispatch was labeled 24d in the worker prompt itself, but this
+file's step-24 sub-step list above predates that prompt and never listed it;
+flagged here per rule 23 rather than silently reconciled). Fixed
+`typeOptionsFor` in `public/settings.html`'s Commissary Meats edit dropdown to
+filter to active types plus the row's own currently-selected type (labeled
+`(retired)` if inactive) — previously it had no active filter at all, unlike
+the create form. See `changelog.md` for the full before/after and the
+trap-case verification (a tagged-then-retired type surviving an unrelated
+field's edit-and-save). Also not pushed, same reason as 24c-ii above.
+
 Full suite: **16 files, 298/298 assertions, 0 failures.** Run individually
 via `node <file>.test.js` — there is no test runner script. Two files are
 easy to miss because they live outside `server/routes`/`server/engines`:
