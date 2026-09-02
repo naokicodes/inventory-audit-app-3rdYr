@@ -432,3 +432,42 @@ work landed clean. The only thing missing was the flag.
   of via `commissary_meat_map`.
 - A hard `DELETE` on `stock_receipts` or `commissary_yield_log` instead of
   a soft delete + activity log entry.
+
+### Amendment 2026-09-02 — workers push their own commits, with proof
+
+Superseding the previous "commit, then stop; NaokiiVT pushes" arrangement:
+**a coder worker now pushes its own work.** The manual-push gate was not
+functioning as a review step — the diff was not being read at push time, and
+the real review is the architect's independent verification pull afterwards.
+Keeping the gate cost a round trip on every dispatch and caught nothing that
+the pull did not also catch.
+
+What replaces it is proof rather than assertion. A worker that pushes must end
+its report with the **raw, verbatim output** of both:
+
+```
+git status -sb
+git log --oneline -1 origin/main
+```
+
+Not a summary of them. Not "pushed successfully." The literal output, pasted.
+A session can honestly write "pushed" about a push that silently failed; it is
+much harder to produce that specific output for a push that never landed, and
+the architect checks it against real `origin/main` on the next pull regardless.
+
+Do **not** push if either is true:
+- the full suite is not green, or
+- any file outside the step's stated scope changed.
+
+In either case, commit, stop, and flag it. A scope surprise is exactly the
+situation where a human should look before it reaches a public repo.
+
+The tradeoff being accepted knowingly: an unpushed bad commit is discarded with
+`git reset --hard`, while a pushed one needs a revert commit that lives in
+history permanently. That cost is judged small for a solo repo, and smaller
+than a round trip per sub-step.
+
+The architect's side of rule 23 is unchanged and now matters more, not less:
+record push state from `origin/main` and a fresh pull, never from a worker's
+report. A worker's "not pushed" was true when written and stale within the
+hour; a worker's "pushed" is a claim until the pull confirms it.

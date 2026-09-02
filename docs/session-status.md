@@ -24,20 +24,23 @@ not taken from a worker's report. Per-step detail is in `changelog.md`; the
 archived sub-step entries and the full step-24 narrative are in
 `session-history.md`.
 
-**There is no next coding step defined.** That is deliberate, not an oversight.
-The plan is to soft-launch against real output and let actual use decide what
-gets built next, rather than guessing at features — the same reasoning that
-deferred the per-meat next-stage config. The open architectural questions are
-listed at the bottom of this file; they are for an architect conversation to
-resolve, not for a worker to pick up.
+**Next coding step: 24b-v** — a live data-corruption bug found 2026-09-02
+*after* step 24 closed, written up in its own section below. Fix it before
+soft-launch. Beyond that, no further step is defined, deliberately.
+The plan after 24b-v is to soft-launch against real output and let actual use
+decide what gets built next, rather than guessing at features — the same
+reasoning that deferred the per-meat next-stage config. The open architectural
+questions are listed at the bottom of this file; they are for an architect
+conversation to resolve, not for a worker to pick up.
 
 **Before soft-launch, one on-site task blocks the new features from doing
 anything:** the meat-type tagging pass (see Known open items below).
 
-Workers are told not to push; NaokiiVT applies every push himself afterwards.
-Record push state as verified against `origin/main`, never as reported by a
-worker who by design cannot push — a worker's "not pushed" is true when they
-write it and stale within the hour.
+**Workers push their own commits** as of the 2026-09-02 amendment to rule 23,
+and must paste raw `git status -sb` and `git log --oneline -1 origin/main`
+output verbatim rather than summarising it. The architect still records push
+state from `origin/main` and a fresh pull, never from the report — a worker's
+claim is a claim until the pull confirms it.
 
 Full suite: **16 files, 314/314 assertions, 0 failures** (up from 298 — 24b-iv
 added 16 net, `commissary.test.js` alone rose from 47 to 83). Run individually
@@ -335,6 +338,54 @@ the step it was working on is fully finished — should, before ending:
    again a second doc that can silently drift out of sync with the real
    one.
 
+## Step 24b-v — REQUIRED: the effective yield output must be kg-tracked
+
+**Found 2026-09-02 by an architect trace, after step 24 was closed. This is a
+live data-corruption bug, not a nicety, and it should be fixed before
+soft-launch.**
+
+24b-iv requires `input_quantity` when the source meat's unit is `unit`, but
+never requires an **output meat**. A blank output means "output is the same
+meat", so a yield event on a unit-tracked source credits its kg output straight
+back onto the count balance. Reproduced against a real DB:
+
+```
+Raw Chicken, unit-tracked, 100 birds on hand
+  yield event: input_quantity 40, raw_weight_in 32.5, backed_weight_out 28,
+               output_commissary_meat_id NULL
+  usage (debit):     40    <- birds
+  backedUp (credit): 28    <- KILOS
+  endingCalculated:  88    <- 100 - 40 + 28, mixing birds and kilos
+```
+
+Nothing rejects it and nothing flags it downstream.
+
+**The rule to add** derives from an already-settled decision ("yield output is
+always kg"; unit-to-unit yield does not occur): the **effective output** —
+`COALESCE(output_commissary_meat_id, commissary_meat_id)` — must be a
+`kg`-tracked meat. That single check covers every case:
+
+- kg source, blank output — credits itself, kg to kg, accepted (unchanged)
+- unit source, blank output — **rejected**; this is the bug
+- unit source, kg output — accepted, the real unit-in/kg-out case
+- unit source, unit output — rejected (unit-to-unit yield does not occur)
+
+Scope: `server/routes/commissary.js` POST and PATCH, extending
+`validateYieldOutputAndInputQty`, which already receives the source meat. Both
+paths call it, so neither can drift. Plus tests. `commissaryYieldEngine.js` and
+`commissaryAuditEngine.js` stay untouched. The error text must name the real
+problem — that the output has to be a kg-tracked meat and one may need creating
+in the catalog first — not just report a rejection.
+
+**Check for existing bad rows before or alongside this.** Any yield row whose
+effective output is unit-tracked has already corrupted that meat's balance.
+Query for them; they are not necessarily repairable by validation alone.
+
+**Related, and the reason this surfaced:** the output meat must exist in the
+catalog as its own `commissary_meats` row. A commissary holding only "Raw
+Chicken" has nothing to select, and today that silently degrades to the broken
+same-meat case instead of saying so. Catalog work belongs in the tagging pass.
+
 ## Open architectural questions (for an architect conversation, not a worker)
 
 None of these blocks anything. They are listed so a fresh architect
@@ -355,15 +406,14 @@ some may have been resolved since this list was written.
    date-stamped directory. Pending a check of graphify's own docs.
 
 **Raised 2026-09-02:**
-5. **Should coder workers push their own commits?** Today they cannot, and
-   NaokiiVT pushes manually. That gate isn't functioning as a review step — the
-   diff isn't being read at push time; the real gate is the architect's
-   verification pull. Against: a pushed bad commit needs a revert, an unpushed
-   one needs a `reset --hard`; and a worker already once reported a push that
-   had not happened. Sketched compromise, never adopted: workers may push, but
-   must paste raw `git status -sb` and `git log --oneline -1 origin/main`
-   output verbatim rather than summarising it, and must not push if the suite
-   is red or if any file outside the stated scope changed.
+5. **RESOLVED 2026-09-02 — workers now push their own commits.** Option B
+   adopted: a worker pushes, and must paste the raw verbatim output of
+   `git status -sb` and `git log --oneline -1 origin/main` rather than
+   summarising it. No push if the suite is red or if any file outside the
+   step's stated scope changed — commit, stop, flag instead. Written into
+   `rules-for-claude-code.md` as the 2026-09-02 amendment to rule 23. The
+   architect still records push state from `origin/main` and a fresh pull,
+   never from the report.
 6. **Do cross-commissary allocations need physical paperwork?** An ALLOCATION
    between commissaries is a real van trip but produces no delivery receipt,
    unlike a restaurant shipment. The stock math is correct either way. Worth
