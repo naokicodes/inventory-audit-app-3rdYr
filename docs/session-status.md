@@ -18,16 +18,22 @@ suite, and how to keep context costs down.
 
 ## Current state — 2026-09-02
 
-**Step 23 is fully closed**, and step 24 is eight sub-steps in: **24a**
-(`output_commissary_meat_id` + the debit/credit ledger), **24a-b** (test
-isolation), **24b-i** (`input_quantity`), **24b-ii**
+**Step 23 is fully closed, and step 24 is fully closed** — all nine
+sub-steps done: **24a** (`output_commissary_meat_id` + the debit/credit
+ledger), **24a-b** (test isolation), **24b-i** (`input_quantity`), **24b-ii**
 (`commissary_adjustments` schema + engine), **24b-iii** (adjustment
 routes), **24c-ii** (Allocate/Write-off UI on `commissary.html`), **24d**
-(meat type retirement fix), and **24b-iv** (yield-log write path) are all
-DONE as of 2026-09-02. 24b-iv is committed locally by this session but NOT
-YET verified against `origin/main` — the architect's next pull will confirm.
-Per-step detail is in `changelog.md`; the archived sub-step entries are in
-`session-history.md`.
+(meat type retirement fix), **24b-iv** (yield-log write path), and **24c-i**
+(yield-entry form UI, the last sub-step) are all DONE as of 2026-09-02. 24c-i
+is committed locally by this session but NOT YET verified against
+`origin/main` — the architect's next pull will confirm. Per-step detail is in
+`changelog.md`; the archived sub-step entries are in `session-history.md`.
+
+**Step 24's design/spec block below (the sub-step list and "Things NOT to
+re-litigate") is left in place rather than archived** — flagging for the
+architect to move it to `session-history.md` at the next natural doc pass,
+per this file's own archiving rule, since a coder-worker session shouldn't
+also be deciding what counts as "resolved history."
 
 Workers are told not to push; NaokiiVT applies every push himself afterwards.
 Earlier revisions of this file described 24c-ii and 24d as "not pushed" — that
@@ -99,7 +105,7 @@ line — read the count, not the last line.
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-## Step 24 — multi-stage yield + Commissary-side allocation (24a, 24a-b, 24b-i, 24b-ii, 24b-iii, 24c-ii, 24d, 24b-iv DONE; 24c-i NEXT)
+## Step 24 — multi-stage yield + Commissary-side allocation (CLOSED — all nine sub-steps DONE)
 
 The full design narrative, the 2026-08-31 resolution of its open questions,
 and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, 24b-iii,
@@ -174,33 +180,27 @@ a future session doesn't rediscover the same gap.
     value for both new columns. Convention (implemented): an **absent key
     keeps** the current value, an explicit **`null` (or `''`) clears** to
     NULL, re-validated against the resulting row.
-- **24c-i — yield-entry form UI. NEXT, and the last sub-step of step 24.** The
-  output-item field (defaults to the same meat, i.e. NULL) and the input-count
-  field alongside the weighed input, in `public/commissary.html`'s yield-entry
-  form **and its inline row editor**. 24b-iv's write path is ready to receive
-  both fields, and `GET /commissary/yield-log` already returns
-  `output_commissary_meat_id`, `input_quantity`, `output_code` and
-  `output_name` for display.
+- **24c-i — yield-entry form UI. DONE, 2026-09-02, the last sub-step of step
+  24.** Added the output-meat `<select>` (defaults to blank = "Same meat" =
+  NULL, filtered client-side to the input's own `commissary_id`) and the
+  input-count field (required/optional hint driven by the selected meat's
+  `unit`) to `public/commissary.html`'s yield-entry form, the yield log table,
+  and the inline row editor — `saveEdit` now actually sends both fields,
+  explicit `null` on clear per the PATCH convention. Full breakdown and live
+  verification detail (including the legacy-row recovery flow below, clicked
+  through for real) in `changelog.md`'s 24c-i entry.
 
-  Two things folded in, decided 2026-09-02 after tracing 24b-iv's real
-  behavior rather than assuming it:
-  - **Legacy rows on unit-tracked meats are currently uneditable.** 24b-iv
-    re-validates the *resulting* row, so a yield row created before 24b-iv on
-    a `unit` meat — where `input_quantity` is NULL — now rejects **any** PATCH,
-    including a notes-only edit, with "input_quantity is required...".
-    **Deliberately kept.** Those rows are actively debiting weighed kg out of a
-    count-based balance, which is exactly the bug 24b-i fixed; they should not
-    stay quietly editable while still wrong. Grandfathering would leave them
-    wrong forever.
-  - The remedy is UI, not a rule change. Surfacing `input_quantity` in the row
-    editor dissolves the problem: the operator sees an empty count box, fills
-    it, saves. **The row editor must send both new fields** — `saveEdit`
-    currently sends neither, safe today only because absent-key-keeps preserves
-    them. Also reword 24b-iv's error so it says the row predates the
-    requirement and needs its count supplied, rather than naming a field the
-    operator cannot see.
-
-  Requires 24b-iv (DONE). Closes step 24.
+  The legacy-row behavior this step was built around, confirmed live: a yield
+  row from before 24b-iv on a unit-tracked meat, where `input_quantity` is
+  NULL, rejects **any** PATCH — including a notes-only edit — with
+  "input_quantity is required...". **Deliberately kept**, not a bug: those
+  rows actively debit weighed kg out of a count-based balance, exactly the bug
+  24b-i fixed. The row editor showing the empty count box is the remedy: the
+  operator sees why, fills it in, saves successfully. 24c-i did **not** reword
+  24b-iv's error text (out of this step's file scope, `public/commissary.html`
+  only) — the existing message reaches the operator via `saveEdit`'s
+  `alert(err.message)`, confirmed live, and reads acceptably even without a
+  rewrite naming the row as "legacy."
 
 24c-ii is deliberately dispatched ahead of 24b-iv even though it sorts later:
 the two are independent, and running them in this order keeps two workers off
