@@ -18,34 +18,26 @@ suite, and how to keep context costs down.
 
 ## Current state — 2026-09-02
 
-**Step 23 is fully closed, and step 24 is fully closed** — all nine
-sub-steps done: **24a** (`output_commissary_meat_id` + the debit/credit
-ledger), **24a-b** (test isolation), **24b-i** (`input_quantity`), **24b-ii**
-(`commissary_adjustments` schema + engine), **24b-iii** (adjustment
-routes), **24c-ii** (Allocate/Write-off UI on `commissary.html`), **24d**
-(meat type retirement fix), **24b-iv** (yield-log write path), and **24c-i**
-(yield-entry form UI, the last sub-step) are all DONE as of 2026-09-02. 24c-i
-is committed locally by this session but NOT YET verified against
-`origin/main` — the architect's next pull will confirm. Per-step detail is in
-`changelog.md`; the archived sub-step entries are in `session-history.md`.
+**Steps 1–24 are all closed.** Step 24's nine sub-steps are done, pushed, and
+verified against `origin/main` at `6c57fc5` by an independent architect pull —
+not taken from a worker's report. Per-step detail is in `changelog.md`; the
+archived sub-step entries and the full step-24 narrative are in
+`session-history.md`.
 
-**Step 24's design/spec block below (the sub-step list and "Things NOT to
-re-litigate") is left in place rather than archived** — flagging for the
-architect to move it to `session-history.md` at the next natural doc pass,
-per this file's own archiving rule, since a coder-worker session shouldn't
-also be deciding what counts as "resolved history."
+**There is no next coding step defined.** That is deliberate, not an oversight.
+The plan is to soft-launch against real output and let actual use decide what
+gets built next, rather than guessing at features — the same reasoning that
+deferred the per-meat next-stage config. The open architectural questions are
+listed at the bottom of this file; they are for an architect conversation to
+resolve, not for a worker to pick up.
+
+**Before soft-launch, one on-site task blocks the new features from doing
+anything:** the meat-type tagging pass (see Known open items below).
 
 Workers are told not to push; NaokiiVT applies every push himself afterwards.
-Earlier revisions of this file described 24c-ii and 24d as "not pushed" — that
-was true at the moment each worker finished and stale within the hour. Record
-push state as verified against `origin/main`, not as reported by a worker who
-by design cannot push.
-
-**24d was dispatched without being written into the sub-step list first** —
-an architect error, correctly flagged by the worker rather than silently
-reconciled. It is now listed below. Numbering a step in a worker prompt does
-not put it in this file; the architect writes it here in the same conversation
-where the decision is made.
+Record push state as verified against `origin/main`, never as reported by a
+worker who by design cannot push — a worker's "not pushed" is true when they
+write it and stale within the hour.
 
 Full suite: **16 files, 314/314 assertions, 0 failures** (up from 298 — 24b-iv
 added 16 net, `commissary.test.js` alone rose from 47 to 83). Run individually
@@ -105,107 +97,22 @@ line — read the count, not the last line.
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-## Step 24 — multi-stage yield + Commissary-side allocation (CLOSED — all nine sub-steps DONE)
+## Step 24 — multi-stage yield + Commissary-side allocation (CLOSED 2026-09-02)
 
-The full design narrative, the 2026-08-31 resolution of its open questions,
-and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, 24b-iii,
-including 24a's blast-radius map) are archived in `session-history.md`. The
-load-bearing decisions they produced live in "Things NOT to re-litigate"
-below — read those, not the archive, unless you need the reasoning behind one.
+**Closed.** All nine sub-steps — 24a, 24a-b, 24b-i, 24b-ii, 24b-iii, 24b-iv,
+24c-i, 24c-ii, 24d — are done, pushed, and independently verified at **16
+files / 314 assertions / 0 failures**. The full design narrative and every
+sub-step entry are archived in `session-history.md`.
 
-**24b-iii landed 2026-09-02**: CRUD routes for `commissary_adjustments` in
-`server/routes/commissary.js` (`GET`/`POST`/`PATCH /:id`/`DELETE /:id`), plus
-`GET /commissary/adjustments/destinations?commissary_meat_id=` — the
-destination filter an ALLOCATION's dropdown needs, returning only commissary
-meats sharing the source's `meat_type_id` **and its `unit`**. No live data has
-any `meat_type_id` tagged yet, so the live-server check exercised LOSS
-create/list/patch/delete and every rejection path, not an accepted ALLOCATION
-end to end — that's covered by the mirrored-logic test file instead. See
-`changelog.md` for full detail.
+The decisions this step produced live in "Things NOT to re-litigate" below.
+Read those, not the archive, unless you need the reasoning behind one.
 
-**Gap found 2026-09-02 (architect verification pass), closed the same day by
-24b-iv below:** `output_commissary_meat_id` (24a) and `input_quantity`
-(24b-i) existed in `schema.sql` and were fully consumed by
-`commissaryAuditEngine.js`, but nothing wrote either column yet — correct
-scoping at the time (24b-i's `changelog.md` entry named the write route as
-explicitly out of scope), just never rescheduled afterwards. Recorded here so
-a future session doesn't rediscover the same gap.
+Commissary meats can now be processed into other commissary meats (multi-stage
+yield, with the input's count and weight tracked separately), and stock can be
+allocated between commissary meats or written off as a declared loss — with the
+balance ledger crediting and debiting both sides correctly, and the UI to enter
+all of it.
 
-**Remaining sub-steps, re-sequenced:**
-
-- **24c-ii — Allocate / Write-off UI on the commissary balance view. DONE and
-  pushed 2026-09-02** (`8d67d59`). Full done/not-done breakdown is in
-  `changelog.md`'s 2026-09-02 24c-ii entry.
-- **24d — meat type retirement fix. DONE and pushed 2026-09-02** (`df8fec5`).
-  `typeOptionsFor` in `public/settings.html`'s Commissary Meats edit dropdown
-  had no `active` filter, unlike the create form's dropdown, so a retired meat
-  type stayed pickable forever beside the real ones. Now filters to active
-  types **plus the row's own currently-selected type**, labeled `(retired)`
-  when inactive — the naive active-only filter would have dropped a
-  tagged-then-retired type from its own row, falling the `<select>` back to
-  `(none)` so that the next edit-and-save on any field silently blanked the
-  meat's real `meat_type_id`, since `saveCommissaryMeatRow` posts every field
-  at once. Verified against that exact case live.
-- **24b-iv — yield-log write path. DONE, 2026-09-02, committed locally by
-  this session (not yet confirmed against `origin/main`).** `POST`/`PATCH
-  /commissary/yield-log` now accept `output_commissary_meat_id` and
-  `input_quantity`, validated per the rules below (shared helper
-  `validateYieldOutputAndInputQty` in `server/routes/commissary.js`); `GET
-  /commissary/yield-log` now also returns `output_commissary_meat_id`,
-  `input_quantity`, `output_code`, `output_name` (null when unset, same
-  convention `GET /commissary/adjustments` uses for its destination fields).
-  `commissaryYieldEngine.js` and `commissaryAuditEngine.js` untouched, as
-  instructed. Full suite 16 files / 314 assertions / 0 failures (up from 298).
-  Live-verified against a real booted server (throwaway commissary meats,
-  cleaned up afterward — see `changelog.md`'s 24b-iv entry, including the one
-  thing NOT live-tested: cross-commissary output rejection, which needs a
-  second live commissary and is already covered exhaustively by the mirrored
-  test suite instead).
-  - **Output meat** must exist, be active, and belong to the **same
-    `commissary_id` as the input**. Otherwise unconstrained — no `meat_type_id`
-    or `unit` match, because the yield log is the one place a unit legitimately
-    changes. An output equal to the input is accepted and behaves identically
-    to NULL, since the engine reads
-    `COALESCE(output_commissary_meat_id, commissary_meat_id)`.
-  - **`input_quantity` is REQUIRED when the source meat's `unit` is `'unit'`.**
-    A unit-tracked input with a NULL `input_quantity` makes
-    `getCommissaryUsage` debit weighed kg from a count-based balance — exactly
-    the bug 24b-i fixed. The settled intake weigh-in means a counted input
-    always has both numbers, so requiring it matches reality rather than
-    imposing on it. Applies to new writes only; existing NULL rows stay valid.
-    For a `kg` source it stays optional, and NULL correctly means "same as
-    `raw_weight_in`".
-  - **PATCH needs an explicit clear.** The existing PATCH coalesce treats
-    `undefined`/`null`/`''` alike as "keep existing", but NULL is a *meaningful*
-    value for both new columns. Convention (implemented): an **absent key
-    keeps** the current value, an explicit **`null` (or `''`) clears** to
-    NULL, re-validated against the resulting row.
-- **24c-i — yield-entry form UI. DONE, 2026-09-02, the last sub-step of step
-  24.** Added the output-meat `<select>` (defaults to blank = "Same meat" =
-  NULL, filtered client-side to the input's own `commissary_id`) and the
-  input-count field (required/optional hint driven by the selected meat's
-  `unit`) to `public/commissary.html`'s yield-entry form, the yield log table,
-  and the inline row editor — `saveEdit` now actually sends both fields,
-  explicit `null` on clear per the PATCH convention. Full breakdown and live
-  verification detail (including the legacy-row recovery flow below, clicked
-  through for real) in `changelog.md`'s 24c-i entry.
-
-  The legacy-row behavior this step was built around, confirmed live: a yield
-  row from before 24b-iv on a unit-tracked meat, where `input_quantity` is
-  NULL, rejects **any** PATCH — including a notes-only edit — with
-  "input_quantity is required...". **Deliberately kept**, not a bug: those
-  rows actively debit weighed kg out of a count-based balance, exactly the bug
-  24b-i fixed. The row editor showing the empty count box is the remedy: the
-  operator sees why, fills it in, saves successfully. 24c-i did **not** reword
-  24b-iv's error text (out of this step's file scope, `public/commissary.html`
-  only) — the existing message reaches the operator via `saveEdit`'s
-  `alert(err.message)`, confirmed live, and reads acceptably even without a
-  rewrite naming the row as "legacy."
-
-24c-ii is deliberately dispatched ahead of 24b-iv even though it sorts later:
-the two are independent, and running them in this order keeps two workers off
-`public/commissary.html` at the same time — that file is the only real
-collision risk between them.
 ## Things NOT to re-litigate (already decided, stable)
 
 - **Commissary-to-commissary movement is an ALLOCATION, not a shipment.**
@@ -427,3 +334,49 @@ the step it was working on is fully finished — should, before ending:
    new parallel "handoff" doc; extend this file instead, so there's never
    again a second doc that can silently drift out of sync with the real
    one.
+
+## Open architectural questions (for an architect conversation, not a worker)
+
+None of these blocks anything. They are listed so a fresh architect
+conversation can pick one up without re-deriving it, and so no worker mistakes
+one for a dispatched task. Verify each against the current repo before acting —
+some may have been resolved since this list was written.
+
+**Carried in from before step 24:**
+1. Should `meat_types` gain an authoritative `unit` column, enforced at tag
+   time? Today `unit` lives on `commissary_meats`, so two meats of the same
+   type can be tracked in different units and will silently never pair as
+   allocation source/destination. Bears directly on the tagging pass.
+2. Is `computeYieldLogForDate` dead code?
+3. Is `commissary_meat_map` vestigial and safe to delete? (Note the standing
+   gotcha: commissary and restaurant meat codes are different numbering
+   systems — never infer a mapping from matching code strings.)
+4. `graphify-out/` undecided paths — cache, `.graphify_labels.json.sig`, the
+   date-stamped directory. Pending a check of graphify's own docs.
+
+**Raised 2026-09-02:**
+5. **Should coder workers push their own commits?** Today they cannot, and
+   NaokiiVT pushes manually. That gate isn't functioning as a review step — the
+   diff isn't being read at push time; the real gate is the architect's
+   verification pull. Against: a pushed bad commit needs a revert, an unpushed
+   one needs a `reset --hard`; and a worker already once reported a push that
+   had not happened. Sketched compromise, never adopted: workers may push, but
+   must paste raw `git status -sb` and `git log --oneline -1 origin/main`
+   output verbatim rather than summarising it, and must not push if the suite
+   is red or if any file outside the stated scope changed.
+6. **Do cross-commissary allocations need physical paperwork?** An ALLOCATION
+   between commissaries is a real van trip but produces no delivery receipt,
+   unlike a restaurant shipment. The stock math is correct either way. Worth
+   deciding once real movements start, not before.
+7. **Does `meat_types` need a proper retirement story?** 24d fixed the dropdown
+   leak, but there is still no delete path and test rows are accumulating (two
+   retired ones sit in live `inventory.db` today). Soft delete via `active` may
+   be sufficient — the question is whether anything else should reference
+   retirement.
+8. **Should `inventory.db` changes by workers be constrained differently?**
+   24c-i's prompt said "change it only through the app's own routes," which was
+   impossible to satisfy for the one case being tested: a legacy row with a
+   NULL `input_quantity` cannot be created through the routes, because
+   rejecting exactly that is what 24b-iv does. The worker used direct SQL,
+   disclosed it, and cleaned up. The rule needs an explicit carve-out for
+   constructing states the current validation forbids.

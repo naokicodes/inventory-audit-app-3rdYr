@@ -2529,3 +2529,115 @@ change), so 24b no longer carries any unsettled schema question — see
 safe without the output split (it reds 4 engine tests on its own), which is
 exactly why the column + credit-retarget were pulled into 24a with it.
 
+
+---
+
+## Step 24 — multi-stage yield + Commissary-side allocation (CLOSED 2026-09-02)
+
+Archived from `session-status.md` on 2026-09-02, once all nine sub-steps
+(24a, 24a-b, 24b-i, 24b-ii, 24b-iii, 24b-iv, 24c-i, 24c-ii, 24d) were done,
+pushed, and independently verified at 16 files / 314 assertions / 0 failures.
+The load-bearing decisions this step produced stay in `session-status.md`
+under "Things NOT to re-litigate" — read those first; this block is here for
+the reasoning behind them.
+
+
+The full design narrative, the 2026-08-31 resolution of its open questions,
+and the completed sub-step entries (24a, 24a-b, 24b-i, 24b-ii, 24b-iii,
+including 24a's blast-radius map) are archived in `session-history.md`. The
+load-bearing decisions they produced live in "Things NOT to re-litigate"
+below — read those, not the archive, unless you need the reasoning behind one.
+
+**24b-iii landed 2026-09-02**: CRUD routes for `commissary_adjustments` in
+`server/routes/commissary.js` (`GET`/`POST`/`PATCH /:id`/`DELETE /:id`), plus
+`GET /commissary/adjustments/destinations?commissary_meat_id=` — the
+destination filter an ALLOCATION's dropdown needs, returning only commissary
+meats sharing the source's `meat_type_id` **and its `unit`**. No live data has
+any `meat_type_id` tagged yet, so the live-server check exercised LOSS
+create/list/patch/delete and every rejection path, not an accepted ALLOCATION
+end to end — that's covered by the mirrored-logic test file instead. See
+`changelog.md` for full detail.
+
+**Gap found 2026-09-02 (architect verification pass), closed the same day by
+24b-iv below:** `output_commissary_meat_id` (24a) and `input_quantity`
+(24b-i) existed in `schema.sql` and were fully consumed by
+`commissaryAuditEngine.js`, but nothing wrote either column yet — correct
+scoping at the time (24b-i's `changelog.md` entry named the write route as
+explicitly out of scope), just never rescheduled afterwards. Recorded here so
+a future session doesn't rediscover the same gap.
+
+**Remaining sub-steps, re-sequenced:**
+
+- **24c-ii — Allocate / Write-off UI on the commissary balance view. DONE and
+  pushed 2026-09-02** (`8d67d59`). Full done/not-done breakdown is in
+  `changelog.md`'s 2026-09-02 24c-ii entry.
+- **24d — meat type retirement fix. DONE and pushed 2026-09-02** (`df8fec5`).
+  `typeOptionsFor` in `public/settings.html`'s Commissary Meats edit dropdown
+  had no `active` filter, unlike the create form's dropdown, so a retired meat
+  type stayed pickable forever beside the real ones. Now filters to active
+  types **plus the row's own currently-selected type**, labeled `(retired)`
+  when inactive — the naive active-only filter would have dropped a
+  tagged-then-retired type from its own row, falling the `<select>` back to
+  `(none)` so that the next edit-and-save on any field silently blanked the
+  meat's real `meat_type_id`, since `saveCommissaryMeatRow` posts every field
+  at once. Verified against that exact case live.
+- **24b-iv — yield-log write path. DONE, 2026-09-02, committed locally by
+  this session (not yet confirmed against `origin/main`).** `POST`/`PATCH
+  /commissary/yield-log` now accept `output_commissary_meat_id` and
+  `input_quantity`, validated per the rules below (shared helper
+  `validateYieldOutputAndInputQty` in `server/routes/commissary.js`); `GET
+  /commissary/yield-log` now also returns `output_commissary_meat_id`,
+  `input_quantity`, `output_code`, `output_name` (null when unset, same
+  convention `GET /commissary/adjustments` uses for its destination fields).
+  `commissaryYieldEngine.js` and `commissaryAuditEngine.js` untouched, as
+  instructed. Full suite 16 files / 314 assertions / 0 failures (up from 298).
+  Live-verified against a real booted server (throwaway commissary meats,
+  cleaned up afterward — see `changelog.md`'s 24b-iv entry, including the one
+  thing NOT live-tested: cross-commissary output rejection, which needs a
+  second live commissary and is already covered exhaustively by the mirrored
+  test suite instead).
+  - **Output meat** must exist, be active, and belong to the **same
+    `commissary_id` as the input**. Otherwise unconstrained — no `meat_type_id`
+    or `unit` match, because the yield log is the one place a unit legitimately
+    changes. An output equal to the input is accepted and behaves identically
+    to NULL, since the engine reads
+    `COALESCE(output_commissary_meat_id, commissary_meat_id)`.
+  - **`input_quantity` is REQUIRED when the source meat's `unit` is `'unit'`.**
+    A unit-tracked input with a NULL `input_quantity` makes
+    `getCommissaryUsage` debit weighed kg from a count-based balance — exactly
+    the bug 24b-i fixed. The settled intake weigh-in means a counted input
+    always has both numbers, so requiring it matches reality rather than
+    imposing on it. Applies to new writes only; existing NULL rows stay valid.
+    For a `kg` source it stays optional, and NULL correctly means "same as
+    `raw_weight_in`".
+  - **PATCH needs an explicit clear.** The existing PATCH coalesce treats
+    `undefined`/`null`/`''` alike as "keep existing", but NULL is a *meaningful*
+    value for both new columns. Convention (implemented): an **absent key
+    keeps** the current value, an explicit **`null` (or `''`) clears** to
+    NULL, re-validated against the resulting row.
+- **24c-i — yield-entry form UI. DONE, 2026-09-02, the last sub-step of step
+  24.** Added the output-meat `<select>` (defaults to blank = "Same meat" =
+  NULL, filtered client-side to the input's own `commissary_id`) and the
+  input-count field (required/optional hint driven by the selected meat's
+  `unit`) to `public/commissary.html`'s yield-entry form, the yield log table,
+  and the inline row editor — `saveEdit` now actually sends both fields,
+  explicit `null` on clear per the PATCH convention. Full breakdown and live
+  verification detail (including the legacy-row recovery flow below, clicked
+  through for real) in `changelog.md`'s 24c-i entry.
+
+  The legacy-row behavior this step was built around, confirmed live: a yield
+  row from before 24b-iv on a unit-tracked meat, where `input_quantity` is
+  NULL, rejects **any** PATCH — including a notes-only edit — with
+  "input_quantity is required...". **Deliberately kept**, not a bug: those
+  rows actively debit weighed kg out of a count-based balance, exactly the bug
+  24b-i fixed. The row editor showing the empty count box is the remedy: the
+  operator sees why, fills it in, saves successfully. 24c-i did **not** reword
+  24b-iv's error text (out of this step's file scope, `public/commissary.html`
+  only) — the existing message reaches the operator via `saveEdit`'s
+  `alert(err.message)`, confirmed live, and reads acceptably even without a
+  rewrite naming the row as "legacy."
+
+24c-ii is deliberately dispatched ahead of 24b-iv even though it sorts later:
+the two are independent, and running them in this order keeps two workers off
+`public/commissary.html` at the same time — that file is the only real
+collision risk between them.
