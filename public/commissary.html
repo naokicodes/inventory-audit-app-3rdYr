@@ -79,8 +79,10 @@
   <div class="add-form">
     <label>Date <input type="date" id="new-date"></label>
     <label>Commissary meat <select id="new-meat"></select></label>
-    <label>Raw weight in <input type="number" step="0.01" id="new-raw" placeholder="0"></label>
+    <label>How many went in <input type="number" step="1" id="new-input-qty" placeholder="0"> <span id="new-input-qty-req" class="hint"></span></label>
+    <label>What they weighed (kg in) <input type="number" step="0.01" id="new-raw" placeholder="0"></label>
     <label>Backed weight out <input type="number" step="0.01" id="new-backed" placeholder="0"></label>
+    <label>What this became <select id="new-output-meat"><option value="">Same meat</option></select></label>
     <label>Notes <input type="text" id="new-notes" placeholder="optional"></label>
     <button id="add-yield">Log Event</button>
   </div>
@@ -102,8 +104,34 @@
     const newMeat = document.getElementById('new-meat');
     const newRaw = document.getElementById('new-raw');
     const newBacked = document.getElementById('new-backed');
+    const newOutputMeat = document.getElementById('new-output-meat');
+    const newInputQty = document.getElementById('new-input-qty');
+    const newInputQtyReq = document.getElementById('new-input-qty-req');
     const newNotes = document.getElementById('new-notes');
     const addStatus = document.getElementById('add-status');
+
+    let allMeats = []; // most recently loaded commissary meats, for output-dropdown filtering and unit lookups
+    function meatById(id) { return allMeats.find(m => m.id === Number(id)); }
+
+    // Populates an output-meat <select> with every meat sharing sourceMeat's
+    // commissary_id - a yield event is a conversion, not a movement, so
+    // crossing commissaries is server-rejected (24b-iv). Blank option means
+    // NULL ("same meat"), the common case.
+    function populateOutputOptions(selectEl, sourceMeatId, selectedValue) {
+      const source = meatById(sourceMeatId);
+      const options = source ? allMeats.filter(m => m.commissary_id === source.commissary_id) : [];
+      selectEl.innerHTML = '<option value="">Same meat</option>' +
+        options.map(m => `<option value="${m.id}">${m.code} - ${m.name} (${m.unit})</option>`).join('');
+      selectEl.value = selectedValue || '';
+    }
+
+    // A unit-tracked source is counted AND weighed at intake, so its own
+    // count (input_quantity) is required; a kg source has nothing separate
+    // to count, so it's optional (settled 2026-09-02, session-status.md).
+    function inputQtyRequired(sourceMeatId) {
+      const source = meatById(sourceMeatId);
+      return !!source && source.unit === 'unit';
+    }
 
     const filterMeat = document.getElementById('filter-meat');
     const filterDate = document.getElementById('filter-date');
@@ -137,6 +165,7 @@
       if (commissarySelect.value) params.set('commissary_id', commissarySelect.value);
       const res = await fetch(`/api/commissary/meats?${params.toString()}`);
       const meats = await res.json();
+      allMeats = meats;
       // Append the commissary as a disambiguator only when the fetched
       // list actually spans more than one commissary - e.g. whenever
       // "All commissaries" is selected and two commissaries share a
@@ -147,7 +176,18 @@
       const opts = meats.map(m => `<option value="${m.id}">${label(m)}</option>`).join('');
       newMeat.innerHTML = opts || '<option value="">No commissary meats seeded yet</option>';
       filterMeat.innerHTML = '<option value="">All</option>' + opts;
+      onNewMeatChanged();
     }
+
+    // Drives the output-meat options and the input-count required/optional
+    // state off the currently-selected "Commissary meat" - the operator
+    // shouldn't have to guess which state applies.
+    function onNewMeatChanged() {
+      populateOutputOptions(newOutputMeat, newMeat.value, '');
+      const required = inputQtyRequired(newMeat.value);
+      newInputQtyReq.textContent = required ? '(required - how many were weighed)' : '(optional for a kg-tracked meat)';
+    }
+    newMeat.addEventListener('change', onNewMeatChanged);
 
     // Current on-hand, same "prefer actual over calculated" convention the
     // Dashboard rollup already uses (server/routes/dashboard.js's
@@ -369,8 +409,10 @@
         <tr data-id="${r.id}">
           <td class="cell-date">${r.business_date}</td>
           <td>${r.commissary_meat_code} - ${r.commissary_meat_name} <span class="hint">(${r.unit})</span></td>
+          <td class="cell-input-qty">${r.input_quantity === null || r.input_quantity === undefined ? '-' : r.input_quantity}</td>
           <td class="cell-raw">${fmt(r.raw_weight_in)}</td>
           <td class="cell-backed">${fmt(r.backed_weight_out)}</td>
+          <td class="cell-output">${r.output_code ? `${r.output_code} - ${r.output_name}` : '(same)'}</td>
           <td>${fmtPct(r.actualLossPct)}</td>
           <td class="${r.status ? 'status-' + r.status : ''}">${r.status || '-'}</td>
           <td>${fmt(r.excessLoss)}</td>
@@ -402,7 +444,7 @@
         <table>
           <thead>
             <tr>
-              <th>Date</th><th>Meat</th><th>Raw In</th><th>Backed Out</th>
+              <th>Date</th><th>Meat</th><th>Input Count</th><th>Raw In (kg)</th><th>Backed Out</th><th>Output</th>
               <th>Actual Loss %</th><th>Status</th><th>Excess Loss</th><th>Notes</th><th></th>
             </tr>
           </thead>
@@ -429,8 +471,11 @@
 
       tr.classList.add('editing');
       tr.querySelector('.cell-date').innerHTML = `<input type="date" class="edit-date" value="${row.business_date}">`;
+      tr.querySelector('.cell-input-qty').innerHTML = `<input type="number" step="1" class="edit-input-qty" value="${row.input_quantity === null || row.input_quantity === undefined ? '' : row.input_quantity}" placeholder="0">`;
       tr.querySelector('.cell-raw').innerHTML = `<input type="number" step="0.01" class="edit-raw" value="${row.raw_weight_in}">`;
       tr.querySelector('.cell-backed').innerHTML = `<input type="number" step="0.01" class="edit-backed" value="${row.backed_weight_out}">`;
+      tr.querySelector('.cell-output').innerHTML = `<select class="edit-output-meat"></select>`;
+      populateOutputOptions(tr.querySelector('.edit-output-meat'), row.commissary_meat_id, row.output_commissary_meat_id || '');
       tr.querySelector('.cell-notes').innerHTML = `<input type="text" class="edit-notes" value="${row.notes || ''}">`;
       tr.querySelector('.row-actions').innerHTML = `
         <button class="save-btn">Save</button>
@@ -444,13 +489,20 @@
       const business_date = tr.querySelector('.edit-date').value;
       const raw_weight_in = tr.querySelector('.edit-raw').value;
       const backed_weight_out = tr.querySelector('.edit-backed').value;
+      const input_qty_val = tr.querySelector('.edit-input-qty').value;
+      const output_val = tr.querySelector('.edit-output-meat').value;
       const notes = tr.querySelector('.edit-notes').value.trim();
 
       try {
         const res = await fetch(`/api/commissary/yield-log/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ business_date, raw_weight_in, backed_weight_out, notes: notes || null, actor: actor() })
+          body: JSON.stringify({
+            business_date, raw_weight_in, backed_weight_out,
+            input_quantity: input_qty_val === '' ? null : input_qty_val,
+            output_commissary_meat_id: output_val === '' ? null : Number(output_val),
+            notes: notes || null, actor: actor()
+          })
         });
         const result = await res.json();
         if (!result.ok) throw new Error(result.error || 'Unknown error');
@@ -484,10 +536,17 @@
       const business_date = newDate.value;
       const raw_weight_in = newRaw.value;
       const backed_weight_out = newBacked.value;
+      const input_quantity = newInputQty.value;
+      const output_commissary_meat_id = newOutputMeat.value ? Number(newOutputMeat.value) : null;
       const notes = newNotes.value.trim();
 
       if (!commissary_meat_id || !business_date || raw_weight_in === '' || backed_weight_out === '') {
         addStatus.textContent = 'Date, commissary meat, raw weight in, and backed weight out are required.';
+        addStatus.className = 'status-message error';
+        return;
+      }
+      if (input_quantity === '' && inputQtyRequired(commissary_meat_id)) {
+        addStatus.textContent = 'How many went in is required for a unit-tracked meat.';
         addStatus.className = 'status-message error';
         return;
       }
@@ -499,7 +558,12 @@
         const res = await fetch('/api/commissary/yield-log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes: notes || null, actor: actor() })
+          body: JSON.stringify({
+            commissary_meat_id, business_date, raw_weight_in, backed_weight_out,
+            input_quantity: input_quantity === '' ? null : input_quantity,
+            output_commissary_meat_id,
+            notes: notes || null, actor: actor()
+          })
         });
         const result = await res.json();
         if (!result.ok) throw new Error(result.error || 'Unknown error');
@@ -508,6 +572,8 @@
         addStatus.className = 'status-message success';
         newRaw.value = '';
         newBacked.value = '';
+        newInputQty.value = '';
+        newOutputMeat.value = '';
         newNotes.value = '';
         await Promise.all([loadBalances(), loadYieldLog()]);
       } catch (err) {
