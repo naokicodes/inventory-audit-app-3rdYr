@@ -174,10 +174,33 @@ a future session doesn't rediscover the same gap.
     value for both new columns. Convention (implemented): an **absent key
     keeps** the current value, an explicit **`null` (or `''`) clears** to
     NULL, re-validated against the resulting row.
-- **24c-i — yield-entry form UI. NEXT.** The output-item field (defaults to
-  the same meat, i.e. NULL) and the input-count field alongside the weighed
-  input, in `public/commissary.html`'s yield-entry form. 24b-iv's write path
-  is ready to receive both fields.
+- **24c-i — yield-entry form UI. NEXT, and the last sub-step of step 24.** The
+  output-item field (defaults to the same meat, i.e. NULL) and the input-count
+  field alongside the weighed input, in `public/commissary.html`'s yield-entry
+  form **and its inline row editor**. 24b-iv's write path is ready to receive
+  both fields, and `GET /commissary/yield-log` already returns
+  `output_commissary_meat_id`, `input_quantity`, `output_code` and
+  `output_name` for display.
+
+  Two things folded in, decided 2026-09-02 after tracing 24b-iv's real
+  behavior rather than assuming it:
+  - **Legacy rows on unit-tracked meats are currently uneditable.** 24b-iv
+    re-validates the *resulting* row, so a yield row created before 24b-iv on
+    a `unit` meat — where `input_quantity` is NULL — now rejects **any** PATCH,
+    including a notes-only edit, with "input_quantity is required...".
+    **Deliberately kept.** Those rows are actively debiting weighed kg out of a
+    count-based balance, which is exactly the bug 24b-i fixed; they should not
+    stay quietly editable while still wrong. Grandfathering would leave them
+    wrong forever.
+  - The remedy is UI, not a rule change. Surfacing `input_quantity` in the row
+    editor dissolves the problem: the operator sees an empty count box, fills
+    it, saves. **The row editor must send both new fields** — `saveEdit`
+    currently sends neither, safe today only because absent-key-keeps preserves
+    them. Also reword 24b-iv's error so it says the row predates the
+    requirement and needs its count supplied, rather than naming a field the
+    operator cannot see.
+
+  Requires 24b-iv (DONE). Closes step 24.
 
 24c-ii is deliberately dispatched ahead of 24b-iv even though it sorts later:
 the two are independent, and running them in this order keeps two workers off
