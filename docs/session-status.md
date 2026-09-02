@@ -153,11 +153,33 @@ what makes the failure silent.
   at once. Verified against that exact case live.
 - **24b-iv — yield-log write path. NEXT.** Extend `POST` and `PATCH
   /commissary/yield-log` to accept `output_commissary_meat_id` and
-  `input_quantity`. The output meat must be active and must belong to the
-  **same `commissary_id` as the input** (see "Things NOT to re-litigate");
-  it is otherwise unconstrained — no `meat_type_id` or `unit` match, because
-  the yield log is the one place a unit legitimately changes. Numbered in the
-  24b tier because it is route work, not UI. Blocks 24c-i.
+  `input_quantity`, and add the output meat's code/name to
+  `GET /commissary/yield-log` (it currently joins only the source meat, so a
+  yield row has no output name to display — the same shape of gap that blocked
+  24c). Settled rules, decided 2026-09-02:
+  - **Output meat** must exist, be active, and belong to the **same
+    `commissary_id` as the input**. Otherwise unconstrained — no `meat_type_id`
+    or `unit` match, because the yield log is the one place a unit legitimately
+    changes. An output equal to the input is accepted and behaves identically
+    to NULL, since the engine reads
+    `COALESCE(output_commissary_meat_id, commissary_meat_id)`.
+  - **`input_quantity` is REQUIRED when the source meat's `unit` is `'unit'`.**
+    A unit-tracked input with a NULL `input_quantity` makes
+    `getCommissaryUsage` debit weighed kg from a count-based balance — exactly
+    the bug 24b-i fixed. The settled intake weigh-in means a counted input
+    always has both numbers, so requiring it matches reality rather than
+    imposing on it. Applies to new writes only; existing NULL rows stay valid.
+    For a `kg` source it stays optional, and NULL correctly means "same as
+    `raw_weight_in`".
+  - **PATCH needs an explicit clear.** The existing PATCH coalesce treats
+    `undefined`/`null`/`''` alike as "keep existing", but NULL is a *meaningful*
+    value for both new columns. Convention: an **absent key keeps** the current
+    value, an explicit **`null` clears** to NULL. Without this, an output meat
+    set by mistake could never be unset.
+  - `commissaryYieldEngine.js` stays untouched. `computeYieldMetrics` keeps
+    dividing by `raw_weight_in` so loss% stays kg-to-kg; repointing it at
+    `input_quantity` would compare a count to a weight.
+  Numbered in the 24b tier because it is route work, not UI. Blocks 24c-i.
 - **24c-i — yield-entry form UI.** The output-item field (defaults to the same
   meat, i.e. NULL) and the input-count field alongside the weighed input.
   Requires 24b-iv first.
