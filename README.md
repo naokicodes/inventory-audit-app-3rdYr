@@ -30,18 +30,56 @@ If you ran `setup-dev-environment.bat`, all four are already handled.
    changes on restart — check this before relying on that machine for
    ongoing work.
 
-2. Clone this repo:
+2. **Run these two before anything else.** On a fresh Windows machine
+   they are not optional — without them `npm`, `claude` and `graphify`
+   all fail, and the errors look like failed installs rather than the
+   PATH and policy problems they actually are.
+   ```
+   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+   ```
+   ```
+   $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+   ```
+   Both apply to **this window only** and are gone when you close it.
+   That is deliberate on a shared machine. Re-run them at the start of
+   each session until you have restarted VS Code at least once.
+
+   They install nothing. They tell the current window about tools that
+   are already on disk — which is why the same errors come back in a
+   fresh terminal and look like the install failed.
+
+   If a tool tells you to restart your shell (`uv tool update-shell`
+   does), **don't** — not mid-setup. Restarting discards the
+   execution-policy line above. The `$env:PATH` line does the same job
+   for this window.
+
+3. Clone this repo:
    ```
    git clone https://github.com/naokicodes/inventory-audit-app-3rdYr.git
    cd inventory-audit-app-3rdYr
    ```
 
-3. Install dependencies (one-time per machine — see note below):
+4. Install dependencies (one-time per machine — see note below):
    ```
    npm install
    ```
 
-4. Install the graphify git hook — **once per clone, not once per
+5. Set your git identity, if this machine has never had it set:
+   ```
+   git config --global user.name "Your Name"
+   ```
+   ```
+   git config --global user.email "your-github-email"
+   ```
+   Without these your first commit either fails or lands misattributed.
+
+   Worth setting at the same time, so a forgotten `-m` doesn't drop you
+   into Vim with no obvious way out:
+   ```
+   git config --global core.editor "code --wait"
+   ```
+
+6. Install the graphify git hook — **once per clone, not once per
    machine**:
    ```
    graphify hook install
@@ -54,7 +92,7 @@ If you ran `setup-dev-environment.bat`, all four are already handled.
    the first time you merge a branch. If you are working on branches and
    opening pull requests, you *will* hit this.
 
-5. Run the app:
+7. Run the app:
    ```
    npm run dev
    ```
@@ -165,6 +203,18 @@ uv tool install graphifyy
 Recent npm blocks install scripts by default and prints an
 `allow-scripts` warning, so the package lands but its postinstall never
 runs. Reinstall with the `--allow-scripts` form above.
+
+**A commit opened a full-screen editor you can't get out of**
+You forgot `-m "message"`, so git opened Vim. Press **Esc**, then type
+`:q!` and Enter to abort (the colon is part of it). If you already typed
+a message, `:wq` saves and commits instead. Setting
+`git config --global core.editor "code --wait"` avoids this entirely.
+
+**`git add` staged nothing and `git push` says "Everything up-to-date"**
+The file was edited but never saved. Ctrl+S, then run `git status` — it
+must say `modified: <file>` before you stage. "Working tree clean" does
+not mean your change matches `main`; it means your file on disk matches
+your last commit, and both can be wrong together.
 
 **`graphify` not recognized even after `uv tool update-shell` says PATH
 is updated**
