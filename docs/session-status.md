@@ -584,11 +584,11 @@ stale fallback. Every subsequent day chains off the wrong figure.
 Missed counts are the expected case, not the exotic one — that is the whole
 reason sync-batch-stock exists on the dish side.
 
-**Decision needed.** Options are: return null and a distinct status when the
-prior day's count is missing (surfaces the gap, refuses to guess); make
-`opening_stock` valid only for its own `business_date`; or carry the last known
-count forward with an explicit staleness marker. This is a Core correctness
-decision and must not be resolved by a worker.
+**Decision, 2026-09-03 — resolved into Step 26a below.** Carry forward and lock
+are not alternatives; they answer different questions and the app needs both.
+The fallback to `opening_stock` regardless of date is fixed unconditionally.
+Beyond that: carry forward the prior day's `ending_calculated`, never silently,
+and flag the row rather than hard-blocking it.
 
 ### Finding 4 — `opening_stock` is write-once and cannot be corrected
 
@@ -692,12 +692,12 @@ dispatched. Written here so the direction survives; do not treat it as a spec.
 - **Beginning of month** — intended to be Terminal-driven, "or unless its
   possible to have it manually open on the first day of any month."
 
-**Open question, blocking.** The beginning-of-month idea has no counterpart in
-the current model. Beginning is always the prior day's `ending_actual`, and
-`opening_stock` is a single lifetime seed per meat with no date in its unique
-constraint (finding 4). A monthly opening balance would be a schema change plus
-an `auditEngine` change. Decide what "beginning of the month" means before
-anything is built: a re-seed, a period boundary, or nothing at all.
+**Resolved 2026-09-03 — see Step 26a.** "Beginning of the month" becomes a
+*declared opening balance on a date*, via `opening_stock`'s unique key gaining
+`business_date`. It is not a separate concept and not a Terminal-only path: the
+Terminal gets a command to *propose* the values, but the balance itself is
+ordinary declared data. The monthly declaration is also what bounds the
+carry-forward fallback in finding 3 — the two answers depend on each other.
 
 **Second open question.** Usage today is derived as `sales × recipe_bom` for
 DIRECT dishes plus `prepped × recipe_bom` for BATCH_PREPPED ones. Loyverse would
@@ -728,6 +728,75 @@ quietly changes what the dish math sees on days nobody logged production.
 **Structural precondition.** See finding 6: the Terminal has no server route and
 its tests mirror a copy of its inline script. Deciding whether it gets a real
 route is the first scoping question of pillar 2.
+
+## Step 26a — beginning stock: date-scoped openings and an honest fallback
+
+**Pillar 1 (Core). Lane: DISPATCH only. Schema rebuild — red by default.
+Resolves gap-hunt findings 3 and 4 and the "beginning of the month" question in
+one change, because they are the same code path.**
+
+**Do this before test data is entered.** It is a table rebuild, and the data is
+test-only today. This is the cheapest it will ever be.
+
+### The shape
+
+`opening_stock`'s unique key changes from `(restaurant_id, meat_id)` to
+`(restaurant_id, meat_id, business_date)`. A row then means **"an authoritative
+declared balance on this date"** rather than a lifetime seed. That one concept
+covers month start, new-restaurant onboarding, and a post-recount reset — no new
+table and no new vocabulary. `commissary_opening_stock` gets the identical
+treatment.
+
+`getBeginningStock` resolves in this order:
+
+```
+1. declared opening for THIS date
+2. yesterday's ending_actual
+3. yesterday's ending_calculated   -> status BEGINNING_CARRIED_FORWARD
+4. null                            -> status MISSING_BEGINNING_STOCK
+```
+
+Step 1 winning over step 2 is deliberate: a declared opening is the operator
+overriding the chain on purpose.
+
+### What carry-forward costs, stated so nobody rediscovers it
+
+`ending_calculated` is `beginning + newStock - usage` — the theoretical number,
+with the missed day's variance already baked out. Carrying it forward makes
+shrinkage on that day permanently invisible. This is acceptable **only because
+the monthly declared opening bounds it**: theory can never chain more than one
+month before a real count forces reconciliation. If the monthly opening
+discipline is ever dropped, this fallback must be revisited, because without it
+the carry chains forever.
+
+Carry-forward is therefore never silent. The row reports
+`BEGINNING_CARRIED_FORWARD`, and the variance must be labelled as covering N
+days rather than presented as one day's.
+
+### Not a hard lock — deliberately
+
+A hard block on the row would prevent recording *today's* count, discarding data
+that does exist. `ending_actual` is keyed by date, so a missed day stays
+writable and the auditor backfills it from the filed paper sheet. Flag the row
+unreconciled; do not refuse it. **This one is operational policy, not a
+technical constraint — reversible if it does not match how the counts actually
+run.**
+
+A month with no declared opening is different: that is a real block, status
+`MISSING_PERIOD_OPENING`, and the page refuses until the opening is written.
+
+### Also required
+
+`opening_stock` and `commissary_opening_stock` currently have no PATCH, PUT or
+DELETE anywhere. Correcting a declared opening must be possible (finding 4).
+Follow `PATCH /sales`, which is the project's correct model for edit-and-clear.
+
+### Depends on this, do not build first
+
+The Terminal command that reads the prior month's final `ending_actual` per meat
+and proposes them as the new month's opening (NaokiiVT 2026-09-03, for
+onboarding and monthly discipline) is pillar 2 work and cannot be built until
+this schema change lands.
 
 ## Steps 25a / 25b — the commissary ledger has no way in
 
@@ -920,11 +989,13 @@ DO UPDATE SET portions_produced = excluded.portions_produced,
 identity on `ending_actual` / `portion_ending_actual`. Recorded here so nobody
 later "fixes" the inconsistency.
 
-**Second half, undecided.** sync-batch-stock writes an `activity_log` entry;
-the manual correction in `dailyAudit.js` writes none. History therefore shows
+**Second half, decided 2026-09-03.** sync-batch-stock writes an `activity_log`
+entry; the manual correction in `dailyAudit.js` writes none, so History shows
 "SYSTEM created this, 30 portions" and never shows a human changing it to 42.
-`prepped` is the only logged entity with an unlogged write path. Decide whether
-the correction gets logged.
+`prepped` is the only logged entity with an unlogged write path. **The
+correction gets logged.** This is not an extension of rule 9 to a new table —
+`prepped` is already a logged entity, and leaving one of its two write paths
+silent is the inconsistency, not the fix.
 
 ### 25d-iii — the name is currently unreadable, which 25d does not fix
 
@@ -939,8 +1010,20 @@ entry carrying the name in a header either.
 
 **So after 25d-i the name is stored and there is no way to get it back out.**
 25d's justification is that you cannot reconstruct who counted the walk-in on a
-given Tuesday later — as scoped, you still cannot. Decide where a stored name
-becomes visible before building this half.
+given Tuesday later — as scoped, you still cannot.
+
+**Decision, 2026-09-03.** One field at the top of the page, beside the
+restaurant and date pickers, mirroring the paper sheet's name-and-date header.
+The same control does both jobs: **blank on a date not yet counted, prefilled
+with the stored name when a counted date is loaded.** That makes the read path
+nearly free rather than a separate feature.
+
+`GET /daily-audit/mixed` returns a flat array of rows and carries no
+`created_by`. A per-sheet name has no home in that shape, so **the response
+becomes `{ rows, actor }`** and `daily-audit.html` is updated to parse it. The
+alternative — repeating the name on every row — was rejected: it is redundant
+and it invites someone later to "support" the per-row names Q3 explicitly ruled
+out. Same treatment on the commissary page.
 
 `ending_actual` and `portion_ending_actual`'s `created_by` are in the schema and
 written by nothing. Found 2026-09-03 by the write-path audit
