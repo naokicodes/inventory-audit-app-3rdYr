@@ -729,6 +729,66 @@ quietly changes what the dish math sees on days nobody logged production.
 its tests mirror a copy of its inline script. Deciding whether it gets a real
 route is the first scoping question of pillar 2.
 
+## Step archive-pass — trim session-status.md
+
+**Lane: DISPATCH only. Docs only — no code, no schema, no test changes.**
+
+This file is ~1,300 lines. Rule 22 keeps it short because every worker session
+reads it cold, so its length is a cost paid on every dispatch. Move resolved
+history to `docs/session-history.md` and leave current state behind.
+
+Sequenced as the first dispatch through the new `/step` machinery deliberately:
+it is doc-only, fully reversible, and cannot corrupt data, so if the workflow
+snags it snags on something harmless. The PR path has been used once in this
+repo's history.
+
+### What MOVES to docs/session-history.md
+
+Only these three, appended in this order under a dated heading
+`## Archived 2026-09-03 (pass 2)`:
+
+- `## Step 24 — multi-stage yield + Commissary-side allocation (CLOSED 2026-09-02)`
+- `### 25b — commissary opening stock + physical count. CLOSED 2026-09-02.`
+- `## Step 25c — seed and tag the meat-type catalog (CLOSED 2026-09-03, ...)`
+
+Move each whole, heading included, byte for byte. Do not summarise, reword,
+reformat or tidy them in transit. Leave a one-line stub where each was:
+
+```
+## Step 24 — CLOSED 2026-09-02. See docs/session-history.md.
+```
+
+### What STAYS — do not move any of it
+
+This is the part most likely to go wrong. The following read like a finished
+session's output. **They are open work.**
+
+- `## Gap hunt 2026-09-03 — findings`, all six findings and the CRUD audit
+- `## Landing input model and Terminal direction — stated 2026-09-03`
+- `## Step 26a`, `## Steps 25a / 25b` (the 25a half), `## Step 24b-v`,
+  `## Step 25d` and all three sub-steps, `## Step 25e`
+- `## Current state`, `## Known open items`, `## Things NOT to re-litigate`,
+  `## End-of-session checklist`, `## Open architectural questions`
+- **This section.** The architect removes it when the step closes.
+
+If a section is not in the MOVES list, it stays. Do not apply judgement about
+what looks resolved — the list is the rule.
+
+### Verify before pushing
+
+`npm run verify`, then confirm by reading, not by assuming:
+
+- `git diff --stat` shows exactly two files changed
+- every line removed from `session-status.md` appears in `session-history.md`;
+  a line count that does not reconcile means content was lost — stop and report
+- `grep -c "Gap hunt 2026-09-03" docs/session-status.md` returns 1
+- `grep -c "Step 26a" docs/session-status.md` returns at least 1
+
+### Class B
+
+This step should raise none. If something the list above does not resolve comes
+up, stop and open a `needs-architect` issue rather than deciding what moves.
+
 ## Step 26a — beginning stock: date-scoped openings and an honest fallback
 
 **Pillar 1 (Core). Lane: DISPATCH only. Schema rebuild — red by default.

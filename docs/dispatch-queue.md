@@ -15,6 +15,16 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ## Queue
 
+### 0. Step archive-pass — trim session-status.md
+**Lane: DISPATCH only. Docs only. Run this first.**
+
+`session-status.md` is ~1,300 lines and every worker session reads it cold.
+Doc-only and fully reversible, which is why it goes first: it is the
+cheapest way to exercise the `/step` and PR machinery, which has been used
+once in this repo's history.
+
+Spec: `session-status.md`, section "Step archive-pass".
+
 ### 1. Step 25a — commissary stock receipts (supplier intake)
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
