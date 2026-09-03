@@ -19,17 +19,27 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 1. Step 25d-ii — `prepped.created_by` is provenance, not identity
 **Lane: DISPATCH only. Small, real code, tiny blast radius.**
+**Re-dispatch. Attempt one was closed unmerged — read the whole spec.**
 
-Clears the `SYSTEM:sync-batch-stock` stamp when a human corrects an
-inferred `prepped` number, and logs the manual correction to
-`activity_log`. No schema change, no `public/` change.
+Makes `POST /api/daily-audit/portions` skip rows whose `portions_produced`
+is unchanged; and on rows that did change, clears the
+`SYSTEM:sync-batch-stock` stamp and logs the correction to `activity_log`.
+No schema change, no `public/` change.
+
+The change detection is not an optimisation and is not optional. The page
+that calls this route posts every dish row on every save, so without it
+the stamp-clearing lands on rows nobody edited. That is what attempt one
+(`marble/25d-ii-prepped-provenance`, `c9f082a`) did — correctly
+implementing a spec that was wrong. The spec is now fixed; the code was
+never the problem.
 
 Sequenced first deliberately: it is the smallest step that exercises the
 full loop on real code — Class A decisions, tests, the write-path audit —
 where a mistake costs a revert rather than a corrupted migration. The
 first dispatch (archive-pass) was doc-only; this is the code equivalent.
 
-Spec: `session-status.md`, section "25d-ii".
+Spec: `session-status.md`, section "25d-ii" — including the "Third half,
+added 2026-09-04" subsection, which is the part attempt one predates.
 
 ### 2. Step 26a — beginning stock: date-scoped openings and an honest fallback
 **Lane: DISPATCH only. Schema rebuild — the most invasive step in the queue.**

@@ -141,6 +141,14 @@ the runner reads the last count line in each file.
   modelled.** Meat arrives boxed; the box is weighed, the tare is already
   accounted for by all parties, then the box is opened and the contents counted.
   A future "box weight" or tare field is not a missing feature.
+- **`created_by` means two different things and that is deliberate.** On
+  `prepped` it is *provenance* — `SYSTEM:sync-batch-stock` means the number was
+  inferred from sales, NULL means a human typed it. On `ending_actual` and
+  `portion_ending_actual` it is *identity*, the name of whoever did the count.
+  Confirmed by NaokiiVT 2026-09-03. Do not "fix" the inconsistency by writing
+  auditor names into `prepped.created_by`; that destroys the only signal saying
+  a number was never physically counted. A future column rename on one side is
+  the acceptable resolution, not unifying the meaning.
 
 - **Every intake records BOTH a count and a weight when the meat is
   unit-tracked.** Confirmed by NaokiiVT 2026-09-02 for purchasing, and it is
@@ -1024,6 +1032,72 @@ entry; the manual correction in `dailyAudit.js` writes none, so History shows
 correction gets logged.** This is not an extension of rule 9 to a new table —
 `prepped` is already a logged entity, and leaving one of its two write paths
 silent is the inconsistency, not the fix.
+
+**Third half, added 2026-09-04 — the part the first dispatch got wrong.**
+
+The two decisions above both say "when a human corrects an inferred number."
+**`POST /api/daily-audit/portions` cannot currently observe such an event**, and
+neither of the decisions above is implementable until it can.
+
+`public/daily-audit.html` (the route's only caller) maps every
+`tr[data-dish-id]` on screen and posts each one's current `.prepped` input value
+on every save, touched or not. The inputs are pre-filled from the loaded row. So
+the route receives the entire grid, unchanged values included, and cannot tell a
+correction from a re-save.
+
+Attempt one (branch `marble/25d-ii-prepped-provenance`, commit `c9f082a`)
+implemented both decisions faithfully against that route and was verified
+end-to-end on 2026-09-04. Seeding three SYSTEM-stamped rows and posting one save
+in which only dish 1 changed produced:
+
+```
+prepped after ONE save:
+  (1, 1, 12.0, None)   <- corrected, stamp cleared: correct
+  (2, 2, 20.0, None)   <- untouched, stamp cleared anyway
+  (3, 3, 30.0, None)   <- untouched, stamp cleared anyway
+```
+
+and three `UPDATE`/`MANUAL` log entries, two of which had no changed field other
+than `created_by` — which `public/history.html` filters out of its diff
+(`SKIP_FIELDS`, see 25d-iii), so they render as "No field-level changes to show
+for this entry." Two further no-op saves brought the table to twelve rows, eight
+of them content-free. The suite was green throughout.
+
+Note what this trades: on `main` today the `DO UPDATE` sets only
+`portions_produced`, so a correction *keeps* a stale SYSTEM stamp — wrong, but
+cosmetic. Attempt one replaced that with provenance destroyed on rows nobody
+edited, plus log noise that buries the one entry that matters. **It is strictly
+worse than the current behaviour and must not be merged as written.**
+
+**Decision, NaokiiVT 2026-09-04: the route detects the change itself.**
+
+Read the existing row first. If a row exists and its `portions_produced` equals
+the submitted value, **do nothing at all** — no upsert, no clearing of
+`created_by`, no `activity_log` entry. Do the full write only when the value
+actually differs, or when no row exists yet.
+
+Fix it server-side, not by making the page send only dirty rows. Server-side
+keeps this step's "no `public/` change" scope, and a route that is idempotent
+under a repeated identical payload is the more defensible contract regardless of
+what any future caller does.
+
+Consequences a worker should expect and not treat as bugs:
+- A save where nothing changed writes nothing and logs nothing.
+- `saved` in the response counts rows actually written, so it will be lower than
+  `rows.length`. That is correct; do not pad it back up.
+- `portion_actual` keeps its existing unconditional per-statement upsert. This
+  step does not touch it.
+- The transaction still wraps only the `prepped` write, as attempt one had it.
+
+Attempt one's other choices were sound and should be carried forward: the
+plain-SELECT before/after lookups (node:sqlite's `DatabaseSync` exposes no
+`RETURNING`), `withTransaction` around the prepped branch only, `actor: null`
+until 25d-i, and the `CREATE`-vs-`UPDATE` action split.
+
+Tests must cover: a no-op save writes nothing and logs nothing; a real
+correction clears the stamp and logs one `UPDATE` with the SYSTEM value visible
+in `before`; a fresh write logs `CREATE` with `before: null`; and a
+multi-row payload where only one row changed touches only that row.
 
 ### 25d-iii — the name is currently unreadable, which 25d does not fix
 
