@@ -15,17 +15,36 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ## Queue
 
-### 0. Step archive-pass — trim session-status.md
-**Lane: DISPATCH only. Docs only. Run this first.**
+### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
-`session-status.md` is ~1,300 lines and every worker session reads it cold.
-Doc-only and fully reversible, which is why it goes first: it is the
-cheapest way to exercise the `/step` and PR machinery, which has been used
-once in this repo's history.
+### 1. Step 25d-ii — `prepped.created_by` is provenance, not identity
+**Lane: DISPATCH only. Small, real code, tiny blast radius.**
 
-Spec: `session-status.md`, section "Step archive-pass".
+Clears the `SYSTEM:sync-batch-stock` stamp when a human corrects an
+inferred `prepped` number, and logs the manual correction to
+`activity_log`. No schema change, no `public/` change.
 
-### 1. Step 25a — commissary stock receipts (supplier intake)
+Sequenced first deliberately: it is the smallest step that exercises the
+full loop on real code — Class A decisions, tests, the write-path audit —
+where a mistake costs a revert rather than a corrupted migration. The
+first dispatch (archive-pass) was doc-only; this is the code equivalent.
+
+Spec: `session-status.md`, section "25d-ii".
+
+### 2. Step 26a — beginning stock: date-scoped openings and an honest fallback
+**Lane: DISPATCH only. Schema rebuild — the most invasive step in the queue.**
+
+**Must not run concurrently with 25d-ii.** Both edit
+`server/routes/dailyAudit.js`, and this one carries a migration; resolving a
+migration inside a conflicted file is how an old constraint silently
+survives. Merge 25d-ii, pull, then start this.
+
+Do it before test data is entered — it is a table rebuild and the data is
+disposable today.
+
+Spec: `session-status.md`, section "Step 26a".
+
+### 3. Step 25a — commissary stock receipts (supplier intake)
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
 Not startable on engineer initiative. It adds a weight column alongside
@@ -36,7 +55,7 @@ not the decision.
 Spec: `session-status.md`, section "Steps 25a / 25b — the commissary
 ledger has no way in".
 
-### 2. Step 24b-v — the effective yield output must be kg-tracked
+### 4. Step 24b-v — the effective yield output must be kg-tracked
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
 A live data-corruption guard. It changes what the code rejects, which is
@@ -44,7 +63,7 @@ red by default. Must land before soft-launch.
 
 Spec: `session-status.md`, section "Step 24b-v".
 
-### 3. Step 25d — record who did the count
+### 5. Step 25d-i and 25d-iii — record who did the count
 **Lane: DISPATCH only. Needs no schema change; the columns exist.**
 
 Adds a per-sheet auditor name to both audit pages and writes it to
@@ -57,7 +76,7 @@ item that cannot be backfilled later.
 
 Spec: `session-status.md`, section "Step 25d".
 
-### 4. Step 25e — restaurant-to-restaurant transfers must credit the receiver
+### 6. Step 25e — restaurant-to-restaurant transfers must credit the receiver
 **Lane: DISPATCH only. Queued AFTER soft launch, deliberately.**
 
 A transfer writes one row today: it subtracts from the sender and credits the
@@ -75,7 +94,7 @@ into whichever step next touches `allocations.js`.
 
 Spec: `session-status.md`, section "Step 25e".
 
-### 5. Nothing.
+### 7. Nothing.
 **This is deliberate. Do not invent a step 25.**
 
 After 24b-v the plan is a soft launch against real output, so that actual
