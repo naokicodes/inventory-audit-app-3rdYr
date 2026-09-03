@@ -125,21 +125,7 @@ the runner reads the last count line in each file.
   guards). If a delete feature is ever added for dishes/meats/restaurants,
   revisit these joins first.
 
-## Step 24 — multi-stage yield + Commissary-side allocation (CLOSED 2026-09-02)
-
-**Closed.** All nine sub-steps — 24a, 24a-b, 24b-i, 24b-ii, 24b-iii, 24b-iv,
-24c-i, 24c-ii, 24d — are done, pushed, and independently verified at **16
-files / 314 assertions / 0 failures**. The full design narrative and every
-sub-step entry are archived in `session-history.md`.
-
-The decisions this step produced live in "Things NOT to re-litigate" below.
-Read those, not the archive, unless you need the reasoning behind one.
-
-Commissary meats can now be processed into other commissary meats (multi-stage
-yield, with the input's count and weight tracked separately), and stock can be
-allocated between commissary meats or written off as a declared loss — with the
-balance ledger crediting and debiting both sides correctly, and the UI to enter
-all of it.
+## Step 24 — CLOSED 2026-09-02. See docs/session-history.md.
 
 ## Things NOT to re-litigate (already decided, stable)
 
@@ -889,13 +875,7 @@ writes `stock_receipts`, `sales.js` writes `sales`. Those tables read as empty
 only because no day has been entered yet. The gap is commissary-only, and each
 piece has a working restaurant-side equivalent to mirror.
 
-### 25b — commissary opening stock + physical count. CLOSED 2026-09-02.
-Done: `POST /commissary/daily-audit` (writes `commissary_opening_stock` via
-INSERT OR IGNORE, write-once; `commissary_ending_actual` via a real per-date
-upsert), plus the "Opening stock & physical count" section on
-`commissary.html`. Tests added to `commissary.test.js`. Live-verified against
-a real booted server. Full detail in `changelog.md`'s 25b entry - don't
-re-derive it here.
+### 25b — CLOSED 2026-09-02. See docs/session-history.md.
 
 ### 25a — commissary stock receipts. Raw meat arriving from suppliers. NEXT.
 Bigger than a route-and-UI mirror of `stockReceipts.js`, because
@@ -945,19 +925,7 @@ plus two retired test meat types. A reseed gives a clean catalog and an empty
 ledger with nothing to mistake for real rows later. Do it before real entry
 starts, not after.
 
-## Step 25c — seed and tag the meat-type catalog (CLOSED 2026-09-03, `1790463`)
-
-Seeds 11 `meat_types` and 15 `commissary_meats` with every meat tagged, so a
-wipe-and-reseed no longer leaves fourteen untagged meats and fourteen empty
-Allocate dropdowns. Adds M15 Processed Chicken (kg, tagged `Whole Chicken`).
-No schema change. Full narrative and verification steps in
-`session-history.md`; per-commit detail in `changelog.md`.
-
-Two consequences that outlived the step and are load-bearing elsewhere:
-- The `Whole Chicken` type deliberately spans two units (M01/M02 in `unit`,
-  M15 in `kg`). See "Things NOT to re-litigate".
-- The live DB is **not** retro-tagged by this step, by design. The on-site
-  tagging pass is still owed. See "Known open items".
+## Step 25c — CLOSED 2026-09-03, `1790463`. See docs/session-history.md.
 
 ## Step 24b-v — REQUIRED: the effective yield output must be kg-tracked
 
