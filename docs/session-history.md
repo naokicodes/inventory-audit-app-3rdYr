@@ -2798,3 +2798,43 @@ some may have been resolved since this list was written.
    rejecting exactly that is what 24b-iv does. The worker used direct SQL,
    disclosed it, and cleaned up. The rule needs an explicit carve-out for
    constructing states the current validation forbids.
+
+## Archived 2026-09-03 (pass 2)
+
+## Step 24 — multi-stage yield + Commissary-side allocation (CLOSED 2026-09-02)
+
+**Closed.** All nine sub-steps — 24a, 24a-b, 24b-i, 24b-ii, 24b-iii, 24b-iv,
+24c-i, 24c-ii, 24d — are done, pushed, and independently verified at **16
+files / 314 assertions / 0 failures**. The full design narrative and every
+sub-step entry are archived in `session-history.md`.
+
+The decisions this step produced live in "Things NOT to re-litigate" below.
+Read those, not the archive, unless you need the reasoning behind one.
+
+Commissary meats can now be processed into other commissary meats (multi-stage
+yield, with the input's count and weight tracked separately), and stock can be
+allocated between commissary meats or written off as a declared loss — with the
+balance ledger crediting and debiting both sides correctly, and the UI to enter
+all of it.
+
+### 25b — commissary opening stock + physical count. CLOSED 2026-09-02.
+Done: `POST /commissary/daily-audit` (writes `commissary_opening_stock` via
+INSERT OR IGNORE, write-once; `commissary_ending_actual` via a real per-date
+upsert), plus the "Opening stock & physical count" section on
+`commissary.html`. Tests added to `commissary.test.js`. Live-verified against
+a real booted server. Full detail in `changelog.md`'s 25b entry - don't
+re-derive it here.
+
+## Step 25c — seed and tag the meat-type catalog (CLOSED 2026-09-03, `1790463`)
+
+Seeds 11 `meat_types` and 15 `commissary_meats` with every meat tagged, so a
+wipe-and-reseed no longer leaves fourteen untagged meats and fourteen empty
+Allocate dropdowns. Adds M15 Processed Chicken (kg, tagged `Whole Chicken`).
+No schema change. Full narrative and verification steps in
+`session-history.md`; per-commit detail in `changelog.md`.
+
+Two consequences that outlived the step and are load-bearing elsewhere:
+- The `Whole Chicken` type deliberately spans two units (M01/M02 in `unit`,
+  M15 in `kg`). See "Things NOT to re-litigate".
+- The live DB is **not** retro-tagged by this step, by design. The on-site
+  tagging pass is still owed. See "Known open items".
