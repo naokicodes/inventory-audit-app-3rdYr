@@ -143,8 +143,14 @@ than an invented step.
 
 ## Before opening a pull request
 
-- Full suite green — all 16 `*.test.js` files under `server/`, each run
-  directly with `node <file>.test.js`. There is no runner script
+- `npm run verify` green — the full suite plus the write-path audit. It must
+  print `SUITE GREEN` and `AUDIT CLEAN`. CI runs the same command on your PR,
+  so paste the real output; a mismatch between your paste and the check is
+  itself a finding
+- If the audit flags something you introduced, build the write path. **Do not
+  add an entry to `scripts/write-path-allowlist.json` to make it pass** — that
+  is an architect decision, and silencing the audit removes the check that was
+  working
 - **If you touched `public/`, a green suite is not enough.** Several real
   bugs have shipped past a fully green suite: a wrong row key on the
   balance cards, a dropdown with no active filter, a bad edit rejection.

@@ -2641,3 +2641,160 @@ a future session doesn't rediscover the same gap.
 the two are independent, and running them in this order keeps two workers off
 `public/commissary.html` at the same time — that file is the only real
 collision risk between them.
+
+---
+
+## Archived 2026-09-03 — step 25c in full
+
+## Step 25c — seed the meat-type catalog and tag it (CLOSED 2026-09-03, `1790463`)
+
+**Lane: DISPATCH. Small, self-contained, no schema change.**
+
+Turns the meat-type tagging pass from recurring manual data entry into a
+property of a fresh seed. Independent of 25a — it shares no table with
+`commissary_stock_receipts` and was deliberately NOT folded into 25a's prompt
+(rule 16: mixed concerns).
+
+### Why it exists
+`seed.js` contains zero references to `meat_type` and neither do any of the
+three seed data files, so a wipe-and-reseed returns an **empty** `meat_types`
+table and **fourteen untagged** commissary meats. Tagging is what
+`GET /commissary/adjustments/destinations` reads; untagged means every Allocate
+dropdown is correctly empty. Today that pass is hand entry through Settings,
+repeated in full after every reseed — and a reseed is expected after 25a's
+migration.
+
+### Scope
+**1. `server/db/commissary-seed-data.json` — add one meat:**
+`M15 | Processed Chicken | unit kg | allowed_leeway_pct 0 | cost_per_unit null`
+
+This is the yield output for M01/M02, whose absence would make every chicken
+yield event fail once 24b-v lands (a unit source needs a kg-tracked effective
+output). It is the **only** new meat.
+
+**2. Add a `meat_types` list and a `meat_type` key per meat.** Eleven types:
+
+| code | meat | unit | meat_type |
+|---|---|---|---|
+| M01 | Whole Chicken | unit | Whole Chicken |
+| M02 | Whole Chicken Raw | unit | Whole Chicken |
+| M03 | Belly Slab | kg | Pork Belly |
+| M04 | Belly Slab Raw | kg | Pork Belly |
+| M05 | JOWL | kg | Jowl |
+| M06 | JOWL Raw | kg | Jowl |
+| M07 | PATA | unit | Pata |
+| M08 | Shortplate | kg | Shortplate |
+| M09 | Pork Steak | unit | Pork Steak |
+| M10 | French Cut | unit | French Cut |
+| M11 | Pompano | unit | Pompano |
+| M12 | Salmon Belly | unit | Salmon Belly |
+| M13 | Ground Beef | kg | Ground Beef |
+| M14 | Miscuts | kg | Miscuts |
+| M15 | Processed Chicken | kg | Whole Chicken |
+
+Eight of the eleven types have a single member and so produce no allocation
+pair today. They are tagged anyway: cross-commissary allocation is the main use
+case the moment a second commissary exists, and tagging in seed data costs
+nothing versus a second manual pass later.
+
+**3. `server/db/seed.js`** — seed `meat_types` before commissary meats, then set
+`meat_type_id` when inserting each commissary meat. Re-running on a populated DB
+must remain a no-op.
+
+**`meat_types` has NO UNIQUE constraint** — the table is `id / name / active`
+only. `INSERT OR IGNORE` therefore does NOT dedupe it and would insert eleven
+fresh duplicate types on every run. Use a lookup-then-insert instead: SELECT the
+id by name, INSERT only when absent, and reuse the id either way. Do NOT add a
+UNIQUE constraint — `schema.sql` is `CREATE TABLE IF NOT EXISTS` and could not
+apply it to an existing `inventory.db` anyway, which would drag a migration into
+a step scoped to have none.
+
+`commissary_meats` is different and its existing `INSERT OR IGNORE` is correct —
+it has `UNIQUE (commissary_id, code)`. Only the new `meat_types` insert needs
+the lookup pattern.
+
+That `INSERT OR IGNORE` on `commissary_meats` also means the tag is applied
+**only on insert**. It will not retro-tag the fourteen rows in an existing
+`inventory.db` — that is fine and expected, because the reseed is preceded by a
+wipe. Do not add an UPDATE path to force it; that would silently overwrite hand
+tagging.
+
+Because type names are matched by name, renaming a type later creates a new row
+rather than editing the old one. Acceptable pre-soft-launch; worth knowing.
+
+**M15 is confirmed free.** The real `Commi_Audit_Master.xlsx` `Meats` sheet has
+16 rows, and M15 is a genuinely empty one — no name, unit or cost. `seed.js`'s
+comment currently reads "M15 blank in the source sheet, skipped"; that comment
+must be updated, since it stops being true.
+
+### Out of scope
+- No schema change. `meat_types` and `commissary_meats.meat_type_id` both
+  already exist. If a migration seems necessary, stop and flag it.
+- No route changes, no UI. Settings already exposes everything.
+- Do not touch `seed-data.json` or `seed-data-B.json` — restaurant-side meats
+  are a different numbering system entirely and are not tagged.
+- Do not add processed counterparts for any meat other than chicken. See
+  "Things NOT to re-litigate".
+
+### Verification
+- Full suite green. Current baseline: **16 files, 325/325, 0 failures.**
+- Delete a scratch DB, run `node server/db/seed.js`, confirm 11 `meat_types`
+  rows and 15 `commissary_meats` rows with no NULL `meat_type_id`.
+- Run `seed.js` a second time and confirm zero new rows.
+- Confirm `GET /commissary/adjustments/destinations?commissary_meat_id=` for M01
+  returns M02 (same type, same unit) and does **not** return M15 (same type,
+  different unit).
+
+### Sequencing
+25c is built and verified against a scratch DB **before** NaokiiVT wipes and
+reseeds `inventory.db`. Wiping first would mean hand-tagging that 25c
+immediately makes redundant.
+
+---
+
+## Archived 2026-09-03 — resolved architectural questions
+
+## Open architectural questions (for an architect conversation, not a worker)
+
+None of these blocks anything. They are listed so a fresh architect
+conversation can pick one up without re-deriving it, and so no worker mistakes
+one for a dispatched task. Verify each against the current repo before acting —
+some may have been resolved since this list was written.
+
+**Carried in from before step 24:**
+1. Should `meat_types` gain an authoritative `unit` column, enforced at tag
+   time? Today `unit` lives on `commissary_meats`, so two meats of the same
+   type can be tracked in different units and will silently never pair as
+   allocation source/destination. Bears directly on the tagging pass.
+2. Is `computeYieldLogForDate` dead code?
+3. Is `commissary_meat_map` vestigial and safe to delete? (Note the standing
+   gotcha: commissary and restaurant meat codes are different numbering
+   systems — never infer a mapping from matching code strings.)
+4. `graphify-out/` undecided paths — cache, `.graphify_labels.json.sig`, the
+   date-stamped directory. Pending a check of graphify's own docs.
+
+**Raised 2026-09-02:**
+5. **RESOLVED 2026-09-02 — workers now push their own commits.** Option B
+   adopted: a worker pushes, and must paste the raw verbatim output of
+   `git status -sb` and `git log --oneline -1 origin/main` rather than
+   summarising it. No push if the suite is red or if any file outside the
+   step's stated scope changed — commit, stop, flag instead. Written into
+   `rules-for-claude-code.md` as the 2026-09-02 amendment to rule 23. The
+   architect still records push state from `origin/main` and a fresh pull,
+   never from the report.
+6. **Do cross-commissary allocations need physical paperwork?** An ALLOCATION
+   between commissaries is a real van trip but produces no delivery receipt,
+   unlike a restaurant shipment. The stock math is correct either way. Worth
+   deciding once real movements start, not before.
+7. **Does `meat_types` need a proper retirement story?** 24d fixed the dropdown
+   leak, but there is still no delete path and test rows are accumulating (two
+   retired ones sit in live `inventory.db` today). Soft delete via `active` may
+   be sufficient — the question is whether anything else should reference
+   retirement.
+8. **Should `inventory.db` changes by workers be constrained differently?**
+   24c-i's prompt said "change it only through the app's own routes," which was
+   impossible to satisfy for the one case being tested: a legacy row with a
+   NULL `input_quantity` cannot be created through the routes, because
+   rejecting exactly that is what 24b-iv does. The worker used direct SQL,
+   disclosed it, and cleaned up. The rule needs an explicit carve-out for
+   constructing states the current validation forbids.

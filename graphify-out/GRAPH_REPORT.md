@@ -1,16 +1,16 @@
 # Graph Report - inventory-audit-app-3rdYr  (2026-09-03)
 
 ## Corpus Check
-- 77 files · ~182,950 words
+- 77 files · ~183,562 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 631 nodes · 878 edges · 48 communities (45 shown, 1 thin omitted)
+- 632 nodes · 879 edges · 48 communities (45 shown, 1 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0d277215`
+- Built from commit: `911e4f1e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -23,7 +23,7 @@
 - schema.sql
 - index.js
 - Settings Admin: Conversion Standards
-- Dispatch queue — what to work on next
+- Queue
 - commissary.js
 - history.test.js
 - Home/Index Page
@@ -45,7 +45,7 @@
 - check-ledger.js
 - terminal.test.js
 - Session History — resolved, kept for "why", not "what's next"
-- activityLog.js
+- commands.js
 - seed.js
 - audit-write-paths.js
 - Workflow guide — how this project is actually run
@@ -57,7 +57,7 @@
 - Decision authority — what you may decide, and what waits
 - needs-architect.md
 - sales.js
-- allocations.js
+- activityLog.js
 - history.js
 - settings.js
 - verify.md
@@ -100,24 +100,24 @@
 ## Communities (48 total, 1 thin omitted)
 
 ### Community 0 - "auditEngine.js"
-Cohesion: 0.05
-Nodes (46): recalcDishRow (client-side live recalculation), addDays(), computeDailyAudit(), computeDishAudit(), computeMeatAudit(), computeMixedDailyAudit(), getAdjustmentsTotal(), getBeginningStock() (+38 more)
+Cohesion: 0.06
+Nodes (45): recalcDishRow (client-side live recalculation), addDays(), computeDailyAudit(), computeDishAudit(), computeMeatAudit(), computeMixedDailyAudit(), getAdjustmentsTotal(), getBeginningStock() (+37 more)
 
 ### Community 1 - "Data Model doc"
 Cohesion: 0.08
 Nodes (43): .claude/CLAUDE.md (graphify router), graphify add & watch reference, graphify exports & benchmark reference, graphify extraction subagent prompt spec, graphify GitHub clone & cross-repo merge reference, graphify commit hook & CLAUDE.md integration reference, graphify query/path/explain reference, graphify transcribe reference (+35 more)
 
 ### Community 2 - "dashboard.test.js"
-Cohesion: 0.09
-Nodes (28): { addDays }, computeCommissaryDailyAudit(), computeCommissaryMeatAudit(), getCommissaryAdjustmentsTotal(), getCommissaryBackedUp(), getCommissaryEndingActual(), getCommissaryStockIn(), getCommissaryUsage() (+20 more)
+Cohesion: 0.18
+Nodes (11): assert, { computeCommissaryMeatAudit }, { computeMeatAudit }, computeRestaurantTotals(), currentBalance(), { DatabaseSync }, db, fs (+3 more)
 
 ### Community 3 - "connection.js"
 Cohesion: 0.17
 Nodes (14): { DatabaseSync }, db, DB_PATH, fs, { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateCommissaryAdjustmentsTable }, path, schema, SCHEMA_PATH (+6 more)
 
 ### Community 4 - "commissary.test.js"
-Cohesion: 0.10
-Nodes (13): assert, { computeCommissaryDailyAudit, computeCommissaryMeatAudit, getCommissaryBackedUp, getCommissaryUsage }, { computeYieldRow }, createShipment(), { DatabaseSync }, db, fs, getPresetWithLines() (+5 more)
+Cohesion: 0.07
+Nodes (31): { addDays }, computeCommissaryDailyAudit(), computeCommissaryMeatAudit(), getCommissaryAdjustmentsTotal(), getCommissaryBackedUp(), getCommissaryBeginningStock(), getCommissaryEndingActual(), getCommissaryStockIn() (+23 more)
 
 ### Community 5 - "schema.sql"
 Cohesion: 0.17
@@ -131,9 +131,9 @@ Nodes (12): allocationsRoutes, app, commandsRoutes, commissaryRoutes, dailyAudit
 Cohesion: 0.09
 Nodes (22): Settings Page, POST /api/commissary/conversion-standards, POST /api/commissary/shipment-presets, PUT /api/commissary/conversion-standards/:id, PUT /api/commissary/shipment-presets/:id, DELETE /api/settings/recipes/:id, GET /api/settings/dishes, GET /api/settings/meats (+14 more)
 
-### Community 8 - "Dispatch queue — what to work on next"
-Cohesion: 0.25
-Nodes (7): 1. Step 25a — commissary stock receipts (supplier intake), 2. Step 24b-v — the effective yield output must be kg-tracked, 3. Nothing., Available engineer-lane work, Dispatch queue — what to work on next, Not in the queue, and not a task, Queue
+### Community 8 - "Queue"
+Cohesion: 0.22
+Nodes (8): 1. Step 25a — commissary stock receipts (supplier intake), 2. Step 24b-v — the effective yield output must be kg-tracked, 3. Step 25d — record who did the count, 4. Nothing., Available engineer-lane work, Dispatch queue — what to work on next, Not in the queue, and not a task, Queue
 
 ### Community 9 - "commissary.js"
 Cohesion: 0.08
@@ -219,8 +219,8 @@ Nodes (10): assert, comAJowl, comAJowl2, comAPata, comBJowl, commissaryMeats, co
 Cohesion: 0.13
 Nodes (14): 23c-ii split into four sub-steps — resolved 2026-09-01 (architect), Archived 2026-09-02 — step 24 design narrative and completed sub-steps, Item 3 design — RESOLVED 2026-08-30, ready to build, none of it started yet, Original five items, raised 2026-08-29, Original five items, raised 2026-08-29 — all resolved, Remaining scope (steps 10–19), Remaining scope (steps 10–19) — all complete, Round 2 findings (2026-08-30) — the plate refilled, UI explicitly delayed (+6 more)
 
-### Community 32 - "activityLog.js"
-Cohesion: 0.33
+### Community 32 - "commands.js"
+Cohesion: 0.40
 Nodes (4): db, express, router, { withTransaction, logActivity }
 
 ### Community 33 - "seed.js"
@@ -267,8 +267,8 @@ Nodes (6): Both readings, Partial work, What I did NOT change, What I hit, What 
 Cohesion: 0.33
 Nodes (3): db, express, router
 
-### Community 44 - "allocations.js"
-Cohesion: 0.40
+### Community 44 - "activityLog.js"
+Cohesion: 0.33
 Nodes (4): db, express, router, { withTransaction }
 
 ### Community 45 - "history.js"
@@ -280,8 +280,8 @@ Cohesion: 0.50
 Nodes (3): db, express, router
 
 ## Knowledge Gaps
-- **339 isolated node(s):** `1. Ground yourself in the real repo`, `2. Establish the baseline before you touch anything`, `3. Read, in this order`, `4. State the plan, then implement`, `5. Verify` (+334 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 414 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **340 isolated node(s):** `1. Step 25a — commissary stock receipts (supplier intake)`, `2. Step 24b-v — the effective yield output must be kg-tracked`, `3. Step 25d — record who did the count`, `4. Nothing.`, `Available engineer-lane work` (+335 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 415 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **1 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -292,12 +292,12 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `Unallocated Commissary Receipt` connect `Data Model doc` to `Stock Receipts Page`?**
   _High betweenness centrality (0.158) - this node is a cross-community bridge._
 - **Why does `recalcMeatRow (client-side live recalculation)` connect `Data Model doc` to `auditEngine.js`?**
-  _High betweenness centrality (0.158) - this node is a cross-community bridge._
-- **What connects `1. Ground yourself in the real repo`, `2. Establish the baseline before you touch anything`, `3. Read, in this order` to the rest of the system?**
-  _339 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.157) - this node is a cross-community bridge._
+- **What connects `1. Step 25a — commissary stock receipts (supplier intake)`, `2. Step 24b-v — the effective yield output must be kg-tracked`, `3. Step 25d — record who did the count` to the rest of the system?**
+  _340 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `auditEngine.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.05389610389610389 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.055218855218855216 - nodes in this community are weakly interconnected._
 - **Should `Data Model doc` be split into smaller, more focused modules?**
   _Cohesion score 0.08416389811738649 - nodes in this community are weakly interconnected._
-- **Should `dashboard.test.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.08912655971479501 - nodes in this community are weakly interconnected._
+- **Should `commissary.test.js` be split into smaller, more focused modules?**
+  _Cohesion score 0.07084785133565621 - nodes in this community are weakly interconnected._

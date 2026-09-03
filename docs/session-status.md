@@ -16,48 +16,42 @@ If you are a fresh session with no memory of prior work, also read rules
 between coder workers and the architect conversation, when to re-run the
 suite, and how to keep context costs down.
 
-## Current state — 2026-09-02
+## Current state — 2026-09-03
 
-**Steps 1–24 are all closed.** Step 24's nine sub-steps are done, pushed, and
-verified against `origin/main` at `6c57fc5` by an independent architect pull —
-not taken from a worker's report. Per-step detail is in `changelog.md`; the
-archived sub-step entries and the full step-24 narrative are in
-`session-history.md`.
+**Steps 1–25c are all closed**, verified against `origin/main` at `911e4f1` by
+an independent architect pull, not from a worker's report. Per-step detail is
+in `changelog.md`; archived narrative is in `session-history.md`.
 
-**Step 25b is CLOSED (2026-09-02).** `POST /commissary/daily-audit` writes
-`commissary_opening_stock` (INSERT OR IGNORE, write-once) and
-`commissary_ending_actual` (real upsert, per-day recount overwrites), plus the
-UI section on `commissary.html`. Full detail in `changelog.md`'s 25b entry.
+**Queue: 25a, then 24b-v, then 25d, then soft launch.** All four have their own
+sections below and their order is in `dispatch-queue.md`. 25a closes the last
+half of the ledger-entry gap (`commissary_stock_receipts` is still unwritten).
+24b-v is a data-corruption guard that only matters once balances work. 25d
+records who did each physical count, sequenced before soft-launch because
+attribution is the one deferred item that cannot be backfilled.
 
-**Next coding step: 25c**, then 25a, then 24b-v — all three written up in their
-own sections below. 25c seeds and tags the meat-type catalog so the tagging
-pass stops being manual data entry repeated after every reseed. 25a closes the remaining half of the gap found 2026-09-02: the
-commissary ledger still has no way to record supplier receipts arriving at
-the commissary (`commissary_stock_receipts` is still unwritten). 24b-v is a
-data-corruption guard that only matters once balances work - both land before
-soft-launch.
-The plan after 24b-v is to soft-launch against real output and let actual use
-decide what gets built next, rather than guessing at features — the same
-reasoning that deferred the per-meat next-stage config. The open architectural
-questions are listed at the bottom of this file; they are for an architect
-conversation to resolve, not for a worker to pick up.
+After 25d, **nothing is defined, deliberately.** The plan is a soft launch
+against real output so that use decides what gets built, rather than guesswork
+— the same reasoning that deferred the per-meat next-stage config. Do not
+invent a step.
+
+**Automation, added 2026-09-03.** `npm test` runs all 16 suite files and
+prints one aggregate count. `npm run audit:write-paths` flags schema tables and
+columns that are read but never written — the bug class that produced 24b-iv
+and 25a/25b — and fails on stale allowlist entries so a closed gap cannot sit
+in `scripts/write-path-allowlist.json` unnoticed. `npm run verify` runs both,
+and GitHub Actions runs `npm run verify` on every push and pull request.
+`.claude/commands/step.md` and `verify.md` hold the dispatch and health-check
+procedures. `docs/workflow-guide.md` is the cold-start reference for the whole
+loop; `docs/decision-authority.md` defines what a worker may decide alone.
 
 **Before soft-launch, one on-site task blocks the new features from doing
-anything:** the meat-type tagging pass (see Known open items below).
+anything:** the meat-type tagging pass on the live DB (see Known open items).
+25c makes a *fresh seed* correctly tagged, but does not retro-tag existing rows
+and deliberately must not.
 
-**Workers push their own commits** as of the 2026-09-02 amendment to rule 23,
-and must paste raw `git status -sb` and `git log --oneline -1 origin/main`
-output verbatim rather than summarising it. The architect still records push
-state from `origin/main` and a fresh pull, never from the report — a worker's
-claim is a claim until the pull confirms it.
-
-Full suite: **16 files, 325/325 assertions, 0 failures** (up from 314 — 25b
-added 11 net, `commissary.test.js` alone rose from 83 to 94). Run individually
-via `node <file>.test.js` — there is no test runner script. Two files are
-easy to miss because they live outside `server/routes`/`server/engines`:
-`server/db/activityLog.test.js` and `server/db/migrate.test.js`. `commands.test.js`
-and `sales.test.js` print a SQLite `ExperimentalWarning` after their count
-line — read the count, not the last line.
+Full suite: **16 files, 325/325 assertions, 0 failures.** Use `npm test`; the
+old per-file ritual and the ExperimentalWarning caveat no longer apply, since
+the runner reads the last count line in each file.
 
 ## Known open items (not the next step's problem, just not forgotten)
 
@@ -510,109 +504,19 @@ plus two retired test meat types. A reseed gives a clean catalog and an empty
 ledger with nothing to mistake for real rows later. Do it before real entry
 starts, not after.
 
-## Step 25c — seed the meat-type catalog and tag it (CLOSED 2026-09-03, `1790463`)
+## Step 25c — seed and tag the meat-type catalog (CLOSED 2026-09-03, `1790463`)
 
-**Lane: DISPATCH. Small, self-contained, no schema change.**
+Seeds 11 `meat_types` and 15 `commissary_meats` with every meat tagged, so a
+wipe-and-reseed no longer leaves fourteen untagged meats and fourteen empty
+Allocate dropdowns. Adds M15 Processed Chicken (kg, tagged `Whole Chicken`).
+No schema change. Full narrative and verification steps in
+`session-history.md`; per-commit detail in `changelog.md`.
 
-Turns the meat-type tagging pass from recurring manual data entry into a
-property of a fresh seed. Independent of 25a — it shares no table with
-`commissary_stock_receipts` and was deliberately NOT folded into 25a's prompt
-(rule 16: mixed concerns).
-
-### Why it exists
-`seed.js` contains zero references to `meat_type` and neither do any of the
-three seed data files, so a wipe-and-reseed returns an **empty** `meat_types`
-table and **fourteen untagged** commissary meats. Tagging is what
-`GET /commissary/adjustments/destinations` reads; untagged means every Allocate
-dropdown is correctly empty. Today that pass is hand entry through Settings,
-repeated in full after every reseed — and a reseed is expected after 25a's
-migration.
-
-### Scope
-**1. `server/db/commissary-seed-data.json` — add one meat:**
-`M15 | Processed Chicken | unit kg | allowed_leeway_pct 0 | cost_per_unit null`
-
-This is the yield output for M01/M02, whose absence would make every chicken
-yield event fail once 24b-v lands (a unit source needs a kg-tracked effective
-output). It is the **only** new meat.
-
-**2. Add a `meat_types` list and a `meat_type` key per meat.** Eleven types:
-
-| code | meat | unit | meat_type |
-|---|---|---|---|
-| M01 | Whole Chicken | unit | Whole Chicken |
-| M02 | Whole Chicken Raw | unit | Whole Chicken |
-| M03 | Belly Slab | kg | Pork Belly |
-| M04 | Belly Slab Raw | kg | Pork Belly |
-| M05 | JOWL | kg | Jowl |
-| M06 | JOWL Raw | kg | Jowl |
-| M07 | PATA | unit | Pata |
-| M08 | Shortplate | kg | Shortplate |
-| M09 | Pork Steak | unit | Pork Steak |
-| M10 | French Cut | unit | French Cut |
-| M11 | Pompano | unit | Pompano |
-| M12 | Salmon Belly | unit | Salmon Belly |
-| M13 | Ground Beef | kg | Ground Beef |
-| M14 | Miscuts | kg | Miscuts |
-| M15 | Processed Chicken | kg | Whole Chicken |
-
-Eight of the eleven types have a single member and so produce no allocation
-pair today. They are tagged anyway: cross-commissary allocation is the main use
-case the moment a second commissary exists, and tagging in seed data costs
-nothing versus a second manual pass later.
-
-**3. `server/db/seed.js`** — seed `meat_types` before commissary meats, then set
-`meat_type_id` when inserting each commissary meat. Re-running on a populated DB
-must remain a no-op.
-
-**`meat_types` has NO UNIQUE constraint** — the table is `id / name / active`
-only. `INSERT OR IGNORE` therefore does NOT dedupe it and would insert eleven
-fresh duplicate types on every run. Use a lookup-then-insert instead: SELECT the
-id by name, INSERT only when absent, and reuse the id either way. Do NOT add a
-UNIQUE constraint — `schema.sql` is `CREATE TABLE IF NOT EXISTS` and could not
-apply it to an existing `inventory.db` anyway, which would drag a migration into
-a step scoped to have none.
-
-`commissary_meats` is different and its existing `INSERT OR IGNORE` is correct —
-it has `UNIQUE (commissary_id, code)`. Only the new `meat_types` insert needs
-the lookup pattern.
-
-That `INSERT OR IGNORE` on `commissary_meats` also means the tag is applied
-**only on insert**. It will not retro-tag the fourteen rows in an existing
-`inventory.db` — that is fine and expected, because the reseed is preceded by a
-wipe. Do not add an UPDATE path to force it; that would silently overwrite hand
-tagging.
-
-Because type names are matched by name, renaming a type later creates a new row
-rather than editing the old one. Acceptable pre-soft-launch; worth knowing.
-
-**M15 is confirmed free.** The real `Commi_Audit_Master.xlsx` `Meats` sheet has
-16 rows, and M15 is a genuinely empty one — no name, unit or cost. `seed.js`'s
-comment currently reads "M15 blank in the source sheet, skipped"; that comment
-must be updated, since it stops being true.
-
-### Out of scope
-- No schema change. `meat_types` and `commissary_meats.meat_type_id` both
-  already exist. If a migration seems necessary, stop and flag it.
-- No route changes, no UI. Settings already exposes everything.
-- Do not touch `seed-data.json` or `seed-data-B.json` — restaurant-side meats
-  are a different numbering system entirely and are not tagged.
-- Do not add processed counterparts for any meat other than chicken. See
-  "Things NOT to re-litigate".
-
-### Verification
-- Full suite green. Current baseline: **16 files, 325/325, 0 failures.**
-- Delete a scratch DB, run `node server/db/seed.js`, confirm 11 `meat_types`
-  rows and 15 `commissary_meats` rows with no NULL `meat_type_id`.
-- Run `seed.js` a second time and confirm zero new rows.
-- Confirm `GET /commissary/adjustments/destinations?commissary_meat_id=` for M01
-  returns M02 (same type, same unit) and does **not** return M15 (same type,
-  different unit).
-
-### Sequencing
-25c is built and verified against a scratch DB **before** NaokiiVT wipes and
-reseeds `inventory.db`. Wiping first would mean hand-tagging that 25c
-immediately makes redundant.
+Two consequences that outlived the step and are load-bearing elsewhere:
+- The `Whole Chicken` type deliberately spans two units (M01/M02 in `unit`,
+  M15 in `kg`). See "Things NOT to re-litigate".
+- The live DB is **not** retro-tagged by this step, by design. The on-site
+  tagging pass is still owed. See "Known open items".
 
 ## Step 24b-v — REQUIRED: the effective yield output must be kg-tracked
 
@@ -714,6 +618,13 @@ optional field would simply produce blank rows and leave the column as useless
 as it is today. This does change what the code rejects, which is why the step
 is DISPATCH-lane.
 
+**If a sheet carries no name, the auditor enters `Unknown`** — convention set
+by NaokiiVT 2026-09-03. This is what makes a required field workable rather
+than an obstacle: entry is never blocked, and a blank is always a mistake
+rather than an ambiguous case. Do not build validation that rejects `Unknown`,
+and do not add it as a default — it must be typed, so that it records a real
+absence rather than an unfilled form.
+
 Legacy rows already in `ending_actual` with a NULL `created_by` are not
 affected and must not be backfilled with a guess.
 
@@ -735,43 +646,61 @@ will turn CI red.
 
 None of these blocks anything. They are listed so a fresh architect
 conversation can pick one up without re-deriving it, and so no worker mistakes
-one for a dispatched task. Verify each against the current repo before acting —
-some may have been resolved since this list was written.
+one for a dispatched task. Verify each against the current repo before acting.
 
-**Carried in from before step 24:**
-1. Should `meat_types` gain an authoritative `unit` column, enforced at tag
-   time? Today `unit` lives on `commissary_meats`, so two meats of the same
-   type can be tracked in different units and will silently never pair as
-   allocation source/destination. Bears directly on the tagging pass.
-2. Is `computeYieldLogForDate` dead code?
-3. Is `commissary_meat_map` vestigial and safe to delete? (Note the standing
-   gotcha: commissary and restaurant meat codes are different numbering
-   systems — never infer a mapping from matching code strings.)
-4. `graphify-out/` undecided paths — cache, `.graphify_labels.json.sig`, the
-   date-stamped directory. Pending a check of graphify's own docs.
+**Resolved 2026-09-03 — kept here briefly so they are not re-raised:**
 
-**Raised 2026-09-02:**
-5. **RESOLVED 2026-09-02 — workers now push their own commits.** Option B
-   adopted: a worker pushes, and must paste the raw verbatim output of
-   `git status -sb` and `git log --oneline -1 origin/main` rather than
-   summarising it. No push if the suite is red or if any file outside the
-   step's stated scope changed — commit, stop, flag instead. Written into
-   `rules-for-claude-code.md` as the 2026-09-02 amendment to rule 23. The
-   architect still records push state from `origin/main` and a fresh pull,
-   never from the report.
-6. **Do cross-commissary allocations need physical paperwork?** An ALLOCATION
+- **Should `meat_types` gain an authoritative `unit` column, enforced at tag
+  time? NO.** M15 Processed Chicken (kg) is deliberately tagged `Whole Chicken`
+  alongside M01/M02 (`unit`), so a meat type spans units on purpose — it is a
+  grouping key across an item's stages, and it is what `dashboard.js` rolls up.
+  An authoritative unit would reject 25c's own seed data. The
+  `AND unit = ?` clause in `GET /commissary/adjustments/destinations` is
+  therefore correct and must stay: it is what stops kg being allocated into a
+  count balance. **The real defect is silence, not the model** — see the UX
+  item below.
+- **Is `computeYieldLogForDate` dead code? Yes, and it stays.** Defined and
+  exported in `commissaryYieldEngine.js`, called by its own test file and
+  nothing else — no route, no command, no terminal path. Retained
+  deliberately: it is tested, costs nothing to carry, and deleting working
+  tested code to tidy up is a change that occasionally takes something with
+  it. Reclassified from open question to intentionally-retained.
+- **Is `commissary_meat_map` vestigial? Yes, and it was already retired.**
+  Resolved and executed 2026-08-29 — routes, admin CRUD, Settings section and
+  the whole "Unallocated" concept are gone; the table stays in `schema.sql`
+  because destructive schema changes are not made. The write-path audit flags
+  it, which is that decision showing up as expected; it is allowlisted with
+  that reason. Nothing further to decide.
+- **Workers pushing their own commits.** Resolved 2026-09-02 and since layered
+  over by `engineer-role.md` and `decision-authority.md`. Archived to
+  `session-history.md`.
+
+**Open:**
+
+1. **The Allocate dropdown does not explain why it is short.** Raised
+   2026-09-03 as the real content of the closed `meat_types` question above.
+   `destinations` correctly filters on type **and** unit, so a same-type
+   different-unit meat is silently omitted, and an untagged source returns `[]`
+   with no message at all. From the auditor's chair both look like tagging
+   failed, and there is no path from that screen to the actual reason. The
+   model is right; the screen says nothing. Fix is UI-only — no schema, no
+   filter change. **Deferred to soft-launch** so real mis-tags shape the
+   wording rather than guesswork.
+2. **`graphify-out/` undecided paths** — cache, `.graphify_labels.json.sig`,
+   the date-stamped directory. Pending a check of graphify's own docs. Partly
+   answered already by the reasoning now written into `.gitignore`.
+3. **Do cross-commissary allocations need physical paperwork?** An ALLOCATION
    between commissaries is a real van trip but produces no delivery receipt,
-   unlike a restaurant shipment. The stock math is correct either way. Worth
-   deciding once real movements start, not before.
-7. **Does `meat_types` need a proper retirement story?** 24d fixed the dropdown
-   leak, but there is still no delete path and test rows are accumulating (two
-   retired ones sit in live `inventory.db` today). Soft delete via `active` may
-   be sufficient — the question is whether anything else should reference
-   retirement.
-8. **Should `inventory.db` changes by workers be constrained differently?**
+   unlike a restaurant shipment. The stock math is correct either way. Decide
+   once real movements start, not before.
+4. **Does `meat_types` need a proper retirement story?** 24d fixed the dropdown
+   leak, but there is no delete path and test rows accumulate (two retired ones
+   sit in live `inventory.db`). Soft delete via `active` may be sufficient —
+   the question is whether anything else should reference retirement.
+5. **Should `inventory.db` changes by workers be constrained differently?**
    24c-i's prompt said "change it only through the app's own routes," which was
-   impossible to satisfy for the one case being tested: a legacy row with a
-   NULL `input_quantity` cannot be created through the routes, because
-   rejecting exactly that is what 24b-iv does. The worker used direct SQL,
-   disclosed it, and cleaned up. The rule needs an explicit carve-out for
-   constructing states the current validation forbids.
+   impossible for the case being tested: a legacy row with a NULL
+   `input_quantity` cannot be created through the routes, because rejecting
+   exactly that is what 24b-iv does. The worker used direct SQL, disclosed it,
+   and cleaned up. The rule needs an explicit carve-out for constructing states
+   the current validation forbids.
