@@ -94,12 +94,24 @@ git status --short
 git add <specific paths>
 git commit -m "<short subject>" -m "<what and why>"
 git push -u origin <branch>
-gh pr create --fill
 ```
 
-Fill in the template honestly, including the `npm run verify` output
-verbatim and your Class A decisions. "I didn't check this" is a welcome
-answer. A guess presented as a check is not.
+Then fill in `.github/pull_request_template.md` — copy it, complete every
+section, and save the filled copy to a scratch file outside the repo.
+Open the PR with it:
+
+```
+gh pr create --title "<short subject>" --body-file <path-to-filled-copy>
+```
+
+**Do not use `gh pr create --fill`.** It builds the body from your commit
+message and silently skips the template, so the verify output, the
+`public/` click-through, the scope check and the settled-decision check
+all go missing.
+
+Fill it in honestly, including the `npm run verify` output verbatim and
+your Class A decisions. "I didn't check this" is a welcome answer. A
+guess presented as a check is not.
 
 Then paste the PR URL and **stop**. Do not merge.
 

@@ -117,6 +117,10 @@ try {
 
 const missingTables = [];
 const missingColumns = [];
+// Allowlist entries whose write path now EXISTS. Just as important as a
+// missing writer: an allowlist nobody prunes silently stops being a record
+// of deliberate gaps and becomes a list everyone scrolls past.
+const staleAllowlist = [];
 
 for (const [table, columns] of Object.entries(tables)) {
   const insertRe = new RegExp(`INSERT\\s+(?:OR\\s+\\w+\\s+)?INTO\\s+${table}\\b`, 'i');
@@ -127,6 +131,9 @@ for (const [table, columns] of Object.entries(tables)) {
   if (!hasInsert && !hasUpdate) {
     if (!allowlist.tables[table]) missingTables.push(table);
     continue;
+  }
+  if (allowlist.tables[table]) {
+    staleAllowlist.push(`${table} (table) - a write path now exists`);
   }
 
   // Column-level: gather every column named in this table's INSERT column
@@ -168,7 +175,12 @@ for (const [table, columns] of Object.entries(tables)) {
   const allowedCols = new Set(Object.keys(allowlist.columns[table] || {}));
   for (const col of columns) {
     if (IGNORED_COLUMNS.has(col)) continue;
-    if (written.has(col)) continue;
+    if (written.has(col)) {
+      if (allowedCols.has(col)) {
+        staleAllowlist.push(`${table}.${col} - a write path now exists`);
+      }
+      continue;
+    }
     if (allowedCols.has(col)) continue;
     missingColumns.push(`${table}.${col}`);
   }
@@ -190,6 +202,11 @@ if (missingColumns.length > 0) {
   for (const c of missingColumns) console.log(`    ${c}`);
   console.log('');
 }
+if (staleAllowlist.length > 0) {
+  console.log('  STALE ALLOWLIST - delete these entries, the gap is closed:');
+  for (const s of staleAllowlist) console.log(`    ${s}`);
+  console.log('');
+}
 
 const allowedTableCount = Object.keys(allowlist.tables).length;
 const allowedColCount = Object.values(allowlist.columns).reduce(
@@ -203,12 +220,13 @@ if (allowedTableCount || allowedColCount) {
   console.log('');
 }
 
-const problems = missingTables.length + missingColumns.length;
+const problems = missingTables.length + missingColumns.length + staleAllowlist.length;
 if (problems === 0) {
   console.log('  AUDIT CLEAN');
   process.exit(0);
 }
 console.log(`  AUDIT FAILED - ${problems} finding(s).`);
 console.log('  Either build the write path, or add an entry with a reason to');
-console.log('  scripts/write-path-allowlist.json.');
+console.log('  scripts/write-path-allowlist.json - and delete any entry listed');
+console.log('  as stale, since its gap has been closed.');
 process.exit(1);

@@ -7,7 +7,7 @@
   "5": "schema.sql",
   "6": "index.js",
   "7": "Settings Admin: Conversion Standards",
-  "8": "Queue",
+  "8": "Dispatch queue — what to work on next",
   "9": "commissary.js",
   "10": "history.test.js",
   "11": "Home/Index Page",
@@ -43,7 +43,6 @@
   "41": "Decision authority — what you may decide, and what waits",
   "42": "needs-architect.md",
   "43": "sales.js",
-  "44": "allocations.js",
   "45": "history.js",
   "46": "settings.js",
   "47": "verify.md"
