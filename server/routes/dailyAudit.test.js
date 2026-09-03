@@ -19,6 +19,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { getBeginningStock } = require('../engines/auditEngine.js');
+const { withTransaction, logActivity } = require('../db/activityLog.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -100,10 +101,15 @@ test('Once ending_actual exists for a day, beginning for the next day comes from
 });
 
 // Mirrors POST /api/daily-audit/portions
+const getPreppedRow = db.prepare(`
+  SELECT * FROM prepped WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?
+`);
 const upsertPrepped = db.prepare(`
   INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced)
   VALUES (?, ?, ?, ?)
-  ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET portions_produced = excluded.portions_produced
+  ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET
+    portions_produced = excluded.portions_produced,
+    created_by = NULL
 `);
 const upsertPortionActual = db.prepare(`
   INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted)
@@ -114,7 +120,20 @@ function savePortions(restaurantId, businessDate, rows) {
   let saved = 0;
   for (const row of rows) {
     if (row.prepped !== null && row.prepped !== undefined && row.prepped !== '') {
-      upsertPrepped.run(restaurantId, row.dish_id, businessDate, Number(row.prepped));
+      withTransaction(db, () => {
+        const before = getPreppedRow.get(restaurantId, row.dish_id, businessDate) || null;
+        upsertPrepped.run(restaurantId, row.dish_id, businessDate, Number(row.prepped));
+        const after = getPreppedRow.get(restaurantId, row.dish_id, businessDate);
+        logActivity(db, {
+          actor: null,
+          entityType: 'prepped',
+          entityId: after.id,
+          action: before ? 'UPDATE' : 'CREATE',
+          before,
+          after,
+          source: 'MANUAL'
+        });
+      });
     }
     if (row.portion_actual !== null && row.portion_actual !== undefined && row.portion_actual !== '') {
       upsertPortionActual.run(restaurantId, row.dish_id, businessDate, Number(row.portion_actual));
@@ -135,6 +154,38 @@ test('a second prepped write for the same dish/date REPLACES it (upsert, not a d
   const rows = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-08-29'`).all();
   assert.strictEqual(rows.length, 1, 'must still be exactly one row, not two');
   assert.strictEqual(rows[0].portions_produced, 18, 'must be the new value, manual entry wins');
+});
+
+test('a fresh manual prepped write logs a CREATE with before=null', () => {
+  savePortions(1, '2026-08-25', [{ dish_id: 1, prepped: 12 }]);
+  const row = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-08-25'`).get();
+  const logRow = db.prepare(`SELECT * FROM activity_log WHERE entity_type = 'prepped' AND entity_id = ?`).get(row.id);
+  assert.ok(logRow, 'an activity_log row must exist for this create');
+  assert.strictEqual(logRow.action, 'CREATE');
+  assert.strictEqual(logRow.source, 'MANUAL');
+  assert.strictEqual(JSON.parse(logRow.before === null ? 'null' : logRow.before), null);
+});
+
+test('step 25d-ii: correcting a SYSTEM-stamped prepped row clears created_by rather than overwriting it, and logs an UPDATE', () => {
+  db.prepare(`
+    INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced, created_by)
+    VALUES (1, 1, '2026-08-26', 40, 'SYSTEM:sync-batch-stock')
+  `).run();
+
+  savePortions(1, '2026-08-26', [{ dish_id: 1, prepped: 42 }]);
+
+  const row = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-08-26'`).get();
+  assert.strictEqual(row.portions_produced, 42, 'the corrected number wins');
+  assert.strictEqual(row.created_by, null, 'the SYSTEM stamp must be cleared, not replaced with a name');
+
+  const logRows = db.prepare(`SELECT * FROM activity_log WHERE entity_type = 'prepped' AND entity_id = ? ORDER BY id`).all(row.id);
+  const correction = logRows[logRows.length - 1];
+  assert.strictEqual(correction.action, 'UPDATE', 'a row already existed, so this is a correction, not a create');
+  const before = JSON.parse(correction.before);
+  const after = JSON.parse(correction.after);
+  assert.strictEqual(before.created_by, 'SYSTEM:sync-batch-stock', 'before snapshot preserves what the SYSTEM stamp was');
+  assert.strictEqual(after.created_by, null);
+  assert.strictEqual(after.portions_produced, 42);
 });
 
 test('a fresh portion_actual write creates one row', () => {

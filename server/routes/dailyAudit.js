@@ -5,6 +5,7 @@
 const express = require('express');
 const db = require('../db/connection.js');
 const { computeMeatAudit, computeMixedDailyAudit } = require('../engines/auditEngine.js');
+const { withTransaction, logActivity } = require('../db/activityLog.js');
 
 const router = express.Router();
 
@@ -194,6 +195,15 @@ router.post('/daily-audit', (req, res) => {
 // inferred default with the real physical number, which should always
 // take precedence.
 //
+// Step 25d-ii (session-status.md): `created_by` on `prepped` is
+// provenance ("this number was inferred by sync-batch-stock"), not
+// identity, so a manual correction clears the SYSTEM stamp rather than
+// overwriting it with a name - the two meanings must not collide. The
+// correction itself was previously unlogged, unlike the SYSTEM write it
+// may be overriding; it now gets its own activity_log entry (CREATE if
+// no row existed yet, UPDATE if one did), same before/after + transaction
+// pattern as commands.js's sync-batch-stock write.
+//
 // Neither table has a notes/remarks column (unlike ending_actual) -
 // not inventing one here, matches the schema exactly as it exists.
 router.post('/daily-audit/portions', (req, res) => {
@@ -202,10 +212,16 @@ router.post('/daily-audit/portions', (req, res) => {
     return res.status(400).json({ error: 'restaurant_id, business_date, and rows[] are required' });
   }
 
+  const getPreppedRow = db.prepare(`
+    SELECT * FROM prepped WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?
+  `);
+
   const upsertPrepped = db.prepare(`
     INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced)
     VALUES (?, ?, ?, ?)
-    ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET portions_produced = excluded.portions_produced
+    ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET
+      portions_produced = excluded.portions_produced,
+      created_by = NULL
   `);
 
   const upsertPortionActual = db.prepare(`
@@ -217,7 +233,20 @@ router.post('/daily-audit/portions', (req, res) => {
   let saved = 0;
   for (const row of rows) {
     if (row.prepped !== null && row.prepped !== undefined && row.prepped !== '') {
-      upsertPrepped.run(restaurant_id, row.dish_id, business_date, Number(row.prepped));
+      withTransaction(db, () => {
+        const before = getPreppedRow.get(restaurant_id, row.dish_id, business_date) || null;
+        upsertPrepped.run(restaurant_id, row.dish_id, business_date, Number(row.prepped));
+        const after = getPreppedRow.get(restaurant_id, row.dish_id, business_date);
+        logActivity(db, {
+          actor: null,
+          entityType: 'prepped',
+          entityId: after.id,
+          action: before ? 'UPDATE' : 'CREATE',
+          before,
+          after,
+          source: 'MANUAL'
+        });
+      });
     }
     if (row.portion_actual !== null && row.portion_actual !== undefined && row.portion_actual !== '') {
       upsertPortionActual.run(restaurant_id, row.dish_id, business_date, Number(row.portion_actual));
