@@ -47,7 +47,25 @@ item that cannot be backfilled later.
 
 Spec: `session-status.md`, section "Step 25d".
 
-### 4. Nothing.
+### 4. Step 25e — restaurant-to-restaurant transfers must credit the receiver
+**Lane: DISPATCH only. Queued AFTER soft launch, deliberately.**
+
+A transfer writes one row today: it subtracts from the sender and credits the
+receiver nothing. The fix writes a `stock_receipts` row at the destination,
+which needs a third `source` value — and since SQLite cannot widen a CHECK
+constraint, that means a full table rebuild in an idempotent migration.
+
+Not before soft launch: `locations` is empty, so the transfer type cannot be
+used and nothing wrong can be recorded today. Spending the project's most
+invasive migration on a feature with no usage evidence is the wrong order.
+
+One cheap guard IS needed before any site-level locations are created: reject a
+transfer whose from- and to-location resolve to the same restaurant. Fold it
+into whichever step next touches `allocations.js`.
+
+Spec: `session-status.md`, section "Step 25e".
+
+### 5. Nothing.
 **This is deliberate. Do not invent a step 25.**
 
 After 24b-v the plan is a soft launch against real output, so that actual

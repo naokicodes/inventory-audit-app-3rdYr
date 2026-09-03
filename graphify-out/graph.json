@@ -289,6 +289,18 @@
       "source_location": "L29"
     },
     {
+      "id": "server_engines_commissaryauditengine_getcommissarybeginningstock",
+      "label": "getCommissaryBeginningStock()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "auditEngine.js",
+      "file_type": "code",
+      "norm_label": "getcommissarybeginningstock()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L54"
+    },
+    {
       "id": "server_routes_commands_test_runoversoldcheck",
       "label": "runOversoldCheck()",
       "_callable": true,
@@ -1355,18 +1367,6 @@
       "norm_label": "getcommissarybackedup()",
       "source_file": "server/engines/commissaryAuditEngine.js",
       "source_location": "L91"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_getcommissarybeginningstock",
-      "label": "getCommissaryBeginningStock()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "getcommissarybeginningstock()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L54"
     },
     {
       "id": "server_engines_commissaryauditengine_getcommissaryendingactual",
@@ -3408,6 +3408,30 @@
       "source_location": "L2211"
     },
     {
+      "id": "docs_session_history_archived_2026_09_03_resolved_architectural_questions",
+      "label": "Archived 2026-09-03 \u2014 resolved architectural questions",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "archived 2026-09-03 \u2014 resolved architectural questions",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2755"
+    },
+    {
+      "id": "docs_session_history_archived_2026_09_03_step_25c_in_full",
+      "label": "Archived 2026-09-03 \u2014 step 25c in full",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "archived 2026-09-03 \u2014 step 25c in full",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2647"
+    },
+    {
       "id": "docs_session_history_item_3_design_resolved_2026_08_30_ready_to_build_none_of_it_started_yet",
       "label": "Item 3 design \u2014 RESOLVED 2026-08-30, ready to build, none of it started yet",
       "_origin": "ast",
@@ -3418,6 +3442,18 @@
       "norm_label": "item 3 design \u2014 resolved 2026-08-30, ready to build, none of it started yet",
       "source_file": "docs/session-history.md",
       "source_location": "L1194"
+    },
+    {
+      "id": "docs_session_history_open_architectural_questions_for_an_architect_conversation_not_a_worker",
+      "label": "Open architectural questions (for an architect conversation, not a worker)",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "open architectural questions (for an architect conversation, not a worker)",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2757"
     },
     {
       "id": "docs_session_history_original_five_items_raised_2026_08_29",
@@ -3442,6 +3478,18 @@
       "norm_label": "original five items, raised 2026-08-29 \u2014 all resolved",
       "source_file": "docs/session-history.md",
       "source_location": "L2050"
+    },
+    {
+      "id": "docs_session_history_out_of_scope",
+      "label": "Out of scope",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "out of scope",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2730"
     },
     {
       "id": "docs_session_history_remaining_scope_steps_10_19",
@@ -3492,6 +3540,30 @@
       "source_location": "L1180"
     },
     {
+      "id": "docs_session_history_scope",
+      "label": "Scope",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "scope",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2667"
+    },
+    {
+      "id": "docs_session_history_sequencing",
+      "label": "Sequencing",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "sequencing",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2748"
+    },
+    {
       "id": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
       "label": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
       "_origin": "ast",
@@ -3516,6 +3588,18 @@
       "source_location": "L2535"
     },
     {
+      "id": "docs_session_history_step_25c_seed_the_meat_type_catalog_and_tag_it_closed_2026_09_03_1790463",
+      "label": "Step 25c \u2014 seed the meat-type catalog and tag it (CLOSED 2026-09-03, `1790463`)",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "step 25c \u2014 seed the meat-type catalog and tag it (closed 2026-09-03, `1790463`)",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2649"
+    },
+    {
       "id": "docs_session_history_steps_1_22_and_the_terminal_s_docked_bar_layout",
       "label": "Steps 1\u201322, and the terminal's docked-bar layout",
       "_origin": "ast",
@@ -3528,6 +3612,18 @@
       "source_location": "L21"
     },
     {
+      "id": "docs_session_history_verification",
+      "label": "Verification",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "verification",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2739"
+    },
+    {
       "id": "docs_session_history_where_things_stand_steps_1_22_done_the_autocad_style_docked_bar",
       "label": "Where things stand: steps 1\u201322 done. The AutoCAD-style docked-bar",
       "_origin": "ast",
@@ -3538,6 +3634,18 @@
       "norm_label": "where things stand: steps 1\u201322 done. the autocad-style docked-bar",
       "source_file": "docs/session-history.md",
       "source_location": "L23"
+    },
+    {
+      "id": "docs_session_history_why_it_exists",
+      "label": "Why it exists",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "why it exists",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2658"
     },
     {
       "id": "docs_session_history_wip_hand_offs_are_now_allowed_experimental_see_rule_17",
@@ -4213,7 +4321,7 @@
       "node_kind": "heading",
       "norm_label": "the one habit worth more than the rest",
       "source_file": "docs/engineer-role.md",
-      "source_location": "L160"
+      "source_location": "L166"
     },
     {
       "id": "docs_engineer_role_the_two_lanes",
@@ -10330,7 +10438,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/engineer-role.md",
-      "source_location": "L160",
+      "source_location": "L166",
       "weight": 1.0
     },
     {
@@ -10511,6 +10619,50 @@
     },
     {
       "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
+      "target": "docs_session_history_archived_2026_09_03_step_25c_in_full",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2647",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
+      "target": "docs_session_history_step_25c_seed_the_meat_type_catalog_and_tag_it_closed_2026_09_03_1790463",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2649",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
+      "target": "docs_session_history_archived_2026_09_03_resolved_architectural_questions",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2755",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
+      "target": "docs_session_history_open_architectural_questions_for_an_architect_conversation_not_a_worker",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2757",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
       "target": "docs_session_history_wip_hand_offs_are_now_allowed_experimental_see_rule_17",
       "relation": "contains",
       "_origin": "ast",
@@ -10540,6 +10692,61 @@
       "confidence_score": 1.0,
       "source_file": "docs/session-history.md",
       "source_location": "L396",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_step_25c_seed_the_meat_type_catalog_and_tag_it_closed_2026_09_03_1790463",
+      "target": "docs_session_history_why_it_exists",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2658",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_step_25c_seed_the_meat_type_catalog_and_tag_it_closed_2026_09_03_1790463",
+      "target": "docs_session_history_scope",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2667",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_step_25c_seed_the_meat_type_catalog_and_tag_it_closed_2026_09_03_1790463",
+      "target": "docs_session_history_out_of_scope",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2730",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_step_25c_seed_the_meat_type_catalog_and_tag_it_closed_2026_09_03_1790463",
+      "target": "docs_session_history_verification",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2739",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_step_25c_seed_the_meat_type_catalog_and_tag_it_closed_2026_09_03_1790463",
+      "target": "docs_session_history_sequencing",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2748",
       "weight": 1.0
     },
     {
@@ -17752,5 +17959,5 @@
       "source_file": "public/commissary-shipments.html"
     }
   ],
-  "built_at_commit": "911e4f1e865d27f1b53e694c60710fe1a6c1e5a8"
+  "built_at_commit": "e0855b3ef6ff2c0bb290e88363857ca851a1c25c"
 }

@@ -385,6 +385,29 @@ all of it.
   is tagged so a future kg-tracked chicken in a second commissary can pair with
   it. Naming chosen by NaokiiVT. Do not "correct" it to a separate type.
 
+- **Station-to-station transfer is out of scope — settled 2026-09-03.** The
+  `locations` table supports two granularities: site-level (Silingan, FC,
+  Commissary) and station-level ("Silingan - Grill Station"). NaokiiVT ruled
+  the station tier out entirely: a restaurant's cycle is beginning, new stock,
+  usage/sales, allocations, ending, and meat moving between stations inside one
+  building is not an event anyone records. The substitution case that *does*
+  happen — one dish's meat used for another — is item-to-item, and
+  `POST /api/allocations/conversion` already implements it with a linked +/-
+  adjustment pair. Consequences: `locations.is_restaurant_level` is
+  permanently inert, and the internal-transfer defect below is out of scope
+  rather than a bug to fix. Do not build station-level features.
+
+- **An internal transfer would produce a phantom surplus, and is guarded, not
+  fixed — settled 2026-09-03.** Reproduced live: `getAdjustmentsTotal` in
+  `auditEngine.js` sums every adjustment for a restaurant/meat/date with no
+  filter on type or location, so a 3-unit Grill-to-Prep move inside one
+  restaurant subtracted 3 from that restaurant's expected ending and reported
+  a SURPLUS of 1 against a physically correct count. Because station-level is
+  out of scope, the fix is **rejection, not accounting**: any transfer whose
+  from- and to-location resolve to the same restaurant must be refused at the
+  route. Do not "fix" the engine to net internal moves to zero — that would be
+  building the station feature by the back door.
+
 ## End-of-session checklist (every session, no exceptions)
 
 Since each session starts with zero memory of prior conversations and
@@ -591,6 +614,17 @@ attribution stays unattributed forever — you cannot reconstruct who counted
 the walk-in on a given Tuesday. Everything else deferred to soft-launch can be
 added later against the same data; this cannot.
 
+### The route already accepts `actor` and throws it away
+Reproduced live 2026-09-03: `POST /daily-audit` with `{"actor":"Naoki"}` in the
+body returns `{"ok":true,"saved":1}` and writes the row with `created_by` NULL,
+because the INSERT never names the column. The commissary twin, same payload,
+stores it correctly.
+
+This is the 24b-i failure shape — a client posts a field, gets a success
+response, and the value vanishes. **25d is not "add a field", it is "close a
+silent-discard path that already exists."** A UI worker could wire the field
+today, see a 200, and never learn it does nothing.
+
 ### Shape
 One text field at the top of each audit page, sent as a top-level `actor` in
 the request body and applied to every row in the batch. This is not a new
@@ -642,6 +676,59 @@ affected and must not be backfilled with a guess.
 part of this step.** The audit now fails on a stale entry, so leaving them
 will turn CI red.
 
+## Step 25e — a restaurant-to-restaurant transfer must credit the receiver
+
+**Lane: DISPATCH only. Schema change: a table rebuild. Defined 2026-09-03,
+deliberately queued AFTER soft launch — see sequencing.**
+
+`POST /api/allocations` writes exactly **one** row. A transfer from Silingan to
+FC subtracts from Silingan and credits FC nothing. The auditor is expected to
+record the transfer at one restaurant and a separate new-stock entry at the
+other — two entries for one physical movement, which can disagree and
+eventually will. This is the same untracked-mismatch shape that retired
+`commissary_meat_map`: the fix there was that one real event writes both sides,
+and the same reasoning applies here.
+
+**Decision, NaokiiVT 2026-09-03: the receiving end is credited automatically,
+as a `stock_receipts` row (option B).** The alternative — a linked negative
+`adjustment` on the receiver, reusing `linked_adjustment_id` and needing no
+schema change — was considered and rejected: arriving meat belongs in the
+receiving restaurant's *new stock*, where an auditor looks for it, not in its
+adjustments column. This also matches the precedent already set by commissary
+shipments, where a receipt row is written as a side effect of a real movement
+and never typed by hand.
+
+### The schema cost, stated plainly
+`stock_receipts.source` is `CHECK (source IN ('DIRECT', 'COMMISSARY'))`. SQLite
+cannot widen a CHECK constraint with `ALTER TABLE`, so admitting a third source
+requires a **full table rebuild** — create the new table, copy rows, drop,
+rename — inside an idempotent migration, on a table that holds real receipts by
+then. This is the most invasive migration in the project so far and is the
+whole reason for the sequencing below.
+
+### Sequencing — after soft launch, on purpose
+Nothing is broken today: `locations` is empty on a fresh seed, so the transfer
+type cannot be used at all and no wrong data can be recorded. Building 25e
+before launch would spend the riskiest migration in the project on a feature
+with zero usage evidence. Let soft launch establish whether
+restaurant-to-restaurant movement actually happens and how often, then build it.
+If it turns out to be frequent, moving this earlier is a queue decision and
+costs nothing but the reordering.
+
+### The guard that IS needed first
+Independently of 25e, and cheap: reject any transfer whose from- and
+to-location resolve to the same restaurant. See "Things NOT to re-litigate".
+Without it, the moment site-level `locations` rows exist, an auditor can pick
+two locations of one restaurant and silently corrupt that restaurant's
+variance.
+
+### Not in scope
+- No station-level anything. Settled and closed.
+- Do not collapse `locations` into a `to_restaurant_id` column on
+  `adjustments`, even though it would be the more honest model now that the
+  station tier is gone. Parked deliberately — it is tidiness, not correctness,
+  and it is a schema change.
+
 ## Open architectural questions (for an architect conversation, not a worker)
 
 None of these blocks anything. They are listed so a fresh architect
@@ -686,18 +773,32 @@ one for a dispatched task. Verify each against the current repo before acting.
    model is right; the screen says nothing. Fix is UI-only — no schema, no
    filter change. **Deferred to soft-launch** so real mis-tags shape the
    wording rather than guesswork.
-2. **`graphify-out/` undecided paths** — cache, `.graphify_labels.json.sig`,
+2. **`is_restaurant_level` is a live control that changes nothing.** Fully
+   CRUD-able through Settings — checkbox, written on create and update,
+   returned on read — and read by no query, no validation, no filter. An
+   operator can toggle it and the app behaves identically. Not urgent now that
+   station-level is out of scope, but it is a control surface that lies.
+   **Note the blind spot it exposes:** `npm run audit:write-paths` cannot catch
+   this class. It checks whether a column is ever *written*; this one is
+   written enthusiastically. "Declared but never consulted" needs a different
+   check, and the audit should not be trusted to find it.
+3. **`GET` and `POST` on `/commissary/daily-audit` take different parameter
+   names** — GET wants `date`, POST wants `business_date`. The UI gets both
+   right so nothing is broken, but it is a trap for anyone writing tests or a
+   new caller. Recorded as a wart; renaming a working API for tidiness is not
+   worth the churn.
+4. **`graphify-out/` undecided paths** — cache, `.graphify_labels.json.sig`,
    the date-stamped directory. Pending a check of graphify's own docs. Partly
    answered already by the reasoning now written into `.gitignore`.
-3. **Do cross-commissary allocations need physical paperwork?** An ALLOCATION
+5. **Do cross-commissary allocations need physical paperwork?** An ALLOCATION
    between commissaries is a real van trip but produces no delivery receipt,
    unlike a restaurant shipment. The stock math is correct either way. Decide
    once real movements start, not before.
-4. **Does `meat_types` need a proper retirement story?** 24d fixed the dropdown
+6. **Does `meat_types` need a proper retirement story?** 24d fixed the dropdown
    leak, but there is no delete path and test rows accumulate (two retired ones
    sit in live `inventory.db`). Soft delete via `active` may be sufficient —
    the question is whether anything else should reference retirement.
-5. **Should `inventory.db` changes by workers be constrained differently?**
+7. **Should `inventory.db` changes by workers be constrained differently?**
    24c-i's prompt said "change it only through the app's own routes," which was
    impossible for the case being tested: a legacy row with a NULL
    `input_quantity` cannot be created through the routes, because rejecting

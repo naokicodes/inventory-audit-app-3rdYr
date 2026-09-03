@@ -354,9 +354,9 @@
     "semantic_hash": "f2736eab89f5430d53d7b481697d1a96"
   },
   "docs/session-status.md": {
-    "mtime": 1788394336.732773,
-    "seen": 1788394353.7313106,
-    "ast_hash": "597f006b5153a73483d148983ac4633a",
+    "mtime": 1788395922.5379736,
+    "seen": 1788395954.0349932,
+    "ast_hash": "fe6d83f745e5c598850c22d276e1ce6c",
     "semantic_hash": ""
   },
   "docs/tech-stack.md": {
@@ -444,9 +444,9 @@
     "semantic_hash": ""
   },
   "docs/session-history.md": {
-    "mtime": 1788349469.8745399,
-    "seen": 1788349500.9305255,
-    "ast_hash": "a30317d432753d6cc6e953b0c6fa8c65",
+    "mtime": 1788395922.5758512,
+    "seen": 1788395954.0349932,
+    "ast_hash": "6ceb6ff696484075788deae7f4cde7dc",
     "semantic_hash": ""
   },
   "server/routes/commissaryAdjustments.test.js": {
@@ -480,9 +480,9 @@
     "semantic_hash": ""
   },
   "docs/engineer-role.md": {
-    "mtime": 1788392225.4396365,
-    "seen": 1788392667.92544,
-    "ast_hash": "5f33cec5b9415e0c9d3b9b309fc454de",
+    "mtime": 1788395922.5639784,
+    "seen": 1788395954.0349932,
+    "ast_hash": "e9375b6a18ec8b553522c11121893cb7",
     "semantic_hash": ""
   },
   "scripts/audit-write-paths.js": {
