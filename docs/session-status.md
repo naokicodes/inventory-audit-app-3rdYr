@@ -662,6 +662,75 @@ catalog as its own `commissary_meats` row. A commissary holding only "Raw
 Chicken" has nothing to select, and today that silently degrades to the broken
 same-meat case instead of saying so. Catalog work belongs in the tagging pass.
 
+## Step 25d — record who did the count
+
+**Lane: DISPATCH only. Operator-visible, so not engineer-lane. No schema
+change — every column already exists.**
+
+`ending_actual.created_by` and `portion_ending_actual.created_by` are in the
+schema and written by nothing. Found 2026-09-03 by the write-path audit
+(`npm run audit:write-paths`). The commissary side is half-built: `POST
+/commissary/daily-audit` already accepts a top-level `actor` and writes it to
+`commissary_ending_actual.created_by`, but `commissary.html` never sends one,
+so the column is supported by the route and fed by nothing.
+
+**Decision, NaokiiVT 2026-09-03: the auditor's name is recorded per sheet, not
+per row.** The auditors already write their names on the physical inventory
+sheet they transcribe from, so the value is known once per submission and is
+the same for every line on it. A per-row field would be re-keying the same
+string twenty times and would invite disagreement between rows on a single
+sheet.
+
+**Why before soft-launch and not after.** This is the one item in the backlog
+that cannot be backfilled. A month of physical counts entered without
+attribution stays unattributed forever — you cannot reconstruct who counted
+the walk-in on a given Tuesday. Everything else deferred to soft-launch can be
+added later against the same data; this cannot.
+
+### Shape
+One text field at the top of each audit page, sent as a top-level `actor` in
+the request body and applied to every row in the batch. This is not a new
+concept — it is the contract `POST /commissary/daily-audit` already
+implements. Mirror it exactly rather than inventing a second convention.
+
+### Scope
+- `server/routes/dailyAudit.js` — add `created_by` to the `ending_actual`
+  upsert in `POST /daily-audit` and to the `portion_ending_actual` upsert in
+  `POST /daily-audit/portions`. Both take `actor` from the top level of the
+  body, the same way the commissary route does. Include it in the `DO UPDATE
+  SET` clause, not only the INSERT, or a corrected count keeps the original
+  auditor's name.
+- `public/daily-audit.html` — one field, sent with both POSTs.
+- `public/commissary.html` — one field, sent with the existing POST. No
+  server change needed here; the route already handles it.
+
+`actor` is free text. There is no auth system and this step does not
+introduce one.
+
+### Required, not optional
+Reject a submission with a blank `actor` with a 400. The name genuinely
+exists at entry time — it is already on the sheet being transcribed — so an
+optional field would simply produce blank rows and leave the column as useless
+as it is today. This does change what the code rejects, which is why the step
+is DISPATCH-lane.
+
+Legacy rows already in `ending_actual` with a NULL `created_by` are not
+affected and must not be backfilled with a guess.
+
+### Not in scope
+- No `activity_log` entries. Rule 9 scopes that to `stock_receipts` and
+  `commissary_yield_log`, and 25b already declined it for the physical-count
+  twins on the same reasoning.
+- No dropdown of known auditors, no staff table, no auth. Free text only.
+- `photo_path` stays untouched on all three tables — rule 13, nothing in the
+  app writes it, and this step does not introduce that.
+
+### Allowlist
+`scripts/write-path-allowlist.json` carries `ending_actual.created_by` and
+`portion_ending_actual.created_by` as UNVERIFIED. **Delete both entries as
+part of this step.** The audit now fails on a stale entry, so leaving them
+will turn CI red.
+
 ## Open architectural questions (for an architect conversation, not a worker)
 
 None of these blocks anything. They are listed so a fresh architect

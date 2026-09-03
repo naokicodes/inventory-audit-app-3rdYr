@@ -34,7 +34,20 @@ red by default. Must land before soft-launch.
 
 Spec: `session-status.md`, section "Step 24b-v".
 
-### 3. Nothing.
+### 3. Step 25d — record who did the count
+**Lane: DISPATCH only. Needs no schema change; the columns exist.**
+
+Adds a per-sheet auditor name to both audit pages and writes it to
+`ending_actual.created_by` and `portion_ending_actual.created_by`. It is
+operator-visible and it makes a blank submission a 400, so it is not
+engineer-lane.
+
+Sequenced before soft-launch deliberately: attribution is the one deferred
+item that cannot be backfilled later.
+
+Spec: `session-status.md`, section "Step 25d".
+
+### 4. Nothing.
 **This is deliberate. Do not invent a step 25.**
 
 After 24b-v the plan is a soft launch against real output, so that actual

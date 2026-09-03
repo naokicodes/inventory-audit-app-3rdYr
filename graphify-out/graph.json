@@ -109,6 +109,18 @@
   },
   "nodes": [
     {
+      "id": "server_engines_auditengine_adddays",
+      "label": "addDays()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "auditEngine.js",
+      "file_type": "code",
+      "norm_label": "adddays()",
+      "source_file": "server/engines/auditEngine.js",
+      "source_location": "L11"
+    },
+    {
       "id": "server_engines_auditengine_computedailyaudit",
       "label": "computeDailyAudit()",
       "_callable": true,
@@ -277,6 +289,18 @@
       "source_location": "L29"
     },
     {
+      "id": "server_engines_commissaryauditengine_getcommissarybeginningstock",
+      "label": "getCommissaryBeginningStock()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "auditEngine.js",
+      "file_type": "code",
+      "norm_label": "getcommissarybeginningstock()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L54"
+    },
+    {
       "id": "server_routes_commands_test_runoversoldcheck",
       "label": "runOversoldCheck()",
       "_callable": true,
@@ -359,18 +383,6 @@
       "norm_label": "currentbalance()",
       "source_file": "server/routes/dashboard.js",
       "source_location": "L26"
-    },
-    {
-      "id": "server_routes_history_test_insertreceiptcreatethenupdate",
-      "label": "insertReceiptCreateThenUpdate()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 10,
-      "community_name": "history.test.js",
-      "file_type": "code",
-      "norm_label": "insertreceiptcreatethenupdate()",
-      "source_file": "server/routes/history.test.js",
-      "source_location": "L97"
     },
     {
       "id": "server_routes_history_test_queryhistory",
@@ -685,18 +697,6 @@
       "source_location": "L16"
     },
     {
-      "id": "server_engines_auditengine_adddays",
-      "label": "addDays()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "dashboard.test.js",
-      "file_type": "code",
-      "norm_label": "adddays()",
-      "source_file": "server/engines/auditEngine.js",
-      "source_location": "L11"
-    },
-    {
       "id": "server_engines_commissaryauditengine_computecommissarydailyaudit",
       "label": "computeCommissaryDailyAudit()",
       "_callable": true,
@@ -745,18 +745,6 @@
       "source_location": "L91"
     },
     {
-      "id": "server_engines_commissaryauditengine_getcommissarybeginningstock",
-      "label": "getCommissaryBeginningStock()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "dashboard.test.js",
-      "file_type": "code",
-      "norm_label": "getcommissarybeginningstock()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L54"
-    },
-    {
       "id": "server_engines_commissaryauditengine_getcommissaryendingactual",
       "label": "getCommissaryEndingActual()",
       "_callable": true,
@@ -803,6 +791,18 @@
       "norm_label": "test()",
       "source_file": "server/engines/commissaryAuditEngine.test.js",
       "source_location": "L37"
+    },
+    {
+      "id": "server_routes_commissary_test_computecommissarymeatauditfor",
+      "label": "computeCommissaryMeatAuditFor()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "dashboard.test.js",
+      "file_type": "code",
+      "norm_label": "computecommissarymeatauditfor()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L1043"
     },
     {
       "id": "server_routes_dashboard_test_computerestauranttotals",
@@ -1141,6 +1141,18 @@
       "source_location": "L832"
     },
     {
+      "id": "server_routes_history_test_insertreceiptcreatethenupdate",
+      "label": "insertReceiptCreateThenUpdate()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "withTransaction",
+      "file_type": "code",
+      "norm_label": "insertreceiptcreatethenupdate()",
+      "source_file": "server/routes/history.test.js",
+      "source_location": "L97"
+    },
+    {
       "id": "server_routes_history_test_insertyieldentry",
       "label": "insertYieldEntry()",
       "_callable": true,
@@ -1415,18 +1427,6 @@
       "norm_label": "test()",
       "source_file": "server/db/migrate.test.js",
       "source_location": "L16"
-    },
-    {
-      "id": "server_routes_commissary_test_computecommissarymeatauditfor",
-      "label": "computeCommissaryMeatAuditFor()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "computecommissarymeatauditfor()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L1043"
     },
     {
       "id": "server_routes_commissary_test_createshipment",
@@ -3684,61 +3684,6 @@
       "source_location": "L1"
     },
     {
-      "id": "server_routes_allocations",
-      "label": "allocations.js",
-      "_origin": "ast",
-      "community": 32,
-      "community_name": "activityLog.js",
-      "file_type": "code",
-      "norm_label": "allocations.js",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L1"
-    },
-    {
-      "id": "server_routes_allocations_db",
-      "label": "db",
-      "_origin": "ast",
-      "community": 32,
-      "community_name": "activityLog.js",
-      "file_type": "code",
-      "norm_label": "db",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L29"
-    },
-    {
-      "id": "server_routes_allocations_express",
-      "label": "express",
-      "_origin": "ast",
-      "community": 32,
-      "community_name": "activityLog.js",
-      "file_type": "code",
-      "norm_label": "express",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L28"
-    },
-    {
-      "id": "server_routes_allocations_router",
-      "label": "router",
-      "_origin": "ast",
-      "community": 32,
-      "community_name": "activityLog.js",
-      "file_type": "code",
-      "norm_label": "router",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L32"
-    },
-    {
-      "id": "server_routes_allocations_withtransaction",
-      "label": "{ withTransaction }",
-      "_origin": "ast",
-      "community": 32,
-      "community_name": "activityLog.js",
-      "file_type": "code",
-      "norm_label": "{ withtransaction }",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L30"
-    },
-    {
       "id": "server_routes_commands",
       "label": "commands.js",
       "_origin": "ast",
@@ -3934,7 +3879,7 @@
       "file_type": "code",
       "norm_label": "allowedcolcount",
       "source_file": "scripts/audit-write-paths.js",
-      "source_location": "L195"
+      "source_location": "L212"
     },
     {
       "id": "scripts_audit_write_paths_allowlist",
@@ -4067,6 +4012,17 @@
       "norm_label": "sources",
       "source_file": "scripts/audit-write-paths.js",
       "source_location": "L99"
+    },
+    {
+      "id": "scripts_audit_write_paths_staleallowlist",
+      "label": "staleAllowlist",
+      "_origin": "ast",
+      "community": 34,
+      "community_name": "audit-write-paths.js",
+      "file_type": "code",
+      "norm_label": "staleallowlist",
+      "source_file": "scripts/audit-write-paths.js",
+      "source_location": "L123"
     },
     {
       "id": "scripts_audit_write_paths_tables",
@@ -4655,7 +4611,7 @@
       "node_kind": "heading",
       "norm_label": "7. if you hit a class b question",
       "source_file": ".claude/commands/step.md",
-      "source_location": "L106"
+      "source_location": "L118"
     },
     {
       "id": "claude_commands_step_reporting",
@@ -4667,7 +4623,7 @@
       "node_kind": "heading",
       "norm_label": "reporting",
       "source_file": ".claude/commands/step.md",
-      "source_location": "L119"
+      "source_location": "L131"
     },
     {
       "id": "server_routes_commissary_test",
@@ -5117,6 +5073,61 @@
       "norm_label": "router",
       "source_file": "server/routes/sales.js",
       "source_location": "L13"
+    },
+    {
+      "id": "server_routes_allocations",
+      "label": "allocations.js",
+      "_origin": "ast",
+      "community": 44,
+      "community_name": "allocations.js",
+      "file_type": "code",
+      "norm_label": "allocations.js",
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L1"
+    },
+    {
+      "id": "server_routes_allocations_db",
+      "label": "db",
+      "_origin": "ast",
+      "community": 44,
+      "community_name": "allocations.js",
+      "file_type": "code",
+      "norm_label": "db",
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L29"
+    },
+    {
+      "id": "server_routes_allocations_express",
+      "label": "express",
+      "_origin": "ast",
+      "community": 44,
+      "community_name": "allocations.js",
+      "file_type": "code",
+      "norm_label": "express",
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L28"
+    },
+    {
+      "id": "server_routes_allocations_router",
+      "label": "router",
+      "_origin": "ast",
+      "community": 44,
+      "community_name": "allocations.js",
+      "file_type": "code",
+      "norm_label": "router",
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L32"
+    },
+    {
+      "id": "server_routes_allocations_withtransaction",
+      "label": "{ withTransaction }",
+      "_origin": "ast",
+      "community": 44,
+      "community_name": "allocations.js",
+      "file_type": "code",
+      "norm_label": "{ withtransaction }",
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L30"
     },
     {
       "id": "server_routes_history",
@@ -9999,7 +10010,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": ".claude/commands/step.md",
-      "source_location": "L106",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -10010,7 +10021,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": ".claude/commands/step.md",
-      "source_location": "L119",
+      "source_location": "L131",
       "weight": 1.0
     },
     {
@@ -11082,13 +11093,24 @@
     },
     {
       "source": "scripts_audit_write_paths",
+      "target": "scripts_audit_write_paths_staleallowlist",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/audit-write-paths.js",
+      "source_location": "L123",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_audit_write_paths",
       "target": "scripts_audit_write_paths_allowedcolcount",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "scripts/audit-write-paths.js",
-      "source_location": "L195",
+      "source_location": "L212",
       "weight": 1.0
     },
     {
@@ -17707,5 +17729,5 @@
       "source_file": "public/commissary-shipments.html"
     }
   ],
-  "built_at_commit": "084c9d8bc57235b9a450be570d8d29a4dd5b87a0"
+  "built_at_commit": "0d277215487b9ce1dd55b9757634a5c91957e317"
 }

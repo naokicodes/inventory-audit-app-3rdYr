@@ -486,9 +486,9 @@
     "semantic_hash": ""
   },
   "scripts/audit-write-paths.js": {
-    "mtime": 1788392411.8077788,
-    "seen": 1788392667.92544,
-    "ast_hash": "5630e0719fe45e6a0c949cc517ff4c0f",
+    "mtime": 1788394044.677184,
+    "seen": 1788394074.5999768,
+    "ast_hash": "d331e375d7cb28f477af8c7be9c6ecc8",
     "semantic_hash": ""
   },
   "scripts/run-tests.js": {
@@ -504,9 +504,9 @@
     "semantic_hash": ""
   },
   ".claude/commands/step.md": {
-    "mtime": 1788392225.4042952,
-    "seen": 1788392667.92544,
-    "ast_hash": "3e1ba661ed9227f499f4a694f7384a01",
+    "mtime": 1788394044.6942005,
+    "seen": 1788394074.5999768,
+    "ast_hash": "ffaa3c03ac0f95e991be98a17b9bdf09",
     "semantic_hash": ""
   },
   ".claude/commands/verify.md": {
