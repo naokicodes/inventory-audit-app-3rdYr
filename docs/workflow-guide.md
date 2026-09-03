@@ -28,15 +28,45 @@ Everything below is detail on those three.
 
 ### On your machine
 
-Already done if you can run `npm run dev`. What the automation adds:
+Already done if you can run `npm run dev`. What the automation adds is the
+GitHub CLI — **install it, then authenticate it.** These are two steps, and
+the second fails silently-ish if you skip the first (`gh` is simply "not
+recognized").
 
 ```
+winget install --id GitHub.cli --source winget
+```
+
+Then **close and reopen PowerShell** — an open session will not pick up the
+new PATH. Confirm, then authenticate:
+
+```
+gh --version
 gh auth login
 ```
 
-That is the whole install. `gh` is what lets a Claude Code session open
-pull requests and issues as you. Without it, `/step` will build and push
-but stop short of opening the PR.
+`gh auth login` asks four things: **GitHub.com**, **HTTPS**, **Yes** to
+authenticate Git with your GitHub credentials, and **Login with a web
+browser**. It prints a one-time code; press Enter, paste the code in the
+browser, authorize. Check it took with `gh auth status`.
+
+**Restart Claude Code after installing**, not just PowerShell. A running
+session inherited its environment at launch and will not find `gh` either.
+
+`gh` is what lets a Claude Code session open pull requests and issues as
+you. Without it, `/step` builds and pushes but stops short of opening the
+PR — which is exactly what happened on the first real dispatch, 2026-09-03.
+
+### `/step` has to be discovered before it exists
+
+`/step` and `/verify` live in `.claude/commands/`, which arrived in commit
+`9edc64c`. Claude Code scans for commands **at session start**, and `/clear`
+does not rescan. So a session started before that commit was pulled will
+answer `Unknown command: /step` with no hint as to why.
+
+Two conditions, both required: the checkout has pulled `9edc64c` or later,
+**and** Claude Code was started after that pull. If `/step` is unrecognised,
+`git pull`, then quit Claude Code entirely and reopen it from the repo root.
 
 ### On a collaborator's machine
 
@@ -109,6 +139,19 @@ the same time. They will conflict, and no process fixes that.
 ---
 
 ## Job 2 — the merge gate
+
+**The worker opens the PR. You approve and merge.** Not a style preference —
+GitHub will not let you approve a PR you opened, and `main` requires one
+approving review. Open it yourself and you are blocked with no legitimate
+way through except the bypass button. This is why `gh` on the worker's
+machine matters more than it looks: without it the worker cannot open the
+PR, so you do, and the protection rule jams. Happened on the first real
+dispatch, 2026-09-03, PR #2.
+
+If you are already stuck there: bypass is defensible for a doc-only PR with
+green CI and an independently verified diff. It is not defensible for code
+or schema. Fix the cause — install `gh` — rather than making the bypass a
+habit.
 
 Merge when: CI green, no open `needs-architect` issue for that step, and
 nothing outside scope changed.

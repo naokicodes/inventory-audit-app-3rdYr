@@ -109,6 +109,14 @@ message and silently skips the template, so the verify output, the
 `public/` click-through, the scope check and the settled-decision check
 all go missing.
 
+**If `gh` is not installed**, do not stop and do not push to `main`. Push
+the branch, save the filled template to a scratch file, and hand over both
+the compare link
+(`https://github.com/naokicodes/inventory-audit-app-3rdYr/pull/new/<branch>`)
+and the file path, saying plainly that `gh` was missing. Note that the
+architect then has to open the PR themselves and cannot approve it — so say
+so, rather than leaving them to discover it at the merge gate.
+
 Fill it in honestly, including the `npm run verify` output verbatim and
 your Class A decisions. "I didn't check this" is a welcome answer. A
 guess presented as a check is not.
