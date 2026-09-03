@@ -1,25 +1,25 @@
-# Graph Report - inventory-audit-app-3rdYr  (2026-09-03)
+# Graph Report - inventory-audit-app-3rdYr  (2026-09-04)
 
 ## Corpus Check
-- 77 files · ~184,355 words
+- 78 files · ~191,473 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 641 nodes · 888 edges · 48 communities (45 shown, 1 thin omitted)
+- 658 nodes · 906 edges · 49 communities (46 shown, 1 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e0855b3e`
+- Built from commit: `d9498f0c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - auditEngine.js
 - Data Model doc
-- dashboard.test.js
-- connection.js
 - commissary.test.js
+- connection.js
+- dashboard.test.js
 - schema.sql
 - index.js
 - Settings Admin: Conversion Standards
@@ -45,7 +45,7 @@
 - check-ledger.js
 - terminal.test.js
 - Session History — resolved, kept for "why", not "what's next"
-- commands.js
+- activityLog.js
 - seed.js
 - audit-write-paths.js
 - Workflow guide — how this project is actually run
@@ -57,16 +57,17 @@
 - Decision authority — what you may decide, and what waits
 - needs-architect.md
 - sales.js
-- activityLog.js
+- guard-db.js
 - history.js
 - settings.js
 - verify.md
+- commands.js
 
 ## God Nodes (most connected - your core abstractions)
 1. `Settings Page` - 30 edges
 2. `withTransaction()` - 20 edges
-3. `logActivity()` - 17 edges
-4. `Session History — resolved, kept for "why", not "what's next"` - 16 edges
+3. `Session History — resolved, kept for "why", not "what's next"` - 19 edges
+4. `logActivity()` - 17 edges
 5. `restaurants` - 16 edges
 6. `Allocations Page` - 15 edges
 7. `computeMeatAudit()` - 14 edges
@@ -97,27 +98,27 @@
 - **graphify's Claude Code routing chain** — _claude_claude, _claude_skills_graphify_skill, claude [INFERRED 0.85]
 - **Commissary-meat/restaurant pairing flow: Shipments, Terminal, and Settings' Presets/Conversion Standards** — public_commissary_shipments, public_terminal, public_settings_shipment_presets_section, public_settings_conversion_standards_section, server_routes_commissary_get_api_commissary_shipment_presets, server_routes_commissary_get_api_commissary_conversion_standards [INFERRED 0.85]
 
-## Communities (48 total, 1 thin omitted)
+## Communities (49 total, 1 thin omitted)
 
 ### Community 0 - "auditEngine.js"
-Cohesion: 0.05
-Nodes (46): recalcDishRow (client-side live recalculation), addDays(), computeDailyAudit(), computeDishAudit(), computeMeatAudit(), computeMixedDailyAudit(), getAdjustmentsTotal(), getBeginningStock() (+38 more)
+Cohesion: 0.06
+Nodes (45): recalcDishRow (client-side live recalculation), addDays(), computeDailyAudit(), computeDishAudit(), computeMeatAudit(), computeMixedDailyAudit(), getAdjustmentsTotal(), getBeginningStock() (+37 more)
 
 ### Community 1 - "Data Model doc"
 Cohesion: 0.08
 Nodes (43): .claude/CLAUDE.md (graphify router), graphify add & watch reference, graphify exports & benchmark reference, graphify extraction subagent prompt spec, graphify GitHub clone & cross-repo merge reference, graphify commit hook & CLAUDE.md integration reference, graphify query/path/explain reference, graphify transcribe reference (+35 more)
 
-### Community 2 - "dashboard.test.js"
-Cohesion: 0.18
-Nodes (11): assert, { computeCommissaryMeatAudit }, { computeMeatAudit }, computeRestaurantTotals(), currentBalance(), { DatabaseSync }, db, fs (+3 more)
+### Community 2 - "commissary.test.js"
+Cohesion: 0.07
+Nodes (33): { addDays }, computeCommissaryDailyAudit(), computeCommissaryMeatAudit(), getCommissaryAdjustmentsTotal(), getCommissaryBackedUp(), getCommissaryBeginningStock(), getCommissaryEndingActual(), getCommissaryStockIn() (+25 more)
 
 ### Community 3 - "connection.js"
-Cohesion: 0.17
+Cohesion: 0.16
 Nodes (14): { DatabaseSync }, db, DB_PATH, fs, { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateCommissaryAdjustmentsTable }, path, schema, SCHEMA_PATH (+6 more)
 
-### Community 4 - "commissary.test.js"
-Cohesion: 0.07
-Nodes (30): { addDays }, computeCommissaryDailyAudit(), computeCommissaryMeatAudit(), getCommissaryAdjustmentsTotal(), getCommissaryBackedUp(), getCommissaryEndingActual(), getCommissaryStockIn(), getCommissaryUsage() (+22 more)
+### Community 4 - "dashboard.test.js"
+Cohesion: 0.18
+Nodes (11): assert, { computeCommissaryMeatAudit }, { computeMeatAudit }, computeRestaurantTotals(), currentBalance(), { DatabaseSync }, db, fs (+3 more)
 
 ### Community 5 - "schema.sql"
 Cohesion: 0.17
@@ -132,8 +133,8 @@ Cohesion: 0.09
 Nodes (22): Settings Page, POST /api/commissary/conversion-standards, POST /api/commissary/shipment-presets, PUT /api/commissary/conversion-standards/:id, PUT /api/commissary/shipment-presets/:id, DELETE /api/settings/recipes/:id, GET /api/settings/dishes, GET /api/settings/meats (+14 more)
 
 ### Community 8 - "Queue"
-Cohesion: 0.22
-Nodes (8): 1. Step 25a — commissary stock receipts (supplier intake), 2. Step 24b-v — the effective yield output must be kg-tracked, 3. Step 25d — record who did the count, 4. Nothing., Available engineer-lane work, Dispatch queue — what to work on next, Not in the queue, and not a task, Queue
+Cohesion: 0.15
+Nodes (12): 0. Step archive-pass — CLOSED 2026-09-03, PR #2., 1. Step 25d-ii — `prepped.created_by` is provenance, not identity, 2. Step 26a — beginning stock: date-scoped openings and an honest fallback, 3. Step 25a — commissary stock receipts (supplier intake), 4. Step 24b-v — the effective yield output must be kg-tracked, 5. Step 25d-i and 25d-iii — record who did the count, 6. Step 25e — restaurant-to-restaurant transfers must credit the receiver, 7. Nothing. (+4 more)
 
 ### Community 9 - "commissary.js"
 Cohesion: 0.08
@@ -204,8 +205,8 @@ Cohesion: 0.19
 Nodes (11): assert, createAdjustment(), { DatabaseSync }, db, deleteAdjustment(), fs, getAdjustmentRow(), isValidDestination() (+3 more)
 
 ### Community 28 - "withTransaction"
-Cohesion: 0.33
-Nodes (9): logActivity(), withTransaction(), createPreset(), createYieldLogEvent(), patchYieldLogEvent(), updatePreset(), validateYieldOutputAndInputQty(), insertReceiptCreateThenUpdate() (+1 more)
+Cohesion: 0.48
+Nodes (7): logActivity(), withTransaction(), createYieldLogEvent(), patchYieldLogEvent(), validateYieldOutputAndInputQty(), insertReceiptCreateThenUpdate(), insertYieldEntry()
 
 ### Community 29 - "check-ledger.js"
 Cohesion: 0.29
@@ -216,12 +217,12 @@ Cohesion: 0.21
 Nodes (10): assert, comAJowl, comAJowl2, comAPata, comBJowl, commissaryMeats, commissaryMeatToken(), ghostMeat (+2 more)
 
 ### Community 31 - "Session History — resolved, kept for "why", not "what's next""
-Cohesion: 0.08
-Nodes (23): 23c-ii split into four sub-steps — resolved 2026-09-01 (architect), Archived 2026-09-02 — step 24 design narrative and completed sub-steps, Archived 2026-09-03 — resolved architectural questions, Archived 2026-09-03 — step 25c in full, Item 3 design — RESOLVED 2026-08-30, ready to build, none of it started yet, Open architectural questions (for an architect conversation, not a worker), Original five items, raised 2026-08-29, Original five items, raised 2026-08-29 — all resolved (+15 more)
+Cohesion: 0.07
+Nodes (27): 23c-ii split into four sub-steps — resolved 2026-09-01 (architect), 25b — commissary opening stock + physical count. CLOSED 2026-09-02., Archived 2026-09-02 — step 24 design narrative and completed sub-steps, Archived 2026-09-03 (pass 2), Archived 2026-09-03 — resolved architectural questions, Archived 2026-09-03 — step 25c in full, Item 3 design — RESOLVED 2026-08-30, ready to build, none of it started yet, Open architectural questions (for an architect conversation, not a worker) (+19 more)
 
-### Community 32 - "commands.js"
-Cohesion: 0.40
-Nodes (4): db, express, router, { withTransaction, logActivity }
+### Community 32 - "activityLog.js"
+Cohesion: 0.33
+Nodes (4): db, express, router, { withTransaction }
 
 ### Community 33 - "seed.js"
 Cohesion: 0.17
@@ -232,8 +233,8 @@ Cohesion: 0.11
 Nodes (15): allowedColCount, ALLOWLIST, corpus, IGNORED_COLUMNS, { join, relative }, missingColumns, missingTables, { readFileSync, readdirSync, statSync } (+7 more)
 
 ### Community 35 - "Workflow guide — how this project is actually run"
-Cohesion: 0.12
-Nodes (16): Command reference, Deliberately not built yet, Job 1 — dispatching, Job 2 — the merge gate, Job 3 — architect sessions, On a collaborator's machine, On your machine, One-time setup (+8 more)
+Cohesion: 0.11
+Nodes (17): Command reference, Deliberately not built yet, Job 1 — dispatching, Job 2 — the merge gate, Job 3 — architect sessions, On a collaborator's machine, On your machine, One-time setup (+9 more)
 
 ### Community 36 - "Engineer role — what a collaborator may change without an architect"
 Cohesion: 0.18
@@ -252,8 +253,8 @@ Cohesion: 0.22
 Nodes (8): 1. Ground yourself in the real repo, 2. Establish the baseline before you touch anything, 3. Read, in this order, 4. State the plan, then implement, 5. Verify, 6. Branch, commit, push, open the PR, 7. If you hit a Class B question, Reporting
 
 ### Community 40 - "pull_request_template.md"
-Cohesion: 0.22
-Nodes (8): Anything I wasn't sure about, Decisions I made myself, Did this touch `public/`?, `npm run verify`, Scope, Settled-decision check, What changed and why, Which lane
+Cohesion: 0.20
+Nodes (9): Anything I wasn't sure about, Decisions I made myself, Did this touch `public/`?, `npm run verify`, Scope, Settled-decision check, What changed and why, Which callers did you check? (+1 more)
 
 ### Community 41 - "Decision authority — what you may decide, and what waits"
 Cohesion: 0.25
@@ -267,9 +268,9 @@ Nodes (6): Both readings, Partial work, What I did NOT change, What I hit, What 
 Cohesion: 0.33
 Nodes (3): db, express, router
 
-### Community 44 - "activityLog.js"
-Cohesion: 0.33
-Nodes (4): db, express, router, { withTransaction }
+### Community 44 - "guard-db.js"
+Cohesion: 0.47
+Nodes (5): block(), DB_NAMES, DESTRUCTIVE, main(), readStdin()
 
 ### Community 45 - "history.js"
 Cohesion: 0.50
@@ -279,25 +280,29 @@ Nodes (3): db, express, router
 Cohesion: 0.50
 Nodes (3): db, express, router
 
+### Community 48 - "commands.js"
+Cohesion: 0.40
+Nodes (4): db, express, router, { withTransaction, logActivity }
+
 ## Knowledge Gaps
-- **348 isolated node(s):** `The two lanes`, `Green — fix it, no permission needed`, `Red — stop, park it, do not fix`, `The check that matters most`, `When you hit the line — how to park something` (+343 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 423 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **359 isolated node(s):** `path`, `fs`, `{ DatabaseSync }`, `DB_PATH`, `db` (+354 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 435 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **1 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `computeMeatAudit()` connect `auditEngine.js` to `Data Model doc`, `dashboard.test.js`?**
-  _High betweenness centrality (0.159) - this node is a cross-community bridge._
+  _High betweenness centrality (0.152) - this node is a cross-community bridge._
 - **Why does `Unallocated Commissary Receipt` connect `Data Model doc` to `Stock Receipts Page`?**
-  _High betweenness centrality (0.154) - this node is a cross-community bridge._
+  _High betweenness centrality (0.146) - this node is a cross-community bridge._
 - **Why does `recalcMeatRow (client-side live recalculation)` connect `Data Model doc` to `auditEngine.js`?**
-  _High betweenness centrality (0.153) - this node is a cross-community bridge._
-- **What connects `The two lanes`, `Green — fix it, no permission needed`, `Red — stop, park it, do not fix` to the rest of the system?**
-  _348 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.146) - this node is a cross-community bridge._
+- **What connects `path`, `fs`, `{ DatabaseSync }` to the rest of the system?**
+  _359 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `auditEngine.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.05389610389610389 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.055218855218855216 - nodes in this community are weakly interconnected._
 - **Should `Data Model doc` be split into smaller, more focused modules?**
   _Cohesion score 0.08416389811738649 - nodes in this community are weakly interconnected._
 - **Should `commissary.test.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.07195121951219512 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06659619450317125 - nodes in this community are weakly interconnected._

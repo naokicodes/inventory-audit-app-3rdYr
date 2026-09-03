@@ -1,9 +1,9 @@
 {
   "0": "auditEngine.js",
   "1": "Data Model doc",
-  "2": "dashboard.test.js",
+  "2": "commissary.test.js",
   "3": "connection.js",
-  "4": "commissary.test.js",
+  "4": "dashboard.test.js",
   "5": "schema.sql",
   "6": "index.js",
   "7": "Settings Admin: Conversion Standards",
@@ -31,7 +31,7 @@
   "29": "check-ledger.js",
   "30": "terminal.test.js",
   "31": "Session History — resolved, kept for \"why\", not \"what's next\"",
-  "32": "commands.js",
+  "32": "activityLog.js",
   "33": "seed.js",
   "34": "audit-write-paths.js",
   "35": "Workflow guide — how this project is actually run",
@@ -43,8 +43,9 @@
   "41": "Decision authority — what you may decide, and what waits",
   "42": "needs-architect.md",
   "43": "sales.js",
-  "44": "activityLog.js",
+  "44": "guard-db.js",
   "45": "history.js",
   "46": "settings.js",
-  "47": "verify.md"
+  "47": "verify.md",
+  "48": "commands.js"
 }

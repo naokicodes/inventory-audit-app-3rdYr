@@ -289,18 +289,6 @@
       "source_location": "L29"
     },
     {
-      "id": "server_engines_commissaryauditengine_getcommissarybeginningstock",
-      "label": "getCommissaryBeginningStock()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 0,
-      "community_name": "auditEngine.js",
-      "file_type": "code",
-      "norm_label": "getcommissarybeginningstock()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L54"
-    },
-    {
       "id": "server_routes_commands_test_runoversoldcheck",
       "label": "runOversoldCheck()",
       "_callable": true,
@@ -697,64 +685,280 @@
       "source_location": "L16"
     },
     {
-      "id": "server_routes_dashboard_test_computerestauranttotals",
-      "label": "computeRestaurantTotals()",
+      "id": "server_engines_commissaryauditengine_computecommissarydailyaudit",
+      "label": "computeCommissaryDailyAudit()",
       "_callable": true,
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
-      "norm_label": "computerestauranttotals()",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L58"
+      "norm_label": "computecommissarydailyaudit()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L196"
     },
     {
-      "id": "server_routes_dashboard_test_currentbalance",
-      "label": "currentBalance()",
+      "id": "server_engines_commissaryauditengine_computecommissarymeataudit",
+      "label": "computeCommissaryMeatAudit()",
       "_callable": true,
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
-      "norm_label": "currentbalance()",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L51"
+      "norm_label": "computecommissarymeataudit()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L150"
     },
     {
-      "id": "server_routes_dashboard_test_findjowlgroup",
-      "label": "findJowlGroup()",
+      "id": "server_engines_commissaryauditengine_getcommissaryadjustmentstotal",
+      "label": "getCommissaryAdjustmentsTotal()",
       "_callable": true,
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
-      "norm_label": "findjowlgroup()",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L176"
+      "norm_label": "getcommissaryadjustmentstotal()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L107"
     },
     {
-      "id": "server_routes_dashboard_test_stockrollup",
-      "label": "stockRollup()",
+      "id": "server_engines_commissaryauditengine_getcommissarybackedup",
+      "label": "getCommissaryBackedUp()",
       "_callable": true,
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
-      "norm_label": "stockrollup()",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L90"
+      "norm_label": "getcommissarybackedup()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L91"
     },
     {
-      "id": "server_routes_dashboard_test_test",
+      "id": "server_engines_commissaryauditengine_getcommissarybeginningstock",
+      "label": "getCommissaryBeginningStock()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "getcommissarybeginningstock()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L54"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_getcommissaryendingactual",
+      "label": "getCommissaryEndingActual()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "getcommissaryendingactual()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L139"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_getcommissarystockin",
+      "label": "getCommissaryStockIn()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "getcommissarystockin()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L76"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_getcommissaryusage",
+      "label": "getCommissaryUsage()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "getcommissaryusage()",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L126"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_test_test",
       "label": "test()",
       "_callable": true,
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
       "norm_label": "test()",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L12"
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L37"
+    },
+    {
+      "id": "server_routes_commissary_test_computecommissarymeatauditfor",
+      "label": "computeCommissaryMeatAuditFor()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "computecommissarymeatauditfor()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L1043"
+    },
+    {
+      "id": "server_routes_commissary_test_createpreset",
+      "label": "createPreset()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "createpreset()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L312"
+    },
+    {
+      "id": "server_routes_commissary_test_createshipment",
+      "label": "createShipment()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "createshipment()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L104"
+    },
+    {
+      "id": "server_routes_commissary_test_createstandard",
+      "label": "createStandard()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "createstandard()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L523"
+    },
+    {
+      "id": "server_routes_commissary_test_getpresetwithlines",
+      "label": "getPresetWithLines()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "getpresetwithlines()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L292"
+    },
+    {
+      "id": "server_routes_commissary_test_getreceiptrow",
+      "label": "getReceiptRow()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "getreceiptrow()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L94"
+    },
+    {
+      "id": "server_routes_commissary_test_getshipmentwithlines",
+      "label": "getShipmentWithLines()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "getshipmentwithlines()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L97"
+    },
+    {
+      "id": "server_routes_commissary_test_listcommissarymeats",
+      "label": "listCommissaryMeats()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "listcommissarymeats()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L60"
+    },
+    {
+      "id": "server_routes_commissary_test_listpresetsforpair",
+      "label": "listPresetsForPair()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "listpresetsforpair()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L299"
+    },
+    {
+      "id": "server_routes_commissary_test_liststandardsforpair",
+      "label": "listStandardsForPair()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "liststandardsforpair()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L504"
+    },
+    {
+      "id": "server_routes_commissary_test_postcommissarydailyaudit",
+      "label": "postCommissaryDailyAudit()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "postcommissarydailyaudit()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L1049"
+    },
+    {
+      "id": "server_routes_commissary_test_test",
+      "label": "test()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "test()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L18"
+    },
+    {
+      "id": "server_routes_commissary_test_updatepreset",
+      "label": "updatePreset()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "updatepreset()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L352"
+    },
+    {
+      "id": "server_routes_commissary_test_updatestandard",
+      "label": "updateStandard()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "updatestandard()",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L549"
     },
     {
       "id": "server_routes_sales_test_freshdb",
@@ -973,18 +1177,6 @@
       "source_location": "L15"
     },
     {
-      "id": "server_routes_commissary_test_createpreset",
-      "label": "createPreset()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 28,
-      "community_name": "withTransaction",
-      "file_type": "code",
-      "norm_label": "createpreset()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L312"
-    },
-    {
       "id": "server_routes_commissary_test_createyieldlogevent",
       "label": "createYieldLogEvent()",
       "_callable": true,
@@ -1007,18 +1199,6 @@
       "norm_label": "patchyieldlogevent()",
       "source_file": "server/routes/commissary.test.js",
       "source_location": "L874"
-    },
-    {
-      "id": "server_routes_commissary_test_updatepreset",
-      "label": "updatePreset()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 28,
-      "community_name": "withTransaction",
-      "file_type": "code",
-      "norm_label": "updatepreset()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L352"
     },
     {
       "id": "server_routes_commissary_test_validateyieldoutputandinputqty",
@@ -1321,244 +1501,64 @@
       "source_location": "L16"
     },
     {
-      "id": "server_engines_commissaryauditengine_computecommissarydailyaudit",
-      "label": "computeCommissaryDailyAudit()",
+      "id": "server_routes_dashboard_test_computerestauranttotals",
+      "label": "computeRestaurantTotals()",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
-      "norm_label": "computecommissarydailyaudit()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L196"
+      "norm_label": "computerestauranttotals()",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L58"
     },
     {
-      "id": "server_engines_commissaryauditengine_computecommissarymeataudit",
-      "label": "computeCommissaryMeatAudit()",
+      "id": "server_routes_dashboard_test_currentbalance",
+      "label": "currentBalance()",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
-      "norm_label": "computecommissarymeataudit()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L150"
+      "norm_label": "currentbalance()",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L51"
     },
     {
-      "id": "server_engines_commissaryauditengine_getcommissaryadjustmentstotal",
-      "label": "getCommissaryAdjustmentsTotal()",
+      "id": "server_routes_dashboard_test_findjowlgroup",
+      "label": "findJowlGroup()",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
-      "norm_label": "getcommissaryadjustmentstotal()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L107"
+      "norm_label": "findjowlgroup()",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L176"
     },
     {
-      "id": "server_engines_commissaryauditengine_getcommissarybackedup",
-      "label": "getCommissaryBackedUp()",
+      "id": "server_routes_dashboard_test_stockrollup",
+      "label": "stockRollup()",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
-      "norm_label": "getcommissarybackedup()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L91"
+      "norm_label": "stockrollup()",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L90"
     },
     {
-      "id": "server_engines_commissaryauditengine_getcommissaryendingactual",
-      "label": "getCommissaryEndingActual()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "getcommissaryendingactual()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L139"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_getcommissarystockin",
-      "label": "getCommissaryStockIn()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "getcommissarystockin()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L76"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_getcommissaryusage",
-      "label": "getCommissaryUsage()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "getcommissaryusage()",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L126"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test_test",
+      "id": "server_routes_dashboard_test_test",
       "label": "test()",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
       "norm_label": "test()",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L37"
-    },
-    {
-      "id": "server_routes_commissary_test_computecommissarymeatauditfor",
-      "label": "computeCommissaryMeatAuditFor()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "computecommissarymeatauditfor()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L1043"
-    },
-    {
-      "id": "server_routes_commissary_test_createshipment",
-      "label": "createShipment()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "createshipment()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L104"
-    },
-    {
-      "id": "server_routes_commissary_test_createstandard",
-      "label": "createStandard()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "createstandard()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L523"
-    },
-    {
-      "id": "server_routes_commissary_test_getpresetwithlines",
-      "label": "getPresetWithLines()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "getpresetwithlines()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L292"
-    },
-    {
-      "id": "server_routes_commissary_test_getreceiptrow",
-      "label": "getReceiptRow()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "getreceiptrow()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L94"
-    },
-    {
-      "id": "server_routes_commissary_test_getshipmentwithlines",
-      "label": "getShipmentWithLines()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "getshipmentwithlines()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L97"
-    },
-    {
-      "id": "server_routes_commissary_test_listcommissarymeats",
-      "label": "listCommissaryMeats()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "listcommissarymeats()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L60"
-    },
-    {
-      "id": "server_routes_commissary_test_listpresetsforpair",
-      "label": "listPresetsForPair()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "listpresetsforpair()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L299"
-    },
-    {
-      "id": "server_routes_commissary_test_liststandardsforpair",
-      "label": "listStandardsForPair()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "liststandardsforpair()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L504"
-    },
-    {
-      "id": "server_routes_commissary_test_postcommissarydailyaudit",
-      "label": "postCommissaryDailyAudit()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "postcommissarydailyaudit()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L1049"
-    },
-    {
-      "id": "server_routes_commissary_test_test",
-      "label": "test()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "test()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L18"
-    },
-    {
-      "id": "server_routes_commissary_test_updatestandard",
-      "label": "updateStandard()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "updatestandard()",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L549"
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L12"
     },
     {
       "id": "server_routes_sales_daysinmonth",
@@ -1583,6 +1583,42 @@
       "norm_label": "pad2()",
       "source_file": "server/routes/sales.js",
       "source_location": "L21"
+    },
+    {
+      "id": "scripts_guard_db_block",
+      "label": "block()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 44,
+      "community_name": "guard-db.js",
+      "file_type": "code",
+      "norm_label": "block()",
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L41"
+    },
+    {
+      "id": "scripts_guard_db_main",
+      "label": "main()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 44,
+      "community_name": "guard-db.js",
+      "file_type": "code",
+      "norm_label": "main()",
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L53"
+    },
+    {
+      "id": "scripts_guard_db_readstdin",
+      "label": "readStdin()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 44,
+      "community_name": "guard-db.js",
+      "file_type": "code",
+      "norm_label": "readstdin()",
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L33"
     },
     {
       "id": "server_engines_commissaryyieldengine_computeactuallosspct",
@@ -2789,103 +2825,235 @@
       "source_location": "L13"
     },
     {
-      "id": "server_routes_dashboard_test",
-      "label": "dashboard.test.js",
+      "id": "server_engines_commissaryauditengine",
+      "label": "commissaryAuditEngine.js",
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
-      "norm_label": "dashboard.test.js",
-      "source_file": "server/routes/dashboard.test.js",
+      "norm_label": "commissaryauditengine.js",
+      "source_file": "server/engines/commissaryAuditEngine.js",
       "source_location": "L1"
     },
     {
-      "id": "server_routes_dashboard_test_assert",
+      "id": "server_engines_commissaryauditengine_adddays",
+      "label": "{ addDays }",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "{ adddays }",
+      "source_file": "server/engines/commissaryAuditEngine.js",
+      "source_location": "L46"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_test",
+      "label": "commissaryAuditEngine.test.js",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "commissaryauditengine.test.js",
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L1"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_test_assert",
       "label": "assert",
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
       "norm_label": "assert",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L7"
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L21"
     },
     {
-      "id": "server_routes_dashboard_test_computecommissarymeataudit",
-      "label": "{ computeCommissaryMeatAudit }",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "dashboard.test.js",
-      "file_type": "code",
-      "norm_label": "{ computecommissarymeataudit }",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L32"
-    },
-    {
-      "id": "server_routes_dashboard_test_computemeataudit",
-      "label": "{ computeMeatAudit }",
-      "_origin": "ast",
-      "community": 2,
-      "community_name": "dashboard.test.js",
-      "file_type": "code",
-      "norm_label": "{ computemeataudit }",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L31"
-    },
-    {
-      "id": "server_routes_dashboard_test_databasesync",
+      "id": "server_engines_commissaryauditengine_test_databasesync",
       "label": "{ DatabaseSync }",
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
       "norm_label": "{ databasesync }",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L6"
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L24"
     },
     {
-      "id": "server_routes_dashboard_test_db",
+      "id": "server_engines_commissaryauditengine_test_db",
       "label": "db",
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
       "norm_label": "db",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L27"
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L56"
     },
     {
-      "id": "server_routes_dashboard_test_fs",
+      "id": "server_engines_commissaryauditengine_test_fs",
       "label": "fs",
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
       "norm_label": "fs",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L8"
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L23"
     },
     {
-      "id": "server_routes_dashboard_test_path",
+      "id": "server_engines_commissaryauditengine_test_getcommissarystockin_getcommissarybackedup_getcommissaryusage_getcommissaryadjustmentstotal_computecommissarymeataudit_computecommissarydailyaudit",
+      "label": "{\n  getCommissaryStockIn,\n  getCommissaryBackedUp,\n  getCommissaryUsage,\n  getCommissaryAdjustmentsTotal,\n  computeCommissaryMeatAudit,\n  computeCommissaryDailyAudit\n}",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "{\n  getcommissarystockin,\n  getcommissarybackedup,\n  getcommissaryusage,\n  getcommissaryadjustmentstotal,\n  computecommissarymeataudit,\n  computecommissarydailyaudit\n}",
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L25"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_test_path",
       "label": "path",
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
       "norm_label": "path",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L9"
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L22"
     },
     {
-      "id": "server_routes_dashboard_test_schema",
+      "id": "server_engines_commissaryauditengine_test_schema",
       "label": "schema",
       "_origin": "ast",
       "community": 2,
-      "community_name": "dashboard.test.js",
+      "community_name": "commissary.test.js",
       "file_type": "code",
       "norm_label": "schema",
-      "source_file": "server/routes/dashboard.test.js",
-      "source_location": "L26"
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L55"
+    },
+    {
+      "id": "server_engines_commissaryauditengine_test_test_db_path",
+      "label": "TEST_DB_PATH",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "test_db_path",
+      "source_file": "server/engines/commissaryAuditEngine.test.js",
+      "source_location": "L50"
+    },
+    {
+      "id": "server_routes_commissary_test",
+      "label": "commissary.test.js",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "commissary.test.js",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L1"
+    },
+    {
+      "id": "server_routes_commissary_test_assert",
+      "label": "assert",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "assert",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L10"
+    },
+    {
+      "id": "server_routes_commissary_test_computecommissarydailyaudit_computecommissarymeataudit_getcommissarybackedup_getcommissaryusage",
+      "label": "{ computeCommissaryDailyAudit, computeCommissaryMeatAudit, getCommissaryBackedUp, getCommissaryUsage }",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "{ computecommissarydailyaudit, computecommissarymeataudit, getcommissarybackedup, getcommissaryusage }",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L14"
+    },
+    {
+      "id": "server_routes_commissary_test_computeyieldrow",
+      "label": "{ computeYieldRow }",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "{ computeyieldrow }",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L15"
+    },
+    {
+      "id": "server_routes_commissary_test_databasesync",
+      "label": "{ DatabaseSync }",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "{ databasesync }",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L9"
+    },
+    {
+      "id": "server_routes_commissary_test_db",
+      "label": "db",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "db",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L33"
+    },
+    {
+      "id": "server_routes_commissary_test_fs",
+      "label": "fs",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "fs",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L11"
+    },
+    {
+      "id": "server_routes_commissary_test_path",
+      "label": "path",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "path",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L12"
+    },
+    {
+      "id": "server_routes_commissary_test_schema",
+      "label": "schema",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "schema",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L32"
+    },
+    {
+      "id": "server_routes_commissary_test_withtransaction_logactivity",
+      "label": "{ withTransaction, logActivity }",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "commissary.test.js",
+      "file_type": "code",
+      "norm_label": "{ withtransaction, logactivity }",
+      "source_file": "server/routes/commissary.test.js",
+      "source_location": "L13"
     },
     {
       "id": "server_routes_sales_test",
@@ -3174,6 +3342,17 @@
       "source_location": "L5"
     },
     {
+      "id": "node_sqlite",
+      "label": "node:sqlite",
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "connection.js",
+      "confidence": "EXTRACTED",
+      "file_type": "code",
+      "norm_label": "node:sqlite",
+      "source_file": "node:sqlite"
+    },
+    {
       "id": "server_db_connection",
       "label": "connection.js",
       "_origin": "ast",
@@ -3396,6 +3575,18 @@
       "source_location": "L1560"
     },
     {
+      "id": "docs_session_history_25b_commissary_opening_stock_physical_count_closed_2026_09_02",
+      "label": "25b \u2014 commissary opening stock + physical count. CLOSED 2026-09-02.",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "25b \u2014 commissary opening stock + physical count. closed 2026-09-02.",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2820"
+    },
+    {
       "id": "docs_session_history_archived_2026_09_02_step_24_design_narrative_and_completed_sub_steps",
       "label": "Archived 2026-09-02 \u2014 step 24 design narrative and completed sub-steps",
       "_origin": "ast",
@@ -3406,6 +3597,18 @@
       "norm_label": "archived 2026-09-02 \u2014 step 24 design narrative and completed sub-steps",
       "source_file": "docs/session-history.md",
       "source_location": "L2211"
+    },
+    {
+      "id": "docs_session_history_archived_2026_09_03_pass_2",
+      "label": "Archived 2026-09-03 (pass 2)",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "archived 2026-09-03 (pass 2)",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2802"
     },
     {
       "id": "docs_session_history_archived_2026_09_03_resolved_architectural_questions",
@@ -3588,6 +3791,30 @@
       "source_location": "L2535"
     },
     {
+      "id": "docs_session_history_step_24_multi_stage_yield_commissary_side_allocation_closed_2026_09_02_2804",
+      "label": "Step 24 \u2014 multi-stage yield + Commissary-side allocation (CLOSED 2026-09-02)",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "step 24 \u2014 multi-stage yield + commissary-side allocation (closed 2026-09-02)",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2804"
+    },
+    {
+      "id": "docs_session_history_step_25c_seed_and_tag_the_meat_type_catalog_closed_2026_09_03_1790463",
+      "label": "Step 25c \u2014 seed and tag the meat-type catalog (CLOSED 2026-09-03, `1790463`)",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Session History \u2014 resolved, kept for \"why\", not \"what's next\"",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "step 25c \u2014 seed and tag the meat-type catalog (closed 2026-09-03, `1790463`)",
+      "source_file": "docs/session-history.md",
+      "source_location": "L2828"
+    },
+    {
       "id": "docs_session_history_step_25c_seed_the_meat_type_catalog_and_tag_it_closed_2026_09_03_1790463",
       "label": "Step 25c \u2014 seed the meat-type catalog and tag it (CLOSED 2026-09-03, `1790463`)",
       "_origin": "ast",
@@ -3660,59 +3887,70 @@
       "source_location": "L364"
     },
     {
-      "id": "server_routes_commands",
-      "label": "commands.js",
+      "id": "server_db_activitylog",
+      "label": "activityLog.js",
       "_origin": "ast",
       "community": 32,
-      "community_name": "commands.js",
+      "community_name": "activityLog.js",
       "file_type": "code",
-      "norm_label": "commands.js",
-      "source_file": "server/routes/commands.js",
+      "norm_label": "activitylog.js",
+      "source_file": "server/db/activityLog.js",
       "source_location": "L1"
     },
     {
-      "id": "server_routes_commands_db",
+      "id": "server_routes_allocations",
+      "label": "allocations.js",
+      "_origin": "ast",
+      "community": 32,
+      "community_name": "activityLog.js",
+      "file_type": "code",
+      "norm_label": "allocations.js",
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L1"
+    },
+    {
+      "id": "server_routes_allocations_db",
       "label": "db",
       "_origin": "ast",
       "community": 32,
-      "community_name": "commands.js",
+      "community_name": "activityLog.js",
       "file_type": "code",
       "norm_label": "db",
-      "source_file": "server/routes/commands.js",
-      "source_location": "L8"
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L29"
     },
     {
-      "id": "server_routes_commands_express",
+      "id": "server_routes_allocations_express",
       "label": "express",
       "_origin": "ast",
       "community": 32,
-      "community_name": "commands.js",
+      "community_name": "activityLog.js",
       "file_type": "code",
       "norm_label": "express",
-      "source_file": "server/routes/commands.js",
-      "source_location": "L7"
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L28"
     },
     {
-      "id": "server_routes_commands_router",
+      "id": "server_routes_allocations_router",
       "label": "router",
       "_origin": "ast",
       "community": 32,
-      "community_name": "commands.js",
+      "community_name": "activityLog.js",
       "file_type": "code",
       "norm_label": "router",
-      "source_file": "server/routes/commands.js",
-      "source_location": "L11"
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L32"
     },
     {
-      "id": "server_routes_commands_withtransaction_logactivity",
-      "label": "{ withTransaction, logActivity }",
+      "id": "server_routes_allocations_withtransaction",
+      "label": "{ withTransaction }",
       "_origin": "ast",
       "community": 32,
-      "community_name": "commands.js",
+      "community_name": "activityLog.js",
       "file_type": "code",
-      "norm_label": "{ withtransaction, logactivity }",
-      "source_file": "server/routes/commands.js",
-      "source_location": "L9"
+      "norm_label": "{ withtransaction }",
+      "source_file": "server/routes/allocations.js",
+      "source_location": "L30"
     },
     {
       "id": "server_db_seed",
@@ -4033,7 +4271,7 @@
       "node_kind": "heading",
       "norm_label": "command reference",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L179"
+      "source_location": "L222"
     },
     {
       "id": "docs_workflow_guide_deliberately_not_built_yet",
@@ -4045,7 +4283,7 @@
       "node_kind": "heading",
       "norm_label": "deliberately not built yet",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L215"
+      "source_location": "L258"
     },
     {
       "id": "docs_workflow_guide_job_1_dispatching",
@@ -4057,7 +4295,7 @@
       "node_kind": "heading",
       "norm_label": "job 1 \u2014 dispatching",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L88"
+      "source_location": "L118"
     },
     {
       "id": "docs_workflow_guide_job_2_the_merge_gate",
@@ -4069,7 +4307,7 @@
       "node_kind": "heading",
       "norm_label": "job 2 \u2014 the merge gate",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L111"
+      "source_location": "L141"
     },
     {
       "id": "docs_workflow_guide_job_3_architect_sessions",
@@ -4081,7 +4319,7 @@
       "node_kind": "heading",
       "norm_label": "job 3 \u2014 architect sessions",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L129"
+      "source_location": "L172"
     },
     {
       "id": "docs_workflow_guide_on_a_collaborator_s_machine",
@@ -4093,7 +4331,7 @@
       "node_kind": "heading",
       "norm_label": "on a collaborator's machine",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L41"
+      "source_location": "L71"
     },
     {
       "id": "docs_workflow_guide_on_your_machine",
@@ -4129,7 +4367,19 @@
       "node_kind": "heading",
       "norm_label": "starting a fresh conversation",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L134"
+      "source_location": "L177"
+    },
+    {
+      "id": "docs_workflow_guide_step_has_to_be_discovered_before_it_exists",
+      "label": "`/step` has to be discovered before it exists",
+      "_origin": "ast",
+      "community": 35,
+      "community_name": "Workflow guide \u2014 how this project is actually run",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "`/step` has to be discovered before it exists",
+      "source_file": "docs/workflow-guide.md",
+      "source_location": "L60"
     },
     {
       "id": "docs_workflow_guide_the_habit_that_matters_most",
@@ -4141,7 +4391,7 @@
       "node_kind": "heading",
       "norm_label": "the habit that matters most",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L172"
+      "source_location": "L215"
     },
     {
       "id": "docs_workflow_guide_the_loop",
@@ -4153,7 +4403,7 @@
       "node_kind": "heading",
       "norm_label": "the loop",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L62"
+      "source_location": "L92"
     },
     {
       "id": "docs_workflow_guide_the_one_page_version",
@@ -4177,7 +4427,7 @@
       "node_kind": "heading",
       "norm_label": "the write-path audit, and how not to break it",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L193"
+      "source_location": "L236"
     },
     {
       "id": "docs_workflow_guide_when_something_goes_wrong",
@@ -4189,7 +4439,7 @@
       "node_kind": "heading",
       "norm_label": "when something goes wrong",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L240"
+      "source_location": "L283"
     },
     {
       "id": "docs_workflow_guide_workflow_guide_how_this_project_is_actually_run",
@@ -4213,7 +4463,7 @@
       "node_kind": "heading",
       "norm_label": "working through flags",
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L151"
+      "source_location": "L194"
     },
     {
       "id": "docs_engineer_role",
@@ -4575,7 +4825,7 @@
       "node_kind": "heading",
       "norm_label": "6. branch, commit, push, open the pr",
       "source_file": ".claude/commands/step.md",
-      "source_location": "L87"
+      "source_location": "L102"
     },
     {
       "id": "claude_commands_step_7_if_you_hit_a_class_b_question",
@@ -4587,7 +4837,7 @@
       "node_kind": "heading",
       "norm_label": "7. if you hit a class b question",
       "source_file": ".claude/commands/step.md",
-      "source_location": "L118"
+      "source_location": "L152"
     },
     {
       "id": "claude_commands_step_reporting",
@@ -4599,238 +4849,106 @@
       "node_kind": "heading",
       "norm_label": "reporting",
       "source_file": ".claude/commands/step.md",
-      "source_location": "L131"
+      "source_location": "L165"
     },
     {
-      "id": "server_engines_commissaryauditengine",
-      "label": "commissaryAuditEngine.js",
+      "id": "server_routes_dashboard_test",
+      "label": "dashboard.test.js",
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
-      "norm_label": "commissaryauditengine.js",
-      "source_file": "server/engines/commissaryAuditEngine.js",
+      "norm_label": "dashboard.test.js",
+      "source_file": "server/routes/dashboard.test.js",
       "source_location": "L1"
     },
     {
-      "id": "server_engines_commissaryauditengine_adddays",
-      "label": "{ addDays }",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "{ adddays }",
-      "source_file": "server/engines/commissaryAuditEngine.js",
-      "source_location": "L46"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test",
-      "label": "commissaryAuditEngine.test.js",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "commissaryauditengine.test.js",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L1"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test_assert",
+      "id": "server_routes_dashboard_test_assert",
       "label": "assert",
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
       "norm_label": "assert",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L21"
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L7"
     },
     {
-      "id": "server_engines_commissaryauditengine_test_databasesync",
-      "label": "{ DatabaseSync }",
+      "id": "server_routes_dashboard_test_computecommissarymeataudit",
+      "label": "{ computeCommissaryMeatAudit }",
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
-      "norm_label": "{ databasesync }",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L24"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test_db",
-      "label": "db",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "db",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L56"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test_fs",
-      "label": "fs",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "fs",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L23"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test_getcommissarystockin_getcommissarybackedup_getcommissaryusage_getcommissaryadjustmentstotal_computecommissarymeataudit_computecommissarydailyaudit",
-      "label": "{\n  getCommissaryStockIn,\n  getCommissaryBackedUp,\n  getCommissaryUsage,\n  getCommissaryAdjustmentsTotal,\n  computeCommissaryMeatAudit,\n  computeCommissaryDailyAudit\n}",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "{\n  getcommissarystockin,\n  getcommissarybackedup,\n  getcommissaryusage,\n  getcommissaryadjustmentstotal,\n  computecommissarymeataudit,\n  computecommissarydailyaudit\n}",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L25"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test_path",
-      "label": "path",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "path",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L22"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test_schema",
-      "label": "schema",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "schema",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L55"
-    },
-    {
-      "id": "server_engines_commissaryauditengine_test_test_db_path",
-      "label": "TEST_DB_PATH",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "test_db_path",
-      "source_file": "server/engines/commissaryAuditEngine.test.js",
-      "source_location": "L50"
-    },
-    {
-      "id": "server_routes_commissary_test",
-      "label": "commissary.test.js",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "commissary.test.js",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L1"
-    },
-    {
-      "id": "server_routes_commissary_test_assert",
-      "label": "assert",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "assert",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L10"
-    },
-    {
-      "id": "server_routes_commissary_test_computecommissarydailyaudit_computecommissarymeataudit_getcommissarybackedup_getcommissaryusage",
-      "label": "{ computeCommissaryDailyAudit, computeCommissaryMeatAudit, getCommissaryBackedUp, getCommissaryUsage }",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "{ computecommissarydailyaudit, computecommissarymeataudit, getcommissarybackedup, getcommissaryusage }",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L14"
-    },
-    {
-      "id": "server_routes_commissary_test_computeyieldrow",
-      "label": "{ computeYieldRow }",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "{ computeyieldrow }",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L15"
-    },
-    {
-      "id": "server_routes_commissary_test_databasesync",
-      "label": "{ DatabaseSync }",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "{ databasesync }",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L9"
-    },
-    {
-      "id": "server_routes_commissary_test_db",
-      "label": "db",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "db",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L33"
-    },
-    {
-      "id": "server_routes_commissary_test_fs",
-      "label": "fs",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "fs",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L11"
-    },
-    {
-      "id": "server_routes_commissary_test_path",
-      "label": "path",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "path",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L12"
-    },
-    {
-      "id": "server_routes_commissary_test_schema",
-      "label": "schema",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "commissary.test.js",
-      "file_type": "code",
-      "norm_label": "schema",
-      "source_file": "server/routes/commissary.test.js",
+      "norm_label": "{ computecommissarymeataudit }",
+      "source_file": "server/routes/dashboard.test.js",
       "source_location": "L32"
     },
     {
-      "id": "server_routes_commissary_test_withtransaction_logactivity",
-      "label": "{ withTransaction, logActivity }",
+      "id": "server_routes_dashboard_test_computemeataudit",
+      "label": "{ computeMeatAudit }",
       "_origin": "ast",
       "community": 4,
-      "community_name": "commissary.test.js",
+      "community_name": "dashboard.test.js",
       "file_type": "code",
-      "norm_label": "{ withtransaction, logactivity }",
-      "source_file": "server/routes/commissary.test.js",
-      "source_location": "L13"
+      "norm_label": "{ computemeataudit }",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L31"
+    },
+    {
+      "id": "server_routes_dashboard_test_databasesync",
+      "label": "{ DatabaseSync }",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "dashboard.test.js",
+      "file_type": "code",
+      "norm_label": "{ databasesync }",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L6"
+    },
+    {
+      "id": "server_routes_dashboard_test_db",
+      "label": "db",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "dashboard.test.js",
+      "file_type": "code",
+      "norm_label": "db",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L27"
+    },
+    {
+      "id": "server_routes_dashboard_test_fs",
+      "label": "fs",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "dashboard.test.js",
+      "file_type": "code",
+      "norm_label": "fs",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L8"
+    },
+    {
+      "id": "server_routes_dashboard_test_path",
+      "label": "path",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "dashboard.test.js",
+      "file_type": "code",
+      "norm_label": "path",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L9"
+    },
+    {
+      "id": "server_routes_dashboard_test_schema",
+      "label": "schema",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "dashboard.test.js",
+      "file_type": "code",
+      "norm_label": "schema",
+      "source_file": "server/routes/dashboard.test.js",
+      "source_location": "L26"
     },
     {
       "id": "github_pull_request_template",
@@ -4854,7 +4972,7 @@
       "node_kind": "heading",
       "norm_label": "anything i wasn't sure about",
       "source_file": ".github/pull_request_template.md",
-      "source_location": "L58"
+      "source_location": "L75"
     },
     {
       "id": "github_pull_request_template_decisions_i_made_myself",
@@ -4866,7 +4984,7 @@
       "node_kind": "heading",
       "norm_label": "decisions i made myself",
       "source_file": ".github/pull_request_template.md",
-      "source_location": "L49"
+      "source_location": "L66"
     },
     {
       "id": "github_pull_request_template_did_this_touch_public",
@@ -4902,7 +5020,7 @@
       "node_kind": "heading",
       "norm_label": "scope",
       "source_file": ".github/pull_request_template.md",
-      "source_location": "L37"
+      "source_location": "L54"
     },
     {
       "id": "github_pull_request_template_settled_decision_check",
@@ -4914,7 +5032,7 @@
       "node_kind": "heading",
       "norm_label": "settled-decision check",
       "source_file": ".github/pull_request_template.md",
-      "source_location": "L43"
+      "source_location": "L60"
     },
     {
       "id": "github_pull_request_template_what_changed_and_why",
@@ -4927,6 +5045,18 @@
       "norm_label": "what changed and why",
       "source_file": ".github/pull_request_template.md",
       "source_location": "L14"
+    },
+    {
+      "id": "github_pull_request_template_which_callers_did_you_check",
+      "label": "Which callers did you check?",
+      "_origin": "ast",
+      "community": 40,
+      "community_name": "pull_request_template.md",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "which callers did you check?",
+      "source_file": ".github/pull_request_template.md",
+      "source_location": "L37"
     },
     {
       "id": "github_pull_request_template_which_lane",
@@ -5172,70 +5302,37 @@
       "source_location": "L13"
     },
     {
-      "id": "server_db_activitylog",
-      "label": "activityLog.js",
+      "id": "scripts_guard_db",
+      "label": "guard-db.js",
       "_origin": "ast",
       "community": 44,
-      "community_name": "activityLog.js",
+      "community_name": "guard-db.js",
       "file_type": "code",
-      "norm_label": "activitylog.js",
-      "source_file": "server/db/activityLog.js",
+      "norm_label": "guard-db.js",
+      "source_file": "scripts/guard-db.js",
       "source_location": "L1"
     },
     {
-      "id": "server_routes_allocations",
-      "label": "allocations.js",
+      "id": "scripts_guard_db_db_names",
+      "label": "DB_NAMES",
       "_origin": "ast",
       "community": 44,
-      "community_name": "activityLog.js",
+      "community_name": "guard-db.js",
       "file_type": "code",
-      "norm_label": "allocations.js",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L1"
+      "norm_label": "db_names",
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L18"
     },
     {
-      "id": "server_routes_allocations_db",
-      "label": "db",
+      "id": "scripts_guard_db_destructive",
+      "label": "DESTRUCTIVE",
       "_origin": "ast",
       "community": 44,
-      "community_name": "activityLog.js",
+      "community_name": "guard-db.js",
       "file_type": "code",
-      "norm_label": "db",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L29"
-    },
-    {
-      "id": "server_routes_allocations_express",
-      "label": "express",
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "activityLog.js",
-      "file_type": "code",
-      "norm_label": "express",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L28"
-    },
-    {
-      "id": "server_routes_allocations_router",
-      "label": "router",
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "activityLog.js",
-      "file_type": "code",
-      "norm_label": "router",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L32"
-    },
-    {
-      "id": "server_routes_allocations_withtransaction",
-      "label": "{ withTransaction }",
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "activityLog.js",
-      "file_type": "code",
-      "norm_label": "{ withtransaction }",
-      "source_file": "server/routes/allocations.js",
-      "source_location": "L30"
+      "norm_label": "destructive",
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L21"
     },
     {
       "id": "server_routes_history",
@@ -5363,6 +5460,61 @@
       "norm_label": "run",
       "source_file": ".claude/commands/verify.md",
       "source_location": "L8"
+    },
+    {
+      "id": "server_routes_commands",
+      "label": "commands.js",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "commands.js",
+      "file_type": "code",
+      "norm_label": "commands.js",
+      "source_file": "server/routes/commands.js",
+      "source_location": "L1"
+    },
+    {
+      "id": "server_routes_commands_db",
+      "label": "db",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "commands.js",
+      "file_type": "code",
+      "norm_label": "db",
+      "source_file": "server/routes/commands.js",
+      "source_location": "L8"
+    },
+    {
+      "id": "server_routes_commands_express",
+      "label": "express",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "commands.js",
+      "file_type": "code",
+      "norm_label": "express",
+      "source_file": "server/routes/commands.js",
+      "source_location": "L7"
+    },
+    {
+      "id": "server_routes_commands_router",
+      "label": "router",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "commands.js",
+      "file_type": "code",
+      "norm_label": "router",
+      "source_file": "server/routes/commands.js",
+      "source_location": "L11"
+    },
+    {
+      "id": "server_routes_commands_withtransaction_logactivity",
+      "label": "{ withTransaction, logActivity }",
+      "_origin": "ast",
+      "community": 48,
+      "community_name": "commands.js",
+      "file_type": "code",
+      "norm_label": "{ withtransaction, logactivity }",
+      "source_file": "server/routes/commands.js",
+      "source_location": "L9"
     },
     {
       "id": "server_db_schema",
@@ -5850,52 +6002,100 @@
       "source_location": "L1"
     },
     {
-      "id": "docs_dispatch_queue_1_step_25a_commissary_stock_receipts_supplier_intake",
-      "label": "1. Step 25a \u2014 commissary stock receipts (supplier intake)",
+      "id": "docs_dispatch_queue_0_step_archive_pass_closed_2026_09_03_pr_2",
+      "label": "0. Step archive-pass \u2014 CLOSED 2026-09-03, PR #2.",
       "_origin": "ast",
       "community": 8,
       "community_name": "Queue",
       "file_type": "document",
       "node_kind": "heading",
-      "norm_label": "1. step 25a \u2014 commissary stock receipts (supplier intake)",
+      "norm_label": "0. step archive-pass \u2014 closed 2026-09-03, pr #2.",
       "source_file": "docs/dispatch-queue.md",
       "source_location": "L18"
     },
     {
-      "id": "docs_dispatch_queue_2_step_24b_v_the_effective_yield_output_must_be_kg_tracked",
-      "label": "2. Step 24b-v \u2014 the effective yield output must be kg-tracked",
+      "id": "docs_dispatch_queue_1_step_25d_ii_prepped_created_by_is_provenance_not_identity",
+      "label": "1. Step 25d-ii \u2014 `prepped.created_by` is provenance, not identity",
       "_origin": "ast",
       "community": 8,
       "community_name": "Queue",
       "file_type": "document",
       "node_kind": "heading",
-      "norm_label": "2. step 24b-v \u2014 the effective yield output must be kg-tracked",
+      "norm_label": "1. step 25d-ii \u2014 `prepped.created_by` is provenance, not identity",
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L29"
+      "source_location": "L20"
     },
     {
-      "id": "docs_dispatch_queue_3_step_25d_record_who_did_the_count",
-      "label": "3. Step 25d \u2014 record who did the count",
+      "id": "docs_dispatch_queue_2_step_26a_beginning_stock_date_scoped_openings_and_an_honest_fallback",
+      "label": "2. Step 26a \u2014 beginning stock: date-scoped openings and an honest fallback",
       "_origin": "ast",
       "community": 8,
       "community_name": "Queue",
       "file_type": "document",
       "node_kind": "heading",
-      "norm_label": "3. step 25d \u2014 record who did the count",
+      "norm_label": "2. step 26a \u2014 beginning stock: date-scoped openings and an honest fallback",
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L37"
+      "source_location": "L44"
     },
     {
-      "id": "docs_dispatch_queue_4_nothing",
-      "label": "4. Nothing.",
+      "id": "docs_dispatch_queue_3_step_25a_commissary_stock_receipts_supplier_intake",
+      "label": "3. Step 25a \u2014 commissary stock receipts (supplier intake)",
       "_origin": "ast",
       "community": 8,
       "community_name": "Queue",
       "file_type": "document",
       "node_kind": "heading",
-      "norm_label": "4. nothing.",
+      "norm_label": "3. step 25a \u2014 commissary stock receipts (supplier intake)",
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L50"
+      "source_location": "L57"
+    },
+    {
+      "id": "docs_dispatch_queue_4_step_24b_v_the_effective_yield_output_must_be_kg_tracked",
+      "label": "4. Step 24b-v \u2014 the effective yield output must be kg-tracked",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "Queue",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "4. step 24b-v \u2014 the effective yield output must be kg-tracked",
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L68"
+    },
+    {
+      "id": "docs_dispatch_queue_5_step_25d_i_and_25d_iii_record_who_did_the_count",
+      "label": "5. Step 25d-i and 25d-iii \u2014 record who did the count",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "Queue",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "5. step 25d-i and 25d-iii \u2014 record who did the count",
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L76"
+    },
+    {
+      "id": "docs_dispatch_queue_6_step_25e_restaurant_to_restaurant_transfers_must_credit_the_receiver",
+      "label": "6. Step 25e \u2014 restaurant-to-restaurant transfers must credit the receiver",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "Queue",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "6. step 25e \u2014 restaurant-to-restaurant transfers must credit the receiver",
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L89"
+    },
+    {
+      "id": "docs_dispatch_queue_7_nothing",
+      "label": "7. Nothing.",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "Queue",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "7. nothing.",
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L107"
     },
     {
       "id": "docs_dispatch_queue_available_engineer_lane_work",
@@ -5907,7 +6107,7 @@
       "node_kind": "heading",
       "norm_label": "available engineer-lane work",
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L60"
+      "source_location": "L117"
     },
     {
       "id": "docs_dispatch_queue_dispatch_queue_what_to_work_on_next",
@@ -5931,7 +6131,7 @@
       "node_kind": "heading",
       "norm_label": "not in the queue, and not a task",
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L78"
+      "source_location": "L135"
     },
     {
       "id": "docs_dispatch_queue_queue",
@@ -7895,6 +8095,30 @@
       "context": "call",
       "source_file": "public/command-panel.js",
       "source_location": "L93",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_guard_db_main",
+      "target": "scripts_guard_db_readstdin",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_guard_db_main",
+      "target": "scripts_guard_db_block",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L71",
       "weight": 1.0
     },
     {
@@ -10124,13 +10348,24 @@
     },
     {
       "source": "claude_commands_step",
+      "target": "claude_commands_step_6_branch_commit_push_open_the_pr",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".claude/commands/step.md",
+      "source_location": "L102",
+      "weight": 1.0
+    },
+    {
+      "source": "claude_commands_step",
       "target": "claude_commands_step_7_if_you_hit_a_class_b_question",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": ".claude/commands/step.md",
-      "source_location": "L118",
+      "source_location": "L152",
       "weight": 1.0
     },
     {
@@ -10141,7 +10376,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": ".claude/commands/step.md",
-      "source_location": "L131",
+      "source_location": "L165",
       "weight": 1.0
     },
     {
@@ -10186,17 +10421,6 @@
       "confidence_score": 1.0,
       "source_file": ".claude/commands/step.md",
       "source_location": "L71",
-      "weight": 1.0
-    },
-    {
-      "source": "claude_commands_step",
-      "target": "claude_commands_step_6_branch_commit_push_open_the_pr",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".claude/commands/step.md",
-      "source_location": "L87",
       "weight": 1.0
     },
     {
@@ -10311,24 +10535,13 @@
     },
     {
       "source": "docs_dispatch_queue_dispatch_queue_what_to_work_on_next",
-      "target": "docs_dispatch_queue_queue",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/dispatch-queue.md",
-      "source_location": "L16",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_dispatch_queue_dispatch_queue_what_to_work_on_next",
       "target": "docs_dispatch_queue_available_engineer_lane_work",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L60",
+      "source_location": "L117",
       "weight": 1.0
     },
     {
@@ -10339,12 +10552,34 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L78",
+      "source_location": "L135",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_dispatch_queue_dispatch_queue_what_to_work_on_next",
+      "target": "docs_dispatch_queue_queue",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L16",
       "weight": 1.0
     },
     {
       "source": "docs_dispatch_queue_queue",
-      "target": "docs_dispatch_queue_1_step_25a_commissary_stock_receipts_supplier_intake",
+      "target": "docs_dispatch_queue_7_nothing",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L107",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_dispatch_queue_queue",
+      "target": "docs_dispatch_queue_0_step_archive_pass_closed_2026_09_03_pr_2",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -10355,35 +10590,68 @@
     },
     {
       "source": "docs_dispatch_queue_queue",
-      "target": "docs_dispatch_queue_2_step_24b_v_the_effective_yield_output_must_be_kg_tracked",
+      "target": "docs_dispatch_queue_1_step_25d_ii_prepped_created_by_is_provenance_not_identity",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L29",
+      "source_location": "L20",
       "weight": 1.0
     },
     {
       "source": "docs_dispatch_queue_queue",
-      "target": "docs_dispatch_queue_3_step_25d_record_who_did_the_count",
+      "target": "docs_dispatch_queue_2_step_26a_beginning_stock_date_scoped_openings_and_an_honest_fallback",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L37",
+      "source_location": "L44",
       "weight": 1.0
     },
     {
       "source": "docs_dispatch_queue_queue",
-      "target": "docs_dispatch_queue_4_nothing",
+      "target": "docs_dispatch_queue_3_step_25a_commissary_stock_receipts_supplier_intake",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/dispatch-queue.md",
-      "source_location": "L50",
+      "source_location": "L57",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_dispatch_queue_queue",
+      "target": "docs_dispatch_queue_4_step_24b_v_the_effective_yield_output_must_be_kg_tracked",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L68",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_dispatch_queue_queue",
+      "target": "docs_dispatch_queue_5_step_25d_i_and_25d_iii_record_who_did_the_count",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L76",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_dispatch_queue_queue",
+      "target": "docs_dispatch_queue_6_step_25e_restaurant_to_restaurant_transfers_must_credit_the_receiver",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/dispatch-queue.md",
+      "source_location": "L89",
       "weight": 1.0
     },
     {
@@ -10663,6 +10931,39 @@
     },
     {
       "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
+      "target": "docs_session_history_archived_2026_09_03_pass_2",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2802",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
+      "target": "docs_session_history_step_24_multi_stage_yield_commissary_side_allocation_closed_2026_09_02_2804",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2804",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
+      "target": "docs_session_history_step_25c_seed_and_tag_the_meat_type_catalog_closed_2026_09_03_1790463",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2828",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_session_history_resolved_kept_for_why_not_what_s_next",
       "target": "docs_session_history_wip_hand_offs_are_now_allowed_experimental_see_rule_17",
       "relation": "contains",
       "_origin": "ast",
@@ -10692,6 +10993,17 @@
       "confidence_score": 1.0,
       "source_file": "docs/session-history.md",
       "source_location": "L396",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_history_step_24_multi_stage_yield_commissary_side_allocation_closed_2026_09_02_2804",
+      "target": "docs_session_history_25b_commissary_opening_stock_physical_count_closed_2026_09_02",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/session-history.md",
+      "source_location": "L2820",
       "weight": 1.0
     },
     {
@@ -10768,7 +11080,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L134",
+      "source_location": "L177",
       "weight": 1.0
     },
     {
@@ -10779,7 +11091,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L151",
+      "source_location": "L194",
       "weight": 1.0
     },
     {
@@ -10790,7 +11102,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L172",
+      "source_location": "L215",
       "weight": 1.0
     },
     {
@@ -10806,13 +11118,35 @@
     },
     {
       "source": "docs_workflow_guide_one_time_setup",
+      "target": "docs_workflow_guide_step_has_to_be_discovered_before_it_exists",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/workflow-guide.md",
+      "source_location": "L60",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_workflow_guide_one_time_setup",
       "target": "docs_workflow_guide_on_a_collaborator_s_machine",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L41",
+      "source_location": "L71",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_workflow_guide_workflow_guide_how_this_project_is_actually_run",
+      "target": "docs_workflow_guide_job_1_dispatching",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/workflow-guide.md",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -10823,7 +11157,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L111",
+      "source_location": "L141",
       "weight": 1.0
     },
     {
@@ -10834,7 +11168,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L129",
+      "source_location": "L172",
       "weight": 1.0
     },
     {
@@ -10845,7 +11179,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L179",
+      "source_location": "L222",
       "weight": 1.0
     },
     {
@@ -10856,7 +11190,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L193",
+      "source_location": "L236",
       "weight": 1.0
     },
     {
@@ -10867,18 +11201,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L215",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_workflow_guide_workflow_guide_how_this_project_is_actually_run",
-      "target": "docs_workflow_guide_when_something_goes_wrong",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/workflow-guide.md",
-      "source_location": "L240",
+      "source_location": "L258",
       "weight": 1.0
     },
     {
@@ -10894,24 +11217,13 @@
     },
     {
       "source": "docs_workflow_guide_workflow_guide_how_this_project_is_actually_run",
-      "target": "docs_workflow_guide_the_loop",
+      "target": "docs_workflow_guide_when_something_goes_wrong",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
-      "source_location": "L62",
-      "weight": 1.0
-    },
-    {
-      "source": "docs_workflow_guide_workflow_guide_how_this_project_is_actually_run",
-      "target": "docs_workflow_guide_job_1_dispatching",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "docs/workflow-guide.md",
-      "source_location": "L88",
+      "source_location": "L283",
       "weight": 1.0
     },
     {
@@ -10923,6 +11235,17 @@
       "confidence_score": 1.0,
       "source_file": "docs/workflow-guide.md",
       "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_workflow_guide_workflow_guide_how_this_project_is_actually_run",
+      "target": "docs_workflow_guide_the_loop",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/workflow-guide.md",
+      "source_location": "L92",
       "weight": 1.0
     },
     {
@@ -11026,7 +11349,7 @@
     },
     {
       "source": "github_pull_request_template",
-      "target": "github_pull_request_template_scope",
+      "target": "github_pull_request_template_which_callers_did_you_check",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -11037,13 +11360,24 @@
     },
     {
       "source": "github_pull_request_template",
+      "target": "github_pull_request_template_scope",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".github/pull_request_template.md",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "github_pull_request_template",
       "target": "github_pull_request_template_settled_decision_check",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": ".github/pull_request_template.md",
-      "source_location": "L43",
+      "source_location": "L60",
       "weight": 1.0
     },
     {
@@ -11054,7 +11388,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": ".github/pull_request_template.md",
-      "source_location": "L49",
+      "source_location": "L66",
       "weight": 1.0
     },
     {
@@ -11065,7 +11399,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": ".github/pull_request_template.md",
-      "source_location": "L58",
+      "source_location": "L75",
       "weight": 1.0
     },
     {
@@ -11462,6 +11796,61 @@
       "confidence_score": 1.0,
       "source_file": "scripts/audit-write-paths.js",
       "source_location": "L99",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_guard_db",
+      "target": "scripts_guard_db_db_names",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_guard_db",
+      "target": "scripts_guard_db_destructive",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_guard_db",
+      "target": "scripts_guard_db_readstdin",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_guard_db",
+      "target": "scripts_guard_db_block",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_guard_db",
+      "target": "scripts_guard_db_main",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/guard-db.js",
+      "source_location": "L53",
       "weight": 1.0
     },
     {
@@ -14919,6 +15308,15 @@
       "weight": 1.0
     },
     {
+      "source": "server_db_migrate",
+      "target": "node_sqlite",
+      "relation": "dynamic_import",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/db/migrate.js"
+    },
+    {
       "source": "server_db_schema_adjustments",
       "target": "server_db_schema_adjustment_types",
       "relation": "references",
@@ -17959,5 +18357,5 @@
       "source_file": "public/commissary-shipments.html"
     }
   ],
-  "built_at_commit": "e0855b3ef6ff2c0bb290e88363857ca851a1c25c"
+  "built_at_commit": "d9498f0c7ba1e56f30e55352edeb1da82065dd12"
 }
