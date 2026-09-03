@@ -84,6 +84,21 @@ a wrong row key on the balance cards, a dropdown with no active filter,
 a bad edit rejection. Start the server, open the screen, click the thing,
 and write down what you actually saw. Then stop the server (rule 21).
 
+**Whether or not you touched `public/`, find out who calls what you
+changed.** Run `grep -rn "<route path>" public/` for every route you
+edited, and read how the caller builds its payload — how many rows, which
+fields, whether it re-sends values the user never touched. Then exercise
+the route *that* way, not with a minimal payload of your own design.
+
+On 2026-09-03 a step's live check posted one row to
+`POST /api/daily-audit/portions`. The page that calls it posts every dish
+row on screen on every save. The step cleared a provenance column on
+conflict, so one save wiped the stamp on rows nobody had edited and logged
+a content-free `activity_log` entry for each. The suite was green, the
+live check was genuine, and `public/` was untouched. A hand-built curl and
+the page that actually calls the route are different tests, and only one
+of them runs in production.
+
 ## 6. Branch, commit, push, open the PR
 
 Never push to `main`. Never force-push. Never merge your own PR.
@@ -95,6 +110,17 @@ git add <specific paths>
 git commit -m "<short subject>" -m "<what and why>"
 git push -u origin <branch>
 ```
+
+If `graphify-out/` shows as modified in `git status --short`, discard it:
+
+```
+git checkout -- graphify-out/
+```
+
+Graphify refreshes land as their own separate architect commit, never
+folded into a step PR. But leaving them modified in the working tree is
+not the alternative — it hands the next worker an unclean checkout that
+nobody owns and that `git pull` will complain about. Discard, don't stash.
 
 Then fill in `.github/pull_request_template.md` — copy it, complete every
 section, and save the filled copy to a scratch file outside the repo.

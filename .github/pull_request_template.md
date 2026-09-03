@@ -34,6 +34,23 @@ A guess presented as a check is not.
      and describe what you actually saw. If no, write "no". -->
 
 
+## Which callers did you check?
+<!-- For every route you changed: name the files in `public/` that call it,
+     and say whether you exercised it the way they call it.
+     `grep -rn "<route path>" public/` finds them.
+
+     A route tested with one hand-built payload is not tested. On 2026-09-03
+     a step's live check posted a single row. The page that calls that route
+     posts every row on screen on every save — and the difference silently
+     cleared a provenance stamp on every untouched row and wrote a
+     content-free activity_log entry for each one. The suite was green, the
+     live check was real, and the honest answer to "did this touch public/"
+     was no.
+
+     If nothing in `public/` calls it, write "no callers" and say how you
+     checked. -->
+
+
 ## Scope
 <!-- Did anything outside the task change? If yes, say what and why —
      don't quietly include it. -->
