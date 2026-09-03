@@ -18,21 +18,40 @@ suite, and how to keep context costs down.
 
 ## Current state — 2026-09-03
 
-**Steps 1–25c are all closed**, verified against `origin/main` at `911e4f1` by
-an independent architect pull, not from a worker's report. Per-step detail is
-in `changelog.md`; archived narrative is in `session-history.md`.
+**Steps 1–25c are all closed**, verified against `origin/main` at `2d8a6a8` by
+an independent architect clone, full suite run and live server run — not from a
+worker's report. Per-step detail is in `changelog.md`; archived narrative is in
+`session-history.md`.
 
-**Queue: 25a, then 24b-v, then 25d, then soft launch.** All four have their own
-sections below and their order is in `dispatch-queue.md`. 25a closes the last
+**Queue: 25a, then 24b-v, then 25d, then soft launch.** Each has its own
+section below and the order is in `dispatch-queue.md`. 25a closes the last
 half of the ledger-entry gap (`commissary_stock_receipts` is still unwritten).
 24b-v is a data-corruption guard that only matters once balances work. 25d
 records who did each physical count, sequenced before soft-launch because
 attribution is the one deferred item that cannot be backfilled.
 
-After 25d, **nothing is defined, deliberately.** The plan is a soft launch
-against real output so that use decides what gets built, rather than guesswork
-— the same reasoning that deferred the per-meat next-stage config. Do not
-invent a step.
+**25d is NOT dispatchable as written.** The 2026-09-03 gap hunt found two
+errors in its own scope section — see "Gap hunt 2026-09-03" below. Both must be
+folded in before a prompt is drafted, and one of them needs an architect
+decision first.
+
+**Step 25e is defined and is queued late, deliberately.** See its section below
+and `dispatch-queue.md`.
+
+**Pre-launch plan, revised by NaokiiVT 2026-09-03 — this supersedes "soft
+launch against real output".** There is no soft launch against real output yet.
+The app will be exercised against **test data** until three pillars are
+complete, and only then does a launch (with or without finished UI) follow:
+
+1. **Core** — the audit math and its inputs are correct and correctable.
+2. **Terminal Use** — see "Terminal direction" below. Explicitly a big step;
+   NaokiiVT: "we should not skimp it."
+3. **INPUT / EDIT / DELETE for every piece of data the app accepts** — see the
+   CRUD coverage audit under "Gap hunt 2026-09-03".
+
+Steps are still not invented ahead of need, but the three pillars are the frame
+that decides what counts as needed. Anything that does not serve one of them
+waits.
 
 **Automation, added 2026-09-03.** `npm test` runs all 16 suite files and
 prints one aggregate count. `npm run audit:write-paths` flags schema tables and
@@ -440,6 +459,276 @@ the step it was working on is fully finished — should, before ending:
    again a second doc that can silently drift out of sync with the real
    one.
 
+## Gap hunt 2026-09-03 — findings
+
+Method: independent clone at `2d8a6a8`, `npm ci`, `npm run verify`, then a
+seeded scratch DB with the server booted and real payloads POSTed, reading the
+tables back. `SUITE GREEN` (16 files, 325) and `AUDIT CLEAN` both pass with
+every finding below live. None of these were visible in the test suite.
+
+### Finding 1 — `prepped.created_by` lies after a manual correction
+
+**Live bug today. Restaurant-side, not commissary. Not caught by the
+write-path audit and not catchable by it. Needs an architect decision before
+25d can absorb it.**
+
+`POST /daily-audit/portions` upserts `prepped` with `ON CONFLICT ... DO UPDATE
+SET portions_produced = excluded.portions_produced`. `created_by` is named in
+neither the INSERT nor the UPDATE. The only writer of `prepped.created_by`
+anywhere is `commands.js`'s sync-batch-stock, which stamps
+`'SYSTEM:sync-batch-stock'`.
+
+Reproduced live:
+
+```
+POST /api/commands/sync-batch-stock       -> prepped row created, 30 portions,
+                                             created_by 'SYSTEM:sync-batch-stock'
+POST /api/daily-audit/portions {prepped:42}
+                                          -> {"ok":true,"saved":1}
+prepped row now: portions_produced 42, created_by 'SYSTEM:sync-batch-stock'
+```
+
+The number is hand-entered by an auditor. The attribution says SYSTEM. This is
+the exact sequence the route's own header comment describes as intended and
+expected ("the auditor correcting an inferred default with the real physical
+number"), so it is the normal path, not an edge case.
+
+**Why the write-path audit cannot see it.** The audit asks whether a column has
+a writer. `prepped.created_by` has one. The gap is a *second* route that upserts
+the same row and silently leaves the column at its old value. Any column written
+by one path and skipped by another upsert path on the same row is invisible to
+this audit. Worth deciding whether that class gets its own check.
+
+**Why it collides with 25d specifically.** `prepped` and `portion_ending_actual`
+are written by the same route, from the same dish row, on the same screen, from
+one submit. 25d gives `portion_ending_actual.created_by` the auditor's name and
+leaves `prepped.created_by` on that same row reading SYSTEM. 25d already states
+the correct rule for this shape ("Include it in the `DO UPDATE SET` clause, not
+only the INSERT, or a corrected count keeps the original auditor's name") and
+simply does not apply it to the third table its own route writes.
+
+**Open decision — what does `prepped.created_by` mean?** Today it is provenance
+(SYSTEM vs NULL-meaning-manual), not identity. Folding it into 25d means either
+overwriting SYSTEM with the auditor's name on correction, or keeping two
+meanings in one column, or adding a second column. That is a semantics call, not
+a worker call. **Do not dispatch 25d until this is answered.**
+
+`opening_stock` was checked and has no `created_by` at all, so 25d correctly
+omits it. No gap there.
+
+### Finding 2 — 25d as written splits the two audit pages' contracts
+
+25d requires a blank `actor` to be a 400 on the restaurant side, and said of the
+commissary side that no server change was needed. That was wrong. Reproduced
+live:
+
+```
+POST /api/commissary/daily-audit  {"actor":""}   -> HTTP 200, created_by NULL
+```
+
+`POST /commissary/daily-audit` writes `actor || null` with no validation. A
+worker following 25d exactly would ship a restaurant sheet that rejects a blank
+name and a commissary sheet that accepts one — same operator, same shift, two
+contracts, with the commissary side still producing the unattributed rows 25d
+exists to eliminate. 25d's scope section has been corrected; the fix is small
+and belongs inside 25d.
+
+### Premises re-verified — all four queued steps still stand
+
+- **25a** — `commissary_stock_receipts` has no writer. Holds. Read by
+  `commissaryAuditEngine.js` for Stock In; every other mention in `server/` is a
+  comment.
+- **24b-v** — a unit-tracked yield output is still accepted. Holds, live. Source
+  M01 Whole Chicken (`unit`), blank output, `input_quantity` 40 /
+  `backed_weight_out` 28 returned HTTP 200 and wrote the row.
+- **25d** — `POST /daily-audit` silently drops `actor`. Holds. `{"actor":"Naoki"}`
+  returned `{"ok":true,"saved":1}` with `ending_actual.created_by` NULL.
+- **25e** — `stock_receipts.source` CHECK blocks a third value. Holds:
+  `CHECK (source IN ('DIRECT','COMMISSARY'))`, so a table rebuild is genuinely
+  required.
+
+### Route/fetch diff — clean in the direction that matters
+
+67 registered routes, 84 `fetch()` calls in `public/`. **Zero fetch calls with
+no matching route.** The reverse direction produced six apparent orphans, all
+six confirmed false positives of the matcher (URLs assigned to a variable before
+the call, multi-line option objects) — not findings. The previously recorded
+"45 for 45" figure matches neither count in today's repo; treat it as stale
+rather than as evidence of a regression.
+
+### Finding 3 — a skipped count silently rewinds beginning stock to the bootstrap number
+
+**SEVERE. Core (pillar 1). Restaurant side. Not a UI bug — it is in
+`auditEngine.js` and it corrupts every downstream number.**
+
+`getBeginningStock` resolves in this order: yesterday's `ending_actual`, else
+`opening_stock`, else null. The `opening_stock` query has **no date filter** —
+it takes the single row for (restaurant, meat) whatever its `business_date`.
+
+Reproduced live:
+
+```
+2026-10-01  opening_stock 100, ending_actual counted at 90
+2026-10-02  auditor skips the count entirely
+2026-10-02  beginning: 90    <- correct, yesterday's ending
+2026-10-03  beginning: 100   <- the BOOTSTRAP number, not 90
+```
+
+One missed count does not produce a gap; it rewinds beginning stock to the
+number the app was first seeded with, which may be months old. Then
+`ending_calculated = beginning + newStock - usage` is computed from it and
+reported as if normal. `status` returns `MISSING_ACTUAL_COUNT`, which describes
+today's missing count and says nothing about the beginning having come from a
+stale fallback. Every subsequent day chains off the wrong figure.
+
+Missed counts are the expected case, not the exotic one — that is the whole
+reason sync-batch-stock exists on the dish side.
+
+**Decision needed.** Options are: return null and a distinct status when the
+prior day's count is missing (surfaces the gap, refuses to guess); make
+`opening_stock` valid only for its own `business_date`; or carry the last known
+count forward with an explicit staleness marker. This is a Core correctness
+decision and must not be resolved by a worker.
+
+### Finding 4 — `opening_stock` is write-once and cannot be corrected
+
+**Pillar 3. Same shape on `commissary_opening_stock`.**
+
+`INSERT OR IGNORE` against `UNIQUE (restaurant_id, meat_id)` — note the
+constraint has **no `business_date`**. The schema comment calls the date "the
+first date this app tracks this meat", so the table is a one-time bootstrap, not
+a periodic opening balance. Reproduced live:
+
+```
+enter 50  -> {"ok":true,"saved":1}   stored: 50
+correct to 75 -> {"ok":true,"saved":1}   stored: 50
+```
+
+The correction reports success and does nothing. There is no PATCH, PUT or
+DELETE for either opening-stock table anywhere in the app. Combined with
+finding 3, a typo in the bootstrap figure is both permanent and periodically
+re-read as live data.
+
+**This is the one to fix before test data is entered**, because entering test
+data is exactly how it gets discovered, and by then the number is stuck.
+
+**It also collides with the stated landing-page plan.** "Beginning of the month
+should always be terminal-based" presumes a monthly opening balance. No such
+concept exists: beginning is always the prior day's ending, with `opening_stock`
+as a single lifetime seed. Supporting a monthly opening is a schema change plus
+an `auditEngine` change, not a terminal command. See "Landing input model"
+below — flagged, not decided.
+
+### Finding 5 — a value entered by mistake cannot be un-entered
+
+**Pillar 3.** `POST /daily-audit` and `POST /daily-audit/portions` write only
+fields that are non-empty (`!== null && !== undefined && !== ''`). Blanking a
+cell and saving is a silent no-op that returns success. Reproduced live:
+
+```
+enter 999 -> saved.  clear the cell, save -> {"ok":true,"saved":1}
+stored: still 999
+```
+
+`PATCH /sales` already handles this correctly — an empty `quantity` is treated
+as `isClearing` and the row is deleted — so the same auditor gets two different
+behaviours on two screens. `PATCH /sales` is the model to copy.
+
+### CRUD coverage audit (pillar 3) — 2026-09-03
+
+Complete (create, edit, delete): `stock_receipts`, `commissary_yield_log`,
+`commissary_adjustments`, and `sales` (via `PATCH /sales`, which handles
+clearing).
+
+**Create only — no edit, no delete:**
+- `allocations` (`POST /allocations`)
+- conversion allocations (`POST /allocations/conversion`)
+- `commissary_shipments` (`POST /commissary/shipments`)
+
+All three are stock movements. A mis-keyed movement currently cannot be
+corrected or voided by any route.
+
+**Upsert only — no delete, and no way to clear a value (finding 5):**
+`ending_actual`, `portion_ending_actual`, `prepped`, `commissary_ending_actual`.
+
+**No write path at all:** `commissary_stock_receipts` (step 25a).
+
+**Write-once, uncorrectable (finding 4):** `opening_stock`,
+`commissary_opening_stock`.
+
+Catalog tables under `/settings/*` all have create and edit; deletion is by
+`active = 0` soft delete by design, except `recipes`, which has a real DELETE.
+That asymmetry is deliberate and is not a pillar-3 gap.
+
+### Finding 6 — the Terminal has no server route and its tests mirror a copy
+
+**Pillar 2.** There is no `server/routes/terminal.js`. `public/terminal.html` is
+entirely inline script. `server/routes/terminal.test.js` states in its own
+header that it mirrors only the resolver logic copied out of that inline script,
+with no DB involved — so its 15 green assertions prove a copy behaves, not that
+the Terminal does. The copy can drift from the original silently and the suite
+will stay green.
+
+Relevant because pillar 2 makes the Terminal a first-class surface and the
+quick-command panel is planned for removal. Whether the Terminal grows a real
+server route is the first scoping question of that pillar.
+
+## Landing input model and Terminal direction — stated 2026-09-03
+
+Recorded as NaokiiVT's stated direction. **Not yet scoped into steps**, and
+several parts have open questions that must be answered before any of it is
+dispatched. Written here so the direction survives; do not treat it as a spec.
+
+### Landing page — which columns are manual
+
+- **Ending** — always manual input. The only column on the landing sheet
+  intended to stay hand-entered permanently.
+- **Notes** — manual. (Terminal has its own separate notes concept.)
+- **New stock** — comes from Stock Receipts, which has its own page.
+- **Usage** — to be driven by a Loyverse API call that parses items. **Not
+  implemented, and there are no settings for it yet.** See `docs/loyverse-sync.md`
+  and rule 14 — the sync is deliberately unbuilt.
+- **Allocations** — has its own page.
+- **Beginning of month** — intended to be Terminal-driven, "or unless its
+  possible to have it manually open on the first day of any month."
+
+**Open question, blocking.** The beginning-of-month idea has no counterpart in
+the current model. Beginning is always the prior day's `ending_actual`, and
+`opening_stock` is a single lifetime seed per meat with no date in its unique
+constraint (finding 4). A monthly opening balance would be a schema change plus
+an `auditEngine` change. Decide what "beginning of the month" means before
+anything is built: a re-seed, a period boundary, or nothing at all.
+
+**Second open question.** Usage today is derived as `sales × recipe_bom` for
+DIRECT dishes plus `prepped × recipe_bom` for BATCH_PREPPED ones. Loyverse would
+supply *sales*, not usage directly. Confirm that reading before scoping, because
+"usage is the API call" and "sales is the API call" produce different designs.
+
+### Terminal direction
+
+NaokiiVT: Terminal is one of the big steps for this project and should not be
+skimped.
+
+Intent: landing-related commands that accept **today or a specific date** and
+then act — call sales, input or edit a value on new stock, allocations, and
+anything else that is not manual, including the manual ones (with the caveat
+that entering Ending through the Terminal wastes the auditor's time, so the
+page keeps that job).
+
+Also planned: **removal of the quick-command panel** at the bottom of every
+page, with commands living in the Terminal instead, possibly as a mobile-usable
+portable prompt.
+
+**Dependency to resolve first.** `POST /commands/sync-batch-stock` is reachable
+only from that panel, and its own comment says it is global precisely because
+the panel has no restaurant/date context. If the panel is removed, the command
+needs a home or SYSTEM-inferred `prepped` rows stop being generated — which
+quietly changes what the dish math sees on days nobody logged production.
+
+**Structural precondition.** See finding 6: the Terminal has no server route and
+its tests mirror a copy of its inline script. Deciding whether it gets a real
+route is the first scoping question of pillar 2.
+
 ## Steps 25a / 25b — the commissary ledger has no way in
 
 **Found 2026-09-02 by an architect audit of every write path into the
@@ -594,8 +883,67 @@ same-meat case instead of saying so. Catalog work belongs in the tagging pass.
 **Lane: DISPATCH only. Operator-visible, so not engineer-lane. No schema
 change — every column already exists.**
 
-`ending_actual.created_by` and `portion_ending_actual.created_by` are in the
-schema and written by nothing. Found 2026-09-03 by the write-path audit
+**Decision, NaokiiVT 2026-09-03: restaurant-side naming is IN.** Blank names are
+never accepted, on either sheet. Q3 resolved the same day: one person handles a
+whole area (Landing, and Commissary), so **one name per sheet covers both POSTs
+that page makes** — there is no need to attribute portions or cooking
+separately from the inventory as a whole.
+
+**25d is now split three ways.** As originally written it was one step; the read
+path below turns it into a design question, so it no longer is.
+
+- **25d-i — the write half.** `actor` into `ending_actual` and
+  `portion_ending_actual`, blank rejected with a 400 on *both* sheets
+  (see gap-hunt finding 2), one field at the top of each page sent with both
+  POSTs. Fully specified, no open questions, dispatchable.
+- **25d-ii — the `prepped` provenance fix.** One line, no naming, independent of
+  everything else; may ride along with any step that touches
+  `dailyAudit.js`. See below.
+- **25d-iii — the read path.** Blocked on an architect decision. See below.
+
+### 25d-ii — `prepped.created_by` is provenance, not identity
+
+**Decision, NaokiiVT 2026-09-03: do NOT write auditor names to `prepped`.**
+
+On `prepped`, `created_by` means *this number was inferred from sales by
+sync-batch-stock*, and NULL means *a human typed it*. Writing an auditor's name
+there would destroy that signal. The bug in gap-hunt finding 1 is narrower than
+first described: when a human corrects an inferred number, the SYSTEM stamp must
+be **cleared**, not replaced.
+
+```sql
+DO UPDATE SET portions_produced = excluded.portions_produced,
+              created_by = NULL
+```
+
+**Same column name, two meanings across tables** — provenance on `prepped`,
+identity on `ending_actual` / `portion_ending_actual`. Recorded here so nobody
+later "fixes" the inconsistency.
+
+**Second half, undecided.** sync-batch-stock writes an `activity_log` entry;
+the manual correction in `dailyAudit.js` writes none. History therefore shows
+"SYSTEM created this, 30 portions" and never shows a human changing it to 42.
+`prepped` is the only logged entity with an unlogged write path. Decide whether
+the correction gets logged.
+
+### 25d-iii — the name is currently unreadable, which 25d does not fix
+
+Found 2026-09-03. Nothing in `server/` reads `created_by` in any WHERE, JOIN or
+branch — every occurrence is a column definition, an INSERT list, a projection,
+or a pass-through into `activity_log.actor`. And `public/history.html` filters
+it out explicitly: `SKIP_FIELDS = new Set(['id', 'created_at', 'created_by'])`.
+
+`ending_actual` and `portion_ending_actual` are also not written to
+`activity_log` at all (rule 9, re-confirmed by this step), so there is no log
+entry carrying the name in a header either.
+
+**So after 25d-i the name is stored and there is no way to get it back out.**
+25d's justification is that you cannot reconstruct who counted the walk-in on a
+given Tuesday later — as scoped, you still cannot. Decide where a stored name
+becomes visible before building this half.
+
+`ending_actual` and `portion_ending_actual`'s `created_by` are in the schema and
+written by nothing. Found 2026-09-03 by the write-path audit
 (`npm run audit:write-paths`). The commissary side is half-built: `POST
 /commissary/daily-audit` already accepts a top-level `actor` and writes it to
 `commissary_ending_actual.created_by`, but `commissary.html` never sends one,
@@ -639,8 +987,12 @@ implements. Mirror it exactly rather than inventing a second convention.
   SET` clause, not only the INSERT, or a corrected count keeps the original
   auditor's name.
 - `public/daily-audit.html` — one field, sent with both POSTs.
-- `public/commissary.html` — one field, sent with the existing POST. No
-  server change needed here; the route already handles it.
+- `public/commissary.html` — one field, sent with the existing POST.
+- `server/routes/commissary.js` — **`POST /commissary/daily-audit` DOES need a
+  change**, contrary to what this section said before 2026-09-03. It stores
+  `actor` correctly but validates nothing: a blank `actor` returns 200 and
+  writes `created_by` NULL. See "Gap hunt 2026-09-03", finding 2. Add the same
+  blank-`actor` 400 here, or the two audit sheets ship with different contracts.
 
 `actor` is free text. There is no auth system and this step does not
 introduce one.
