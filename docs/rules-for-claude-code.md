@@ -424,6 +424,36 @@ exactly where rule 16 spent real effort removing it. The 2026-09-02 session
 that hit this was correct to proceed — its prompt was self-contained and its
 work landed clean. The only thing missing was the flag.
 
+## Rule 24 — Never delete the local database
+
+Never delete, move, or overwrite `server/db/inventory.db` or its
+`inventory.db-wal` / `inventory.db-shm` companions. Not with `rm`, not with
+`Remove-Item`, not by redirecting output onto them, not "temporarily."
+
+If a step needs a clean database, build a scratch one **outside the repo**
+from `server/db/schema.sql` and point at that. Do not clear the real one.
+
+On 2026-09-03 a worker ran `rm -f` on all three files intending to copy a
+backup first. The `cp` ran *after* the `rm` and carried `2>/dev/null`, so
+its failure was silent and the database was gone with no backup. The
+worker stopped immediately and reported it plainly rather than continuing,
+which is the correct half of what happened. The contents turned out to be
+test residue and a wipe-and-reseed was already an owed pre-launch task, so
+nothing was lost — but a harmless outcome does not make the action safe.
+The same three commands against a soft-launched database lose real counts
+that exist nowhere else, because this app has no backup story yet and runs
+on one machine.
+
+This rule is enforced, not just written: `scripts/guard-db.js` runs as a
+`PreToolUse` hook on `Bash`, `Write` and `Edit` and exits non-zero on a
+matching command. The hook is a backstop for a rule you are expected to
+already be following. If it fires, do not rephrase the command to get
+around it — stop and ask the architect.
+
+Reads are deliberately unaffected. `sqlite3 server/db/inventory.db`,
+`node server/db/seed.js`, and the server opening the file normally all
+pass.
+
 ## Red flags — stop and ask if you notice yourself about to do these
 - Adding authentication/user roles beyond a single local user.
 - Suggesting a hosted database or cloud deployment.

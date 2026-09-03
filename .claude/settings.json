@@ -18,6 +18,15 @@
             "command": "graphify hook-guard read"
           }
         ]
+      },
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/guard-db.js"
+          }
+        ]
       }
     ]
   }
