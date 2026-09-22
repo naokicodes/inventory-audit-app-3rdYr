@@ -43,3 +43,9 @@ graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 # Standard clutter
 node_modules/
 .DS_Store
+# Architect / dispatcher working notes — kept LOCAL, never published
+# (this repo is public). They live in docs/ so Claude Code reads them as
+# ground truth, but git never tracks them.
+docs/architect-notes-PRIVATE.md
+docs/DISPATCHER-HANDOFF.md
+docs/handoffs/

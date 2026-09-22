@@ -18,7 +18,8 @@ const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 const db = new DatabaseSync(DB_PATH);
 
-// A couple of sane defaults for a single-user local SQLite file:
+// A couple of pragmas for a shared, multi-user local SQLite file
+// (busy_timeout still to be added — see 2026-09-15 handoff §3.11):
 db.exec('PRAGMA journal_mode = WAL');   // better crash-safety, minimal downside here
 db.exec('PRAGMA foreign_keys = ON');    // enforce FK constraints once tables exist
 

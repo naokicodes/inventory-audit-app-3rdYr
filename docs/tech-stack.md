@@ -18,7 +18,7 @@ have.
 | ORM / DB access | Node's **built-in `node:sqlite`** module (`DatabaseSync`) — not `better-sqlite3` | `better-sqlite3` is a native module requiring compilation (needs Visual Studio Build Tools on Windows) — real friction for a solo Windows dev with no upside at this scale. Node 22.13+ ships SQLite support built into the runtime itself, zero install, zero compilation. Requires Node 22.13.0 or newer (confirmed available on Node 24, what this project uses). Still marked experimental/release-candidate by Node as of this writing — acceptable for a small local single-user tool, revisit only if it causes a real problem. |
 | Frontend | Plain HTML + CSS + vanilla JavaScript (or a very light templating approach) | No React/build-step needed for forms this simple; fewer moving parts, faster to iterate on with Claude Code |
 | File uploads (photos) | Saved to a local folder (e.g. `/uploads/`), path stored in the DB | No cloud storage needed for a local single-machine app |
-| Hosting | **None — runs locally** on the auditor's machine, `npm run dev` style | See scope.md — not networked, not cloud-hosted, by design |
+| Hosting | **Local shared server** — one PC on the LAN serving multiple co-located stations, `npm run dev` style | Networked on the local network (not cloud-hosted). See scope.md and the 2026-09-15 handoff |
 | Version control | Git + private GitHub repo | Code and docs only — never the database file or uploads (see .gitignore in the GitHub setup guide) |
 | Testing | A lightweight test runner (e.g. Node's built-in `node:test`, or Vitest if it's needed) covering the audit engine's math specifically | The calculation logic is the part that must never be silently wrong — test it directly with real numbers from the old spreadsheet |
 
@@ -35,7 +35,11 @@ have.
 - **Cloud hosting (Vercel/Render/etc.)** — not needed until/unless this
   becomes multi-location (see scope.md), which is a deliberate future
   decision, not a default.
-- **Authentication/authorization system** — single local user, see scope.md.
+- **Passwords / full authentication** — deferred to a stub login (pick-your-name,
+  no password) until the recycled auth system lands. NOTE: authorization
+  (configurable roles + permissions) is now IN SCOPE and being built — see
+  scope.md and the 2026-09-15 handoff. This line covers only the password
+  mechanism, not roles.
 
 ## Project structure (starting point)
 ```
@@ -57,7 +61,10 @@ Keep this flat and boring. Don't add folders/layers speculatively for
 features that aren't being built yet.
 
 ## When to revisit this doc
-If the app is later handed to multiple simultaneous users, moved to a
-shared server, or needs to survive far larger data volumes than described
-in scope.md — that's when Postgres/hosting/auth become worth discussing.
-Not before.
+The multi-simultaneous-users trigger has now FIRED: the app is becoming
+multi-user on a shared local server. That did NOT flip the stack — SQLite,
+node:sqlite, and the local PC all stay (per the 2026-09-15 handoff: data volume
+is an index problem, not a Postgres problem; hosting stays a local shared PC).
+What it added is authorization (roles/permissions) plus concurrency hardening
+(busy_timeout, indexes, an optimistic-concurrency column). Postgres and cloud
+hosting remain deliberately deferred, not adopted by default.

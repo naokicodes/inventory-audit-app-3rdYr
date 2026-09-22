@@ -56,6 +56,11 @@ choice was made deliberately rather than by accident. One line each.
 - Step ordering, priority, or scope — including "this step would be
   better split"
 - Anything in `session-status.md`'s **"Things NOT to re-litigate"**
+- A **restaurant/domain decision disguised as an implementation detail** — if
+  resolving what looks like a pure code choice quietly decides how the
+  restaurant works (what a number means, what a worker must key in, how stock
+  moves), it is Class B. This is the tell most likely to slip through as "just
+  code," and catching it is the whole point of the gate.
 
 Use `gh issue create --template needs-architect.md`. State the step, the
 exact ambiguity, and **both readings** — not a recommendation. A

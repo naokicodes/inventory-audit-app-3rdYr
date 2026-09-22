@@ -32,11 +32,14 @@ an obvious/helpful addition. Small scale, deliberately.
   goods, beverages, or anything besides meat. The existing station-by-station
   daily inventory process for everything else continues unchanged, outside
   this app.
-- **Not multi-user / not networked.** One auditor, one computer, one
-  database file. No login system beyond maybe a simple local password if
-  ever needed — no roles, no permissions matrix, no concurrent access. The
-  activity log's "actor" field is plain text the person types, not an
-  authenticated identity.
+- **Multi-user with role-based access (in progress).** Moving from the original
+  single-user local tool to a multi-user system: multiple concurrent checkers on
+  one shared database on one PC serving co-located sites, with configurable roles
+  and permissions. Authorization (roles/perms) is being built now; authentication
+  (passwords) is deferred to a stub — pick-your-name-from-a-list, no password —
+  until the recycled auth system is available. Identity moves from the activity
+  log's free-text "actor" to a thin `users` table that `created_by` references.
+  See `docs/handoffs/ARCHITECTURE-HANDOFF-2026-09-15.md` for design and reasoning.
 - **Not cloud-hosted (for now).** No server to maintain, no monthly hosting
   bill, no uptime to worry about.
 - **Not a POS.** Sales numbers come FROM the existing Loyverse setup via the

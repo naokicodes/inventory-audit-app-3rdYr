@@ -1,7 +1,7 @@
 {
   "name": "inventory-audit-app",
   "version": "0.1.0",
-  "description": "Meat inventory audit tool - local, single-user, 3-restaurant scope. See docs/ for full spec.",
+  "description": "Meat inventory audit tool - multi-user (configurable roles), shared local server, multi-restaurant scope. See docs/ for full spec.",
   "main": "server/index.js",
   "scripts": {
     "dev": "node server/index.js",
