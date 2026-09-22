@@ -34,7 +34,7 @@ const IGNORED_COLUMNS = new Set(['id', 'created_at', 'updated_at']);
 function stripSqlComments(sql) {
   return sql
     .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
+    .split(/\r?\n/)
     .map((line) => line.replace(/--.*$/, ''))
     .join('\n');
 }
