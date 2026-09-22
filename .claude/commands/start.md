@@ -1,21 +1,27 @@
 ---
-description: Begin the next runnable step from the queue — ground, select, plan, then pause for /continue.
+description: Begin the next runnable step from the queue — ground on main, select, plan, then pause for /continue.
 ---
 
 Pick up the next runnable step from the queue and take it up to the point of
 implementation, then stop for a checkpoint. **Do NOT write code in this
 command** — that is `/continue`.
 
-## 1. Ground yourself in the real repo
+## 1. Ground yourself on a current main
+
+Start every run from `main`, not wherever the last one left you:
 
 ```
+git checkout main
 git pull
 git status -sb
 git log --oneline -3
 ```
 
-Paste the raw output. An architect's commits are invisible to a local checkout
-until you pull.
+Confirm `git status -sb` reads "On branch main" and up to date with
+`origin/main`. If `git checkout main` refuses because of uncommitted changes,
+**stop and report** — a previous step wasn't finished, and that must be resolved
+before a new one starts. An architect's commits are invisible to a local
+checkout until you pull.
 
 ## 2. Baseline
 
@@ -25,6 +31,7 @@ npm run verify
 
 Must print `SUITE GREEN` and `AUDIT CLEAN`. If it does not, **stop and report** —
 you have inherited a problem, and anything built on it will be blamed on you.
+(If `verify` is reported missing, you are not on `main` — return to step 1.)
 
 ## 3. Select the next runnable step — do NOT guess
 
