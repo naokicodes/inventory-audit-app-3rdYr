@@ -455,8 +455,15 @@ Reads are deliberately unaffected. `sqlite3 server/db/inventory.db`,
 pass.
 
 ## Red flags — stop and ask if you notice yourself about to do these
-- Adding authentication/user roles beyond a single local user.
-- Suggesting a hosted database or cloud deployment.
+- Building authentication or roles OFF YOUR OWN INITIATIVE. Authorization
+  (configurable roles + permissions) is now IN SCOPE — but it is architect-
+  defined, step by step (see `session-status.md` -> "Things NOT to re-litigate",
+  2026-09-15); do not design or add it ad hoc. Authentication (passwords) stays
+  deferred to a stub (pick-your-name, no password) until the recycled auth
+  system lands — do not build password login.
+- Suggesting a hosted database or cloud deployment. The app is multi-user now,
+  but on ONE shared LOCAL PC — SQLite / node:sqlite and local hosting stay
+  (volume is an index problem, not a Postgres one).
 - Building features not listed in `scope.md`.
 - Writing a calculation as a hardcoded number "for now."
 - Silently changing the sign convention, units, or table names from

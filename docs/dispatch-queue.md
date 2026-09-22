@@ -11,6 +11,17 @@ See `docs/engineer-role.md`.
 step. This file says *what order* and *which lane* — not what the work
 is. Read the step's own section in `session-status.md` before starting.
 
+> **2026-09-15 — read alongside the pivot.** The app is moving to multi-user
+> with roles. The decisions are recorded in `session-status.md` -> "Things NOT
+> to re-litigate" (2026-09-15 block); fuller reasoning is in the architect-held
+> `ARCHITECTURE-HANDOFF-2026-09-15.md` (local / gitignored — ask the architect).
+> The steps below are the still-valid CORRECTNESS backbone and mostly stand, but
+> **two now carry a reconciliation flag** (25a and 25d-i/iii), and the new
+> multi-user surface is listed under "Planned" at the bottom as **NOT yet
+> specified.** The launch model is now a phased beta (P0 open -> P1
+> identity+roles -> P2 passwords) and the definition-of-done is still owed, so
+> the "before soft-launch" tags below are under revision.
+
 ---
 
 ## Queue
@@ -65,6 +76,12 @@ not the decision.
 Spec: `session-status.md`, section "Steps 25a / 25b — the commissary
 ledger has no way in".
 
+**RECONCILE before the prompt is written (2026-09-15).** Endorsement-as-receipt
+makes "confirm an arrival = write a receipt." Before 25a's prompt is authored,
+the architect must settle whether commissary supplier-intake and the
+endorsement / PO-arrival receipt share ONE receipt shape or stay distinct. This
+is a domain reconciliation, still open — not the engineer's call.
+
 ### 4. Step 24b-v — the effective yield output must be kg-tracked
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
@@ -85,6 +102,12 @@ Sequenced before soft-launch deliberately: attribution is the one deferred
 item that cannot be backfilled later.
 
 Spec: `session-status.md`, section "Step 25d".
+
+**HOLD / RECONCILE (2026-09-15).** This stamps a free-text human name with
+`Unknown` as the convention. That free-text identity is SUPERSEDED by the thin
+`users` table (identity-now-passwords-later). Do NOT dispatch it as free-text;
+it waits for, or folds into, the users-table step, which is not yet written.
+(25d-ii — provenance, SYSTEM/NULL — is unaffected and proceeds.)
 
 ### 6. Step 25e — restaurant-to-restaurant transfers must credit the receiver
 **Lane: DISPATCH only. Queued AFTER soft launch, deliberately.**
@@ -111,6 +134,29 @@ After 24b-v the plan is a soft launch against real output, so that actual
 use decides what gets built next rather than guesswork. This is the same
 reasoning that deferred the per-meat next-stage config. An idle assistant
 costs far less than an invented step.
+
+---
+
+## Planned — multi-user surface (architect-defined, NOT yet specified)
+
+Decided in scoping (2026-09-15), listed so they are visible — but **none is
+dispatchable yet.** Each is gated on still-open items (the recycled auth repo,
+the custom POS repo, the written definition-of-done) and must be written into
+`session-status.md` one at a time before dispatch. Do NOT start any on engineer
+initiative — that is still "inventing a step."
+
+- Thin `users` table + configurable roles/permissions (anchors identity,
+  logging, station scoping; supersedes 25d-i/iii free-text identity)
+- Endorsement-as-receipt (reconcile with 25a first)
+- Side inventory (simple counting, separate from the meat engine)
+- Sahog / no-standard-consumption residual (day-close valuation)
+- Running-low par-level config
+- Finalization flag (mark-and-warn, per site/date sheet)
+- Optimistic-concurrency column + `busy_timeout` + hot-query indexes
+- Snapshot-then-sync backups
+- Source-agnostic sales ingestion (Loyverse-first) + CSV export
+
+Decisions: `session-status.md` -> "Things NOT to re-litigate" (2026-09-15).
 
 ---
 

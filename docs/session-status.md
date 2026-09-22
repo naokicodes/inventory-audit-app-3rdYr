@@ -129,6 +129,57 @@ the runner reads the last count line in each file.
 
 ## Things NOT to re-litigate (already decided, stable)
 
+### 2026-09-15 multi-user scoping — decided (direction; build is gated/Planned)
+
+The app is pivoting from single-user local to multi-user with roles. These are
+decided design directions — reopen only under the conditions stated in the
+architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
+-> "Planned."
+
+- **Sales confidentiality is a data-layer fact, not access control.** Only sales
+  *quantities* enter the app. "Cash" for management = inventory *valuation*
+  (ending stock x the cost price set in settings), for meats and sides. Sales
+  revenue / margin / profit never enters this app.
+- **Side inventory is simple counting**, separate from the meat engine: beginning
+  + receipts − ending, no recipe / no variance, valued at price as a guide. Must
+  NOT route through `auditEngine`.
+- **Sahog / no-standard consumption is a derived residual** at day-close (total
+  consumed − what the direct + prep standards explain), labeled "unstandardized"
+  (NOT "staff meals"), ONE bucket. A reclassification of the already-computed
+  variance, not a new real-time entry.
+- **Endorsement IS the receipt** — confirming an arrival writes the stock receipt
+  (one record), capturing arrived / short (qty) / none. Record-only, non-blocking.
+- **Running-low is user-configured** (par level = a settings field); watches the
+  real ending count with a calculated-ending fallback the checker can overwrite.
+- **Roles are configurable (GitHub-style)**, with server-side per-capability
+  enforcement (never client-side hide-the-button) and a safe bootstrap
+  (un-lockable super-admin + default roles). Roles are station-AGNOSTIC.
+- **Identity now, passwords later.** A thin `users` table (id, name, role) that
+  `created_by` points at is built now; login is a stub (pick-your-name, no
+  password) until the recycled auth lands. Phased beta: P0 open -> P1
+  identity+roles -> P2 passwords.
+- **Station scoping is structural**, via multi-station membership (membership and
+  permission are SEPARATE facts). Floaters belong to both; access = union;
+  schedule is informational + a copy-button. Never fuse station into the role.
+- **Finalization is mark-and-warn** per (site, date) sheet — soft, not a hard
+  lock; any checker marks done (logged); reopening is a logged edit. First-time
+  entry is not logged; changing stored data is.
+- **Concurrency is optimistic** (a version / `updated_at` column + "changed under
+  you — reload"), paired with `busy_timeout` and one-owner-per-sheet. NOT
+  last-write-wins, NOT a waitlist.
+- **Sales ingestion is source-agnostic** (business_date, product_id, quantity,
+  source), Loyverse-first, custom POS a later adapter; map by explicit
+  product_id, never by name; quantities only.
+- **Backups: snapshot-then-sync to Drive.** Never put the live WAL `inventory.db`
+  in a synced folder; a scheduled SQLite backup writes a consistent snapshot that
+  Drive syncs.
+- **Data volume: no PC upgrade.** Speed is an index problem, not hardware or
+  pruning. Archive, don't delete. CSV export yes; CSV import deferred.
+- **Pin Node forward** (recent version, suite green, then lock the exact version).
+- **Configure-from-the-ground-up posture**, with the honest caveat that it needs
+  a written **definition-of-done** — still OWED (Naoki's to draft; it is the
+  bound on "solid / no more features").
+
 - **The app records what is physically on hand, not what was invoiced.**
   Confirmed by NaokiiVT 2026-09-02. On a delivery the commissary weigh-checks
   against the supplier's figure; where they disagree, **our own scale wins** and
