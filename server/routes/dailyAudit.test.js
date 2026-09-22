@@ -19,6 +19,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { getBeginningStock } = require('../engines/auditEngine.js');
+const { withTransaction, logActivity } = require('../db/activityLog.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -46,6 +47,7 @@ db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES 
 db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (2, 1, 'M02', 'Pork Belly', 'kg')`).run();
 db.prepare(`INSERT INTO dishes (id, restaurant_id, dish_code, name, prep_type) VALUES (1, 1, 'D01', 'Mozzarella Sticks', 'BATCH_PREPPED')`).run();
 db.prepare(`INSERT INTO dishes (id, restaurant_id, dish_code, name, prep_type) VALUES (2, 1, 'D02', 'Chicken Skewers', 'BATCH_PREPPED')`).run();
+db.prepare(`INSERT INTO dishes (id, restaurant_id, dish_code, name, prep_type) VALUES (3, 1, 'D03', 'Beef Tapa', 'BATCH_PREPPED')`).run();
 
 const insertOpeningStock = db.prepare(`
   INSERT OR IGNORE INTO opening_stock (restaurant_id, meat_id, business_date, quantity)
@@ -100,10 +102,16 @@ test('Once ending_actual exists for a day, beginning for the next day comes from
 });
 
 // Mirrors POST /api/daily-audit/portions
-const upsertPrepped = db.prepare(`
-  INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced)
-  VALUES (?, ?, ?, ?)
-  ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET portions_produced = excluded.portions_produced
+const getPrepped = db.prepare(`
+  SELECT * FROM prepped WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?
+`);
+const insertPrepped = db.prepare(`
+  INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced, created_by)
+  VALUES (?, ?, ?, ?, NULL)
+`);
+const updatePrepped = db.prepare(`
+  UPDATE prepped SET portions_produced = ?, created_by = NULL
+  WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?
 `);
 const upsertPortionActual = db.prepare(`
   INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted)
@@ -113,13 +121,39 @@ const upsertPortionActual = db.prepare(`
 function savePortions(restaurantId, businessDate, rows) {
   let saved = 0;
   for (const row of rows) {
+    let wrote = false;
+
     if (row.prepped !== null && row.prepped !== undefined && row.prepped !== '') {
-      upsertPrepped.run(restaurantId, row.dish_id, businessDate, Number(row.prepped));
+      const value = Number(row.prepped);
+      const existing = getPrepped.get(restaurantId, row.dish_id, businessDate);
+      if (!existing || existing.portions_produced !== value) {
+        withTransaction(db, () => {
+          if (existing) {
+            updatePrepped.run(value, restaurantId, row.dish_id, businessDate);
+          } else {
+            insertPrepped.run(restaurantId, row.dish_id, businessDate, value);
+          }
+          const after = getPrepped.get(restaurantId, row.dish_id, businessDate);
+          logActivity(db, {
+            actor: null,
+            entityType: 'prepped',
+            entityId: after.id,
+            action: existing ? 'UPDATE' : 'CREATE',
+            before: existing || null,
+            after,
+            source: 'MANUAL'
+          });
+        });
+        wrote = true;
+      }
     }
+
     if (row.portion_actual !== null && row.portion_actual !== undefined && row.portion_actual !== '') {
       upsertPortionActual.run(restaurantId, row.dish_id, businessDate, Number(row.portion_actual));
+      wrote = true;
     }
-    saved++;
+
+    if (wrote) saved++;
   }
   return saved;
 }
@@ -130,11 +164,74 @@ test('a fresh prepped write creates one row', () => {
   assert.strictEqual(row.portions_produced, 20);
 });
 
-test('a second prepped write for the same dish/date REPLACES it (upsert, not a duplicate row) - this is the sync-batch-stock override case', () => {
+test('a second prepped write for the same dish/date with a DIFFERENT value REPLACES it (upsert, not a duplicate row) - this is the sync-batch-stock override case', () => {
   savePortions(1, '2026-08-29', [{ dish_id: 1, prepped: 18 }]);
   const rows = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-08-29'`).all();
   assert.strictEqual(rows.length, 1, 'must still be exactly one row, not two');
   assert.strictEqual(rows[0].portions_produced, 18, 'must be the new value, manual entry wins');
+});
+
+test('a no-op prepped save (same value reposted) writes nothing, logs nothing, and does not count toward saved', () => {
+  const before = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-08-29'`).get();
+  const logCountBefore = db.prepare(`SELECT COUNT(*) as c FROM activity_log WHERE entity_type = 'prepped'`).get().c;
+
+  const saved = savePortions(1, '2026-08-29', [{ dish_id: 1, prepped: 18 }]);
+
+  const after = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-08-29'`).get();
+  const logCountAfter = db.prepare(`SELECT COUNT(*) as c FROM activity_log WHERE entity_type = 'prepped'`).get().c;
+  assert.deepStrictEqual(after, before, 'row must be byte-for-byte unchanged, including created_by');
+  assert.strictEqual(logCountAfter, logCountBefore, 'no activity_log entry for a no-op save');
+  assert.strictEqual(saved, 0, 'saved must not count an untouched row');
+});
+
+test('a real prepped correction clears a SYSTEM stamp to NULL and logs one UPDATE with the SYSTEM value visible in before', () => {
+  db.prepare(`
+    INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced, created_by)
+    VALUES (1, 3, '2026-09-05', 12, 'SYSTEM:sync-batch-stock')
+  `).run();
+
+  const saved = savePortions(1, '2026-09-05', [{ dish_id: 3, prepped: 9 }]);
+
+  const row = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 3 AND business_date = '2026-09-05'`).get();
+  assert.strictEqual(row.portions_produced, 9, 'manual entry wins over the inferred value');
+  assert.strictEqual(row.created_by, null, 'SYSTEM stamp must be cleared, not kept');
+  assert.strictEqual(saved, 1);
+
+  const entry = db.prepare(`
+    SELECT * FROM activity_log WHERE entity_type = 'prepped' AND entity_id = ? ORDER BY id DESC LIMIT 1
+  `).get(row.id);
+  assert.strictEqual(entry.action, 'UPDATE');
+  const loggedBefore = JSON.parse(entry.before);
+  assert.strictEqual(loggedBefore.created_by, 'SYSTEM:sync-batch-stock', 'the overwritten SYSTEM stamp must be visible in before');
+});
+
+test('a fresh prepped write (no existing row) logs a CREATE with before: null', () => {
+  savePortions(1, '2026-09-06', [{ dish_id: 3, prepped: 7 }]);
+  const row = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 3 AND business_date = '2026-09-06'`).get();
+  const entry = db.prepare(`
+    SELECT * FROM activity_log WHERE entity_type = 'prepped' AND entity_id = ? ORDER BY id DESC LIMIT 1
+  `).get(row.id);
+  assert.strictEqual(entry.action, 'CREATE');
+  assert.strictEqual(entry.before, null);
+});
+
+test('a multi-row payload where only one row changed touches only that row', () => {
+  savePortions(1, '2026-09-07', [{ dish_id: 1, prepped: 50 }, { dish_id: 3, prepped: 60 }]);
+  const logCountBefore = db.prepare(`SELECT COUNT(*) as c FROM activity_log WHERE entity_type = 'prepped'`).get().c;
+
+  const saved = savePortions(1, '2026-09-07', [
+    { dish_id: 1, prepped: 50 },  // unchanged - resave
+    { dish_id: 3, prepped: 65 }   // changed
+  ]);
+
+  const dish1 = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-09-07'`).get();
+  const dish3 = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 3 AND business_date = '2026-09-07'`).get();
+  const logCountAfter = db.prepare(`SELECT COUNT(*) as c FROM activity_log WHERE entity_type = 'prepped'`).get().c;
+
+  assert.strictEqual(dish1.portions_produced, 50, 'untouched row keeps its value');
+  assert.strictEqual(dish3.portions_produced, 65, 'changed row gets the new value');
+  assert.strictEqual(saved, 1, 'only the changed row counts');
+  assert.strictEqual(logCountAfter, logCountBefore + 1, 'only the changed row logs an entry');
 });
 
 test('a fresh portion_actual write creates one row', () => {

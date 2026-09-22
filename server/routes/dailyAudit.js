@@ -5,6 +5,7 @@
 const express = require('express');
 const db = require('../db/connection.js');
 const { computeMeatAudit, computeMixedDailyAudit } = require('../engines/auditEngine.js');
+const { withTransaction, logActivity } = require('../db/activityLog.js');
 
 const router = express.Router();
 
@@ -178,21 +179,22 @@ router.post('/daily-audit', (req, res) => {
 // The write path for BATCH_PREPPED dish rows that's been missing since
 // step 11 (session-status.md) - dish rows on Landing have been
 // display-only until now. Same "only write fields actually provided"
-// convention as POST /api/daily-audit, and the same real SQLite upsert
-// pattern (ON CONFLICT ... DO UPDATE) against prepped/
-// portion_ending_actual's own UNIQUE(restaurant_id, dish_id,
-// business_date) constraints - not a separate exists-check, the schema
-// itself guarantees one row per dish/date.
+// convention as POST /api/daily-audit. portion_ending_actual keeps the
+// original ON CONFLICT ... DO UPDATE upsert - unconditional, every post
+// overwrites it, no history to protect.
 //
-// A manual write here always wins over whatever's already in `prepped`
-// for that dish/date - including a SYSTEM row from step 15's "Sync
-// batch stock" command (created_by = 'SYSTEM:sync-batch-stock'). That's
-// intentional, not an oversight: sync-batch-stock only ever fills gaps
-// where no entry exists yet (its own query explicitly excludes dishes
-// that already have a prepped row - see commands.js), so a manual entry
-// arriving after a sync-generated one is the auditor correcting an
-// inferred default with the real physical number, which should always
-// take precedence.
+// prepped is different (session-status.md "25d-ii", third half): the
+// page posts every dish row on every save, touched or not, so the route
+// reads the existing row first and only writes when portions_produced
+// actually differs. A manual write still always wins over whatever's
+// already in `prepped` for that dish/date - including a SYSTEM row from
+// step 15's "Sync batch stock" command (created_by =
+// 'SYSTEM:sync-batch-stock') - but only when the value actually changed;
+// a repost of the same number must not clear that stamp or log a no-op
+// "correction". `created_by` on `prepped` is provenance (NULL = human),
+// not identity, so a real change always clears it to NULL and logs the
+// correction to activity_log - unlike ending_actual/portion_ending_actual
+// where the same column name means the auditor's identity instead.
 //
 // Neither table has a notes/remarks column (unlike ending_actual) -
 // not inventing one here, matches the schema exactly as it exists.
@@ -202,10 +204,16 @@ router.post('/daily-audit/portions', (req, res) => {
     return res.status(400).json({ error: 'restaurant_id, business_date, and rows[] are required' });
   }
 
-  const upsertPrepped = db.prepare(`
-    INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET portions_produced = excluded.portions_produced
+  const getPrepped = db.prepare(`
+    SELECT * FROM prepped WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?
+  `);
+  const insertPrepped = db.prepare(`
+    INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced, created_by)
+    VALUES (?, ?, ?, ?, NULL)
+  `);
+  const updatePrepped = db.prepare(`
+    UPDATE prepped SET portions_produced = ?, created_by = NULL
+    WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?
   `);
 
   const upsertPortionActual = db.prepare(`
@@ -216,13 +224,43 @@ router.post('/daily-audit/portions', (req, res) => {
 
   let saved = 0;
   for (const row of rows) {
+    let wrote = false;
+
     if (row.prepped !== null && row.prepped !== undefined && row.prepped !== '') {
-      upsertPrepped.run(restaurant_id, row.dish_id, business_date, Number(row.prepped));
+      const value = Number(row.prepped);
+      const existing = getPrepped.get(restaurant_id, row.dish_id, business_date);
+      // A repost of the same value (every dish row is posted on every save,
+      // touched or not - session-status.md "25d-ii", third half) must not
+      // clear an inferred SYSTEM stamp or log a no-op correction. Only a
+      // genuine change to portions_produced counts as a manual correction.
+      if (!existing || existing.portions_produced !== value) {
+        withTransaction(db, () => {
+          if (existing) {
+            updatePrepped.run(value, restaurant_id, row.dish_id, business_date);
+          } else {
+            insertPrepped.run(restaurant_id, row.dish_id, business_date, value);
+          }
+          const after = getPrepped.get(restaurant_id, row.dish_id, business_date);
+          logActivity(db, {
+            actor: null,
+            entityType: 'prepped',
+            entityId: after.id,
+            action: existing ? 'UPDATE' : 'CREATE',
+            before: existing || null,
+            after,
+            source: 'MANUAL'
+          });
+        });
+        wrote = true;
+      }
     }
+
     if (row.portion_actual !== null && row.portion_actual !== undefined && row.portion_actual !== '') {
       upsertPortionActual.run(restaurant_id, row.dish_id, business_date, Number(row.portion_actual));
+      wrote = true;
     }
-    saved++;
+
+    if (wrote) saved++;
   }
 
   res.json({ ok: true, saved });
