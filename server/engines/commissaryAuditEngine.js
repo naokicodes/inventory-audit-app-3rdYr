@@ -45,25 +45,86 @@
 
 const { addDays } = require('./auditEngine.js');
 
+// Step 26a (session-status.md): commissary_opening_stock gets the
+// identical date-scoped treatment as opening_stock - see the matching
+// block of comments on getBeginningStock in auditEngine.js for the full
+// reasoning. Same resolution order, same carry-forward/recount-difference
+// mechanics, just against the commissary_* tables and driven by
+// commissary_stock_receipts/commissary_yield_log/commissary_shipments/
+// commissary_adjustments instead of stock_receipts/sales/prepped.
+const MAX_CARRY_WALK = 3660; // ~10 years of days - safety valve, not a business rule
+
+function findCommissaryPriorAnchor(db, commissaryMeatId, date) {
+  const priorDate = addDays(date, -1);
+
+  const lastActual = db.prepare(
+    `SELECT business_date, quantity FROM commissary_ending_actual WHERE commissary_meat_id = ? AND business_date <= ? ORDER BY business_date DESC LIMIT 1`
+  ).get(commissaryMeatId, priorDate);
+  const lastOpening = db.prepare(
+    `SELECT business_date, quantity FROM commissary_opening_stock WHERE commissary_meat_id = ? AND business_date <= ? ORDER BY business_date DESC LIMIT 1`
+  ).get(commissaryMeatId, priorDate);
+
+  if (!lastActual && !lastOpening) return null;
+
+  const anchor = (lastActual && (!lastOpening || lastActual.business_date >= lastOpening.business_date))
+    ? { type: 'actual', date: lastActual.business_date, value: lastActual.quantity }
+    : { type: 'opening', date: lastOpening.business_date, value: lastOpening.quantity };
+
+  const uncountedDates = [];
+  let cursor = addDays(anchor.date, 1);
+  for (let i = 0; i < MAX_CARRY_WALK && cursor <= priorDate; i++) {
+    uncountedDates.push(cursor);
+    cursor = addDays(cursor, 1);
+  }
+
+  return { ...anchor, uncountedDates };
+}
+
+/** Commissary equivalent of resolvePriorChain in auditEngine.js. */
+function resolveCommissaryPriorChain(db, commissaryMeatId, date) {
+  const anchor = findCommissaryPriorAnchor(db, commissaryMeatId, date);
+  if (!anchor) return null;
+
+  const flowDates = anchor.type === 'opening' ? [anchor.date, ...anchor.uncountedDates] : anchor.uncountedDates;
+  let value = anchor.value;
+  for (const d of flowDates) {
+    value += getCommissaryStockIn(db, commissaryMeatId, d) + getCommissaryBackedUp(db, commissaryMeatId, d)
+      - getCommissaryUsage(db, commissaryMeatId, d);
+  }
+
+  return {
+    value,
+    daysCovered: anchor.uncountedDates.length + 1,
+    carried: !(anchor.type === 'actual' && anchor.uncountedDates.length === 0)
+  };
+}
+
 /**
- * Beginning stock = yesterday's commissary_ending_actual.
- * Falls back to the one-time commissary_opening_stock entry if no prior
- * day exists (first day this commissary meat has ever been tracked).
- * Returns null if neither exists.
+ * Beginning stock for one commissary meat/date - see getBeginningStock in
+ * auditEngine.js for the full order/reasoning (identical here). Returns
+ * { value, carried, daysCovered, recountDifference }.
  */
 function getCommissaryBeginningStock(db, commissaryMeatId, businessDate) {
-  const priorDate = addDays(businessDate, -1);
-  const prev = db.prepare(
-    `SELECT quantity FROM commissary_ending_actual WHERE commissary_meat_id = ? AND business_date = ?`
-  ).get(commissaryMeatId, priorDate);
-  if (prev) return prev.quantity;
+  const declared = db.prepare(
+    `SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = ? AND business_date = ?`
+  ).get(commissaryMeatId, businessDate);
 
-  const opening = db.prepare(
-    `SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = ?`
-  ).get(commissaryMeatId);
-  if (opening) return opening.quantity;
+  if (declared) {
+    const priorChain = resolveCommissaryPriorChain(db, commissaryMeatId, businessDate);
+    return {
+      value: declared.quantity,
+      carried: false,
+      daysCovered: priorChain ? priorChain.daysCovered : 1,
+      recountDifference: priorChain ? (priorChain.value - declared.quantity) : null
+    };
+  }
 
-  return null;
+  const chain = resolveCommissaryPriorChain(db, commissaryMeatId, businessDate);
+  if (!chain) {
+    return { value: null, carried: false, daysCovered: null, recountDifference: null };
+  }
+
+  return { value: chain.value, carried: chain.carried, daysCovered: chain.daysCovered, recountDifference: null };
 }
 
 /**
@@ -112,6 +173,20 @@ function getCommissaryAdjustmentsTotal(db, commissaryMeatId, businessDate) {
 }
 
 /**
+ * Step 26a - commissary equivalent of getAdjustmentsTotalForWindow in
+ * auditEngine.js. Sums LOSS adjustments over the last `daysCovered` days
+ * ending on `businessDate`, inclusive - same window as daysCovered itself.
+ */
+function getCommissaryAdjustmentsTotalForWindow(db, commissaryMeatId, businessDate, daysCovered) {
+  if (daysCovered <= 1) return getCommissaryAdjustmentsTotal(db, commissaryMeatId, businessDate);
+  const windowStart = addDays(businessDate, -(daysCovered - 1));
+  const row = db.prepare(
+    `SELECT SUM(quantity) as qty FROM commissary_adjustments WHERE kind = 'LOSS' AND commissary_meat_id = ? AND business_date >= ? AND business_date <= ? AND deleted_at IS NULL`
+  ).get(commissaryMeatId, windowStart, businessDate);
+  return row.qty || 0;
+}
+
+/**
  * Usage = SUM of commissary_shipments.total_quantity across every
  * destination restaurant for this commissary meat/date (Commissary doesn't
  * sell to end customers, so shipments out are its usage), PLUS SUM of
@@ -145,10 +220,13 @@ function getCommissaryEndingActual(db, commissaryMeatId, businessDate) {
 
 /**
  * Full audit computation for one commissary meat, one date. Same
- * null-when-missing-data behavior as computeMeatAudit.
+ * null-when-missing-data behavior as computeMeatAudit. Step 26a adds
+ * daysCovered/beginningCarried/recountDifference - see the matching
+ * comment on computeMeatAudit in auditEngine.js.
  */
 function computeCommissaryMeatAudit(db, commissaryMeatId, businessDate) {
-  const beginning = getCommissaryBeginningStock(db, commissaryMeatId, businessDate);
+  const beginningInfo = getCommissaryBeginningStock(db, commissaryMeatId, businessDate);
+  const { value: beginning, carried: beginningCarried, daysCovered, recountDifference } = beginningInfo;
   const stockIn = getCommissaryStockIn(db, commissaryMeatId, businessDate);
   const backedUp = getCommissaryBackedUp(db, commissaryMeatId, businessDate);
   const usage = getCommissaryUsage(db, commissaryMeatId, businessDate);
@@ -156,18 +234,29 @@ function computeCommissaryMeatAudit(db, commissaryMeatId, businessDate) {
   const actual = getCommissaryEndingActual(db, commissaryMeatId, businessDate);
 
   if (beginning === null) {
-    return { beginning: null, stockIn, backedUp, usage, adjustments, actual, endingCalculated: null, expectedEnding: null, variance: null, unexplainedVariance: null, status: 'MISSING_BEGINNING_STOCK' };
+    return {
+      beginning: null, stockIn, backedUp, usage, adjustments, actual,
+      endingCalculated: null, expectedEnding: null, variance: null, unexplainedVariance: null,
+      status: 'MISSING_BEGINNING_STOCK',
+      daysCovered, beginningCarried, recountDifference, windowAdjustments: null
+    };
   }
 
   const endingCalculated = beginning + stockIn + backedUp - usage;
-  const expectedEnding = endingCalculated - adjustments;
+  const windowAdjustments = getCommissaryAdjustmentsTotalForWindow(db, commissaryMeatId, businessDate, daysCovered);
+  const expectedEnding = endingCalculated - windowAdjustments + (recountDifference || 0);
 
   if (actual === null) {
-    return { beginning, stockIn, backedUp, usage, adjustments, actual: null, endingCalculated, expectedEnding, variance: null, unexplainedVariance: null, status: 'MISSING_ACTUAL_COUNT' };
+    return {
+      beginning, stockIn, backedUp, usage, adjustments, actual: null,
+      endingCalculated, expectedEnding, variance: null, unexplainedVariance: null,
+      status: 'MISSING_ACTUAL_COUNT',
+      daysCovered, beginningCarried, recountDifference, windowAdjustments
+    };
   }
 
-  const variance = endingCalculated - actual;               // raw, before adjustments
-  const unexplainedVariance = expectedEnding - actual;       // after known adjustments
+  const variance = endingCalculated - actual;               // raw, before adjustments - unchanged by the covered window
+  const unexplainedVariance = expectedEnding - actual;       // after known adjustments over the covered window, plus any recount difference
 
   const EPSILON = 0.01; // float rounding tolerance, matches auditEngine.js
   let status;
@@ -175,7 +264,11 @@ function computeCommissaryMeatAudit(db, commissaryMeatId, businessDate) {
   else if (unexplainedVariance > 0) status = 'SHORTAGE';
   else status = 'SURPLUS';
 
-  return { beginning, stockIn, backedUp, usage, adjustments, actual, endingCalculated, expectedEnding, variance, unexplainedVariance, status };
+  return {
+    beginning, stockIn, backedUp, usage, adjustments, actual,
+    endingCalculated, expectedEnding, variance, unexplainedVariance, status,
+    daysCovered, beginningCarried, recountDifference, windowAdjustments
+  };
 }
 
 /**

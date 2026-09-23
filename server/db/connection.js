@@ -11,7 +11,7 @@
 const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
-const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateCommissaryAdjustmentsTable } = require('./migrate.js');
+const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateCommissaryAdjustmentsTable, migrateOpeningStockDateScoped } = require('./migrate.js');
 
 const DB_PATH = path.join(__dirname, 'inventory.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
@@ -68,6 +68,11 @@ migrateYieldLogInputQuantityColumn(db);
 // anyone with a pre-existing local database from before this feature. See
 // server/db/migrate.js.
 migrateCommissaryAdjustmentsTable(db);
+
+// Step 26a (2026-09-23): opening_stock/commissary_opening_stock's UNIQUE
+// key gains business_date, for anyone with a pre-existing local database
+// from before this feature. See server/db/migrate.js.
+migrateOpeningStockDateScoped(db);
 
 // Run schema.sql on every startup. All statements use "CREATE TABLE IF
 // NOT EXISTS" and "INSERT OR IGNORE", so this is safe to re-run every

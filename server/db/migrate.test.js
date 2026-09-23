@@ -10,7 +10,7 @@
 
 const { DatabaseSync } = require('node:sqlite');
 const assert = require('assert');
-const { migrateCommissaryMultiTenant, migrateConversionStandardsMeatType } = require('./migrate.js');
+const { migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateOpeningStockDateScoped } = require('./migrate.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -352,6 +352,177 @@ test('running the migration twice is idempotent - no duplicate meat_types row, n
   assert.strictEqual(meatTypeCount, 1);
   const standardCount = db.prepare(`SELECT COUNT(*) AS n FROM commissary_conversion_standards`).get().n;
   assert.strictEqual(standardCount, 1);
+});
+
+console.log('\nMigration Tests: migrateOpeningStockDateScoped (step 26a)\n');
+
+// Pre-26a shape: business_date exists as a column on both tables already
+// (it's not a new column), only the UNIQUE constraint is old - the
+// PRE-26a real schema, not a guess.
+function makePreOpeningStockDb() {
+  const db = new DatabaseSync(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec(`
+    CREATE TABLE restaurants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      code TEXT NOT NULL UNIQUE,
+      active INTEGER NOT NULL DEFAULT 1
+    )
+  `);
+  db.exec(`
+    CREATE TABLE meats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      meat_code TEXT NOT NULL,
+      name TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
+    )
+  `);
+  db.exec(`
+    CREATE TABLE opening_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
+      FOREIGN KEY (meat_id) REFERENCES meats(id),
+      UNIQUE (restaurant_id, meat_id)
+    )
+  `);
+  db.exec(`
+    CREATE TABLE commissary_meats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      allowed_leeway_pct REAL NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1
+    )
+  `);
+  db.exec(`
+    CREATE TABLE commissary_opening_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commissary_meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+      UNIQUE (commissary_meat_id)
+    )
+  `);
+
+  db.prepare(`INSERT INTO restaurants (name, code) VALUES ('FC', 'FC')`).run();
+  db.prepare(`INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (1, 'M01', 'Whole Chicken', 'kg')`).run();
+  db.prepare(`INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (1, 'M02', 'Pork Belly', 'kg')`).run();
+  db.prepare(`INSERT INTO commissary_meats (code, name, unit, allowed_leeway_pct) VALUES ('M01', 'Whole Chicken', 'kg', 0.0)`).run();
+
+  return db;
+}
+
+test('fresh install (no opening_stock/commissary_opening_stock tables yet) is a no-op', () => {
+  const db = new DatabaseSync(':memory:');
+  const result = migrateOpeningStockDateScoped(db);
+  assert.strictEqual(result.openingStock.ran, false);
+  assert.strictEqual(result.commissaryOpeningStock.ran, false);
+});
+
+test('already-migrated shape (UNIQUE already includes business_date) is a no-op', () => {
+  const db = new DatabaseSync(':memory:');
+  db.exec(`
+    CREATE TABLE opening_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      UNIQUE (restaurant_id, meat_id, business_date)
+    )
+  `);
+  db.exec(`
+    CREATE TABLE commissary_opening_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commissary_meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      UNIQUE (commissary_meat_id, business_date)
+    )
+  `);
+  const result = migrateOpeningStockDateScoped(db);
+  assert.strictEqual(result.openingStock.ran, false);
+  assert.strictEqual(result.commissaryOpeningStock.ran, false);
+});
+
+test('every existing opening_stock/commissary_opening_stock row is preserved with correct data', () => {
+  const db = makePreOpeningStockDb();
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-08-01', 100)`).run();
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 2, '2026-08-01', 50)`).run();
+  db.prepare(`INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (1, '2026-08-01', 200)`).run();
+
+  const result = migrateOpeningStockDateScoped(db);
+  assert.strictEqual(result.openingStock.ran, true);
+  assert.strictEqual(result.openingStock.rowsPreserved, 2);
+  assert.strictEqual(result.commissaryOpeningStock.ran, true);
+  assert.strictEqual(result.commissaryOpeningStock.rowsPreserved, 1);
+
+  const chicken = db.prepare(`SELECT * FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 1`).get();
+  assert.strictEqual(chicken.business_date, '2026-08-01');
+  assert.strictEqual(chicken.quantity, 100);
+
+  const commissaryRow = db.prepare(`SELECT * FROM commissary_opening_stock WHERE commissary_meat_id = 1`).get();
+  assert.strictEqual(commissaryRow.quantity, 200);
+});
+
+test('new UNIQUE(restaurant_id, meat_id, business_date) allows a second declared opening for a later date', () => {
+  const db = makePreOpeningStockDb();
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-08-01', 100)`).run();
+  migrateOpeningStockDateScoped(db);
+
+  assert.doesNotThrow(() => {
+    db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-09-01', 80)`).run();
+  });
+  const count = db.prepare(`SELECT COUNT(*) AS n FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 1`).get().n;
+  assert.strictEqual(count, 2, 'a declared opening on a later date must not collide with the first');
+});
+
+test('the OLD unique key (no business_date) is gone - same date is still rejected, but a duplicate meat/restaurant on a DIFFERENT date is not', () => {
+  const db = makePreOpeningStockDb();
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-08-01', 100)`).run();
+  migrateOpeningStockDateScoped(db);
+
+  assert.throws(() => {
+    db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-08-01', 999)`).run();
+  }, 'same (restaurant, meat, date) must still be rejected as a duplicate');
+});
+
+test('row counts are unchanged by the migration', () => {
+  const db = makePreOpeningStockDb();
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-08-01', 100)`).run();
+  db.prepare(`INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (1, '2026-08-01', 200)`).run();
+
+  const openingBefore = db.prepare(`SELECT COUNT(*) AS n FROM opening_stock`).get().n;
+  const commissaryBefore = db.prepare(`SELECT COUNT(*) AS n FROM commissary_opening_stock`).get().n;
+  migrateOpeningStockDateScoped(db);
+  const openingAfter = db.prepare(`SELECT COUNT(*) AS n FROM opening_stock`).get().n;
+  const commissaryAfter = db.prepare(`SELECT COUNT(*) AS n FROM commissary_opening_stock`).get().n;
+
+  assert.strictEqual(openingAfter, openingBefore);
+  assert.strictEqual(commissaryAfter, commissaryBefore);
+});
+
+test('running the migration twice is idempotent - no data loss, second run is a no-op', () => {
+  const db = makePreOpeningStockDb();
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-08-01', 100)`).run();
+
+  migrateOpeningStockDateScoped(db);
+  const secondResult = migrateOpeningStockDateScoped(db);
+
+  assert.strictEqual(secondResult.openingStock.ran, false);
+  assert.strictEqual(secondResult.commissaryOpeningStock.ran, false);
+  const count = db.prepare(`SELECT COUNT(*) AS n FROM opening_stock`).get().n;
+  assert.strictEqual(count, 1);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

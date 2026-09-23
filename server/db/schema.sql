@@ -115,18 +115,22 @@ CREATE TABLE IF NOT EXISTS ending_actual (
   UNIQUE (restaurant_id, meat_id, business_date)
 );
 
--- One-time opening count per meat - only used to seed beginning_stock
--- on the very first day this app is used for that meat. Every day after,
--- beginning_stock is calculated from the prior day's ending_actual.
+-- An authoritative declared balance for a meat on a specific date (step
+-- 26a, session-status.md) - covers month start, new-restaurant onboarding,
+-- and a post-recount reset with one concept. getBeginningStock
+-- (auditEngine.js) prefers a declared opening for a given date over the
+-- prior day's ending_actual; absent both, it carries the prior day's
+-- ending_calculated forward. UNIQUE includes business_date - a meat can
+-- have a declared opening on more than one date now, not just once ever.
 CREATE TABLE IF NOT EXISTS opening_stock (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   restaurant_id INTEGER NOT NULL,
   meat_id INTEGER NOT NULL,
-  business_date TEXT NOT NULL,    -- the first date this app tracks this meat
+  business_date TEXT NOT NULL,
   quantity REAL NOT NULL,
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (meat_id) REFERENCES meats(id),
-  UNIQUE (restaurant_id, meat_id)
+  UNIQUE (restaurant_id, meat_id, business_date)
 );
 
 CREATE TABLE IF NOT EXISTS sales (
@@ -326,16 +330,16 @@ CREATE TABLE IF NOT EXISTS commissary_ending_actual (
   UNIQUE (commissary_meat_id, business_date)
 );
 
--- commissary_opening_stock: mirrors opening_stock (step 12's pattern) -
--- one-time first-ever beginning value per commissary meat. Every day
--- after derives from the prior day's commissary_ending_actual.
+-- commissary_opening_stock: mirrors opening_stock's date-scoped shape
+-- (step 26a, session-status.md) - an authoritative declared balance per
+-- commissary meat per date, not a one-time lifetime seed.
 CREATE TABLE IF NOT EXISTS commissary_opening_stock (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   commissary_meat_id INTEGER NOT NULL,
-  business_date TEXT NOT NULL,    -- the first date this app tracks this meat
+  business_date TEXT NOT NULL,
   quantity REAL NOT NULL,
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
-  UNIQUE (commissary_meat_id)
+  UNIQUE (commissary_meat_id, business_date)
 );
 
 -- commissary_stock_receipts: raw meat arriving at Commissary from an

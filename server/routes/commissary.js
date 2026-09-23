@@ -167,11 +167,13 @@ router.get('/commissary/daily-audit', (req, res) => {
 //
 // The two tables get deliberately different treatment, exactly like their
 // restaurant-side twins:
-// - commissary_opening_stock: INSERT OR IGNORE. UNIQUE(commissary_meat_id)
-//   has no date in the key (schema.sql) - opening stock is a one-time
-//   "where we started tracking this meat" figure, set once and never
-//   revised. First write wins; a later attempt is silently a no-op, never
-//   an upsert and never per-date.
+// - commissary_opening_stock: INSERT OR IGNORE. Step 26a (session-
+//   status.md) gave UNIQUE(commissary_meat_id, business_date) a date in
+//   the key - a declared opening is now write-once PER DATE, not once
+//   ever for the meat's whole lifetime (that was finding 3/4). A later
+//   attempt for the SAME date is silently a no-op; a different date is a
+//   genuine new declared opening. See PATCH /commissary/opening-stock
+//   below for CORRECTING an already-declared value.
 // - commissary_ending_actual: real upsert, ON CONFLICT (commissary_meat_id,
 //   business_date) DO UPDATE - a physical count is per-day and corrigible,
 //   so a same-day recount overwrites rather than duplicating or failing.
@@ -212,6 +214,45 @@ router.post('/commissary/daily-audit', (req, res) => {
   }
 
   res.json({ ok: true, saved });
+});
+
+// PATCH /api/commissary/opening-stock
+// Body: { commissary_meat_id, business_date, quantity }
+// Step 26a (session-status.md): corrects an ALREADY-declared opening for
+// this exact date - the commissary-side twin of PATCH /daily-audit/
+// opening-stock. Same edit-and-clear model as PATCH /sales: quantity
+// null/undefined/'' clears (deletes) the declared opening; otherwise it
+// overwrites the existing value. Requires a row to already exist for this
+// exact (commissary_meat_id, date) - this corrects a declared opening, it
+// does not create a new one (that's POST /commissary/daily-audit above,
+// which the frontend only offers when beginning is null for the loaded
+// date).
+router.patch('/commissary/opening-stock', (req, res) => {
+  const { commissary_meat_id, business_date, quantity } = req.body || {};
+
+  if (!commissary_meat_id || !business_date) {
+    return res.status(400).json({ error: 'commissary_meat_id and business_date are required' });
+  }
+
+  const existing = db.prepare(
+    `SELECT id FROM commissary_opening_stock WHERE commissary_meat_id = ? AND business_date = ?`
+  ).get(commissary_meat_id, business_date);
+  if (!existing) {
+    return res.status(404).json({ error: 'No declared opening exists for this commissary meat/date to correct' });
+  }
+
+  const isClearing = quantity === null || quantity === undefined || quantity === '';
+  if (!isClearing && (typeof quantity !== 'number' && isNaN(Number(quantity)))) {
+    return res.status(400).json({ error: 'quantity must be a number, or null/omitted to clear the declared opening' });
+  }
+
+  if (isClearing) {
+    db.prepare(`DELETE FROM commissary_opening_stock WHERE id = ?`).run(existing.id);
+    return res.json({ ok: true, cleared: true });
+  }
+
+  db.prepare(`UPDATE commissary_opening_stock SET quantity = ? WHERE id = ?`).run(Number(quantity), existing.id);
+  res.json({ ok: true, cleared: false, quantity: Number(quantity) });
 });
 
 // POST /api/commissary/shipments
