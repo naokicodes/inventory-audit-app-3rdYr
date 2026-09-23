@@ -998,32 +998,122 @@ The Terminal command that reads the prior month's final `ending_actual` per meat
 and proposes them as the new month's opening is pillar 2 work, and overlaps
 26a-ii's copy rule. Neither starts until this lands.
 
-## Step 26a-ii — the month-start recount (HELD: architect answers owed)
+## Step 26a-ii — the month-start recount
 
-**Not dispatchable.** Recorded 2026-09-23 so the decided parts survive.
+**Pillar 1 (Core). Lane: DISPATCH only. Schema addition + `public/` change.
+Starts only after 26a is merged** — it builds on 26a's date-keyed opening
+tables, its beginning-stock walk, and its PATCH routes. Decided 2026-09-23
+(NaokiiVT). **Must land before real entry starts:** it is what bounds 26a's carry
+chain to one month.
 
-Decided (NaokiiVT):
+### Why it exists
 
-- A full count of every meat at month end is mandatory.
-- On the first day(s) of the month, **required** meats are recounted and entered
-  as declared openings; the rest are **copied** from the previous month's final
-  ending.
-- A **hard block at month start only** is acceptable, to enforce the recount: a
-  meat with no opening for the new month blocks. `MISSING_PERIOD_OPENING` lives
-  here. This is what bounds 26a's carry chain to one month.
-- Frozen meats carry a 500 g – 1 kg weighing leeway. That is the users'
-  judgment, **not an app rule** — the app shows every difference as a number.
-- Needs its own screen: the pages offer an opening input only when beginning is
-  null.
+A full count of every meat at month end is mandatory. At the start of each month,
+every meat gets a declared opening — recounted or copied — so each month starts
+from a real number ("fresh months": problems stay in the month they belong to).
+This is the **only hard block in the app.** Everywhere else the app assists the
+workflow and flags; here the restaurant asked it to enforce.
 
-Open — architect, not worker:
+### Settings: which meats must always be recounted
 
-1. **Copy rule.** May a meat be copied if its last ending was only *calculated*?
-   (Architect lean: no — it must be recounted, or theory carries into the
-   "fresh" month and the bound fails.)
-2. **Who sets "required."** A per-meat setting in Settings, for restaurants and
-   commissary alike?
-3. **Block window.** The 1st only (until entered), or a grace window?
+- New column `recount_required INTEGER NOT NULL DEFAULT 0` (0/1) on `meats` and
+  on `commissary_meats`, via an idempotent migration in `server/db/migrate.js`
+  (follow `migrateYieldLogInputQuantityColumn`).
+- A checkbox per meat on the Settings page, restaurant and commissary meats
+  alike, labelled **Recount at month start**. Settings is the admin surface; staff
+  only enter and read data. There is no role gating until Phase 1 — do not add
+  any here.
+
+### Must count vs copyable
+
+For month M, a meat is **must-count** if any of these holds:
+
+1. `recount_required = 1`;
+2. its ending on the last day of M−1 is not a real count (no `ending_actual` /
+   `commissary_ending_actual` row — the figure would only be calculated);
+3. it has no earlier opening and no earlier count at all (the first month, or a
+   meat added mid-month).
+
+Otherwise it is **copyable**. Rule 2 means a meat whose month-end count was
+skipped is caught automatically, even if it is not on the required list. Rule 3
+means onboarding needs no special mode: in the first month every meat is
+must-count.
+
+### How an opening is recorded
+
+- **Recount:** a declared opening dated the day the recount actually happens —
+  normally the 1st, possibly later.
+- **Copy:** a declared opening dated the 1st of M, quantity = the last day of
+  M−1's real ending. Its recount difference is 0 by construction.
+- New nullable column `opening_source TEXT CHECK (opening_source IN
+  ('RECOUNT','COPY'))` on `opening_stock` and `commissary_opening_stock`, via
+  idempotent migration. NULL only for openings written before this step. This is
+  what lets the app label an opening as recounted or copied — a stored fact, not
+  something inferred from matching numbers (a recount can equal last month's
+  ending).
+- Correction: an entered opening can be edited or cleared from the panel, through
+  26a's PATCH routes. Clearing a meat's only opening in M blocks it again.
+
+### The block
+
+- For a meat with **no opening dated in month M**, every day of M is blocked:
+  status `MISSING_PERIOD_OPENING`, computed fields null, ending inputs disabled,
+  and the row reads **needs month opening — recount or copy**.
+- **Any opening dated in M unblocks all of M** for that meat. Days before the
+  opening's date chain from M−1 normally (26a rules), and the recount difference
+  lands on the opening's date (26a option A). Those earlier days are then
+  backfilled from the paper sheet. Example: recount done the morning of Oct 2 →
+  Oct 1 was blocked, unblocks once the Oct 2 opening is in, and chains from
+  Sept 30; the recount difference shows on Oct 2.
+- **No grace window.** The block lasts until an opening exists.
+- **Month start only.** A missed day mid-month is still flagged, never blocked
+  (26a, "Not a hard lock").
+- **Enforced on the server, not only in the page.** `POST /daily-audit` and
+  `POST /commissary/daily-audit` refuse an ending count for a blocked meat-date.
+  Hiding an input is decoration, not enforcement. **Caller note:** both pages
+  post every row on every save (the 25d-ii lesson). Refuse only rows that carry a
+  non-empty ending for a blocked meat; save the other rows normally; return the
+  refused meat ids so the page can say which ones.
+
+### The Month opening panel — settled, not Class B
+
+Settled by NaokiiVT 2026-09-23. This paragraph is the `ui-conventions.md` escape
+for this panel. **No new page and no navigation change** — the shared-shell
+frontend rebuild is still ahead.
+
+- A **Month opening** panel at the top of `public/daily-audit.html` and
+  `public/commissary.html`, for the selected restaurant or commissary and the
+  selected date's month.
+- One row per active meat without an opening in that month:
+  - **must-count** meats show an empty input and a reason tag: `required`,
+    `last ending not counted`, or `new`;
+  - **copyable** meats show last month's ending, ready to copy.
+- A **Copy all** button copies every copyable meat not yet opened. Must-count
+  meats are never copied.
+- A recount is dated the page's selected date.
+- Once every meat has an opening, the panel collapses to one line — **Month
+  opening complete — edit** — rather than disappearing, so an opening can still
+  be corrected.
+- On the opening's own day, the landing row's Beginning cell is tagged
+  `(recount)` or `(copied)`.
+- **Removes** the existing per-row opening input on both pages (the
+  beginning-is-null path). The panel is the single way to enter an opening.
+
+### Callers
+
+- `server/routes/dashboard.js` — the `hasData` check must treat
+  `MISSING_PERIOD_OPENING` like `MISSING_BEGINNING_STOCK` (flagged by the worker
+  in issue #6).
+- `server/routes/commands.js` — sync-batch-stock branches on
+  `MISSING_BEGINNING_STOCK`; decide in the same way for the new status.
+- Every other caller of `computeMeatAudit` / `computeCommissaryMeatAudit` (grep).
+
+### The Terminal
+
+The planned command that proposes last month's endings as the new month's
+openings is now a **Terminal shortcut to Copy all**, not a separate feature. It
+must call the same code path, so the must-count rules cannot drift between two
+implementations. Pillar 2.
 
 ## Steps 25a / 25b — the commissary ledger has no way in
 

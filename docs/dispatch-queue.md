@@ -46,12 +46,14 @@ disposable today.
 Spec: `session-status.md`, section "Step 26a".
 
 ### 2b. Step 26a-ii — the month-start recount
-**HOLD — architect answers owed. Not startable.**
+**Lane: DISPATCH only. Schema addition + `public/` change.**
 
-Required meats recounted at month start, the rest copied, a hard block at month
-start only. Three questions are still open (copy rule, who sets "required,"
-block window). Must land before real entry starts, because it is what bounds
-26a's carry chain.
+**Starts only after 26a is merged.** It builds on 26a's date-keyed opening
+tables, beginning-stock walk and PATCH routes, and both touch
+`server/routes/dailyAudit.js` and `server/routes/commissary.js`. Merge 26a, pull,
+then start this.
+
+Must land before real entry starts — it is what bounds 26a's carry chain.
 
 Spec: `session-status.md`, section "Step 26a-ii".
 
