@@ -27,6 +27,7 @@ const {
   getCommissaryBackedUp,
   getCommissaryUsage,
   getCommissaryAdjustmentsTotal,
+  getCommissaryBeginningStock,
   computeCommissaryMeatAudit,
   computeCommissaryDailyAudit
 } = require('./commissaryAuditEngine.js');
@@ -472,6 +473,101 @@ test('a soft-deleted LOSS does not reduce expectedEnding', () => {
 
   const adjustments = getCommissaryAdjustmentsTotal(db, lossMeatId, '2026-08-23');
   assert.strictEqual(adjustments, 0, 'soft-deleted loss must not count toward adjustments');
+});
+
+// --- Step 26a: date-scoped commissary_opening_stock, carry-forward, recount difference ---
+// Own dedicated commissary meat, per this file's isolation convention.
+db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+  .run(commissaryId, 'M09', 'Pork Shoulder', 'kg', 0.15);
+const carryMeatId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M09').id;
+
+console.log('\nStep 26a: date-scoped commissary opening stock, carry-forward, recount difference\n');
+
+test('a normal day (declared opening for THIS date, no prior chain): daysCovered=1, not carried', () => {
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(carryMeatId, '2026-09-28', 100);
+
+  const result = computeCommissaryMeatAudit(db, carryMeatId, '2026-09-28');
+  assert.strictEqual(result.beginning, 100);
+  assert.strictEqual(result.daysCovered, 1);
+  assert.strictEqual(result.beginningCarried, false);
+  assert.strictEqual(result.recountDifference, null);
+});
+
+test('carried beginning across uncounted days: daysCovered accumulates, beginningCarried is true', () => {
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(carryMeatId, '2026-09-28', 90); // counted at 90, chain resets here
+
+  const uncountedDay = computeCommissaryMeatAudit(db, carryMeatId, '2026-09-30');
+  assert.strictEqual(uncountedDay.beginning, 90);
+  assert.strictEqual(uncountedDay.beginningCarried, true);
+  assert.strictEqual(uncountedDay.daysCovered, 2, 'Sept 29 (1) + Sept 30 (2)');
+
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(carryMeatId, '2026-10-03', 90);
+  const result = computeCommissaryMeatAudit(db, carryMeatId, '2026-10-03');
+  assert.strictEqual(result.daysCovered, 5, 'Sept 29, 30, Oct 1, 2 (carried) + Oct 3 (today)');
+  assert.strictEqual(result.status, 'OK');
+});
+
+test('a LOSS adjustment dated on a carried day is still picked up by the count day\'s window sum', () => {
+  db.prepare(`INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity) VALUES (?, ?, 'LOSS', ?)`)
+    .run(carryMeatId, '2026-10-05', 3.0);
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(carryMeatId, '2026-10-07', 87); // 90 - 3 (unlogged shrinkage) = 87
+
+  const result = computeCommissaryMeatAudit(db, carryMeatId, '2026-10-07');
+  assert.strictEqual(result.daysCovered, 4, 'Oct 4, 5, 6 (carried) + Oct 7 (today)');
+  assert.strictEqual(result.variance, 3, 'raw variance unaffected by the window');
+  assert.ok(Math.abs(result.unexplainedVariance) < 0.0001, 'the Oct 5 LOSS, picked up via the window sum, fully explains it');
+  assert.strictEqual(result.status, 'OK');
+});
+
+test('recount difference (option A): a declared opening on a date with a prior chain adds the difference into that day\'s Over/Short', () => {
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(carryMeatId, '2026-10-10', 80);
+
+  const beforeCount = computeCommissaryMeatAudit(db, carryMeatId, '2026-10-10');
+  assert.strictEqual(beforeCount.beginning, 80);
+  assert.strictEqual(beforeCount.recountDifference, 7, 'priorEnding (87) - opening (80) = 7');
+  assert.strictEqual(beforeCount.daysCovered, 3, 'Oct 8, 9 (carried) + Oct 10 (today)');
+
+  db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(carryMeatId, '2026-10-10', 80);
+  const afterCount = computeCommissaryMeatAudit(db, carryMeatId, '2026-10-10');
+  assert.strictEqual(afterCount.variance, 0, 'raw variance: endingCalculated(80) - actual(80)');
+  assert.strictEqual(afterCount.unexplainedVariance, 7, 'the recount difference alone');
+  assert.strictEqual(afterCount.status, 'SHORTAGE');
+});
+
+test('a declared opening with NO prior chain (onboarding): recountDifference is null, daysCovered is 1', () => {
+  db.prepare('INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, ?, ?)')
+    .run(commissaryId, 'M99', 'Beef Cheek', 'kg', 0.1);
+  const freshMeatId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get('M99').id;
+
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(freshMeatId, '2026-09-15', 25);
+
+  const result = computeCommissaryMeatAudit(db, freshMeatId, '2026-09-15');
+  assert.strictEqual(result.recountDifference, null);
+  assert.strictEqual(result.daysCovered, 1);
+  assert.strictEqual(result.beginningCarried, false);
+});
+
+test('MISSING_BEGINNING_STOCK reports daysCovered/beginningCarried/recountDifference as null/false/null', () => {
+  const result = computeCommissaryMeatAudit(db, bellyId, '2026-09-20');
+  assert.strictEqual(result.status, 'MISSING_BEGINNING_STOCK');
+  assert.strictEqual(result.daysCovered, null);
+  assert.strictEqual(result.beginningCarried, false);
+  assert.strictEqual(result.recountDifference, null);
+});
+
+test('getCommissaryBeginningStock returns the full { value, carried, daysCovered, recountDifference } shape directly', () => {
+  const info = getCommissaryBeginningStock(db, carryMeatId, '2026-09-28');
+  assert.strictEqual(info.value, 100);
+  assert.strictEqual(info.carried, false);
+  assert.strictEqual(info.daysCovered, 1);
+  assert.strictEqual(info.recountDifference, null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

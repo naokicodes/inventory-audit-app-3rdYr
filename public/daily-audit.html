@@ -18,6 +18,7 @@
     .status-SURPLUS { color: darkorange; font-weight: bold; }
     .status-MISSING_ACTUAL_COUNT, .status-MISSING_BEGINNING_STOCK { color: #999; font-style: italic; }
     .type-badge { font-size: 0.7em; color: #999; margin-left: 0.3em; }
+    .carry-tag { font-size: 0.8em; color: #888; font-weight: normal; }
     tr.dish-row td:first-child { border-left: 3px solid #ccc; }
   </style>
 </head>
@@ -79,30 +80,55 @@
     // Meat row: same editable fields/save flow as before this step, plus
     // step 12's Beginning cell. Beginning is only ever editable when it's
     // null (r.beginning === null / status MISSING_BEGINNING_STOCK) - once
-    // an opening_stock row exists for this meat, getBeginningStock never
-    // returns null for it again, so the cell naturally reverts to
-    // calculated/read-only on every later day. No separate "is this the
-    // first day" check needed on the frontend - null-ness already is that
-    // check.
+    // an opening_stock row exists for this meat ON THIS DATE, getBeginningStock
+    // never returns null for it again for that date, so the cell naturally
+    // reverts to calculated/read-only on every later day. No separate "is
+    // this the first day" check needed on the frontend - null-ness already
+    // is that check. Step 26a: this remains true for a NEW period too - a
+    // month with no declared opening (or any other blocked date) still
+    // resolves beginning to null, so the same input cell reappears; there is
+    // no separate "declare a new period" affordance in this step.
     // Step 13: data-new-stock/data-usage are always present (fixed at load
-    // - not editable on this screen, see intro paragraph above). Step 22
-    // adds data-adjustments to that same fixed-at-load group - Adjustments
-    // is now entered on the Allocations page, not here, so its cell is
-    // read-only and doesn't need live recalculation of its own value (only
-    // Ending(calc)/Over-Short need to react to it, same as New Stock/Usage
-    // already do). data-beginning is only present when r.beginning !== null;
+    // - not editable on this screen, see intro paragraph above). The
+    // Adjustments column itself (entered on the Allocations page, not here)
+    // is a plain static cell with no data-* attribute of its own - nothing
+    // recalculates it live, so it needs none. data-beginning is only present
+    // when r.beginning !== null;
     // when it's null, recalcMeatRow() reads the live .opening_stock input
     // instead, so a still-empty opening count naturally keeps the row at
     // "-" until typed (matches MISSING_BEGINNING_STOCK, same as the server
     // would compute). Only Beginning (when it's the opening-stock cell)
     // and Ending (actual) are ever live-edited here now.
+    //
+    // Step 26a: data-window-adjustments/data-recount-difference are ALSO
+    // fixed at load, same convention - both are derived from history the
+    // server already read, not from anything editable on this screen, so
+    // recalcMeatRow uses them as-is rather than recomputing them (it has no
+    // way to see other days' adjustments or a declared-opening comparison
+    // from the DOM alone).
+    function overShortTags(r) {
+      const tags = [];
+      if (r.daysCovered > 1) tags.push(`${r.daysCovered} days`);
+      if (r.recountDifference !== null && r.recountDifference !== undefined) {
+        tags.push(`incl. ${fmt(r.recountDifference)} recount difference`);
+      }
+      return tags.length ? ` <span class="carry-tag">(${tags.join(', ')})</span>` : '';
+    }
+
     function meatRowHtml(r) {
       const beginningAttr = r.beginning === null ? '' : ` data-beginning="${r.beginning}"`;
+      const carriedTag = r.beginningCarried ? ' <span class="carry-tag">(carried)</span>' : '';
       const beginningCell = r.beginning === null
         ? `<td><input type="number" step="0.01" class="opening_stock" placeholder="opening count"></td>`
-        : `<td class="calculated">${fmt(r.beginning)}</td>`;
+        : `<td class="calculated">${fmt(r.beginning)}${carriedTag}</td>`;
+      const windowAdjustments = r.windowAdjustments ?? 0;
+      // Empty string, not 0, when null - a genuine recount that found
+      // EXACTLY the expected number is a real 0, distinct from "no recount
+      // happened on this date" (null). Collapsing them would hide a
+      // completed recount from the Over/Short tag.
+      const recountDifferenceAttr = (r.recountDifference === null || r.recountDifference === undefined) ? '' : r.recountDifference;
       return `
-        <tr data-meat-id="${r.meat_id}"${beginningAttr} data-new-stock="${r.newStock}" data-usage="${r.usage}" data-adjustments="${r.adjustments}">
+        <tr data-meat-id="${r.meat_id}"${beginningAttr} data-new-stock="${r.newStock}" data-usage="${r.usage}" data-window-adjustments="${windowAdjustments}" data-recount-difference="${recountDifferenceAttr}" data-days-covered="${r.daysCovered ?? ''}">
           <td>${r.name} <span class="type-badge">(${r.unit})</span></td>
           ${beginningCell}
           <td class="calculated">${fmt(r.newStock)}</td>
@@ -110,7 +136,7 @@
           <td class="calculated">${fmt(r.adjustments)}</td>
           <td class="calculated ending-calc">${fmt(r.endingCalculated)}</td>
           <td><input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0"></td>
-          <td class="calculated over-short">${fmt(r.unexplainedVariance)}</td>
+          <td class="calculated over-short">${fmt(r.unexplainedVariance)}${overShortTags(r)}</td>
           <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""></td>
           <td class="row-status status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
         </tr>
@@ -163,13 +189,32 @@
       return Number.isNaN(n) ? null : n;
     }
 
+    // Step 26a: rebuilds the same "(N days)"/"incl. X recount difference"
+    // tag(s) meatRowHtml's overShortTags() renders at load - reads them
+    // from the row's fixed data-* attributes (history the server already
+    // read, not anything this function can recompute from the DOM alone).
+    function overShortTagsFromRow(tr) {
+      const tags = [];
+      const daysCovered = tr.dataset.daysCovered === '' ? null : Number(tr.dataset.daysCovered);
+      if (daysCovered !== null && daysCovered > 1) tags.push(`${daysCovered} days`);
+      if (tr.dataset.recountDifference !== '') {
+        tags.push(`incl. ${fmt(Number(tr.dataset.recountDifference))} recount difference`);
+      }
+      return tags.length ? ` <span class="carry-tag">(${tags.join(', ')})</span>` : '';
+    }
+
     function recalcMeatRow(tr) {
       const beginning = tr.dataset.beginning !== undefined
         ? Number(tr.dataset.beginning)
         : toNumOrNull(tr.querySelector('.opening_stock')?.value ?? '');
       const newStock = Number(tr.dataset.newStock);
       const usage = Number(tr.dataset.usage);
-      const adjustments = Number(tr.dataset.adjustments);
+      // Step 26a: the window-adjustments sum and any recount difference
+      // (both fixed at load - see meatRowHtml) replace the plain single-day
+      // `adjustments` this used before 26a, so a live edit matches what
+      // Save+reload would show once daysCovered > 1.
+      const windowAdjustments = Number(tr.dataset.windowAdjustments);
+      const recountDifference = tr.dataset.recountDifference === '' ? 0 : Number(tr.dataset.recountDifference);
       const actual = toNumOrNull(tr.querySelector('.ending_actual').value);
 
       const endingCalcCell = tr.querySelector('.ending-calc');
@@ -184,7 +229,7 @@
         if (actual === null) {
           status = 'MISSING_ACTUAL_COUNT';
         } else {
-          const expectedEnding = endingCalculated - adjustments;
+          const expectedEnding = endingCalculated - windowAdjustments + recountDifference;
           unexplainedVariance = expectedEnding - actual;
           if (Math.abs(unexplainedVariance) <= EPSILON) status = 'OK';
           else if (unexplainedVariance > 0) status = 'SHORTAGE';
@@ -193,7 +238,7 @@
       }
 
       endingCalcCell.textContent = fmt(endingCalculated);
-      overShortCell.textContent = fmt(unexplainedVariance);
+      overShortCell.innerHTML = fmt(unexplainedVariance) + overShortTagsFromRow(tr);
       statusCell.className = `row-status status-${status}`;
       statusCell.textContent = status.replace(/_/g, ' ');
     }

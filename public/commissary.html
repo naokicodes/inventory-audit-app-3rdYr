@@ -18,6 +18,7 @@
     .status-Review { color: crimson; font-weight: bold; }
     td.calculated { background: #f7f7f7; color: #555; }
     .status-MISSING_BEGINNING_STOCK { color: #999; font-style: italic; }
+    .carry-tag { font-size: 0.8em; color: #888; font-weight: normal; }
     #count-entry input[type="number"] { width: 5rem; padding: 0.3rem; }
     #count-entry input[type="text"] { width: 8rem; padding: 0.3rem; }
     .balance-cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
@@ -65,7 +66,7 @@
   <div id="balances">Loading...</div>
 
   <h2>Opening stock &amp; physical count</h2>
-  <p class="hint">Opening stock is one-time per meat - set once, then never editable again (a meat already showing a beginning value has nothing to change here). Physical count is per day and can be recounted - saving again for the same date overwrites the prior count. Select a specific commissary above (not "All commissaries") to enter counts.</p>
+  <p class="hint">Opening stock is a declared balance for a specific date - once one exists for the loaded date, this screen shows it read-only (correcting it, or declaring a new one on a different date, isn't done here yet). Physical count is per day and can be recounted - saving again for the same date overwrites the prior count. Select a specific commissary above (not "All commissaries") to enter counts.</p>
   <div id="count-entry">Loading...</div>
   <div id="count-status" class="status-message"></div>
 
@@ -247,14 +248,18 @@
       renderCountEntry(rows);
     }
 
-    // ---------- Opening stock & physical count (step 25b) ----------
+    // ---------- Opening stock & physical count (step 25b, date-scoped since 26a) ----------
     // Reuses the same rows GET /commissary/daily-audit already returned for
     // the balance cards above, rather than a second fetch - the two states
     // an operator needs to tell apart map directly onto r.beginning: null
-    // means MISSING_BEGINNING_STOCK (no write yet, show an editable opening
-    // count), anything else means it's already established (show it as
-    // read-only so a typed number can't be silently discarded - see
-    // schema.sql's UNIQUE(commissary_meat_id), no date in the key).
+    // means MISSING_BEGINNING_STOCK/blocked for this date (no declared
+    // opening or prior count for it - show an editable opening count),
+    // anything else means beginning is already established for this date
+    // (show it as read-only so a typed number can't be silently discarded -
+    // see schema.sql's UNIQUE(commissary_meat_id, business_date)). Step 26a
+    // adds no new affordance here - declaring an opening on a date that
+    // already has a chain, or correcting one, isn't done on this screen in
+    // this step (session-status.md "Also required").
     function renderCountEntry(rows) {
       const el = document.getElementById('count-entry');
       if (!commissarySelect.value) {
@@ -275,7 +280,7 @@
               <td>${r.code} - ${r.name} <span class="hint">(${r.unit})</span></td>
               <td class="${r.beginning === null ? '' : 'calculated'}">${r.beginning === null
                 ? `<input type="number" step="0.01" class="count-opening" placeholder="opening count">`
-                : fmt(r.beginning)}</td>
+                : fmt(r.beginning) + (r.beginningCarried ? ' <span class="carry-tag">(carried)</span>' : '')}</td>
               <td><input type="number" step="0.01" class="count-actual" value="${r.actual ?? ''}" placeholder="0"></td>
               <td><input type="text" class="count-notes" placeholder="optional"></td>
               <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>

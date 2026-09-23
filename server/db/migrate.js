@@ -568,3 +568,141 @@ function migrateCommissaryAdjustmentsTable(db) {
 }
 
 module.exports.migrateCommissaryAdjustmentsTable = migrateCommissaryAdjustmentsTable;
+
+// ----------------------------------------------------------------------
+// Step 26a (2026-09-23): opening_stock and commissary_opening_stock's
+// UNIQUE key gains business_date - a declared opening becomes "an
+// authoritative balance on this date" instead of a once-ever lifetime
+// seed. See docs/session-status.md "Step 26a" and getBeginningStock in
+// server/engines/auditEngine.js.
+//
+// business_date already exists as a column on both tables pre-26a - only
+// the UNIQUE constraint's column set changes, so detection reads
+// PRAGMA index_list/index_info (the constraint), not table_info (the
+// column list, which is unchanged and would show "already migrated" on
+// every database). Must run BEFORE schema.sql - see connection.js.
+
+function hasUniqueKeyOn(db, tableName, keyColumns) {
+  const indexes = db.prepare(`PRAGMA index_list(${tableName})`).all();
+  return indexes.some(idx => {
+    if (!idx.unique) return false;
+    const cols = db.prepare(`PRAGMA index_info(${idx.name})`).all().map(c => c.name);
+    return cols.length === keyColumns.length && keyColumns.every(c => cols.includes(c));
+  });
+}
+
+function rebuildOpeningStock(db) {
+  const rowCountBefore = db.prepare(`SELECT COUNT(*) AS n FROM opening_stock`).get().n;
+
+  db.exec(`
+    CREATE TABLE opening_stock__migrated (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
+      FOREIGN KEY (meat_id) REFERENCES meats(id),
+      UNIQUE (restaurant_id, meat_id, business_date)
+    )
+  `);
+  db.exec(`
+    INSERT INTO opening_stock__migrated (id, restaurant_id, meat_id, business_date, quantity)
+    SELECT id, restaurant_id, meat_id, business_date, quantity FROM opening_stock
+  `);
+
+  const rowCountAfter = db.prepare(`SELECT COUNT(*) AS n FROM opening_stock__migrated`).get().n;
+  if (rowCountAfter !== rowCountBefore) {
+    throw new Error(
+      `Migration row count mismatch on opening_stock: ${rowCountBefore} before, ${rowCountAfter} after - aborting rather than risk data loss.`
+    );
+  }
+
+  db.exec('DROP TABLE opening_stock');
+  db.exec('ALTER TABLE opening_stock__migrated RENAME TO opening_stock');
+
+  return rowCountBefore;
+}
+
+function rebuildCommissaryOpeningStock(db) {
+  const rowCountBefore = db.prepare(`SELECT COUNT(*) AS n FROM commissary_opening_stock`).get().n;
+
+  db.exec(`
+    CREATE TABLE commissary_opening_stock__migrated (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commissary_meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
+      UNIQUE (commissary_meat_id, business_date)
+    )
+  `);
+  db.exec(`
+    INSERT INTO commissary_opening_stock__migrated (id, commissary_meat_id, business_date, quantity)
+    SELECT id, commissary_meat_id, business_date, quantity FROM commissary_opening_stock
+  `);
+
+  const rowCountAfter = db.prepare(`SELECT COUNT(*) AS n FROM commissary_opening_stock__migrated`).get().n;
+  if (rowCountAfter !== rowCountBefore) {
+    throw new Error(
+      `Migration row count mismatch on commissary_opening_stock: ${rowCountBefore} before, ${rowCountAfter} after - aborting rather than risk data loss.`
+    );
+  }
+
+  db.exec('DROP TABLE commissary_opening_stock');
+  db.exec('ALTER TABLE commissary_opening_stock__migrated RENAME TO commissary_opening_stock');
+
+  return rowCountBefore;
+}
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ openingStock: {ran: boolean, rowsPreserved: number}, commissaryOpeningStock: {ran: boolean, rowsPreserved: number} }}
+ */
+function migrateOpeningStockDateScoped(db) {
+  const result = {
+    openingStock: { ran: false, rowsPreserved: 0 },
+    commissaryOpeningStock: { ran: false, rowsPreserved: 0 }
+  };
+
+  const openingStockExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'opening_stock'`
+  ).get();
+  const commissaryOpeningStockExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'commissary_opening_stock'`
+  ).get();
+
+  const openingStockNeedsMigration = openingStockExists
+    && !hasUniqueKeyOn(db, 'opening_stock', ['restaurant_id', 'meat_id', 'business_date']);
+  const commissaryOpeningStockNeedsMigration = commissaryOpeningStockExists
+    && !hasUniqueKeyOn(db, 'commissary_opening_stock', ['commissary_meat_id', 'business_date']);
+
+  if (!openingStockNeedsMigration && !commissaryOpeningStockNeedsMigration) {
+    // Fresh install (schema.sql creates the new shape directly) or already
+    // migrated - nothing to do either way.
+    return result;
+  }
+
+  const fkWasOn = db.prepare(`PRAGMA foreign_keys`).get().foreign_keys === 1;
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  db.exec('BEGIN');
+  try {
+    if (openingStockNeedsMigration) {
+      result.openingStock = { ran: true, rowsPreserved: rebuildOpeningStock(db) };
+    }
+    if (commissaryOpeningStockNeedsMigration) {
+      result.commissaryOpeningStock = { ran: true, rowsPreserved: rebuildCommissaryOpeningStock(db) };
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  } finally {
+    if (fkWasOn) db.exec('PRAGMA foreign_keys = ON');
+  }
+
+  return result;
+}
+
+module.exports.migrateOpeningStockDateScoped = migrateOpeningStockDateScoped;

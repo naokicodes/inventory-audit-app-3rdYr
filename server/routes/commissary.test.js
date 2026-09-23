@@ -1108,16 +1108,29 @@ test('an opening stock write establishes a beginning for that meat', () => {
   assert.strictEqual(row.quantity, 50);
 });
 
-test('a second opening-stock write for the same meat is silently ignored, not an overwrite or error', () => {
+test('a second opening-stock write for the SAME date is silently ignored, not an overwrite or error (step 26a: write-once PER DATE)', () => {
   const r = postCommissaryDailyAudit({
-    commissary_id: 1, business_date: '2026-09-06',
+    commissary_id: 1, business_date: '2026-09-05',
     rows: [{ commissary_meat_id: 30, opening_stock: 999 }]
   });
-  assert.strictEqual(r.status, 200, 'the write-once table never errors on a repeat attempt');
-  const row = db.prepare('SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = 30').get();
+  assert.strictEqual(r.status, 200, 'the write-once-per-date table never errors on a repeat attempt');
+  const row = db.prepare('SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = 30 AND business_date = ?').get('2026-09-05');
   assert.strictEqual(row.quantity, 50, 'the original 50 must survive, not be replaced by 999');
+  const count = db.prepare('SELECT COUNT(*) as n FROM commissary_opening_stock WHERE commissary_meat_id = 30 AND business_date = ?').get('2026-09-05');
+  assert.strictEqual(count.n, 1, 'still exactly one row for this date');
+});
+
+test('a declared opening on a DIFFERENT date for the same meat is a genuine new write, not silently ignored (step 26a fix, finding 4)', () => {
+  const r = postCommissaryDailyAudit({
+    commissary_id: 1, business_date: '2026-09-10',
+    rows: [{ commissary_meat_id: 30, opening_stock: 80 }]
+  });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.saved, 1);
+  const row = db.prepare('SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = 30 AND business_date = ?').get('2026-09-10');
+  assert.strictEqual(row.quantity, 80, 'a declared opening on a later date must take effect, not be silently ignored');
   const count = db.prepare('SELECT COUNT(*) as n FROM commissary_opening_stock WHERE commissary_meat_id = 30').get();
-  assert.strictEqual(count.n, 1, 'still exactly one row - opening stock has no date in its key');
+  assert.strictEqual(count.n, 2, 'meat 30 must now have two declared openings - 09-05 and 09-10');
 });
 
 test('with a beginning now established, MISSING_BEGINNING_STOCK clears and endingCalculated computes', () => {
@@ -1177,6 +1190,65 @@ test('created_by is carried through to commissary_ending_actual', () => {
   });
   const row = db.prepare('SELECT created_by FROM commissary_ending_actual WHERE commissary_meat_id = 31 AND business_date = ?').get('2026-09-07');
   assert.strictEqual(row.created_by, 'Dan');
+});
+
+// Mirrors PATCH /api/commissary/opening-stock exactly (step 26a) - same
+// mirrored-function convention as postCommissaryDailyAudit above.
+function patchCommissaryOpeningStock({ commissary_meat_id, business_date, quantity }) {
+  if (!commissary_meat_id || !business_date) {
+    return { status: 400, error: 'commissary_meat_id and business_date are required' };
+  }
+
+  const existing = db.prepare(
+    `SELECT id FROM commissary_opening_stock WHERE commissary_meat_id = ? AND business_date = ?`
+  ).get(commissary_meat_id, business_date);
+  if (!existing) {
+    return { status: 404, error: 'No declared opening exists for this commissary meat/date to correct' };
+  }
+
+  const isClearing = quantity === null || quantity === undefined || quantity === '';
+  if (!isClearing && (typeof quantity !== 'number' && isNaN(Number(quantity)))) {
+    return { status: 400, error: 'quantity must be a number, or null/omitted to clear the declared opening' };
+  }
+
+  if (isClearing) {
+    db.prepare(`DELETE FROM commissary_opening_stock WHERE id = ?`).run(existing.id);
+    return { status: 200, ok: true, cleared: true };
+  }
+
+  db.prepare(`UPDATE commissary_opening_stock SET quantity = ? WHERE id = ?`).run(Number(quantity), existing.id);
+  return { status: 200, ok: true, cleared: false, quantity: Number(quantity) };
+}
+
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (32, 1, 'CM32', '26a PATCH Test Meat', 'kg', 0.1)`).run();
+
+test('PATCH commissary opening-stock: correcting an already-declared value overwrites it, one row', () => {
+  postCommissaryDailyAudit({
+    commissary_id: 1, business_date: '2026-09-12',
+    rows: [{ commissary_meat_id: 32, opening_stock: 20 }]
+  });
+  const result = patchCommissaryOpeningStock({ commissary_meat_id: 32, business_date: '2026-09-12', quantity: 35 });
+  assert.strictEqual(result.status, 200);
+  assert.strictEqual(result.quantity, 35);
+  const row = db.prepare('SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = 32 AND business_date = ?').get('2026-09-12');
+  assert.strictEqual(row.quantity, 35);
+  const count = db.prepare('SELECT COUNT(*) as n FROM commissary_opening_stock WHERE commissary_meat_id = 32 AND business_date = ?').get('2026-09-12');
+  assert.strictEqual(count.n, 1);
+});
+
+test('PATCH commissary opening-stock: quantity null clears (deletes) the declared opening', () => {
+  const result = patchCommissaryOpeningStock({ commissary_meat_id: 32, business_date: '2026-09-12', quantity: null });
+  assert.strictEqual(result.status, 200);
+  assert.strictEqual(result.cleared, true);
+  const row = db.prepare('SELECT * FROM commissary_opening_stock WHERE commissary_meat_id = 32 AND business_date = ?').get('2026-09-12');
+  assert.strictEqual(row, undefined);
+});
+
+test('PATCH commissary opening-stock: correcting a date with no declared opening at all is a 404, not a silent create', () => {
+  const result = patchCommissaryOpeningStock({ commissary_meat_id: 32, business_date: '2026-09-13', quantity: 50 });
+  assert.strictEqual(result.status, 404);
+  const row = db.prepare('SELECT * FROM commissary_opening_stock WHERE commissary_meat_id = 32 AND business_date = ?').get('2026-09-13');
+  assert.strictEqual(row, undefined, 'must not have been created as a side effect of the failed correction');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

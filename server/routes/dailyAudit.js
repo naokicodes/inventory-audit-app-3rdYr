@@ -80,6 +80,13 @@ router.get('/daily-audit', (req, res) => {
       variance: audit.variance,
       unexplained_variance: audit.unexplainedVariance,
       status: audit.status,
+      // Step 26a: how stale/derived the figures above are, and what a
+      // same-date recount changed - see session-status.md "What the
+      // auditor sees".
+      days_covered: audit.daysCovered,
+      beginning_carried: audit.beginningCarried,
+      recount_difference: audit.recountDifference,
+      window_adjustments: audit.windowAdjustments,
       remarks: inputs.remarks
     };
   });
@@ -130,18 +137,20 @@ router.get('/daily-audit/mixed', (req, res) => {
 // Allocations page (server/routes/allocations.js) instead of Landing's
 // old three hardcoded per-type boxes.
 //
-// opening_stock (step 12, session-status.md): a one-time value, only
-// meaningful the first time a meat has no computable beginning stock
-// (see auditEngine.js's getBeginningStock - no prior ending_actual and
-// no existing opening_stock row). `INSERT OR IGNORE` relies on
-// opening_stock's own UNIQUE(restaurant_id, meat_id) constraint
-// (schema.sql) to make the write-once guarantee a DB-level fact, not
-// just a frontend convention - a stale client that already has a
-// beginning value and resubmits it anyway is silently a no-op here,
-// never a second write or an error. Deliberately not run through
-// activity_log per rule 9 - that logging is scoped to stock_receipts
-// and commissary_yield_log only, not silently extended to every input
-// table.
+// opening_stock (step 26a, session-status.md): a declared balance for
+// (restaurant, meat, business_date) - write-once PER DATE, not per meat
+// for its whole lifetime (that was the pre-26a bug, finding 3/4). The
+// frontend only ever offers this input when beginning is null for the
+// loaded date (see auditEngine.js's getBeginningStock), so a normal save
+// only ever attempts one date at a time; `INSERT OR IGNORE` against
+// opening_stock's UNIQUE(restaurant_id, meat_id, business_date) makes
+// that a DB-level fact too - a stale client resubmitting the same date's
+// value is silently a no-op, never a second write or an error. Declaring
+// a NEW date's opening (a recount, a new month) writes a fresh row - see
+// PATCH /daily-audit/opening-stock below for CORRECTING an already-
+// declared value on the same date. Deliberately not run through
+// activity_log per rule 9 - that logging is scoped to stock_receipts and
+// commissary_yield_log only, not silently extended to every input table.
 router.post('/daily-audit', (req, res) => {
   const { restaurant_id, business_date, rows } = req.body;
   if (!restaurant_id || !business_date || !Array.isArray(rows)) {
@@ -264,6 +273,45 @@ router.post('/daily-audit/portions', (req, res) => {
   }
 
   res.json({ ok: true, saved });
+});
+
+// PATCH /api/daily-audit/opening-stock
+// Body: { restaurant_id, meat_id, business_date, quantity }
+// Step 26a (session-status.md): corrects an ALREADY-declared opening for
+// this exact date - finding 4 ("write-once and cannot be corrected").
+// Follows PATCH /sales' edit-and-clear model: quantity null/undefined/''
+// clears (deletes) the declared opening for this date; otherwise it
+// overwrites the existing value. Both require a row to already exist for
+// this exact (restaurant, meat, date) - this route corrects a declared
+// opening, it does not create a new one (that's POST /daily-audit, which
+// the frontend only offers when beginning is null for the loaded date -
+// see session-status.md "Also required").
+router.patch('/daily-audit/opening-stock', (req, res) => {
+  const { restaurant_id, meat_id, business_date, quantity } = req.body || {};
+
+  if (!restaurant_id || !meat_id || !business_date) {
+    return res.status(400).json({ error: 'restaurant_id, meat_id, and business_date are required' });
+  }
+
+  const existing = db.prepare(
+    `SELECT id FROM opening_stock WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
+  ).get(restaurant_id, meat_id, business_date);
+  if (!existing) {
+    return res.status(404).json({ error: 'No declared opening exists for this restaurant/meat/date to correct' });
+  }
+
+  const isClearing = quantity === null || quantity === undefined || quantity === '';
+  if (!isClearing && (typeof quantity !== 'number' && isNaN(Number(quantity)))) {
+    return res.status(400).json({ error: 'quantity must be a number, or null/omitted to clear the declared opening' });
+  }
+
+  if (isClearing) {
+    db.prepare(`DELETE FROM opening_stock WHERE id = ?`).run(existing.id);
+    return res.json({ ok: true, cleared: true });
+  }
+
+  db.prepare(`UPDATE opening_stock SET quantity = ? WHERE id = ?`).run(Number(quantity), existing.id);
+  res.json({ ok: true, cleared: false, quantity: Number(quantity) });
 });
 
 module.exports = router;

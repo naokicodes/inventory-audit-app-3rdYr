@@ -20,7 +20,8 @@ const {
   getNewStock,
   addDays,
   computeDishAudit,
-  computeMixedDailyAudit
+  computeMixedDailyAudit,
+  getBeginningStock
 } = require('./auditEngine.js');
 
 let passed = 0;
@@ -246,6 +247,132 @@ test('mixed daily audit: tags meats and BATCH_PREPPED dishes, excludes DIRECT di
   assert.strictEqual(dishRows[0].code, 'D003');
   assert.strictEqual(dishRows[0].item_id, dishId);
   assert.strictEqual(dishRows[0].portionEndingCalculated, 18); // reuses 08-10 scenario above
+});
+
+// --- Step 26a: date-scoped opening_stock, carry-forward, recount difference ---
+// A dedicated meat (M04) so this chain is fully isolated from the
+// scenarios above - carry-forward depends on the meat's entire history,
+// not just one date.
+db.prepare('INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (?, ?, ?, ?)')
+  .run(restaurantId, 'M04', 'Pork Belly', 'kg');
+const carryMeatId = db.prepare('SELECT id FROM meats WHERE meat_code = ?').get('M04').id;
+
+console.log('\nStep 26a: date-scoped opening stock, carry-forward, recount difference\n');
+
+test('a normal day (declared opening for THIS date, no prior chain): daysCovered=1, not carried, no recount difference', () => {
+  db.prepare('INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, carryMeatId, '2026-09-28', 100);
+
+  const result = computeMeatAudit(db, restaurantId, carryMeatId, '2026-09-28');
+  assert.strictEqual(result.beginning, 100);
+  assert.strictEqual(result.daysCovered, 1);
+  assert.strictEqual(result.beginningCarried, false);
+  assert.strictEqual(result.recountDifference, null);
+});
+
+test('a normal day (yesterday has an actual): daysCovered=1, not carried', () => {
+  db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, carryMeatId, '2026-09-28', 90); // counted at 90, chain resets here
+
+  const result = computeMeatAudit(db, restaurantId, carryMeatId, '2026-09-29');
+  assert.strictEqual(result.beginning, 90);
+  assert.strictEqual(result.daysCovered, 1);
+  assert.strictEqual(result.beginningCarried, false);
+});
+
+test('spec example: counted Sept 28 (90), uncounted 29-Oct 2, counted Oct 3 -> daysCovered=5, beginningCarried=true, Over/Short covers all 5 days', () => {
+  // Sept 29 - Oct 2: no activity at all (no receipts/usage), no actual entered.
+  const uncountedDay = computeMeatAudit(db, restaurantId, carryMeatId, '2026-09-30');
+  assert.strictEqual(uncountedDay.beginning, 90, 'no flows on any uncounted day so far, beginning stays 90');
+  assert.strictEqual(uncountedDay.beginningCarried, true);
+  assert.strictEqual(uncountedDay.daysCovered, 2, 'Sept 29 (1) + Sept 30 (2) - reported even though Sept 30 itself has no actual yet');
+  assert.strictEqual(uncountedDay.status, 'MISSING_ACTUAL_COUNT');
+
+  db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, carryMeatId, '2026-10-03', 90); // exact match, no further variance
+
+  const result = computeMeatAudit(db, restaurantId, carryMeatId, '2026-10-03');
+  assert.strictEqual(result.beginning, 90, 'no new_stock/usage anywhere in the carried window');
+  assert.strictEqual(result.beginningCarried, true);
+  assert.strictEqual(result.daysCovered, 5, 'Sept 29, 30, Oct 1, 2 (carried) + Oct 3 (today)');
+  assert.strictEqual(result.status, 'OK');
+});
+
+test('an adjustment dated on a carried (uncounted) day is still picked up by the count day\'s window sum', () => {
+  const typeId = db.prepare('SELECT id FROM adjustment_types WHERE name = ?').get('Wastage').id;
+  // Same chain as above, next segment: Oct 4-6 uncounted, an adjustment
+  // logged for Oct 5 (a day with no variance of its own), counted Oct 7.
+  db.prepare('INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id) VALUES (?, ?, ?, ?, ?)')
+    .run(restaurantId, carryMeatId, '2026-10-05', 3.0, typeId);
+  db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, carryMeatId, '2026-10-07', 87); // 90 - 3 (unlogged shrinkage) = 87
+
+  const result = computeMeatAudit(db, restaurantId, carryMeatId, '2026-10-07');
+  assert.strictEqual(result.daysCovered, 4, 'Oct 4, 5, 6 (carried) + Oct 7 (today)');
+  assert.strictEqual(result.endingCalculated, 90, 'no new_stock/usage - only the LOSS adjustment explains the gap');
+  assert.strictEqual(result.variance, 3, 'raw variance unaffected by the window - endingCalculated(90) - actual(87)');
+  assert.ok(Math.abs(result.unexplainedVariance) < 0.0001, 'the Oct 5 adjustment, picked up via the window sum, fully explains it');
+  assert.strictEqual(result.status, 'OK', 'fully explained by the known adjustment, same as any other day');
+});
+
+test('recount difference (option A): a declared opening on a date with a prior chain adds the difference into that day\'s Over/Short, not earlier days', () => {
+  // Chain continues from Oct 7's actual (87). Oct 8-9 uncounted, then a
+  // recount on Oct 10 declares 80 - 7 less than the chain expected.
+  db.prepare('INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, carryMeatId, '2026-10-10', 80);
+
+  const result = computeMeatAudit(db, restaurantId, carryMeatId, '2026-10-10');
+  assert.strictEqual(result.beginning, 80, 'the declared opening always wins for its own date');
+  assert.strictEqual(result.recountDifference, 7, 'priorEnding (87, no flows since) - opening (80) = 7, a shortage found at the recount');
+  assert.strictEqual(result.daysCovered, 3, 'Oct 8, 9 (carried) + Oct 10 (today) - the days the recount difference covers');
+
+  db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, carryMeatId, '2026-10-10', 80); // no further variance beyond the recount itself
+
+  const afterCount = computeMeatAudit(db, restaurantId, carryMeatId, '2026-10-10');
+  assert.strictEqual(afterCount.endingCalculated, 80, 'today\'s own calc uses the declared 80 as beginning, no other flows');
+  assert.strictEqual(afterCount.variance, 0, 'raw variance: endingCalculated(80) - actual(80)');
+  assert.strictEqual(afterCount.unexplainedVariance, 7, 'the recount difference alone - "as if the recount never happened"');
+  assert.strictEqual(afterCount.status, 'SHORTAGE');
+
+  // Earlier days are untouched by this - Oct 7 still reads exactly as it did.
+  const earlierDay = computeMeatAudit(db, restaurantId, carryMeatId, '2026-10-07');
+  assert.ok(Math.abs(earlierDay.unexplainedVariance) < 0.0001, 'Oct 7 is unaffected by a recount three days later');
+});
+
+test('a declared opening with NO prior chain (onboarding, brand-new meat): recountDifference is null, daysCovered is 1', () => {
+  db.prepare('INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, 'M05', 'Beef Tapa', 'kg');
+  const freshMeatId = db.prepare('SELECT id FROM meats WHERE meat_code = ?').get('M05').id;
+
+  db.prepare('INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, freshMeatId, '2026-09-15', 25);
+
+  const result = computeMeatAudit(db, restaurantId, freshMeatId, '2026-09-15');
+  assert.strictEqual(result.beginning, 25);
+  assert.strictEqual(result.recountDifference, null, 'nothing to compare against - the opening simply starts the chain');
+  assert.strictEqual(result.daysCovered, 1);
+  assert.strictEqual(result.beginningCarried, false);
+});
+
+test('MISSING_BEGINNING_STOCK (no opening, no prior count anywhere): daysCovered/beginningCarried/recountDifference report as null/false/null, not garbage', () => {
+  db.prepare('INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, 'M06', 'Chicken Skin', 'kg');
+  const neverSeededId = db.prepare('SELECT id FROM meats WHERE meat_code = ?').get('M06').id;
+
+  const result = computeMeatAudit(db, restaurantId, neverSeededId, '2026-09-20');
+  assert.strictEqual(result.status, 'MISSING_BEGINNING_STOCK');
+  assert.strictEqual(result.daysCovered, null);
+  assert.strictEqual(result.beginningCarried, false);
+  assert.strictEqual(result.recountDifference, null);
+});
+
+test('getBeginningStock returns the full { value, carried, daysCovered, recountDifference } shape directly', () => {
+  const info = getBeginningStock(db, restaurantId, carryMeatId, '2026-09-28');
+  assert.strictEqual(info.value, 100);
+  assert.strictEqual(info.carried, false);
+  assert.strictEqual(info.daysCovered, 1);
+  assert.strictEqual(info.recountDifference, null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

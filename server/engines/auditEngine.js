@@ -14,27 +14,120 @@ function addDays(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
+// Step 26a (session-status.md): opening_stock is now date-scoped - a row
+// means "an authoritative declared balance on this date", not a lifetime
+// seed. getBeginningStock resolves, in order: (1) a declared opening for
+// THIS date, (2) yesterday's ending_actual, (3) yesterday's
+// ending_calculated, carried - repeating backward day by day until it
+// finds a real count or a declared opening, (4) neither exists anywhere ->
+// null. Not bounded by the calendar month in this step (that bound is
+// Step 26a-ii, held); a never-recounted meat can carry indefinitely.
+//
+// A safety valve, not a business rule: MAX_CARRY_WALK caps the backward
+// walk so a genuinely never-seeded meat fails fast with null (status
+// MISSING_BEGINNING_STOCK) instead of looping toward the epoch.
+const MAX_CARRY_WALK = 3660; // ~10 years of days
+
 /**
- * Beginning stock = yesterday's actual ending count.
- * Falls back to the one-time opening_stock entry if no prior day exists
- * (i.e. this is the first day this meat has ever been tracked).
- * Returns null if neither exists - meaning the caller is missing data
- * needed to compute anything further (should surface as "needs setup",
- * not silently treated as zero).
+ * Finds the nearest anchor on or before `date` - 1: a date with either an
+ * ending_actual (a physical count - that day's own newStock/usage are
+ * already reflected in it) or a declared opening_stock row (a
+ * beginning-of-day value - that day's own newStock/usage still need to be
+ * added). Two indexed lookups (most recent row of each kind), not a
+ * day-by-day scan - the walk this replaces made a "genuinely new meat"
+ * cost MAX_CARRY_WALK queries to conclude nothing exists. Returns null if
+ * neither table has any row at all on or before that date.
+ */
+function findPriorAnchor(db, restaurantId, meatId, date) {
+  const priorDate = addDays(date, -1);
+
+  const lastActual = db.prepare(
+    `SELECT business_date, quantity FROM ending_actual WHERE restaurant_id = ? AND meat_id = ? AND business_date <= ? ORDER BY business_date DESC LIMIT 1`
+  ).get(restaurantId, meatId, priorDate);
+  const lastOpening = db.prepare(
+    `SELECT business_date, quantity FROM opening_stock WHERE restaurant_id = ? AND meat_id = ? AND business_date <= ? ORDER BY business_date DESC LIMIT 1`
+  ).get(restaurantId, meatId, priorDate);
+
+  if (!lastActual && !lastOpening) return null;
+
+  // Whichever is more recent wins; on the same date, an actual wins (step
+  // 2 is checked before ever falling through to that day's opening).
+  const anchor = (lastActual && (!lastOpening || lastActual.business_date >= lastOpening.business_date))
+    ? { type: 'actual', date: lastActual.business_date, value: lastActual.quantity }
+    : { type: 'opening', date: lastOpening.business_date, value: lastOpening.quantity };
+
+  // The uncounted dates strictly between the anchor and `date` - bounded
+  // by the real gap, not MAX_CARRY_WALK (that stays only as a defensive
+  // cap against a pathological far-future date).
+  const uncountedDates = [];
+  let cursor = addDays(anchor.date, 1);
+  for (let i = 0; i < MAX_CARRY_WALK && cursor <= priorDate; i++) {
+    uncountedDates.push(cursor);
+    cursor = addDays(cursor, 1);
+  }
+
+  return { ...anchor, uncountedDates };
+}
+
+/**
+ * What beginning(date) would resolve to via steps 2-4 alone, ignoring any
+ * declared opening ON `date` itself - i.e. "yesterday's ending_actual,
+ * else yesterday's carried ending_calculated". Used both for the ordinary
+ * carried-forward case and, by getBeginningStock, as `priorEnding` for the
+ * recount-difference calculation on a declared-opening day. Returns null
+ * if no anchor exists at all (a genuinely new meat/restaurant).
+ */
+function resolvePriorChain(db, restaurantId, meatId, date) {
+  const anchor = findPriorAnchor(db, restaurantId, meatId, date);
+  if (!anchor) return null;
+
+  // An actual already reflects its own day's flows; an opening is a
+  // beginning-of-day value, so its own day's flows still apply.
+  const flowDates = anchor.type === 'opening' ? [anchor.date, ...anchor.uncountedDates] : anchor.uncountedDates;
+  let value = anchor.value;
+  for (const d of flowDates) {
+    value += getNewStock(db, restaurantId, meatId, d) - getUsage(db, restaurantId, meatId, d);
+  }
+
+  return {
+    value,
+    daysCovered: anchor.uncountedDates.length + 1,
+    // "Normal" per session-status.md means step 2 applied cleanly - the
+    // anchor was found immediately, as an actual, right on date - 1.
+    carried: !(anchor.type === 'actual' && anchor.uncountedDates.length === 0)
+  };
+}
+
+/**
+ * Returns { value, carried, daysCovered, recountDifference } for one
+ * meat/date - see session-status.md "Step 26a". `value` is null only when
+ * no declared opening and no prior count exist anywhere (status
+ * MISSING_BEGINNING_STOCK downstream). `recountDifference` is non-null
+ * only on a date with its own declared opening AND a prior chain to
+ * compare it against (option A, 2026-09-23): positive means the recount
+ * found less than the chain expected.
  */
 function getBeginningStock(db, restaurantId, meatId, businessDate) {
-  const priorDate = addDays(businessDate, -1);
-  const prev = db.prepare(
-    `SELECT quantity FROM ending_actual WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
-  ).get(restaurantId, meatId, priorDate);
-  if (prev) return prev.quantity;
+  const declared = db.prepare(
+    `SELECT quantity FROM opening_stock WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
+  ).get(restaurantId, meatId, businessDate);
 
-  const opening = db.prepare(
-    `SELECT quantity FROM opening_stock WHERE restaurant_id = ? AND meat_id = ?`
-  ).get(restaurantId, meatId);
-  if (opening) return opening.quantity;
+  if (declared) {
+    const priorChain = resolvePriorChain(db, restaurantId, meatId, businessDate);
+    return {
+      value: declared.quantity,
+      carried: false,
+      daysCovered: priorChain ? priorChain.daysCovered : 1,
+      recountDifference: priorChain ? (priorChain.value - declared.quantity) : null
+    };
+  }
 
-  return null;
+  const chain = resolvePriorChain(db, restaurantId, meatId, businessDate);
+  if (!chain) {
+    return { value: null, carried: false, daysCovered: null, recountDifference: null };
+  }
+
+  return { value: chain.value, carried: chain.carried, daysCovered: chain.daysCovered, recountDifference: null };
 }
 
 /**
@@ -94,6 +187,24 @@ function getAdjustmentsTotal(db, restaurantId, meatId, businessDate) {
   return row.qty || 0;
 }
 
+/**
+ * Step 26a (session-status.md, "Adjustments across the covered window"):
+ * sum of adjustments across the SAME window daysCovered represents - the
+ * last `daysCovered` days ending on `businessDate`, inclusive. An
+ * adjustment dated on a day that was carried (uncounted) would otherwise
+ * explain nothing, since that day itself shows no variance and the count
+ * day only reads its own date. daysCovered === 1 reduces to the plain
+ * single-day sum, unchanged from before this step.
+ */
+function getAdjustmentsTotalForWindow(db, restaurantId, meatId, businessDate, daysCovered) {
+  if (daysCovered <= 1) return getAdjustmentsTotal(db, restaurantId, meatId, businessDate);
+  const windowStart = addDays(businessDate, -(daysCovered - 1));
+  const row = db.prepare(
+    `SELECT SUM(quantity) as qty FROM adjustments WHERE restaurant_id = ? AND meat_id = ? AND business_date >= ? AND business_date <= ?`
+  ).get(restaurantId, meatId, windowStart, businessDate);
+  return row.qty || 0;
+}
+
 function getEndingActual(db, restaurantId, meatId, businessDate) {
   const row = db.prepare(
     `SELECT quantity FROM ending_actual WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
@@ -104,27 +215,46 @@ function getEndingActual(db, restaurantId, meatId, businessDate) {
 /**
  * Full audit computation for one meat, one date.
  * Returns null fields where data is missing rather than guessing.
+ *
+ * Step 26a (session-status.md) adds daysCovered/beginningCarried/
+ * recountDifference. `status` stays a single severity value (OK/SHORTAGE/
+ * SURPLUS/MISSING_*) - carry is a field, not a status. `adjustments`
+ * stays the plain single-day sum (unchanged - real movements already flow
+ * through endingCalculated day by day); `unexplainedVariance` is the one
+ * figure that reflects the covered window and any recount difference.
  */
 function computeMeatAudit(db, restaurantId, meatId, businessDate) {
-  const beginning = getBeginningStock(db, restaurantId, meatId, businessDate);
+  const beginningInfo = getBeginningStock(db, restaurantId, meatId, businessDate);
+  const { value: beginning, carried: beginningCarried, daysCovered, recountDifference } = beginningInfo;
   const newStock = getNewStock(db, restaurantId, meatId, businessDate);
   const usage = getUsage(db, restaurantId, meatId, businessDate);
   const adjustments = getAdjustmentsTotal(db, restaurantId, meatId, businessDate);
   const actual = getEndingActual(db, restaurantId, meatId, businessDate);
 
   if (beginning === null) {
-    return { beginning: null, newStock, usage, adjustments, actual, endingCalculated: null, variance: null, expectedEnding: null, unexplainedVariance: null, status: 'MISSING_BEGINNING_STOCK' };
+    return {
+      beginning: null, newStock, usage, adjustments, actual,
+      endingCalculated: null, variance: null, expectedEnding: null, unexplainedVariance: null,
+      status: 'MISSING_BEGINNING_STOCK',
+      daysCovered, beginningCarried, recountDifference, windowAdjustments: null
+    };
   }
 
   const endingCalculated = beginning + newStock - usage;
-  const expectedEnding = endingCalculated - adjustments;
+  const windowAdjustments = getAdjustmentsTotalForWindow(db, restaurantId, meatId, businessDate, daysCovered);
+  const expectedEnding = endingCalculated - windowAdjustments + (recountDifference || 0);
 
   if (actual === null) {
-    return { beginning, newStock, usage, adjustments, actual: null, endingCalculated, expectedEnding, variance: null, unexplainedVariance: null, status: 'MISSING_ACTUAL_COUNT' };
+    return {
+      beginning, newStock, usage, adjustments, actual: null,
+      endingCalculated, expectedEnding, variance: null, unexplainedVariance: null,
+      status: 'MISSING_ACTUAL_COUNT',
+      daysCovered, beginningCarried, recountDifference, windowAdjustments
+    };
   }
 
-  const variance = endingCalculated - actual;               // raw, before adjustments
-  const unexplainedVariance = expectedEnding - actual;       // after known adjustments
+  const variance = endingCalculated - actual;               // raw, before adjustments - unchanged by the covered window
+  const unexplainedVariance = expectedEnding - actual;       // after known adjustments over the covered window, plus any recount difference
 
   const EPSILON = 0.01; // float rounding tolerance
   let status;
@@ -132,7 +262,11 @@ function computeMeatAudit(db, restaurantId, meatId, businessDate) {
   else if (unexplainedVariance > 0) status = 'SHORTAGE';
   else status = 'SURPLUS';
 
-  return { beginning, newStock, usage, adjustments, actual, endingCalculated, expectedEnding, variance, unexplainedVariance, status };
+  return {
+    beginning, newStock, usage, adjustments, actual,
+    endingCalculated, expectedEnding, variance, unexplainedVariance, status,
+    daysCovered, beginningCarried, recountDifference, windowAdjustments
+  };
 }
 
 /** Runs computeMeatAudit for every active meat in a restaurant, for one date. */
