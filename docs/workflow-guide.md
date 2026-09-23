@@ -101,6 +101,14 @@ One command. The worker pulls, baselines with `npm run verify`, reads the
 step, implements it, verifies again, branches, pushes, and opens a PR.
 Class A decisions it makes alone and logs in the PR body.
 
+**Every step starts in a fresh context.** `/clear` before `/start` (or `/step`),
+and again after the PR is opened or an issue is parked — never between `/start`
+and `/continue`, which needs `/start`'s plan. After pulling changes to
+`.claude/commands/`, quit and reopen Claude Code instead, since `/clear` does not
+rescan commands. `/start` refuses to run in a conversation that still holds a
+previous step. Added 2026-09-23 after a step ran at ~3x its usual tokens carrying
+the prior step's context.
+
 **Phase 2 — CI, nobody present.**
 The suite and the write-path audit run on the PR. Cubic reviews in
 parallel. This is what replaced trusting a pasted test count.

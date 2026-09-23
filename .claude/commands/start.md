@@ -6,6 +6,24 @@ Pick up the next runnable step from the queue and take it up to the point of
 implementation, then stop for a checkpoint. **Do NOT write code in this
 command** — that is `/continue`.
 
+## 0. Start from a clean context — check this before anything else
+
+This command must run in a fresh conversation. Before running any command
+below, look back over this conversation. If it already holds a previous step's
+work — another `/start`, `/continue` or `/step` run, a PR opened, an issue
+parked, code edits, or long test output — **stop** and say only:
+
+> This conversation still holds a previous step's work. Run `/clear`, then
+> `/start` again. If you just pulled changes to `.claude/commands/`, quit and
+> reopen Claude Code instead — `/clear` does not reload commands.
+
+Do not run git, read docs, or select a step first. A previous step's context is
+re-sent on every turn of this one: it multiplies the cost of the step and brings
+context compaction sooner, which is how spec details get lost mid-build.
+Everything a step needs is in the repo, so clearing loses nothing.
+
+A conversation holding only a greeting or a short question is fine — proceed.
+
 ## 1. Ground yourself on a current main
 
 Start every run from `main`, not wherever the last one left you:
