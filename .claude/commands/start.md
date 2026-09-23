@@ -51,19 +51,40 @@ on any earlier steps you skipped and why (held, planned, blocked). If NO step is
 runnable, say so plainly and **stop** — do not invent one, and never start a
 Planned or flagged step to have something to do.
 
-## 4. Read the spec and state the plan
+## 4. Read the spec and check it against the code
 
 - Read the chosen step's own section in `docs/session-status.md` (the spec), plus
   `docs/decision-authority.md`, `docs/engineer-role.md`,
   `docs/rules-for-claude-code.md`.
 - Check the step's stated prerequisites against the **actual code** (grep the
   write path), not against the step text.
-- State the plan briefly: which files change, the approach, and what you are
-  explicitly NOT touching.
 
-## 5. Stop for the checkpoint
+## 5. If checking the spec surfaces a Class B question — escalate, do NOT ask the dispatcher
 
-Do NOT implement. End with exactly:
+If the spec does not fully settle the step — a gap you would have to fill with a
+design choice, or anything Class B (operator-visible, changes a
+balance/variance/yield number, a new column or constraint, anything in "Things
+NOT to re-litigate") — then the step is **not design-settled after all.** Do NOT
+proceed to the checkpoint, and do NOT present the dispatcher a menu, a choice, or
+a "recommended" option: the dispatcher cannot resolve a Class B question, and a
+recommendation is exactly what a hurried person treats as permission.
+
+Instead, open an issue and stop:
+
+```
+gh issue create --template needs-architect.md
+```
+
+State **both readings evenly with NO recommendation**, name what is undecided and
+what you did not change, then STOP. Resolving it is the architect's, through the
+issue → `session-status.md` → re-dispatch. (This is `/step` phase 7, applied at
+planning time.)
+
+## 6. Otherwise, state the plan and stop for the checkpoint
+
+If the spec fully settles the step, state the plan briefly: which files change,
+the approach, and what you are explicitly NOT touching. Then do NOT implement, and
+end with exactly:
 
 > Ready to implement **<step>**. Type `/continue` to build it. If this isn't the
 > step you meant, tell me instead.
