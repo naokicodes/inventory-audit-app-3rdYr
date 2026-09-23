@@ -837,11 +837,21 @@ up, stop and open a `needs-architect` issue rather than deciding what moves.
 ## Step 26a — beginning stock: date-scoped openings and an honest fallback
 
 **Pillar 1 (Core). Lane: DISPATCH only. Schema rebuild — red by default.
-Resolves gap-hunt findings 3 and 4 and the "beginning of the month" question in
-one change, because they are the same code path.**
+Resolves gap-hunt findings 3 and 4.**
+
+**Revised 2026-09-23 to answer issue #6** (both gaps). Decisions are NaokiiVT's;
+the reasoning is recorded here so nobody rediscovers it. The month-start recount
+workflow is split out to **Step 26a-ii (held)** — this step does not build it.
 
 **Do this before test data is entered.** It is a table rebuild, and the data is
 test-only today. This is the cheapest it will ever be.
+
+### Governing principle (NaokiiVT, 2026-09-23)
+
+The app replaces the paper sheets and does the same job, but it **assists the
+workflow; it is not the workflow.** Tags and labels that help people read a
+number are welcome. Enforcing process is not — the single exception is the
+month-start recount block in 26a-ii.
 
 ### The shape
 
@@ -850,58 +860,170 @@ test-only today. This is the cheapest it will ever be.
 declared balance on this date"** rather than a lifetime seed. That one concept
 covers month start, new-restaurant onboarding, and a post-recount reset — no new
 table and no new vocabulary. `commissary_opening_stock` gets the identical
-treatment.
+treatment. Follow `migrateStockReceiptsNullableDestination` in
+`server/db/migrate.js` for the rebuild.
 
-`getBeginningStock` resolves in this order:
+`getBeginningStock` (and `getCommissaryBeginningStock`, identically) resolves:
 
 ```
-1. declared opening for THIS date
+1. declared opening for THIS date     -> beginning (see "Recount difference")
 2. yesterday's ending_actual
-3. yesterday's ending_calculated   -> status BEGINNING_CARRIED_FORWARD
-4. null                            -> status MISSING_BEGINNING_STOCK
+3. yesterday's ending_calculated      -> beginning is CARRIED
+4. no earlier opening or count exists -> null, status MISSING_BEGINNING_STOCK
 ```
 
-Step 1 winning over step 2 is deliberate: a declared opening is the operator
-overriding the chain on purpose.
+Step 3 repeats backward day by day until it reaches a real count (2) or a
+declared opening (1). It reaches 4 only for a meat with no earlier opening and no
+earlier count at all — a genuinely new meat or restaurant, never a missed day.
+Walk back iteratively rather than by unbounded recursion (Class A: how).
 
-### What carry-forward costs, stated so nobody rediscovers it
+**The chain is not bounded by the calendar month in this step.** The bound is the
+month-start recount, Step 26a-ii. Until 26a-ii lands, a meat that is never
+recounted carries across month boundaries with a growing day count. That is
+acceptable only because the data is test-only; **26a-ii must land before real
+entry starts.** There is no `MISSING_PERIOD_OPENING` status in this step — it
+belongs to 26a-ii.
 
-`ending_calculated` is `beginning + newStock - usage` — the theoretical number,
-with the missed day's variance already baked out. Carrying it forward makes
-shrinkage on that day permanently invisible. This is acceptable **only because
-the monthly declared opening bounds it**: theory can never chain more than one
-month before a real count forces reconciliation. If the monthly opening
-discipline is ever dropped, this fallback must be revisited, because without it
-the carry chains forever.
+### Status stays severity; carry is a field, not a status
 
-Carry-forward is therefore never silent. The row reports
-`BEGINNING_CARRIED_FORWARD`, and the variance must be labelled as covering N
-days rather than presented as one day's.
+Revised from the original spec, which made `BEGINNING_CARRIED_FORWARD` a status.
+`status` is a single value, and on a count day after a carried stretch it must
+still say `SHORTAGE` / `SURPLUS` / `OK` — otherwise the row stops saying whether
+anything is wrong. The existing status values are unchanged. So is
+`dashboard.js`'s `status !== 'MISSING_BEGINNING_STOCK'` check.
+
+`computeMeatAudit` and `computeCommissaryMeatAudit` gain three return fields:
+
+- `daysCovered` — how many days of activity the Over/Short figure includes.
+  1 on a normal day. On a count day after carried days: the carried days plus
+  today. On a declared-opening day: the days the recount difference covers plus
+  today. Reported on uncounted days too (how far back the beginning is carried).
+- `beginningCarried` — boolean, true when the beginning came from step 3.
+- `recountDifference` — number or null (below).
+
+Example: counted Sept 28, uncounted Sept 29 – Oct 2, counted Oct 3 → on Oct 3,
+`daysCovered = 5`, and the Over/Short covers Sept 29 through Oct 3.
+
+### Adjustments across the covered window — found 2026-09-23
+
+`getAdjustmentsTotal` (restaurant; the Allocations page writes `adjustments`) and
+the commissary `kind = 'LOSS'` sum both filter `business_date = ?`. Over a
+carried stretch, an adjustment dated on an uncounted day explains nothing
+anywhere: that day has no variance, and the count day reads only its own date.
+The explanation vanishes while the variance stays — the inverse of "a declared
+loss reclassifies a variance, it never makes it disappear."
+
+**Rule:** `unexplainedVariance` subtracts adjustments (restaurant) / `LOSS` rows
+(commissary) summed over the whole covered window — the same days as
+`daysCovered`. Raw `variance` and every stock movement (receipts, commissary
+`ALLOCATION` in and out, shipments, yield) are unchanged; they already flow
+through `ending_calculated` day by day. On-site the kitchen dates its allocation
+report on the count day, so this mostly catches backdated entries — but the
+Terminal accepts a specific date, so it will happen.
+
+### Recount difference — option A, decided 2026-09-23
+
+On a date D with a declared opening **and** a prior chain (D−1 has an
+`ending_actual`, or a carried `ending_calculated`):
+
+```
+recountDifference = priorEnding − opening
+priorEnding       = D−1's ending_actual, else D−1's carried ending_calculated
+```
+
+Positive = less meat at the recount than the chain expected (a shortage).
+
+It is **added into D's `unexplainedVariance`**, so D's Over/Short equals the
+total the chain would have shown had the recount never happened — the recount
+only splits it into "found at the recount" and "happened today." `status` uses
+the combined figure. Adjustments over D's covered window explain it. Earlier
+days, and the earlier month, are not changed.
+
+No prior chain (onboarding, a brand-new meat) → `recountDifference` is null; the
+opening simply starts the chain.
+
+**Why A and not B (difference booked on the old month's last day).** B means
+routinely reopening a sheet already marked done and dating allocations backward,
+every month, at every site. A keeps the kitchen's existing habit — explain a
+shortage on the day it is found; fix things going forward. Cost, accepted: the
+old month's totals exclude the recount difference, and the new month's first day
+carries it, tagged. Reopen only if management needs the recount difference
+inside the old month's totals.
+
+This closes the hole in the original spec, where a declared opening *overrode*
+the prior ending and the month-boundary gap appeared in no row at all.
+
+### What the auditor sees — settled, not Class B
+
+Settled by NaokiiVT 2026-09-23 (tags go on the number). This paragraph is the
+`ui-conventions.md` escape for these cells.
+
+- **Over/Short:** when `daysCovered > 1`, append `(N days)`. When
+  `recountDifference` is not null, append `incl. X recount difference`. Both can
+  appear on one row.
+- **Beginning:** on a carried day, append `(carried)`.
+- **Status:** unchanged.
+- The inline live recalculation in `public/daily-audit.html` (`recalcMeatRow`)
+  and in `public/commissary.html` must use the window adjustments and
+  `recountDifference` from the server, or the Over/Short changes between typing
+  and reload.
 
 ### Not a hard lock — deliberately
 
-A hard block on the row would prevent recording *today's* count, discarding data
-that does exist. `ending_actual` is keyed by date, so a missed day stays
-writable and the auditor backfills it from the filed paper sheet. Flag the row
-unreconciled; do not refuse it. **This one is operational policy, not a
-technical constraint — reversible if it does not match how the counts actually
-run.**
-
-A month with no declared opening is different: that is a real block, status
-`MISSING_PERIOD_OPENING`, and the page refuses until the opening is written.
+A hard block on a missed day would prevent recording *today's* count, discarding
+data that does exist. `ending_actual` is keyed by date, so a missed day stays
+writable and can be backfilled from the paper sheet. Flag, do not refuse. The
+only hard block is 26a-ii's month-start recount.
 
 ### Also required
 
-`opening_stock` and `commissary_opening_stock` currently have no PATCH, PUT or
-DELETE anywhere. Correcting a declared opening must be possible (finding 4).
-Follow `PATCH /sales`, which is the project's correct model for edit-and-clear.
+`opening_stock` and `commissary_opening_stock` have no PATCH, PUT or DELETE
+anywhere. Correcting a declared opening must be possible (finding 4). Follow
+`PATCH /sales`, the project's model for edit-and-clear.
+
+The existing POST paths keep insert-if-absent. The landing and commissary pages
+offer an opening input only when beginning is null, so **declaring an opening on
+a day that already has a chain has no screen in this step** — that screen is
+26a-ii. This step exercises the recount difference through the API and tests.
+
+### Callers
+
+The two engine return shapes grow. Grep every caller of `computeMeatAudit` and
+`computeCommissaryMeatAudit` (dashboard, history, the audit routes) and confirm
+each still renders and sums correctly.
 
 ### Depends on this, do not build first
 
 The Terminal command that reads the prior month's final `ending_actual` per meat
-and proposes them as the new month's opening (NaokiiVT 2026-09-03, for
-onboarding and monthly discipline) is pillar 2 work and cannot be built until
-this schema change lands.
+and proposes them as the new month's opening is pillar 2 work, and overlaps
+26a-ii's copy rule. Neither starts until this lands.
+
+## Step 26a-ii — the month-start recount (HELD: architect answers owed)
+
+**Not dispatchable.** Recorded 2026-09-23 so the decided parts survive.
+
+Decided (NaokiiVT):
+
+- A full count of every meat at month end is mandatory.
+- On the first day(s) of the month, **required** meats are recounted and entered
+  as declared openings; the rest are **copied** from the previous month's final
+  ending.
+- A **hard block at month start only** is acceptable, to enforce the recount: a
+  meat with no opening for the new month blocks. `MISSING_PERIOD_OPENING` lives
+  here. This is what bounds 26a's carry chain to one month.
+- Frozen meats carry a 500 g – 1 kg weighing leeway. That is the users'
+  judgment, **not an app rule** — the app shows every difference as a number.
+- Needs its own screen: the pages offer an opening input only when beginning is
+  null.
+
+Open — architect, not worker:
+
+1. **Copy rule.** May a meat be copied if its last ending was only *calculated*?
+   (Architect lean: no — it must be recounted, or theory carries into the
+   "fresh" month and the bound fails.)
+2. **Who sets "required."** A per-meat setting in Settings, for restaurants and
+   commissary alike?
+3. **Block window.** The 1st only (until entered), or a grace window?
 
 ## Steps 25a / 25b — the commissary ledger has no way in
 

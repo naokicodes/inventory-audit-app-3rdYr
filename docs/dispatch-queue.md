@@ -28,42 +28,32 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
-### 1. Step 25d-ii — `prepped.created_by` is provenance, not identity
-**Lane: DISPATCH only. Small, real code, tiny blast radius.**
-**Re-dispatch. Attempt one was closed unmerged — read the whole spec.**
-
-Makes `POST /api/daily-audit/portions` skip rows whose `portions_produced`
-is unchanged; and on rows that did change, clears the
-`SYSTEM:sync-batch-stock` stamp and logs the correction to `activity_log`.
-No schema change, no `public/` change.
-
-The change detection is not an optimisation and is not optional. The page
-that calls this route posts every dish row on every save, so without it
-the stamp-clearing lands on rows nobody edited. That is what attempt one
-(`marble/25d-ii-prepped-provenance`, `c9f082a`) did — correctly
-implementing a spec that was wrong. The spec is now fixed; the code was
-never the problem.
-
-Sequenced first deliberately: it is the smallest step that exercises the
-full loop on real code — Class A decisions, tests, the write-path audit —
-where a mistake costs a revert rather than a corrupted migration. The
-first dispatch (archive-pass) was doc-only; this is the code equivalent.
-
-Spec: `session-status.md`, section "25d-ii" — including the "Third half,
-added 2026-09-04" subsection, which is the part attempt one predates.
+### 1. Step 25d-ii — CLOSED 2026-09-22, PR #5 (`6c21238`).
 
 ### 2. Step 26a — beginning stock: date-scoped openings and an honest fallback
 **Lane: DISPATCH only. Schema rebuild — the most invasive step in the queue.**
 
-**Must not run concurrently with 25d-ii.** Both edit
-`server/routes/dailyAudit.js`, and this one carries a migration; resolving a
-migration inside a conflicted file is how an old constraint silently
-survives. Merge 25d-ii, pull, then start this.
+**Spec revised 2026-09-23, answering issue #6.** Both gaps are closed. Re-read
+the whole section; it changed shape (no new status string, a covered-window rule
+for adjustments, the recount difference). The month-start recount workflow is
+split out to 26a-ii and is **not** part of this step.
+
+25d-ii is merged (`6c21238`), so the concurrency constraint is satisfied.
 
 Do it before test data is entered — it is a table rebuild and the data is
 disposable today.
 
 Spec: `session-status.md`, section "Step 26a".
+
+### 2b. Step 26a-ii — the month-start recount
+**HOLD — architect answers owed. Not startable.**
+
+Required meats recounted at month start, the rest copied, a hard block at month
+start only. Three questions are still open (copy rule, who sets "required,"
+block window). Must land before real entry starts, because it is what bounds
+26a's carry chain.
+
+Spec: `session-status.md`, section "Step 26a-ii".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **Lane: DISPATCH only. Needs an architect-written prompt.**
