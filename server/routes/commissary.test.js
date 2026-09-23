@@ -13,6 +13,7 @@ const path = require('path');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
 const { computeCommissaryDailyAudit, computeCommissaryMeatAudit, getCommissaryBackedUp, getCommissaryUsage } = require('../engines/commissaryAuditEngine.js');
 const { computeYieldRow } = require('../engines/commissaryYieldEngine.js');
+const { recordRecount, isBlocked } = require('../engines/monthOpening.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -1035,7 +1036,7 @@ console.log('\nCommissary Route Tests (25b: POST /commissary/daily-audit)\n');
 
 // Dedicated fixtures for this block only - ids 30/31, dates no other test
 // in this file touches (24a-b isolation rule). CM30 starts untracked (no
-// opening stock yet, so MISSING_BEGINNING_STOCK); CM31 is a control meat
+// opening this month yet, so MISSING_PERIOD_OPENING - step 26a-ii); CM31 is a control meat
 // used only for the "second write is ignored" case.
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (30, 1, 'CM30', '25b Test Meat', 'kg', 0.1)`).run();
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (31, 1, 'CM31', '25b Second Meat', 'kg', 0.1)`).run();
@@ -1051,10 +1052,6 @@ function postCommissaryDailyAudit({ commissary_id, business_date, rows, actor })
     return { status: 400, error: 'commissary_id, business_date, and rows[] are required' };
   }
 
-  const insertOpeningStock = db.prepare(`
-    INSERT OR IGNORE INTO commissary_opening_stock (commissary_meat_id, business_date, quantity)
-    VALUES (?, ?, ?)
-  `);
   const upsertEndingActual = db.prepare(`
     INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity, notes, created_by)
     VALUES (?, ?, ?, ?, ?)
@@ -1062,16 +1059,18 @@ function postCommissaryDailyAudit({ commissary_id, business_date, rows, actor })
   `);
 
   let saved = 0;
+  const refused = [];
   for (const row of rows) {
-    if (row.opening_stock !== null && row.opening_stock !== undefined && row.opening_stock !== '') {
-      insertOpeningStock.run(row.commissary_meat_id, business_date, Number(row.opening_stock));
-    }
     if (row.ending_actual !== null && row.ending_actual !== undefined && row.ending_actual !== '') {
+      if (isBlocked(db, 'commissary', null, row.commissary_meat_id, business_date)) {
+        refused.push(row.commissary_meat_id);
+        continue;
+      }
       upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), row.notes || null, actor || null);
     }
     saved++;
   }
-  return { status: 200, ok: true, saved };
+  return { status: 200, ok: true, saved, refused };
 }
 
 test('400 when commissary_id is missing', () => {
@@ -1089,48 +1088,52 @@ test('400 when rows is not an array', () => {
   assert.strictEqual(r.status, 400);
 });
 
-test('a meat with no beginning starts MISSING_BEGINNING_STOCK before any write', () => {
+test('a meat with no opening this month starts MISSING_PERIOD_OPENING before any write (step 26a-ii)', () => {
   const before = computeCommissaryMeatAuditFor(30, '2026-09-05');
-  assert.strictEqual(before.status, 'MISSING_BEGINNING_STOCK');
+  assert.strictEqual(before.status, 'MISSING_PERIOD_OPENING');
   assert.strictEqual(before.beginning, null);
   assert.strictEqual(before.endingCalculated, null);
   assert.strictEqual(before.variance, null);
 });
 
-test('an opening stock write establishes a beginning for that meat', () => {
+test('while blocked, an ending for that meat is refused and the other rows in the same post still save', () => {
+  recordRecount(db, 'commissary', 1, 31, '2026-09-01', 10); // meat 31 is open for September
   const r = postCommissaryDailyAudit({
     commissary_id: 1, business_date: '2026-09-05',
-    rows: [{ commissary_meat_id: 30, opening_stock: 50 }]
+    rows: [{ commissary_meat_id: 30, ending_actual: 40 }, { commissary_meat_id: 31, ending_actual: 9 }]
   });
   assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.refused, [30]);
   assert.strictEqual(r.saved, 1);
-  const row = db.prepare('SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = 30').get();
+  assert.strictEqual(db.prepare('SELECT * FROM commissary_ending_actual WHERE commissary_meat_id = 30').get(), undefined);
+  assert.strictEqual(db.prepare(`SELECT quantity FROM commissary_ending_actual WHERE commissary_meat_id = 31 AND business_date = '2026-09-05'`).get().quantity, 9);
+});
+
+test('a recount opening (Month opening panel) establishes a beginning for that meat, source RECOUNT', () => {
+  const r = recordRecount(db, 'commissary', 1, 30, '2026-09-05', 50);
+  assert.strictEqual(r.ok, true);
+  const row = db.prepare('SELECT quantity, opening_source FROM commissary_opening_stock WHERE commissary_meat_id = 30').get();
   assert.strictEqual(row.quantity, 50);
+  assert.strictEqual(row.opening_source, 'RECOUNT');
 });
 
-test('a second opening-stock write for the SAME date is silently ignored, not an overwrite or error (step 26a: write-once PER DATE)', () => {
-  const r = postCommissaryDailyAudit({
-    commissary_id: 1, business_date: '2026-09-05',
-    rows: [{ commissary_meat_id: 30, opening_stock: 999 }]
-  });
-  assert.strictEqual(r.status, 200, 'the write-once-per-date table never errors on a repeat attempt');
-  const row = db.prepare('SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = 30 AND business_date = ?').get('2026-09-05');
-  assert.strictEqual(row.quantity, 50, 'the original 50 must survive, not be replaced by 999');
-  const count = db.prepare('SELECT COUNT(*) as n FROM commissary_opening_stock WHERE commissary_meat_id = 30 AND business_date = ?').get('2026-09-05');
-  assert.strictEqual(count.n, 1, 'still exactly one row for this date');
-});
-
-test('a declared opening on a DIFFERENT date for the same meat is a genuine new write, not silently ignored (step 26a fix, finding 4)', () => {
-  const r = postCommissaryDailyAudit({
-    commissary_id: 1, business_date: '2026-09-10',
-    rows: [{ commissary_meat_id: 30, opening_stock: 80 }]
-  });
-  assert.strictEqual(r.status, 200);
-  assert.strictEqual(r.saved, 1);
-  const row = db.prepare('SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = 30 AND business_date = ?').get('2026-09-10');
-  assert.strictEqual(row.quantity, 80, 'a declared opening on a later date must take effect, not be silently ignored');
+test('a second recount for the same meat in the same month is refused (409), the original survives', () => {
+  const r = recordRecount(db, 'commissary', 1, 30, '2026-09-06', 999);
+  assert.strictEqual(r.status, 409);
   const count = db.prepare('SELECT COUNT(*) as n FROM commissary_opening_stock WHERE commissary_meat_id = 30').get();
-  assert.strictEqual(count.n, 2, 'meat 30 must now have two declared openings - 09-05 and 09-10');
+  assert.strictEqual(count.n, 1);
+});
+
+test('a recount for a meat of a DIFFERENT commissary is a 404, not a write', () => {
+  const r = recordRecount(db, 'commissary', 2, 30, '2026-09-05', 1);
+  assert.strictEqual(r.status, 404);
+});
+
+test('a recount in a DIFFERENT month for the same meat is a genuine new opening (step 26a: date-scoped)', () => {
+  const r = recordRecount(db, 'commissary', 1, 30, '2026-10-02', 80);
+  assert.strictEqual(r.ok, true);
+  const count = db.prepare('SELECT COUNT(*) as n FROM commissary_opening_stock WHERE commissary_meat_id = 30').get();
+  assert.strictEqual(count.n, 2, 'meat 30 must now have two declared openings - 09-05 and 10-02');
 });
 
 test('with a beginning now established, MISSING_BEGINNING_STOCK clears and endingCalculated computes', () => {
@@ -1172,14 +1175,14 @@ test('blank/null fields are skipped, never written as zero', () => {
   const before = db.prepare('SELECT COUNT(*) as n FROM commissary_ending_actual WHERE commissary_meat_id = 31').get().n;
   const r = postCommissaryDailyAudit({
     commissary_id: 1, business_date: '2026-09-05',
-    rows: [{ commissary_meat_id: 31, opening_stock: '', ending_actual: null }]
+    rows: [{ commissary_meat_id: 31, opening_stock: '5', ending_actual: null }]
   });
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.saved, 1, 'the row still counts as processed even though nothing was written');
   const after = db.prepare('SELECT COUNT(*) as n FROM commissary_ending_actual WHERE commissary_meat_id = 31').get().n;
   assert.strictEqual(after, before, 'no row written for a blank/null ending_actual');
-  const opening = db.prepare('SELECT * FROM commissary_opening_stock WHERE commissary_meat_id = 31').get();
-  assert.strictEqual(opening, undefined, 'no row written for a blank opening_stock');
+  const openings = db.prepare('SELECT * FROM commissary_opening_stock WHERE commissary_meat_id = 31').all();
+  assert.strictEqual(openings.length, 1, 'POST no longer writes opening_stock (step 26a-ii) - only the panel\'s Sept 1 recount exists');
 });
 
 test('created_by is carried through to commissary_ending_actual', () => {
@@ -1223,10 +1226,7 @@ function patchCommissaryOpeningStock({ commissary_meat_id, business_date, quanti
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (32, 1, 'CM32', '26a PATCH Test Meat', 'kg', 0.1)`).run();
 
 test('PATCH commissary opening-stock: correcting an already-declared value overwrites it, one row', () => {
-  postCommissaryDailyAudit({
-    commissary_id: 1, business_date: '2026-09-12',
-    rows: [{ commissary_meat_id: 32, opening_stock: 20 }]
-  });
+  assert.strictEqual(recordRecount(db, 'commissary', 1, 32, '2026-09-12', 20).ok, true);
   const result = patchCommissaryOpeningStock({ commissary_meat_id: 32, business_date: '2026-09-12', quantity: 35 });
   assert.strictEqual(result.status, 200);
   assert.strictEqual(result.quantity, 35);
@@ -1236,8 +1236,10 @@ test('PATCH commissary opening-stock: correcting an already-declared value overw
   assert.strictEqual(count.n, 1);
 });
 
-test('PATCH commissary opening-stock: quantity null clears (deletes) the declared opening', () => {
+test('PATCH commissary opening-stock: quantity null clears (deletes) the declared opening - the month is blocked again (26a-ii)', () => {
+  assert.strictEqual(isBlocked(db, 'commissary', null, 32, '2026-09-20'), false);
   const result = patchCommissaryOpeningStock({ commissary_meat_id: 32, business_date: '2026-09-12', quantity: null });
+  assert.strictEqual(isBlocked(db, 'commissary', null, 32, '2026-09-20'), true);
   assert.strictEqual(result.status, 200);
   assert.strictEqual(result.cleared, true);
   const row = db.prepare('SELECT * FROM commissary_opening_stock WHERE commissary_meat_id = 32 AND business_date = ?').get('2026-09-12');

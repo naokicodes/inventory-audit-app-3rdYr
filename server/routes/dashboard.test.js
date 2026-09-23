@@ -109,6 +109,7 @@ function stockRollup(date, restaurantIds) {
       ...cm,
       balance: currentBalance(commissaryAudit),
       hasData: commissaryAudit.status !== 'MISSING_BEGINNING_STOCK'
+        && commissaryAudit.status !== 'MISSING_PERIOD_OPENING'
     };
   });
 
@@ -387,6 +388,16 @@ test('a dangling commissary_id degrades gracefully instead of silently dropping 
   // its balance must be counted into the group total too, not just present
   // in by_commissary
   assert.strictEqual(jowlRow.commissary_balance, 1019, 'previous total 1014 + orphan\'s 5 = 1019');
+});
+
+test('step 26a-ii: a month with no opening yet reads as no-data, not as a zero balance', () => {
+  // The Jowl scenario above opened everything in August only; September has
+  // no opening for any of the three meats, so every September day is blocked.
+  const r = stockRollup('2026-09-05');
+  const jowlRow = findJowlGroup(r.rows);
+  assert.strictEqual(jowlRow.commissary_has_data, false);
+  assert.strictEqual(jowlRow.by_restaurant[1].hasData, false);
+  assert.strictEqual(jowlRow.row_has_any_data, false);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

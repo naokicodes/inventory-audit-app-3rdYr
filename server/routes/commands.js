@@ -76,6 +76,9 @@ router.get('/commands/oversold-check', (req, res) => {
       // graceful-degradation pattern used throughout this app (prefer
       // real/fuller data, degrade to something still useful when it
       // isn't available yet) rather than an all-or-nothing switch.
+      // Step 26a-ii: MISSING_PERIOD_OPENING needs no branch here - it is a
+      // meat status (computeMeatAudit), and computeDishAudit never returns
+      // it; dishes have no month opening.
       if (audit.sold > audit.prepped + EPSILON) {
         flagged.push({
           restaurant_id: c.restaurant_id, restaurant_name: c.restaurant_name,

@@ -8,6 +8,13 @@ const db = require('../db/connection.js');
 
 const router = express.Router();
 
+// Step 26a-ii: a 0/1 flag from a checkbox-style body value, or null when the
+// field was not sent at all (the meat UPDATEs COALESCE null away).
+function toFlagOrNull(value) {
+  if (value === undefined || value === null) return null;
+  return value ? 1 : 0;
+}
+
 // ---------- RESTAURANTS ----------
 // Round 2 findings item 1 (session-status.md): until now, restaurants
 // rows only ever came from seed.js reading a JSON file - no in-app way
@@ -147,7 +154,7 @@ router.get('/settings/commissary-meats', (req, res) => {
   const commissaryId = Number(req.query.commissary_id);
   if (!commissaryId) return res.status(400).json({ error: 'commissary_id required' });
   const rows = db.prepare(
-    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active
+    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active, recount_required
      FROM commissary_meats WHERE commissary_id = ? ORDER BY code`
   ).all(commissaryId);
   res.json(rows);
@@ -173,13 +180,17 @@ router.post('/settings/commissary-meats', (req, res) => {
   }
 });
 
+// Step 26a-ii: recount_required ("Recount at month start") is optional in
+// the body - omitted keeps the stored value, so a caller that predates the
+// column cannot silently clear it. Same on PUT /settings/meats/:id below.
 router.put('/settings/commissary-meats/:id', (req, res) => {
-  const { name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active } = req.body;
+  const { name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active, recount_required } = req.body;
   db.prepare(
     `UPDATE commissary_meats
-     SET name = ?, unit = ?, allowed_leeway_pct = ?, cost_per_unit = ?, meat_type_id = ?, active = ?
+     SET name = ?, unit = ?, allowed_leeway_pct = ?, cost_per_unit = ?, meat_type_id = ?, active = ?,
+         recount_required = COALESCE(?, recount_required)
      WHERE id = ?`
-  ).run(name, unit, Number(allowed_leeway_pct), cost_per_unit || null, meat_type_id || null, active ? 1 : 0, req.params.id);
+  ).run(name, unit, Number(allowed_leeway_pct), cost_per_unit || null, meat_type_id || null, active ? 1 : 0, toFlagOrNull(recount_required), req.params.id);
   res.json({ ok: true });
 });
 
@@ -189,7 +200,7 @@ router.get('/settings/meats', (req, res) => {
   const restaurantId = Number(req.query.restaurant_id);
   if (!restaurantId) return res.status(400).json({ error: 'restaurant_id required' });
   const meats = db.prepare(
-    `SELECT id, meat_code, name, unit, cost_per_unit, active FROM meats WHERE restaurant_id = ? ORDER BY meat_code`
+    `SELECT id, meat_code, name, unit, cost_per_unit, active, recount_required FROM meats WHERE restaurant_id = ? ORDER BY meat_code`
   ).all(restaurantId);
   res.json(meats);
 });
@@ -213,10 +224,10 @@ router.post('/settings/meats', (req, res) => {
 });
 
 router.put('/settings/meats/:id', (req, res) => {
-  const { name, unit, cost_per_unit, active } = req.body;
+  const { name, unit, cost_per_unit, active, recount_required } = req.body;
   db.prepare(
-    `UPDATE meats SET name = ?, unit = ?, cost_per_unit = ?, active = ? WHERE id = ?`
-  ).run(name, unit, cost_per_unit || null, active ? 1 : 0, req.params.id);
+    `UPDATE meats SET name = ?, unit = ?, cost_per_unit = ?, active = ?, recount_required = COALESCE(?, recount_required) WHERE id = ?`
+  ).run(name, unit, cost_per_unit || null, active ? 1 : 0, toFlagOrNull(recount_required), req.params.id);
   res.json({ ok: true });
 });
 

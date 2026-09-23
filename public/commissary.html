@@ -17,7 +17,15 @@
     .status-Pass { color: #0a7d0a; font-weight: bold; }
     .status-Review { color: crimson; font-weight: bold; }
     td.calculated { background: #f7f7f7; color: #555; }
-    .status-MISSING_BEGINNING_STOCK { color: #999; font-style: italic; }
+    .status-MISSING_BEGINNING_STOCK, .status-MISSING_PERIOD_OPENING { color: #999; font-style: italic; }
+    /* Step 26a-ii: Month opening panel (public/month-opening.js) */
+    .month-opening { border: 1px solid #ddd; background: #fcfcf4; padding: 0.6rem 0.8rem; margin: 0.8rem 0; }
+    .month-opening h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+    .month-opening .mo-table { width: auto; margin-bottom: 0.5rem; }
+    .month-opening .mo-tag { font-size: 0.8em; background: #eee; border-radius: 3px; padding: 0 0.3em; }
+    .month-opening .mo-month { color: #888; font-size: 0.85em; }
+    .month-opening .mo-message { margin-top: 0.4rem; color: #555; }
+    .month-opening input[type="number"] { width: 5rem; padding: 0.3rem; }
     .carry-tag { font-size: 0.8em; color: #888; font-weight: normal; }
     #count-entry input[type="number"] { width: 5rem; padding: 0.3rem; }
     #count-entry input[type="text"] { width: 8rem; padding: 0.3rem; }
@@ -58,6 +66,8 @@
     <label>Commissary <select id="commissary"></select></label>
   </div>
 
+  <div id="month-opening"></div>
+
   <h2>On-hand balance</h2>
   <p class="hint">Beginning + Stock In + Backed Up - Shipped Out for the date below, via the same daily audit engine as the Shipments page and Dashboard - a real physical count where one's been entered, otherwise the calculated ending.</p>
   <div class="filters">
@@ -65,8 +75,8 @@
   </div>
   <div id="balances">Loading...</div>
 
-  <h2>Opening stock &amp; physical count</h2>
-  <p class="hint">Opening stock is a declared balance for a specific date - once one exists for the loaded date, this screen shows it read-only (correcting it, or declaring a new one on a different date, isn't done here yet). Physical count is per day and can be recounted - saving again for the same date overwrites the prior count. Select a specific commissary above (not "All commissaries") to enter counts.</p>
+  <h2>Physical count</h2>
+  <p class="hint">Openings are entered in the Month opening panel at the top of this page. Physical count is per day and can be recounted - saving again for the same date overwrites the prior count. Select a specific commissary above (not "All commissaries") to enter counts.</p>
   <div id="count-entry">Loading...</div>
   <div id="count-status" class="status-message"></div>
 
@@ -107,6 +117,7 @@
 
   <div id="yield-table">Loading...</div>
 
+  <script src="month-opening.js"></script>
   <script>
     const actorInput = document.getElementById('actor-name');
     const commissarySelect = document.getElementById('commissary');
@@ -248,22 +259,28 @@
       renderCountEntry(rows);
     }
 
-    // ---------- Opening stock & physical count (step 25b, date-scoped since 26a) ----------
+    // ---------- Physical count (step 25b, date-scoped since 26a) ----------
     // Reuses the same rows GET /commissary/daily-audit already returned for
-    // the balance cards above, rather than a second fetch - the two states
-    // an operator needs to tell apart map directly onto r.beginning: null
-    // means MISSING_BEGINNING_STOCK/blocked for this date (no declared
-    // opening or prior count for it - show an editable opening count),
-    // anything else means beginning is already established for this date
-    // (show it as read-only so a typed number can't be silently discarded -
-    // see schema.sql's UNIQUE(commissary_meat_id, business_date)). Step 26a
-    // adds no new affordance here - declaring an opening on a date that
-    // already has a chain, or correcting one, isn't done on this screen in
-    // this step (session-status.md "Also required").
+    // the balance cards above, rather than a second fetch. Step 26a-ii:
+    // Beginning is read-only here - the Month opening panel at the top of
+    // the page is the single way to enter an opening. A meat whose month
+    // has no opening (MISSING_PERIOD_OPENING) is blocked: its count input
+    // is disabled and it reads "needs month opening - recount or copy" (the
+    // server refuses a count for it too). On an opening's own day,
+    // Beginning is tagged (recount) or (copied).
+    const OPENING_SOURCE_TAG = { RECOUNT: 'recount', COPY: 'copied' };
+    const BLOCKED_STATUS_TEXT = 'needs month opening — recount or copy';
+
+    function beginningCellText(r) {
+      if (r.beginning === null) return fmt(null);
+      if (r.beginningCarried) return fmt(r.beginning) + ' <span class="carry-tag">(carried)</span>';
+      if (r.openingSource) return fmt(r.beginning) + ` <span class="carry-tag">(${OPENING_SOURCE_TAG[r.openingSource]})</span>`;
+      return fmt(r.beginning);
+    }
     function renderCountEntry(rows) {
       const el = document.getElementById('count-entry');
       if (!commissarySelect.value) {
-        el.innerHTML = '<p class="hint">Select a specific commissary above to enter opening stock or physical counts.</p>';
+        el.innerHTML = '<p class="hint">Select a specific commissary above to enter physical counts.</p>';
         return;
       }
       if (rows.length === 0) {
@@ -273,17 +290,15 @@
       el.innerHTML = `
         <table>
           <thead>
-            <tr><th>Meat</th><th>Opening stock</th><th>Physical count</th><th>Notes</th><th>Status</th></tr>
+            <tr><th>Meat</th><th>Beginning</th><th>Physical count</th><th>Notes</th><th>Status</th></tr>
           </thead>
           <tbody>${rows.map(r => `
             <tr data-id="${r.commissary_meat_id}">
               <td>${r.code} - ${r.name} <span class="hint">(${r.unit})</span></td>
-              <td class="${r.beginning === null ? '' : 'calculated'}">${r.beginning === null
-                ? `<input type="number" step="0.01" class="count-opening" placeholder="opening count">`
-                : fmt(r.beginning) + (r.beginningCarried ? ' <span class="carry-tag">(carried)</span>' : '')}</td>
-              <td><input type="number" step="0.01" class="count-actual" value="${r.actual ?? ''}" placeholder="0"></td>
+              <td class="calculated">${beginningCellText(r)}</td>
+              <td><input type="number" step="0.01" class="count-actual" value="${r.actual ?? ''}" placeholder="0"${r.status === 'MISSING_PERIOD_OPENING' ? ' disabled' : ''}></td>
               <td><input type="text" class="count-notes" placeholder="optional"></td>
-              <td class="status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
+              <td class="status-${r.status}">${r.status === 'MISSING_PERIOD_OPENING' ? BLOCKED_STATUS_TEXT : r.status.replace(/_/g, ' ')}</td>
             </tr>
           `).join('')}</tbody>
         </table>
@@ -300,7 +315,6 @@
 
       const rows = Array.from(document.querySelectorAll('#count-entry tbody tr')).map(tr => ({
         commissary_meat_id: Number(tr.dataset.id),
-        opening_stock: tr.querySelector('.count-opening') ? tr.querySelector('.count-opening').value : undefined,
         ending_actual: tr.querySelector('.count-actual').value,
         notes: tr.querySelector('.count-notes').value.trim() || null
       }));
@@ -317,8 +331,15 @@
         const result = await res.json();
         if (!result.ok) throw new Error(result.error || 'Unknown error');
 
-        countStatus.textContent = `Saved.`;
-        countStatus.className = 'status-message success';
+        // Step 26a-ii: name any meat the server refused (no month opening yet).
+        const refusedNames = (result.refused || []).map(id => {
+          const tr = document.querySelector(`#count-entry tr[data-id="${id}"]`);
+          return tr ? tr.cells[0].textContent.trim() : `meat ${id}`;
+        });
+        countStatus.textContent = refusedNames.length
+          ? `Saved. Not saved - needs month opening first: ${refusedNames.join(', ')}.`
+          : `Saved.`;
+        countStatus.className = refusedNames.length ? 'status-message error' : 'status-message success';
         await loadBalances();
       } catch (err) {
         countStatus.textContent = 'Error: ' + err.message;
@@ -672,7 +693,19 @@
       }
     });
 
-    balanceDate.addEventListener('change', () => { loadBalances(); loadAdjustments(); });
+    // Step 26a-ii: the Month opening panel (public/month-opening.js) for the
+    // selected commissary and the balance date's month. Nothing renders for
+    // "All commissaries". A write through it can unblock rows, so it
+    // reloads the balances/count grid.
+    const monthOpening = createMonthOpeningPanel({
+      container: document.getElementById('month-opening'),
+      ledger: 'commissary',
+      getOwnerId: () => commissarySelect.value,
+      getDate: () => balanceDate.value,
+      onChange: loadBalances
+    });
+
+    balanceDate.addEventListener('change', () => { monthOpening.load(); loadBalances(); loadAdjustments(); });
 
     [filterMeat, filterDate].forEach(el => el.addEventListener('change', loadYieldLog));
     document.getElementById('clear-filters').addEventListener('click', () => {
@@ -681,6 +714,7 @@
     });
 
     commissarySelect.addEventListener('change', () => {
+      monthOpening.load();
       loadMeats().then(() => {
         loadBalances();
         loadYieldLog();
@@ -689,6 +723,7 @@
     });
 
     loadCommissaries().then(() => {
+      monthOpening.load();
       loadMeats().then(() => {
         loadBalances();
         loadYieldLog();

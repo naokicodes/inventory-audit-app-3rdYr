@@ -16,7 +16,14 @@
     .status-OK { color: green; font-weight: bold; }
     .status-SHORTAGE { color: crimson; font-weight: bold; }
     .status-SURPLUS { color: darkorange; font-weight: bold; }
-    .status-MISSING_ACTUAL_COUNT, .status-MISSING_BEGINNING_STOCK { color: #999; font-style: italic; }
+    .status-MISSING_ACTUAL_COUNT, .status-MISSING_BEGINNING_STOCK, .status-MISSING_PERIOD_OPENING { color: #999; font-style: italic; }
+    /* Step 26a-ii: Month opening panel (public/month-opening.js) */
+    .month-opening { border: 1px solid #ddd; background: #fcfcf4; padding: 0.6rem 0.8rem; margin: 0.8rem 0; }
+    .month-opening h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+    .month-opening .mo-table { width: auto; margin-bottom: 0.5rem; }
+    .month-opening .mo-tag { font-size: 0.8em; background: #eee; border-radius: 3px; padding: 0 0.3em; }
+    .month-opening .mo-month { color: #888; font-size: 0.85em; }
+    .month-opening .mo-message { margin-top: 0.4rem; color: #555; }
     .type-badge { font-size: 0.7em; color: #999; margin-left: 0.3em; }
     .carry-tag { font-size: 0.8em; color: #888; font-weight: normal; }
     tr.dish-row td:first-child { border-left: 3px solid #ccc; }
@@ -51,6 +58,8 @@
     </label>
   </div>
 
+  <div id="month-opening"></div>
+
   <div id="grid-container">Loading...</div>
 
   <div class="save-bar">
@@ -58,6 +67,7 @@
     <span id="status" class="status-message"></span>
   </div>
 
+  <script src="month-opening.js"></script>
   <script>
     const restaurantSelect = document.getElementById('restaurant');
     const dateInput = document.getElementById('business-date');
@@ -77,28 +87,21 @@
       restaurantSelect.innerHTML = restaurants.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
     }
 
-    // Meat row: same editable fields/save flow as before this step, plus
-    // step 12's Beginning cell. Beginning is only ever editable when it's
-    // null (r.beginning === null / status MISSING_BEGINNING_STOCK) - once
-    // an opening_stock row exists for this meat ON THIS DATE, getBeginningStock
-    // never returns null for it again for that date, so the cell naturally
-    // reverts to calculated/read-only on every later day. No separate "is
-    // this the first day" check needed on the frontend - null-ness already
-    // is that check. Step 26a: this remains true for a NEW period too - a
-    // month with no declared opening (or any other blocked date) still
-    // resolves beginning to null, so the same input cell reappears; there is
-    // no separate "declare a new period" affordance in this step.
+    // Meat row. Step 26a-ii: Beginning is never an input any more - the
+    // Month opening panel above the grid is the single way to enter an
+    // opening. A row whose month has no opening (status
+    // MISSING_PERIOD_OPENING) is blocked: its ending input is disabled and
+    // it reads "needs month opening - recount or copy" (the server refuses
+    // an ending for it too, see POST /api/daily-audit). On an opening's own
+    // day, Beginning is tagged (recount) or (copied).
     // Step 13: data-new-stock/data-usage are always present (fixed at load
     // - not editable on this screen, see intro paragraph above). The
     // Adjustments column itself (entered on the Allocations page, not here)
     // is a plain static cell with no data-* attribute of its own - nothing
     // recalculates it live, so it needs none. data-beginning is only present
-    // when r.beginning !== null;
-    // when it's null, recalcMeatRow() reads the live .opening_stock input
-    // instead, so a still-empty opening count naturally keeps the row at
-    // "-" until typed (matches MISSING_BEGINNING_STOCK, same as the server
-    // would compute). Only Beginning (when it's the opening-stock cell)
-    // and Ending (actual) are ever live-edited here now.
+    // when r.beginning !== null; when it's null the row stays at "-"
+    // (MISSING_BEGINNING_STOCK, same as the server). Only Ending (actual) is
+    // ever live-edited here now.
     //
     // Step 26a: data-window-adjustments/data-recount-difference are ALSO
     // fixed at load, same convention - both are derived from history the
@@ -115,12 +118,20 @@
       return tags.length ? ` <span class="carry-tag">(${tags.join(', ')})</span>` : '';
     }
 
+    const OPENING_SOURCE_TAG = { RECOUNT: 'recount', COPY: 'copied' };
+    const BLOCKED_STATUS_TEXT = 'needs month opening — recount or copy';
+
+    function beginningTag(r) {
+      if (r.beginningCarried) return ' <span class="carry-tag">(carried)</span>';
+      if (r.openingSource) return ` <span class="carry-tag">(${OPENING_SOURCE_TAG[r.openingSource]})</span>`;
+      return '';
+    }
+
     function meatRowHtml(r) {
+      const blocked = r.status === 'MISSING_PERIOD_OPENING';
       const beginningAttr = r.beginning === null ? '' : ` data-beginning="${r.beginning}"`;
-      const carriedTag = r.beginningCarried ? ' <span class="carry-tag">(carried)</span>' : '';
-      const beginningCell = r.beginning === null
-        ? `<td><input type="number" step="0.01" class="opening_stock" placeholder="opening count"></td>`
-        : `<td class="calculated">${fmt(r.beginning)}${carriedTag}</td>`;
+      const beginningCell = `<td class="calculated">${fmt(r.beginning)}${r.beginning === null ? '' : beginningTag(r)}</td>`;
+      const statusText = blocked ? BLOCKED_STATUS_TEXT : r.status.replace(/_/g, ' ');
       const windowAdjustments = r.windowAdjustments ?? 0;
       // Empty string, not 0, when null - a genuine recount that found
       // EXACTLY the expected number is a real 0, distinct from "no recount
@@ -128,17 +139,17 @@
       // completed recount from the Over/Short tag.
       const recountDifferenceAttr = (r.recountDifference === null || r.recountDifference === undefined) ? '' : r.recountDifference;
       return `
-        <tr data-meat-id="${r.meat_id}"${beginningAttr} data-new-stock="${r.newStock}" data-usage="${r.usage}" data-window-adjustments="${windowAdjustments}" data-recount-difference="${recountDifferenceAttr}" data-days-covered="${r.daysCovered ?? ''}">
+        <tr data-meat-id="${r.meat_id}"${blocked ? ' data-blocked="1"' : ''}${beginningAttr} data-new-stock="${r.newStock}" data-usage="${r.usage}" data-window-adjustments="${windowAdjustments}" data-recount-difference="${recountDifferenceAttr}" data-days-covered="${r.daysCovered ?? ''}">
           <td>${r.name} <span class="type-badge">(${r.unit})</span></td>
           ${beginningCell}
           <td class="calculated">${fmt(r.newStock)}</td>
           <td class="calculated">${fmt(r.usage)}</td>
           <td class="calculated">${fmt(r.adjustments)}</td>
           <td class="calculated ending-calc">${fmt(r.endingCalculated)}</td>
-          <td><input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0"></td>
+          <td><input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0"${blocked ? ' disabled' : ''}></td>
           <td class="calculated over-short">${fmt(r.unexplainedVariance)}${overShortTags(r)}</td>
           <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""></td>
-          <td class="row-status status-${r.status}">${r.status.replace(/_/g, ' ')}</td>
+          <td class="row-status status-${r.status}">${statusText}</td>
         </tr>
       `;
     }
@@ -204,9 +215,8 @@
     }
 
     function recalcMeatRow(tr) {
-      const beginning = tr.dataset.beginning !== undefined
-        ? Number(tr.dataset.beginning)
-        : toNumOrNull(tr.querySelector('.opening_stock')?.value ?? '');
+      if (tr.dataset.blocked) return; // step 26a-ii: nothing to compute until the month has an opening
+      const beginning = tr.dataset.beginning !== undefined ? Number(tr.dataset.beginning) : null;
       const newStock = Number(tr.dataset.newStock);
       const usage = Number(tr.dataset.usage);
       // Step 26a: the window-adjustments sum and any recount difference
@@ -285,7 +295,7 @@
     // Delegated once, not re-attached per loadGrid() call - avoids stacking
     // duplicate listeners on every restaurant/date change.
     gridContainer.addEventListener('input', (e) => {
-      if (e.target.matches('.opening_stock, .ending_actual')) {
+      if (e.target.matches('.ending_actual')) {
         const tr = e.target.closest('tr[data-meat-id]');
         if (tr) recalcMeatRow(tr);
       } else if (e.target.matches('.prepped, .portion_actual')) {
@@ -328,20 +338,11 @@
       const date = dateInput.value;
       const trs = gridContainer.querySelectorAll('tr[data-meat-id]');
 
-      const rows = Array.from(trs).map(tr => {
-        const openingStockInput = tr.querySelector('.opening_stock');
-        return {
-          meat_id: Number(tr.dataset.meatId),
-          // Only present on rows whose Beginning cell was editable this
-          // load (see meatRowHtml) - the backend also enforces write-once
-          // via opening_stock's UNIQUE constraint, but there's no reason
-          // to send the field at all for rows that already have a
-          // calculated Beginning.
-          opening_stock: openingStockInput ? openingStockInput.value : undefined,
-          ending_actual: tr.querySelector('.ending_actual').value,
-          remarks: tr.querySelector('.remarks').value
-        };
-      });
+      const rows = Array.from(trs).map(tr => ({
+        meat_id: Number(tr.dataset.meatId),
+        ending_actual: tr.querySelector('.ending_actual').value,
+        remarks: tr.querySelector('.remarks').value
+      }));
 
       statusEl.textContent = 'Saving...';
       statusEl.className = 'status-message';
@@ -377,21 +378,45 @@
           portionsSaved = portionsResult.saved;
         }
 
+        // Step 26a-ii: the server refuses an ending for a meat whose month
+        // has no opening yet, and says which - named here so it's not lost.
+        const refusedNames = (result.refused || []).map(id => {
+          const tr = gridContainer.querySelector(`tr[data-meat-id="${id}"]`);
+          return tr ? tr.cells[0].textContent.trim() : `meat ${id}`;
+        });
+
         statusEl.textContent = `Saved. Reloading...`;
         statusEl.className = 'status-message success';
         await loadGrid();
-        statusEl.textContent = `Saved ${result.saved} meat row(s)${portionsSaved ? ` and ${portionsSaved} dish row(s)` : ''}.`;
+        statusEl.textContent = `Saved ${result.saved} meat row(s)${portionsSaved ? ` and ${portionsSaved} dish row(s)` : ''}.`
+          + (refusedNames.length ? ` Not saved - needs month opening first: ${refusedNames.join(', ')}.` : '');
+        if (refusedNames.length) statusEl.className = 'status-message error';
       } catch (err) {
         statusEl.textContent = 'Error saving: ' + err.message;
         statusEl.className = 'status-message error';
       }
     }
 
-    restaurantSelect.addEventListener('change', loadGrid);
-    dateInput.addEventListener('change', loadGrid);
+    // Step 26a-ii: the Month opening panel (public/month-opening.js) for
+    // the selected restaurant and the selected date's month. Any opening
+    // written through it reloads the grid, since it can unblock rows.
+    const monthOpening = createMonthOpeningPanel({
+      container: document.getElementById('month-opening'),
+      ledger: 'restaurant',
+      getOwnerId: () => restaurantSelect.value,
+      getDate: () => dateInput.value,
+      onChange: loadGrid
+    });
+
+    function loadAll() {
+      return Promise.all([monthOpening.load(), loadGrid()]);
+    }
+
+    restaurantSelect.addEventListener('change', loadAll);
+    dateInput.addEventListener('change', loadAll);
     saveBtn.addEventListener('click', save);
 
-    loadRestaurants().then(loadGrid);
+    loadRestaurants().then(loadAll);
   </script>
   <script src="command-panel.js"></script>
   <script src="commands/sync-batch-stock.js"></script>

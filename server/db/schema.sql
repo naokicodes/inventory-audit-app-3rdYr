@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS meats (
   unit TEXT NOT NULL CHECK (unit IN ('kg', 'unit')),
   cost_per_unit REAL,
   active INTEGER NOT NULL DEFAULT 1,
+  recount_required INTEGER NOT NULL DEFAULT 0,  -- step 26a-ii: 0/1, "Recount at month start"
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   UNIQUE (restaurant_id, meat_code)
 );
@@ -128,6 +129,9 @@ CREATE TABLE IF NOT EXISTS opening_stock (
   meat_id INTEGER NOT NULL,
   business_date TEXT NOT NULL,
   quantity REAL NOT NULL,
+  -- step 26a-ii: how the opening was entered at month start. NULL only for
+  -- openings written before that step.
+  opening_source TEXT CHECK (opening_source IN ('RECOUNT','COPY')),
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (meat_id) REFERENCES meats(id),
   UNIQUE (restaurant_id, meat_id, business_date)
@@ -268,6 +272,7 @@ CREATE TABLE IF NOT EXISTS commissary_meats (
   cost_per_unit REAL,
   meat_type_id INTEGER,
   active INTEGER NOT NULL DEFAULT 1,
+  recount_required INTEGER NOT NULL DEFAULT 0,  -- step 26a-ii: 0/1, "Recount at month start"
   FOREIGN KEY (commissary_id) REFERENCES commissaries(id),
   FOREIGN KEY (meat_type_id) REFERENCES meat_types(id),
   UNIQUE (commissary_id, code)
@@ -338,6 +343,7 @@ CREATE TABLE IF NOT EXISTS commissary_opening_stock (
   commissary_meat_id INTEGER NOT NULL,
   business_date TEXT NOT NULL,
   quantity REAL NOT NULL,
+  opening_source TEXT CHECK (opening_source IN ('RECOUNT','COPY')),  -- step 26a-ii, see opening_stock
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
   UNIQUE (commissary_meat_id, business_date)
 );

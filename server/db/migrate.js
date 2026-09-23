@@ -706,3 +706,51 @@ function migrateOpeningStockDateScoped(db) {
 }
 
 module.exports.migrateOpeningStockDateScoped = migrateOpeningStockDateScoped;
+
+// ----------------------------------------------------------------------
+// Step 26a-ii (2026-09-23): the month-start recount - see
+// docs/session-status.md "Step 26a-ii". Four additive columns, no rebuild:
+//   - meats.recount_required / commissary_meats.recount_required
+//     (INTEGER NOT NULL DEFAULT 0, 0/1) - "Recount at month start" on the
+//     Settings page. ADD COLUMN with a constant default is allowed on an
+//     existing table and backfills every row to 0.
+//   - opening_stock.opening_source / commissary_opening_stock.opening_source
+//     (nullable, RECOUNT/COPY) - whether a declared opening was recounted or
+//     copied from last month's ending. NULL only for openings written before
+//     this step. SQLite allows a CHECK on an added column; existing rows are
+//     NULL, which the CHECK admits.
+// Same per-column idempotency check as migrateYieldLogInputQuantityColumn.
+// Must run BEFORE schema.sql, and AFTER migrateOpeningStockDateScoped (that
+// rebuild recreates the opening tables without this column) - see
+// connection.js.
+
+const MONTH_START_RECOUNT_COLUMNS = [
+  { table: 'meats', column: 'recount_required', ddl: 'recount_required INTEGER NOT NULL DEFAULT 0' },
+  { table: 'commissary_meats', column: 'recount_required', ddl: 'recount_required INTEGER NOT NULL DEFAULT 0' },
+  { table: 'opening_stock', column: 'opening_source', ddl: `opening_source TEXT CHECK (opening_source IN ('RECOUNT','COPY'))` },
+  { table: 'commissary_opening_stock', column: 'opening_source', ddl: `opening_source TEXT CHECK (opening_source IN ('RECOUNT','COPY'))` }
+];
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ added: string[] }} "table.column" for each column actually added
+ */
+function migrateMonthStartRecountColumns(db) {
+  const added = [];
+  for (const { table, column, ddl } of MONTH_START_RECOUNT_COLUMNS) {
+    const tableExists = db.prepare(
+      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`
+    ).get(table);
+    // Fresh install - schema.sql creates the table with the column already.
+    if (!tableExists) continue;
+
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (columns.some(c => c.name === column)) continue;
+
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+    added.push(`${table}.${column}`);
+  }
+  return { added };
+}
+
+module.exports.migrateMonthStartRecountColumns = migrateMonthStartRecountColumns;
