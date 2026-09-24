@@ -6,8 +6,8 @@
 //
 // Server side: GET/POST .../month-opening, POST .../month-opening/copy-all
 // (server/engines/monthOpening.js decides must-count vs copyable - this file
-// only renders what the server says) and 26a's PATCH .../opening-stock for
-// edit/clear.
+// only renders what the server says; since 26a-iii the recount POST also
+// serves opened rows) and 26a's PATCH .../opening-stock for Correct/clear.
 //
 // createMonthOpeningPanel({
 //   container,        // element the panel renders into
@@ -76,13 +76,16 @@
         </tr>`;
     }
 
+    // Step 26a-iii: an opened row carries two intents, kept visibly apart.
+    // Recount ("I counted") comes first and is dated the page's date;
+    // Correct ("I typed it wrong") PATCHes the shown opening and keeps its source.
     function openedRowHtml(r) {
       return `
         <tr data-mo-meat-id="${r.meat_id}" data-mo-date="${r.opening.business_date}">
           <td>${esc(r.name)} <span class="type-badge">(${esc(r.unit)})</span></td>
           <td>${r.opening.business_date}${r.opening.opening_source ? ` <span class="mo-tag">${SOURCE_TAG[r.opening.opening_source]}</span>` : ''}</td>
-          <td><input type="number" step="0.01" class="mo-edit" value="${r.opening.quantity}"></td>
-          <td><button type="button" class="mo-save-edit">Save</button> <button type="button" class="mo-clear">Clear</button></td>
+          <td><input type="number" step="0.01" class="mo-recount" placeholder="count"> <button type="button" class="mo-save-recount">Save recount</button></td>
+          <td><input type="number" step="0.01" class="mo-edit" value="${r.opening.quantity}"> <button type="button" class="mo-save-edit">Correct</button> <button type="button" class="mo-clear">Clear</button></td>
         </tr>`;
     }
 
@@ -116,7 +119,7 @@
 
       const editTable = !editing ? (opened.length ? `<p><a href="#" class="mo-toggle-edit">edit entered openings (${opened.length})</a></p>` : '') : `
         <table class="mo-table">
-          <thead><tr><th>Meat</th><th>Opened</th><th>Opening</th><th></th></tr></thead>
+          <thead><tr><th>Meat</th><th>Opened</th><th>Recount</th><th>Correct</th></tr></thead>
           <tbody>${opened.map(openedRowHtml).join('')}</tbody>
         </table>
         <p><a href="#" class="mo-toggle-edit">done editing</a></p>`;

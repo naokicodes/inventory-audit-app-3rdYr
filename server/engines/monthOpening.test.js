@@ -252,5 +252,61 @@ test('a blocked meat with a stored ending reports actual null (no phantom balanc
   assert.strictEqual(cBlocked.actual, null);
 });
 
+console.log('\nMonth opening: explicit recount overwrite (step 26a-iii)\n');
+
+// November state from the tests above: M01 (40) and M03 (15) copied on
+// Nov 1, M04 recounted 0 on Nov 2.
+const novOpenings = (meatId) => db.prepare(
+  `SELECT business_date, quantity, opening_source FROM opening_stock
+   WHERE restaurant_id = 1 AND meat_id = ? AND business_date >= '2026-11-01' ORDER BY business_date`
+).all(meatId).map(r => ({ ...r }));
+
+test('a same-date recount flips COPY to RECOUNT - including the same number - with no second row', () => {
+  assert.deepStrictEqual(novOpenings(1), [{ business_date: '2026-11-01', quantity: 40, opening_source: 'COPY' }]);
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 1, '2026-11-01', 40).ok, true);
+  assert.deepStrictEqual(novOpenings(1), [{ business_date: '2026-11-01', quantity: 40, opening_source: 'RECOUNT' }]);
+  assert.strictEqual(computeMeatAudit(db, 1, 1, '2026-11-01').openingSource, 'RECOUNT');
+});
+
+test('a later-date recount keeps the earlier opening and lands the recount difference on the new date', () => {
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 3, '2026-11-02', 12).ok, true);
+  assert.deepStrictEqual(novOpenings(3), [
+    { business_date: '2026-11-01', quantity: 15, opening_source: 'COPY' },
+    { business_date: '2026-11-02', quantity: 12, opening_source: 'RECOUNT' }
+  ]);
+  const nov1 = computeMeatAudit(db, 1, 3, '2026-11-01');
+  assert.strictEqual(nov1.beginning, 15);
+  assert.strictEqual(nov1.recountDifference, 0);
+  const nov2 = computeMeatAudit(db, 1, 3, '2026-11-02');
+  assert.strictEqual(nov2.beginning, 12);
+  assert.strictEqual(nov2.recountDifference, 3, 'priorEnding (15, carried through Nov 1) - opening (12)');
+  assert.strictEqual(nov2.openingSource, 'RECOUNT');
+});
+
+test('a negative recount on an already-opened meat is still 400 and changes nothing', () => {
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 3, '2026-11-02', -1).status, 400);
+  assert.strictEqual(novOpenings(3)[1].quantity, 12);
+});
+
+test('the panel shows the latest opening on or before the page date; one dated only after it still shows (any opening unblocks)', () => {
+  assert.deepStrictEqual({ ...byCode(getMonthOpeningStatus(db, 'restaurant', 1, '2026-11-01'), 'M03').opening },
+    { business_date: '2026-11-01', quantity: 15, opening_source: 'COPY' });
+  assert.deepStrictEqual({ ...byCode(getMonthOpeningStatus(db, 'restaurant', 1, '2026-11-20'), 'M03').opening },
+    { business_date: '2026-11-02', quantity: 12, opening_source: 'RECOUNT' });
+  // M04's only November opening is Nov 2: seen from Nov 1 it is still opened, never blank.
+  assert.strictEqual(isBlocked(db, 'restaurant', 1, 4, '2026-11-01'), false);
+  assert.strictEqual(byCode(getMonthOpeningStatus(db, 'restaurant', 1, '2026-11-01'), 'M04').opening.business_date, '2026-11-02');
+});
+
+test('the commissary ledger upserts the same way', () => {
+  // C01 (meat 10) was copied on Oct 1.
+  assert.strictEqual(recordRecount(db, 'commissary', 1, 10, '2026-10-01', 88).ok, true);
+  const rows = db.prepare(`SELECT business_date, quantity, opening_source FROM commissary_opening_stock WHERE commissary_meat_id = 10 AND business_date >= '2026-10-01'`).all().map(r => ({ ...r }));
+  assert.deepStrictEqual(rows, [{ business_date: '2026-10-01', quantity: 88, opening_source: 'RECOUNT' }]);
+  assert.strictEqual(recordRecount(db, 'commissary', 1, 10, '2026-10-03', 80).ok, true);
+  assert.strictEqual(computeCommissaryMeatAudit(db, 10, '2026-10-01').beginning, 88, 'earlier opening kept');
+  assert.strictEqual(computeCommissaryMeatAudit(db, 10, '2026-10-03').beginning, 80);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
