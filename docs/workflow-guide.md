@@ -89,6 +89,44 @@ level.
 
 ---
 
+## The daily rhythm (from 2026-09-23)
+
+The architect works mornings only, so the day is built around one morning merge.
+
+**Morning — architect.** For each open PR, in a fresh Claude Code session:
+`/review <n>`, read the summary, then answer **merge**, **request changes** (in
+your own words), or **leave it**. `/review` does the approving and merging only on
+that answer, never on a green suite alone, and it refuses to merge a `public/` PR
+with no `Click-through:` comment. Then answer any `needs-architect` issues and
+spec new steps in the web architect conversation.
+
+**Later — dispatcher.** From the repo root:
+
+```
+git checkout main
+git pull
+.\scripts\run-queue.ps1
+```
+
+Each unit of work runs in a fresh Claude Code process, so no `/clear` is needed
+and new command files are always picked up. Each run first fixes a PR the
+architect sent back (or one with a conflict), otherwise builds the next runnable
+step, and the loop stops when nothing is runnable. Then click through every PR
+that touched `public/` and comment `Click-through: <what you saw>` on it. That
+comment is what lets the architect merge it.
+
+**How parallel PRs stay safe.** Every PR is branched from `main` — never stacked
+on another unmerged PR. A step is skipped while it has an open PR, an open
+`needs-architect` issue, an unmerged dependency, or any file in common with an
+open PR (its `Touches:` line). Only one migration is in flight at a time. So a
+dependent chain moves one link per morning merge; independent steps all finish
+in one evening.
+
+**First run of the script:** `.\scripts\run-queue.ps1 -MaxSteps 1` and watch it.
+Logs land in `.run-queue-logs/` (gitignored), with each step's cost.
+
+`/start` and `/continue` remain for running one step by hand, watching it.
+
 ## The loop
 
 **Phase 0 — architect conversation (you, on the web).**

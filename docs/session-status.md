@@ -836,6 +836,9 @@ up, stop and open a `needs-architect` issue rather than deciding what moves.
 
 ## Step 26a — beginning stock: date-scoped openings and an honest fallback
 
+**CLOSED 2026-09-23, PR #7 (`c8fb7e0`).** Kept here until the next archive pass;
+26a-ii below builds on it.
+
 **Pillar 1 (Core). Lane: DISPATCH only. Schema rebuild — red by default.
 Resolves gap-hunt findings 3 and 4.**
 

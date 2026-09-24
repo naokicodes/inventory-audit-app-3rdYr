@@ -127,8 +127,12 @@ section, and save the filled copy to a scratch file outside the repo.
 Open the PR with it:
 
 ```
-gh pr create --title "<short subject>" --body-file <path-to-filled-copy>
+gh pr create --title "<type>(<step-id>): <short subject>" --body-file <path-to-filled-copy>
 ```
+
+**The step id in parentheses is required** — e.g. `fix(26a-ii): month-start
+recount`. `/start` and the queue runner find in-flight steps by it; a PR
+without it looks like the step was never built, and it gets built twice.
 
 **Do not use `gh pr create --fill`.** It builds the body from your commit
 message and silently skips the template, so the verify output, the

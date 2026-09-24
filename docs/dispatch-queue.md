@@ -7,6 +7,10 @@ clone.
 **Only an architect adds to this queue.** If it is empty, stop and wait.
 See `docs/engineer-role.md`.
 
+**`Touches:` lines.** A runnable step lists the files it will change, so
+`/start` and the queue runner can skip it while an open PR touches the same
+files. The architect adds the line when a step becomes runnable.
+
 `docs/session-status.md` remains the authoritative description of each
 step. This file says *what order* and *which lane* — not what the work
 is. Read the step's own section in `session-status.md` before starting.
@@ -30,20 +34,7 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 1. Step 25d-ii — CLOSED 2026-09-22, PR #5 (`6c21238`).
 
-### 2. Step 26a — beginning stock: date-scoped openings and an honest fallback
-**Lane: DISPATCH only. Schema rebuild — the most invasive step in the queue.**
-
-**Spec revised 2026-09-23, answering issue #6.** Both gaps are closed. Re-read
-the whole section; it changed shape (no new status string, a covered-window rule
-for adjustments, the recount difference). The month-start recount workflow is
-split out to 26a-ii and is **not** part of this step.
-
-25d-ii is merged (`6c21238`), so the concurrency constraint is satisfied.
-
-Do it before test data is entered — it is a table rebuild and the data is
-disposable today.
-
-Spec: `session-status.md`, section "Step 26a".
+### 2. Step 26a — CLOSED 2026-09-23, PR #7 (`c8fb7e0`).
 
 ### 2b. Step 26a-ii — the month-start recount
 **Lane: DISPATCH only. Schema addition + `public/` change.**
@@ -54,6 +45,13 @@ tables, beginning-stock walk and PATCH routes, and both touch
 then start this.
 
 Must land before real entry starts — it is what bounds 26a's carry chain.
+
+Touches: `server/db/schema.sql`, `server/db/migrate.js`, `server/db/connection.js`,
+`server/engines/auditEngine.js`, `server/engines/commissaryAuditEngine.js`,
+`server/routes/dailyAudit.js`, `server/routes/commissary.js`,
+`server/routes/settings.js`, `server/routes/dashboard.js`,
+`server/routes/commands.js`, `public/daily-audit.html`, `public/commissary.html`,
+`public/settings.html`, and their tests. Carries a migration.
 
 Spec: `session-status.md`, section "Step 26a-ii".
 
@@ -102,7 +100,7 @@ it waits for, or folds into, the users-table step, which is not yet written.
 (25d-ii — provenance, SYSTEM/NULL — is unaffected and proceeds.)
 
 ### 6. Step 25e — restaurant-to-restaurant transfers must credit the receiver
-**Lane: DISPATCH only. Queued AFTER soft launch, deliberately.**
+**Lane: DISPATCH only. Queued AFTER soft launch, deliberately. Not startable before then.**
 
 A transfer writes one row today: it subtracts from the sender and credits the
 receiver nothing. The fix writes a `stock_receipts` row at the destination,

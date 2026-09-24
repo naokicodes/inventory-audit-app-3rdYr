@@ -40,6 +40,9 @@ graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 # Secrets
 .env
 
+# Queue runner logs (scripts/run-queue.ps1) - per-machine, per-run.
+.run-queue-logs/
+
 # Standard clutter
 node_modules/
 .DS_Store

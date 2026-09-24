@@ -61,11 +61,34 @@ order that is ALL of:
 - **not flagged** HOLD, RECONCILE, or "needs an architect-written prompt";
 - **not in the "Planned" section** — that surface is architect-gated and never
   auto-startable;
-- **dependencies satisfied** — if a step says "must not run concurrently with X"
-  or "merge X first," confirm X is already on `origin/main` before choosing it.
+- **dependencies satisfied** — if a step says "must not run concurrently with X",
+  "merge X first" or "starts only after X is merged," confirm X is already on
+  `origin/main` before choosing it;
+- **not already in flight or done** — no open or merged PR whose title contains
+  `(<step-id>)`, the exact id: `(26a)` is not `(26a-ii)`. Check with
+  `gh pr list --state open --json number,title` and
+  `gh pr list --state merged --search "<step-id> in:title" --json number,title`.
+  Open means built and waiting for review; merged means done, even if the queue
+  has not been marked CLOSED yet — say so in the announcement. Starting either
+  again duplicates the whole build. A PR closed *without* merging does not
+  count: that step was abandoned and may be reissued;
+- **not parked** — no open `needs-architect` issue naming this exact step (title
+  contains `Step <step-id>` followed by a space). Check with
+  `gh issue list --state open --label needs-architect --json number,title`;
+- **not deferred** — anything marked "after soft launch", "not before soft
+  launch" or otherwise not yet due is skipped exactly like HOLD;
+- **no file overlap with an open PR** — compare the step's `Touches:` line in
+  `dispatch-queue.md` with the changed files of every open PR
+  (`gh pr diff <n> --name-only`). Any shared file means the step waits behind
+  that PR. **One migration in flight at a time:** a step that changes the schema
+  always overlaps an open PR that touches `server/db/migrate.js` or
+  `server/db/schema.sql`. If the step has no `Touches:` line, derive its file
+  list from the spec before planning, and check again once the plan in step 6
+  is known — if the plan overlaps, stop and name the PR it waits behind.
 
 Announce, in a few lines: the step you chose, one line on why, and one line each
-on any earlier steps you skipped and why (held, planned, blocked). If NO step is
+on any earlier steps you skipped and why (held, planned, blocked, in flight,
+parked, deferred, or waiting behind PR #n). If NO step is
 runnable, say so plainly and **stop** — do not invent one, and never start a
 Planned or flagged step to have something to do.
 
