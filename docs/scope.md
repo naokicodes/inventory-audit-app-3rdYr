@@ -4,9 +4,21 @@ Read this before implementing anything. If a feature isn't listed under
 "In scope," don't build it without checking first — even if it seems like
 an obvious/helpful addition. Small scale, deliberately.
 
+## Governing principle (NaokiiVT, 2026-09-23)
+
+The app replaces the paper sheets and does the same job, but it **assists the
+workflow — it is not the workflow.** Tags and labels that help people read a
+number are welcome; enforcing process is not. The one deliberate exception is
+the month-start recount block (Step 26a-ii), which the restaurant asked for.
+
+If a step would make the app dictate how staff work — a new block, a required
+field, a forced order of steps — that is a restaurant question, not a code
+question: open a `needs-architect` issue rather than deciding it.
+
 ## What this app IS
-- A **meat-cost audit tool** for one person (the "auditor") to use, on one
-  computer, covering 3 restaurants.
+- A **meat-cost audit tool** for the restaurant group's checkers, on one
+  shared PC, covering the restaurants and the commissary (multi-user is in
+  progress — see below).
 - Tracks, per restaurant per day: stock received (from a unified log — see
   below), actual physical ending count, sales (auto-synced), prep
   quantities (for batch-cooked dishes), and optional adjustments (waste,
@@ -23,9 +35,10 @@ an obvious/helpful addition. Small scale, deliberately.
   (create/edit/soft-delete, with before/after values) to a single
   admin-visible activity log — added 2026-08-27, see
   `commissary-and-stock-receipts.md`.
-- Runs **locally**, on the auditor's machine, backed by a single SQLite file.
-- Code lives in a private GitHub repo. Business data (counts, photos) never
-  leaves the local machine unless deliberately exported.
+- Runs **locally**, on one shared PC, backed by a single SQLite file.
+- Code lives in a **public** GitHub repo — no secrets and no business data are
+  ever committed. Business data (counts, photos) never leaves the local machine
+  unless deliberately exported.
 
 ## What this app is NOT
 - **Not a full restaurant inventory system.** It does not track produce, dry
@@ -39,7 +52,8 @@ an obvious/helpful addition. Small scale, deliberately.
   (passwords) is deferred to a stub — pick-your-name-from-a-list, no password —
   until the recycled auth system is available. Identity moves from the activity
   log's free-text "actor" to a thin `users` table that `created_by` references.
-  See `docs/handoffs/ARCHITECTURE-HANDOFF-2026-09-15.md` for design and reasoning.
+  Design and reasoning: `docs/session-status.md`, "Things NOT to re-litigate" >
+  "2026-09-15 multi-user scoping".
 - **Not cloud-hosted (for now).** No server to maintain, no monthly hosting
   bill, no uptime to worry about.
 - **Not a POS.** Sales numbers come FROM the existing Loyverse setup via the
