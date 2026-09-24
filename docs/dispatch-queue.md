@@ -36,26 +36,34 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 2. Step 26a — CLOSED 2026-09-23, PR #7 (`c8fb7e0`).
 
-### 2b. Step 26a-ii — the month-start recount
-**Lane: DISPATCH only. Schema addition + `public/` change.**
+### 2b. Step 26a-ii — CLOSED 2026-09-24, PR #8 (`769a110`).
 
-**Starts only after 26a is merged.** It builds on 26a's date-keyed opening
-tables, beginning-stock walk and PATCH routes, and both touch
-`server/routes/dailyAudit.js` and `server/routes/commissary.js`. Merge 26a, pull,
-then start this.
+### 2c. Step 26a-iii — explicit recount overwrite
+**Lane: DISPATCH only. No schema change.**
 
-Must land before real entry starts — it is what bounds 26a's carry chain.
+Touches: `server/engines/monthOpening.js`, `server/engines/monthOpening.test.js`,
+`server/routes/dailyAudit.js`, `server/routes/dailyAudit.test.js`,
+`server/routes/commissary.js`, `server/routes/commissary.test.js`,
+`public/month-opening.js`.
 
-Touches: `server/db/schema.sql`, `server/db/migrate.js`, `server/db/connection.js`,
-`server/engines/auditEngine.js`, `server/engines/commissaryAuditEngine.js`,
-`server/routes/dailyAudit.js`, `server/routes/commissary.js`,
-`server/routes/settings.js`, `server/routes/dashboard.js`,
-`server/routes/commands.js`, `public/daily-audit.html`, `public/commissary.html`,
-`public/settings.html`, and their tests. Carries a migration.
+Spec: `session-status.md`, section "Step 26a-iii".
 
-Spec: `session-status.md`, section "Step 26a-ii".
+### 2d. Step ui-viewport — viewport meta on every page
+**Lane: DISPATCH only. Parallel-safe with 26a-iii.**
+
+Touches: `public/allocations.html`, `public/commissary-shipments.html`,
+`public/commissary.html`, `public/daily-audit.html`, `public/dashboard.html`,
+`public/history.html`, `public/index.html`, `public/sales.html`,
+`public/settings.html`, `public/stock-receipts.html`, `public/terminal.html`.
+
+Spec: `session-status.md`, section "Step ui-viewport".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
+
+**Note 2026-09-24:** the architecture draft cancels the intake weigh-in
+(`weight_kg`) — 25a shrinks to quantity-only receipts. Do not build from the
+spec below until it is rewritten.
+
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
 Not startable on engineer initiative. It adds a weight column alongside

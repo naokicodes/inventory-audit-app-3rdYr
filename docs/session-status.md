@@ -1003,6 +1003,9 @@ and proposes them as the new month's opening is pillar 2 work, and overlaps
 
 ## Step 26a-ii — the month-start recount
 
+**CLOSED 2026-09-24, PR #8 (`769a110`).** Kept here until the next archive pass;
+26a-iii below builds on it.
+
 **Pillar 1 (Core). Lane: DISPATCH only. Schema addition + `public/` change.
 Starts only after 26a is merged** — it builds on 26a's date-keyed opening
 tables, its beginning-stock walk, and its PATCH routes. Decided 2026-09-23
@@ -1120,6 +1123,81 @@ openings is now a **Terminal shortcut to Copy all**, not a separate feature. It
 must call the same code path, so the must-count rules cannot drift between two
 implementations. Pillar 2.
 
+## Step 26a-iii — explicit recount overwrite
+
+**Pillar 1 (Core). Lane: DISPATCH only. No schema change.** Decided 2026-09-24
+(NaokiiVT): the recount rule in the PR #8 review conversation, the date rule in
+the 26a/26a-ii conversation.
+
+### Why it exists
+
+`recordRecount` is create-only: it answers 409 when the meat already has an
+opening in the month. So the month-start flow the restaurant actually wants —
+**Copy all, then recount whichever meats were really counted, in any order** —
+fails on every copied meat. It can only be *edited*, and an edit keeps source
+COPY. A recount must be keyed off the **act**, not the number: a recount that
+happens to match last month's ending is still a recount.
+
+### The rule
+
+`recordRecount` becomes an upsert, and the 409 goes away:
+
+- **An opening exists on this exact date** → update it: new quantity, source
+  `RECOUNT`. This flips a same-day COPY to RECOUNT, same number included.
+- **Otherwise** → insert a `RECOUNT` opening on this date. Any earlier opening in
+  the month stays, and 26a's recount difference lands on this date (option A).
+  Example: Copy all on Oct 1, pork belly recounted the morning of Oct 2 → Oct 1
+  keeps its COPY opening, Oct 2 gets a RECOUNT opening, and Oct 2's Over/Short
+  reads `incl. X recount difference`.
+
+Unchanged: the negative guard; 26a's PATCH edit (corrects a number, **keeps**
+its source — a typo fix on a copy stays COPY); the block (any opening in the
+month unblocks all of it); Copy all (skips already-opened meats). No per-meat
+copy button.
+
+### The panel (`public/month-opening.js`) — settled, not Class B
+
+- An opened row shows the month's **latest** opening on or before the page's
+  date, with its source tag. `findMonthOpening` returns the *earliest* today;
+  the panel needs the latest. `isBlocked` is unaffected — any opening unblocks.
+- Opened rows get the recount control too, **at least as prominent as the
+  edit**: a count input and **Save recount**, dated the page's date. Label the
+  existing edit **Correct** so the two intents are visibly different: "I
+  counted" is Recount, "I typed it wrong" is Correct.
+
+### Tests
+
+Same-date recount flips COPY → RECOUNT, including the same number; a later-date
+recount leaves the earlier opening and produces the recount difference on the
+new date; a negative is still 400; the PATCH edit still keeps COPY.
+
+### Click-through
+
+Copy all; recount one meat on the same day with the same number → its tag reads
+`recount`. Move the page to the next day and recount another meat with a
+different number → that day's Over/Short shows `incl. X recount difference`.
+
+## Step ui-viewport — viewport meta on every page
+
+**Beta-enabling UI (architecture draft 2026-09-24, §6). Lane: DISPATCH only. No
+schema change. Parallel-safe with 26a-iii — no shared files.**
+
+None of the 11 pages in `public/` has a viewport tag, so phones render them at
+desktop width, zoomed out. Add
+
+```
+<meta name="viewport" content="width=device-width, initial-scale=1">
+```
+
+directly after `<meta charset="UTF-8">` in every `public/*.html`. **Nothing
+else** — no CSS, no layout. The daily-audit mobile layout is a separate, later
+step, and this one's click-through feeds it.
+
+**Click-through:** open each page on a phone (or the browser's device mode).
+Text should render at a readable size. Pages that now scroll sideways or break
+are **findings to list in the PR, not to fix here** — they are the input for the
+mobile layout step.
+
 ## Steps 25a / 25b — the commissary ledger has no way in
 
 **Found 2026-09-02 by an architect audit of every write path into the
@@ -1200,6 +1278,12 @@ real data anywhere (every ledger table is 0 rows), but there is test residue:
 plus two retired test meat types. A reseed gives a clean catalog and an empty
 ledger with nothing to mistake for real rows later. Do it before real entry
 starts, not after.
+
+**Then declare month-1 openings** (26a-ii). After a wipe, every meat is
+must-count in its first month, so nothing takes counts until each has an
+opening. This applies to the friends beta on sample data too — declaring
+openings is part of setting it up. No backfill of earlier months (decided
+2026-09-24).
 
 ## Step 25c — CLOSED 2026-09-03, `1790463`. See docs/session-history.md.
 
