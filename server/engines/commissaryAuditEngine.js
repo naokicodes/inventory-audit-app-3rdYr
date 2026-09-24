@@ -233,10 +233,11 @@ function computeCommissaryMeatAudit(db, commissaryMeatId, businessDate) {
   const adjustments = getCommissaryAdjustmentsTotal(db, commissaryMeatId, businessDate);
   const actual = getCommissaryEndingActual(db, commissaryMeatId, businessDate);
 
-  // Step 26a-ii - see the matching block in computeMeatAudit (auditEngine.js).
+  // Step 26a-ii - see the matching block in computeMeatAudit (auditEngine.js),
+  // including why `actual` is nulled.
   if (isBlocked(db, 'commissary', null, commissaryMeatId, businessDate)) {
     return {
-      beginning: null, stockIn, backedUp, usage, adjustments, actual,
+      beginning: null, stockIn, backedUp, usage, adjustments, actual: null,
       endingCalculated: null, expectedEnding: null, variance: null, unexplainedVariance: null,
       status: 'MISSING_PERIOD_OPENING',
       daysCovered: null, beginningCarried: false, recountDifference: null, windowAdjustments: null,

@@ -1213,6 +1213,9 @@ function patchCommissaryOpeningStock({ commissary_meat_id, business_date, quanti
   if (!isClearing && (typeof quantity !== 'number' && isNaN(Number(quantity)))) {
     return { status: 400, error: 'quantity must be a number, or null/omitted to clear the declared opening' };
   }
+  if (!isClearing && Number(quantity) < 0) {
+    return { status: 400, error: 'quantity cannot be negative - an opening count is never below zero' };
+  }
 
   if (isClearing) {
     db.prepare(`DELETE FROM commissary_opening_stock WHERE id = ?`).run(existing.id);
@@ -1251,6 +1254,14 @@ test('PATCH commissary opening-stock: correcting a date with no declared opening
   assert.strictEqual(result.status, 404);
   const row = db.prepare('SELECT * FROM commissary_opening_stock WHERE commissary_meat_id = 32 AND business_date = ?').get('2026-09-13');
   assert.strictEqual(row, undefined, 'must not have been created as a side effect of the failed correction');
+});
+
+test('PATCH commissary opening-stock: a negative quantity is refused (400) and the declared value is unchanged (26a-ii review)', () => {
+  assert.strictEqual(recordRecount(db, 'commissary', 1, 32, '2026-09-15', 20).ok, true);
+  const result = patchCommissaryOpeningStock({ commissary_meat_id: 32, business_date: '2026-09-15', quantity: -5 });
+  assert.strictEqual(result.status, 400);
+  const row = db.prepare('SELECT quantity FROM commissary_opening_stock WHERE commissary_meat_id = 32 AND business_date = ?').get('2026-09-15');
+  assert.strictEqual(row.quantity, 20);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

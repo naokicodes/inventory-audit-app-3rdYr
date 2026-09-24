@@ -240,10 +240,13 @@ function computeMeatAudit(db, restaurantId, meatId, businessDate) {
   // null. Checked first, so a blocked day never reports a figure. The
   // block is a status on the requested date only: getBeginningStock's
   // backward walk is unchanged, so days before a mid-month opening still
-  // chain from the previous month (26a rules).
+  // chain from the previous month (26a rules). `actual` is nulled too, so a
+  // stored ending on a blocked day can't leak a balance into the Dashboard
+  // rollup - the row isn't deleted and reappears once the month has an
+  // opening.
   if (isBlocked(db, 'restaurant', restaurantId, meatId, businessDate)) {
     return {
-      beginning: null, newStock, usage, adjustments, actual,
+      beginning: null, newStock, usage, adjustments, actual: null,
       endingCalculated: null, variance: null, expectedEnding: null, unexplainedVariance: null,
       status: 'MISSING_PERIOD_OPENING',
       daysCovered: null, beginningCarried: false, recountDifference: null, windowAdjustments: null,

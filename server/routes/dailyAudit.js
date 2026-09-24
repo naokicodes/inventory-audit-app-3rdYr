@@ -347,6 +347,10 @@ router.patch('/daily-audit/opening-stock', (req, res) => {
   if (!isClearing && (typeof quantity !== 'number' && isNaN(Number(quantity)))) {
     return res.status(400).json({ error: 'quantity must be a number, or null/omitted to clear the declared opening' });
   }
+  // Step 26a-ii review: an opening count is never below zero.
+  if (!isClearing && Number(quantity) < 0) {
+    return res.status(400).json({ error: 'quantity cannot be negative - an opening count is never below zero' });
+  }
 
   if (isClearing) {
     db.prepare(`DELETE FROM opening_stock WHERE id = ?`).run(existing.id);

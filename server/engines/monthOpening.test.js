@@ -208,5 +208,49 @@ test('commissary Copy all copies only this commissary\'s copyable meats', () => 
   assert.strictEqual(isBlocked(db, 'commissary', null, 12, '2026-10-01'), true, 'Commissary B untouched');
 });
 
+console.log('\nMonth opening: review fixes (PR #8)\n');
+
+test('a negative recount is refused (400) and writes nothing - an opening count is never below zero', () => {
+  const result = recordRecount(db, 'restaurant', 1, 4, '2026-10-03', -1);
+  assert.strictEqual(result.status, 400);
+  assert.strictEqual(isBlocked(db, 'restaurant', 1, 4, '2026-10-03'), true);
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 4, '2026-11-02', 0).ok, true, 'zero is a real count, not refused');
+});
+
+test('Copy all is one transaction: a failure partway through leaves the month with no copies at all', () => {
+  // M01 and M03 are both counted on Oct 31 -> both copyable for November.
+  insertActual.run(1, '2026-10-31', 40);
+  insertActual.run(3, '2026-10-31', 15);
+  // A db whose SECOND opening insert throws, standing in for any mid-loop failure.
+  let inserts = 0;
+  const flakyDb = {
+    exec: (sql) => db.exec(sql),
+    prepare: (sql) => {
+      if (/INSERT INTO opening_stock/.test(sql) && ++inserts === 2) throw new Error('simulated mid-loop failure');
+      return db.prepare(sql);
+    }
+  };
+  assert.throws(() => copyAll(flakyDb, 'restaurant', 1, '2026-11-01'), /simulated mid-loop failure/);
+  const n = db.prepare(`SELECT COUNT(*) AS n FROM opening_stock WHERE restaurant_id = 1 AND business_date = '2026-11-01'`).get().n;
+  assert.strictEqual(n, 0, 'the first copy was rolled back, not left behind');
+  assert.deepStrictEqual(copyAll(db, 'restaurant', 1, '2026-11-01'), [1, 3], 'a clean retry copies both');
+});
+
+test('a blocked meat with a stored ending reports actual null (no phantom balance), and the count reappears once the month is opened', () => {
+  // M04's only October opening was cleared above -> October is blocked.
+  insertActual.run(4, '2026-10-10', 6);
+  const blocked = computeMeatAudit(db, 1, 4, '2026-10-10');
+  assert.strictEqual(blocked.status, 'MISSING_PERIOD_OPENING');
+  assert.strictEqual(blocked.actual, null);
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 4, '2026-10-10', 6).ok, true);
+  assert.strictEqual(computeMeatAudit(db, 1, 4, '2026-10-10').actual, 6, 'the stored count was never deleted');
+
+  // Same on the commissary ledger: Commissary B's C01 has no October opening.
+  db.prepare(`INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (12, '2026-10-05', 3)`).run();
+  const cBlocked = computeCommissaryMeatAudit(db, 12, '2026-10-05');
+  assert.strictEqual(cBlocked.status, 'MISSING_PERIOD_OPENING');
+  assert.strictEqual(cBlocked.actual, null);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

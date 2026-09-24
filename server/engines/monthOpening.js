@@ -13,6 +13,8 @@
 // Deliberately self-contained (its own date math) so the audit engines can
 // require it without a circular require through auditEngine.js.
 
+const { withTransaction } = require('../db/activityLog.js');
+
 const LEDGERS = {
   restaurant: {
     meatsSql: `SELECT id, meat_code AS code, name, unit, recount_required FROM meats WHERE restaurant_id = ? AND active = 1 ORDER BY meat_code`,
@@ -172,6 +174,9 @@ function recordRecount(db, ledger, ownerId, meatId, date, quantity) {
   if (quantity === null || quantity === undefined || quantity === '' || isNaN(Number(quantity))) {
     return { status: 400, error: 'quantity must be a number' };
   }
+  if (Number(quantity) < 0) {
+    return { status: 400, error: 'quantity cannot be negative - an opening count is never below zero' };
+  }
   if (findMonthOpening(db, ledger, ownerId, meatId, date)) {
     return { status: 409, error: 'This meat already has an opening this month - edit it instead' };
   }
@@ -184,17 +189,20 @@ function recordRecount(db, ledger, ownerId, meatId, date, quantity) {
  * declares an opening dated the 1st of the month with quantity = the last
  * day of M-1's real count, source COPY. Must-count meats are never copied.
  * Returns the meat ids copied. Safe to repeat - an already-opened meat is
- * skipped.
+ * skipped. One transaction, so a failure mid-loop can't leave the month
+ * half-copied.
  */
 function copyAll(db, ledger, ownerId, date) {
-  const status = getMonthOpeningStatus(db, ledger, ownerId, date);
-  const copied = [];
-  for (const row of status.rows) {
-    if (row.opening !== null || row.must_count) continue;
-    insertOpening(db, ledger, ownerId, row.meat_id, status.month_start, row.copy_quantity, 'COPY');
-    copied.push(row.meat_id);
-  }
-  return copied;
+  return withTransaction(db, () => {
+    const status = getMonthOpeningStatus(db, ledger, ownerId, date);
+    const copied = [];
+    for (const row of status.rows) {
+      if (row.opening !== null || row.must_count) continue;
+      insertOpening(db, ledger, ownerId, row.meat_id, status.month_start, row.copy_quantity, 'COPY');
+      copied.push(row.meat_id);
+    }
+    return copied;
+  });
 }
 
 module.exports = {
