@@ -6,8 +6,15 @@ Proceed with the step you selected and planned in the `/start` output above.
 This command finishes it. **If `/start` has not been run in this conversation,
 stop and say so — run `/start` first.**
 
-Follow the `/step` command's procedure from **phase 4 (implement) through phase 7
-(open the PR)**, for the already-selected step. It is the same procedure, resumed
+**If `/start` chose a sent-back PR** (its step 2b), fix it instead of building a
+step: follow `.claude/commands/run-step.md` section 2 — check out the PR's
+branch, do what the review asks and nothing more, verify, push to the **same**
+branch (never force), and comment on the PR what was addressed. A merge conflict
+in `server/db/migrate.js` or `server/db/schema.sql` is never resolved by you —
+abort the merge and open an issue. Then report and stop.
+
+Otherwise, follow the `/step` command's procedure from **phase 4 (implement)
+through phase 7 (open the PR)**, for the already-selected step. It is the same procedure, resumed
 from the plan `/start` already stated — the full detail for each phase lives in
 `/step`. These guardrails are non-negotiable and are restated here on purpose:
 

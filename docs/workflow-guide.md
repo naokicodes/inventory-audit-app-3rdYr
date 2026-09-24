@@ -105,27 +105,35 @@ spec new steps in the web architect conversation.
 ```
 git checkout main
 git pull
-.\scripts\run-queue.ps1
+claude
 ```
 
-Each unit of work runs in a fresh Claude Code process, so no `/clear` is needed
-and new command files are always picked up. Each run first fixes a PR the
-architect sent back (or one with a conflict), otherwise builds the next runnable
-step, and the loop stops when nothing is runnable. Then click through every PR
-that touched `public/` and comment `Click-through: <what you saw>` on it. That
-comment is what lets the architect merge it.
+In Claude Code: `/start`, read what it picked, then `/continue`. When the PR (or
+issue) is done: `/clear`, then `/start` again for the next one. Stop when
+`/start` says nothing is runnable. `/start` first offers any PR the architect
+sent back with **Request changes**, so fixes and new steps are the same routine.
+Never `/clear` between `/start` and `/continue`. After pulling changes to
+`.claude/commands/`, quit and reopen Claude Code — `/clear` does not reload them.
+
+Then click through every PR that touched `public/` and comment
+`Click-through: <what you saw>` on it. That comment is what lets the architect
+merge it.
+
+**Sending a PR back.** Only a formal **Request changes** review is picked up —
+`/review`'s "request changes" answer posts one. A plain PR comment is not seen.
+Whatever the review says is the spec for the fix, so decide any design question
+in the review itself.
 
 **How parallel PRs stay safe.** Every PR is branched from `main` — never stacked
-on another unmerged PR. A step is skipped while it has an open PR, an open
-`needs-architect` issue, an unmerged dependency, or any file in common with an
-open PR (its `Touches:` line). Only one migration is in flight at a time. So a
-dependent chain moves one link per morning merge; independent steps all finish
-in one evening.
+on another unmerged PR. A step is skipped while it has an open or merged PR, an
+open `needs-architect` issue, an unmerged dependency, or any file in common with
+an open PR (its `Touches:` line). Only one migration is in flight at a time. So a
+dependent chain moves one link per morning merge; independent steps can all be
+built the same evening.
 
-**First run of the script:** `.\scripts\run-queue.ps1 -MaxSteps 1` and watch it.
-Logs land in `.run-queue-logs/` (gitignored), with each step's cost.
-
-`/start` and `/continue` remain for running one step by hand, watching it.
+**`scripts/run-queue.ps1` — not in use.** An unattended version of the same
+routine, kept for later. It runs silently until each step finishes, which read as
+frozen to a first-time user (2026-09-24). The slash commands are the default.
 
 ## The loop
 

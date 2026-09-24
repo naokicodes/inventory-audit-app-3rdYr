@@ -51,6 +51,26 @@ Must print `SUITE GREEN` and `AUDIT CLEAN`. If it does not, **stop and report** 
 you have inherited a problem, and anything built on it will be blamed on you.
 (If `verify` is reported missing, you are not on `main` — return to step 1.)
 
+## 2b. First: a PR the architect sent back?
+
+Before choosing new work, check whether the architect sent a PR back:
+
+```
+gh pr list --state open --json number,title,reviewDecision,mergeable
+```
+
+A PR needs fixing if EITHER its `reviewDecision` is `CHANGES_REQUESTED` and the
+newest changes-requested review is newer than the PR's newest commit
+(`gh pr view <n> --json reviews,commits` — if the newest commit is newer, it was
+already fixed and is waiting for re-review), OR its `mergeable` is `CONFLICTING`.
+
+If one qualifies, the lowest-numbered one is today's work instead of a new step:
+read the review and every inline comment (`gh pr view <n> --comments`), state
+what you will change, and skip steps 3–4. If the request leaves a design choice
+open, that is Class B — step 5 applies. Otherwise go to step 6 and end with:
+
+> Ready to fix **PR #<n>** as the architect asked. Type `/continue` to apply it.
+
 ## 3. Select the next runnable step — do NOT guess
 
 Read `docs/dispatch-queue.md`. The next runnable step is the first one in queue
