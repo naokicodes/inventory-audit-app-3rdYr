@@ -109,6 +109,7 @@ function stockRollup(date, restaurantIds) {
       ...cm,
       balance: currentBalance(commissaryAudit),
       hasData: commissaryAudit.status !== 'MISSING_BEGINNING_STOCK'
+        && commissaryAudit.status !== 'MISSING_PERIOD_OPENING'
     };
   });
 
@@ -387,6 +388,30 @@ test('a dangling commissary_id degrades gracefully instead of silently dropping 
   // its balance must be counted into the group total too, not just present
   // in by_commissary
   assert.strictEqual(jowlRow.commissary_balance, 1019, 'previous total 1014 + orphan\'s 5 = 1019');
+});
+
+test('step 26a-ii: a month with no opening yet reads as no-data, not as a zero balance', () => {
+  // The Jowl scenario above opened everything in August only; September has
+  // no opening for any of the three meats, so every September day is blocked.
+  const r = stockRollup('2026-09-05');
+  const jowlRow = findJowlGroup(r.rows);
+  assert.strictEqual(jowlRow.commissary_has_data, false);
+  assert.strictEqual(jowlRow.by_restaurant[1].hasData, false);
+  assert.strictEqual(jowlRow.row_has_any_data, false);
+});
+
+test('step 26a-ii review: a stored ending on a blocked day leaks no phantom balance into the rollup, on either side', () => {
+  // Real counts on Sept 5, but September still has no opening for any of
+  // these meats - the counts are kept, just not reported until it does.
+  db.prepare(`INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (1, '2026-09-05', 77)`).run();
+  db.prepare(`INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-09-05', 12)`).run();
+  const r = stockRollup('2026-09-05');
+  const jowlRow = findJowlGroup(r.rows);
+  assert.strictEqual(jowlRow.by_commissary.find(bc => bc.commissary_meat_id === 1).balance, null);
+  assert.strictEqual(jowlRow.commissary_balance, 0, 'the blocked 77 is not summed');
+  assert.strictEqual(jowlRow.by_restaurant[1].total, 0, 'the blocked 12 is not summed');
+  assert.strictEqual(jowlRow.by_restaurant[1].hasData, false);
+  assert.strictEqual(jowlRow.grand_total, 0);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

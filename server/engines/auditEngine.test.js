@@ -288,6 +288,15 @@ test('spec example: counted Sept 28 (90), uncounted 29-Oct 2, counted Oct 3 -> d
   assert.strictEqual(uncountedDay.daysCovered, 2, 'Sept 29 (1) + Sept 30 (2) - reported even though Sept 30 itself has no actual yet');
   assert.strictEqual(uncountedDay.status, 'MISSING_ACTUAL_COUNT');
 
+  // Step 26a-ii: October has no opening yet, so every October day is
+  // blocked. The October recount happens on Oct 10 (declared 80); any
+  // opening dated in October unblocks all of October, and the days before
+  // it still chain from September. The recount-difference test below
+  // reads that same Oct 10 opening.
+  assert.strictEqual(computeMeatAudit(db, restaurantId, carryMeatId, '2026-10-03').status, 'MISSING_PERIOD_OPENING');
+  db.prepare('INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, carryMeatId, '2026-10-10', 80);
+
   db.prepare('INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
     .run(restaurantId, carryMeatId, '2026-10-03', 90); // exact match, no further variance
 
@@ -316,11 +325,9 @@ test('an adjustment dated on a carried (uncounted) day is still picked up by the
 });
 
 test('recount difference (option A): a declared opening on a date with a prior chain adds the difference into that day\'s Over/Short, not earlier days', () => {
-  // Chain continues from Oct 7's actual (87). Oct 8-9 uncounted, then a
-  // recount on Oct 10 declares 80 - 7 less than the chain expected.
-  db.prepare('INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
-    .run(restaurantId, carryMeatId, '2026-10-10', 80);
-
+  // Chain continues from Oct 7's actual (87). Oct 8-9 uncounted, then the
+  // recount on Oct 10 (declared in the spec-example test above) is 80 - 7
+  // less than the chain expected.
   const result = computeMeatAudit(db, restaurantId, carryMeatId, '2026-10-10');
   assert.strictEqual(result.beginning, 80, 'the declared opening always wins for its own date');
   assert.strictEqual(result.recountDifference, 7, 'priorEnding (87, no flows since) - opening (80) = 7, a shortage found at the recount');
@@ -355,11 +362,22 @@ test('a declared opening with NO prior chain (onboarding, brand-new meat): recou
   assert.strictEqual(result.beginningCarried, false);
 });
 
-test('MISSING_BEGINNING_STOCK (no opening, no prior count anywhere): daysCovered/beginningCarried/recountDifference report as null/false/null, not garbage', () => {
+test('MISSING_BEGINNING_STOCK (no prior count, opening later in the month): daysCovered/beginningCarried/recountDifference report as null/false/null, not garbage', () => {
   db.prepare('INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (?, ?, ?, ?)')
     .run(restaurantId, 'M06', 'Chicken Skin', 'kg');
   const neverSeededId = db.prepare('SELECT id FROM meats WHERE meat_code = ?').get('M06').id;
 
+  // Step 26a-ii: with no opening at all the month is blocked, which is
+  // checked first - MISSING_BEGINNING_STOCK is only reachable once the
+  // month has an opening dated after this day.
+  const blocked = computeMeatAudit(db, restaurantId, neverSeededId, '2026-09-20');
+  assert.strictEqual(blocked.status, 'MISSING_PERIOD_OPENING');
+  assert.strictEqual(blocked.daysCovered, null);
+  assert.strictEqual(blocked.beginningCarried, false);
+  assert.strictEqual(blocked.recountDifference, null);
+
+  db.prepare('INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (?, ?, ?, ?)')
+    .run(restaurantId, neverSeededId, '2026-09-25', 10);
   const result = computeMeatAudit(db, restaurantId, neverSeededId, '2026-09-20');
   assert.strictEqual(result.status, 'MISSING_BEGINNING_STOCK');
   assert.strictEqual(result.daysCovered, null);

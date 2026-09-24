@@ -293,7 +293,7 @@
       const meats = await res.json();
       document.getElementById('meats-table').innerHTML = `
         <table>
-          <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Cost/unit</th><th>Active</th></tr></thead>
+          <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Cost/unit</th><th>Recount at month start</th><th>Active</th></tr></thead>
           <tbody>${meats.map(m => `
             <tr>
               <td>${m.meat_code}</td>
@@ -305,6 +305,7 @@
                 </select>
               </td>
               <td><input type="number" step="0.01" value="${m.cost_per_unit ?? ''}" data-field="cost_per_unit" data-id="${m.id}" class="meat-edit"></td>
+              <td><input type="checkbox" ${m.recount_required ? 'checked' : ''} data-field="recount_required" data-id="${m.id}" class="meat-edit"></td>
               <td><input type="checkbox" ${m.active ? 'checked' : ''} data-field="active" data-id="${m.id}" class="meat-edit"></td>
             </tr>
           `).join('')}</tbody>
@@ -324,6 +325,7 @@
           name: get('name').value,
           unit: get('unit').value,
           cost_per_unit: get('cost_per_unit').value || null,
+          recount_required: get('recount_required').checked,
           active: get('active').checked
         })
       });
@@ -1021,7 +1023,7 @@
           .map(t => `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.name}${t.active ? '' : ' (retired)'}</option>`).join('');
       document.getElementById('commissary-meats-table').innerHTML = `
         <table>
-          <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Leeway %</th><th>Cost/unit</th><th>Meat Type</th><th>Active</th></tr></thead>
+          <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Leeway %</th><th>Cost/unit</th><th>Meat Type</th><th>Recount at month start</th><th>Active</th></tr></thead>
           <tbody>${meats.map(m => `
             <tr>
               <td>${m.code}</td>
@@ -1039,6 +1041,7 @@
                   ${typeOptionsFor(m.meat_type_id)}
                 </select>
               </td>
+              <td><input type="checkbox" ${m.recount_required ? 'checked' : ''} data-field="recount_required" data-id="${m.id}" class="commissary-meat-edit"></td>
               <td><input type="checkbox" ${m.active ? 'checked' : ''} data-field="active" data-id="${m.id}" class="commissary-meat-edit"></td>
             </tr>
           `).join('')}</tbody>
@@ -1060,6 +1063,7 @@
           allowed_leeway_pct: get('allowed_leeway_pct').value,
           cost_per_unit: get('cost_per_unit').value || null,
           meat_type_id: get('meat_type_id').value || null,
+          recount_required: get('recount_required').checked,
           active: get('active').checked
         })
       });

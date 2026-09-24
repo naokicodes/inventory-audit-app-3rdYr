@@ -285,7 +285,7 @@ console.log('\nSettings Route Tests (Commissary Meats CRUD)\n');
 function listCommissaryMeats(commissaryId) {
   if (!commissaryId) return { status: 400, body: { error: 'commissary_id required' } };
   const rows = db.prepare(
-    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active
+    `SELECT id, code, name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active, recount_required
      FROM commissary_meats WHERE commissary_id = ? ORDER BY code`
   ).all(commissaryId);
   return { status: 200, body: rows };
@@ -310,12 +310,19 @@ function createCommissaryMeat({ commissary_id, code, name, unit, allowed_leeway_
   }
 }
 
-function updateCommissaryMeat(id, { name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active }) {
+// Mirrors settings.js's toFlagOrNull (step 26a-ii).
+function toFlagOrNull(value) {
+  if (value === undefined || value === null) return null;
+  return value ? 1 : 0;
+}
+
+function updateCommissaryMeat(id, { name, unit, allowed_leeway_pct, cost_per_unit, meat_type_id, active, recount_required }) {
   db.prepare(
     `UPDATE commissary_meats
-     SET name = ?, unit = ?, allowed_leeway_pct = ?, cost_per_unit = ?, meat_type_id = ?, active = ?
+     SET name = ?, unit = ?, allowed_leeway_pct = ?, cost_per_unit = ?, meat_type_id = ?, active = ?,
+         recount_required = COALESCE(?, recount_required)
      WHERE id = ?`
-  ).run(name, unit, Number(allowed_leeway_pct), cost_per_unit || null, meat_type_id || null, active ? 1 : 0, id);
+  ).run(name, unit, Number(allowed_leeway_pct), cost_per_unit || null, meat_type_id || null, active ? 1 : 0, toFlagOrNull(recount_required), id);
   return { status: 200, body: { ok: true } };
 }
 
@@ -391,6 +398,49 @@ test('deactivating a commissary meat via PUT still leaves it listed (inactive in
   const row = rows.find(r => r.id === jowlMeatId);
   assert.ok(row, 'inactive rows must still appear in the admin list');
   assert.strictEqual(row.active, 0);
+});
+
+console.log('\nSettings Route Tests (26a-ii: Recount at month start)\n');
+
+// Mirrors PUT /settings/meats/:id (step 26a-ii shape).
+function updateMeat(id, { name, unit, cost_per_unit, active, recount_required }) {
+  db.prepare(
+    `UPDATE meats SET name = ?, unit = ?, cost_per_unit = ?, active = ?, recount_required = COALESCE(?, recount_required) WHERE id = ?`
+  ).run(name, unit, cost_per_unit || null, active ? 1 : 0, toFlagOrNull(recount_required), id);
+  return { status: 200, body: { ok: true } };
+}
+
+test('a new commissary meat defaults to recount_required = 0, and the list returns the flag', () => {
+  const created = createCommissaryMeat({ commissary_id: commissaryAId, code: 'RC1', name: 'Recount Meat', unit: 'kg', allowed_leeway_pct: 0.1 });
+  const row = listCommissaryMeats(commissaryAId).body.find(m => m.id === created.body.id);
+  assert.strictEqual(row.recount_required, 0);
+});
+
+test('ticking Recount at month start sets the flag; a PUT that omits the field keeps it; unticking clears it', () => {
+  const id = listCommissaryMeats(commissaryAId).body.find(m => m.code === 'RC1').id;
+  const base = { name: 'Recount Meat', unit: 'kg', allowed_leeway_pct: 0.1, active: true };
+  const flag = () => db.prepare('SELECT recount_required FROM commissary_meats WHERE id = ?').get(id).recount_required;
+  updateCommissaryMeat(id, { ...base, recount_required: true });
+  assert.strictEqual(flag(), 1);
+  updateCommissaryMeat(id, base);
+  assert.strictEqual(flag(), 1, 'an older caller without the field must not clear it');
+  updateCommissaryMeat(id, { ...base, recount_required: false });
+  assert.strictEqual(flag(), 0);
+});
+
+test('restaurant meats: the same default / set / keep-when-omitted / clear behaviour', () => {
+  const restaurantId = db.prepare('SELECT id FROM restaurants LIMIT 1').get().id;
+  db.prepare(`INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (?, 'RCM', 'Recount Rest Meat', 'kg')`).run(restaurantId);
+  const id = db.prepare(`SELECT id FROM meats WHERE meat_code = 'RCM'`).get().id;
+  const flag = () => db.prepare('SELECT recount_required FROM meats WHERE id = ?').get(id).recount_required;
+  assert.strictEqual(flag(), 0);
+  const base = { name: 'Recount Rest Meat', unit: 'kg', active: true };
+  updateMeat(id, { ...base, recount_required: true });
+  assert.strictEqual(flag(), 1);
+  updateMeat(id, base);
+  assert.strictEqual(flag(), 1);
+  updateMeat(id, { ...base, recount_required: false });
+  assert.strictEqual(flag(), 0);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

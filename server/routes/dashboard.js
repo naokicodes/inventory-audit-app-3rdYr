@@ -116,7 +116,10 @@ router.get('/dashboard/stock-rollup', (req, res) => {
     return {
       ...cm,
       balance: currentBalance(commissaryAudit),
+      // Step 26a-ii: a month-blocked meat (no opening this month) has no
+      // data either, same as one with no beginning at all.
       hasData: commissaryAudit.status !== 'MISSING_BEGINNING_STOCK'
+        && commissaryAudit.status !== 'MISSING_PERIOD_OPENING'
     };
   });
 

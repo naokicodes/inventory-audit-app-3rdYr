@@ -81,12 +81,21 @@ const bellyId = db.prepare('SELECT id FROM commissary_meats WHERE code = ?').get
 
 console.log('Commissary Audit Engine Tests\n');
 
-test('a meat with no opening_stock and no prior ending_actual -> MISSING_BEGINNING_STOCK', () => {
+test('a meat with no opening_stock and no prior ending_actual -> MISSING_PERIOD_OPENING (step 26a-ii: no opening this month blocks it)', () => {
   const result = computeCommissaryMeatAudit(db, bellyId, '2026-08-01');
   assert.strictEqual(result.beginning, null);
-  assert.strictEqual(result.status, 'MISSING_BEGINNING_STOCK');
+  assert.strictEqual(result.status, 'MISSING_PERIOD_OPENING');
   assert.strictEqual(result.endingCalculated, null);
 });
+
+// Step 26a-ii: any opening dated in the month unblocks the whole month.
+// The day-2/surplus/missing-count tests below are about carrying from a
+// prior day's actual, so they get a month opening on the 1st - earlier
+// than the actual they carry from, which therefore stays the anchor.
+function openMonth(commissaryMeatId, date) {
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(commissaryMeatId, date, 0);
+}
 
 test('computeCommissaryDailyAudit lists every active commissary meat for a date', () => {
   // Self-contained: gives jowlId its own opening_stock/ending_actual right
@@ -105,7 +114,7 @@ test('computeCommissaryDailyAudit lists every active commissary meat for a date'
   assert.ok(jowlRow, 'expected a JOWL row');
   assert.ok(bellyRow, 'expected a Belly Slab row');
   assert.strictEqual(jowlRow.status, 'OK');
-  assert.strictEqual(bellyRow.status, 'MISSING_BEGINNING_STOCK');
+  assert.strictEqual(bellyRow.status, 'MISSING_PERIOD_OPENING');
 });
 
 test('computeCommissaryDailyAudit filters to a single commissary meat when an id is given', () => {
@@ -242,6 +251,7 @@ const day2MeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_
 test('day 2: beginning stock carries forward from a prior day\'s actual ending automatically', () => {
   // The "prior day" actual is inserted directly, right here - self
   // contained, not dependent on any other test having computed/written it.
+  openMonth(day2MeatId, '2026-09-01');
   db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
     .run(day2MeatId, '2026-09-10', 14.5);
 
@@ -274,6 +284,7 @@ const day3MeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_
 
 test('surplus case: actual higher than expected gives negative variance', () => {
   // Prior day's actual, inserted directly (self-contained).
+  openMonth(day3MeatId, '2026-09-01');
   db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
     .run(day3MeatId, '2026-09-10', 13.0);
   // No inflows/usage today - beginning=13.0 carries as-is.
@@ -296,6 +307,7 @@ const day4MeatId = db.prepare('SELECT id FROM commissary_meats WHERE commissary_
 
 test('missing actual count is flagged, not silently treated as zero variance', () => {
   // Prior day's actual, inserted directly (self-contained).
+  openMonth(day4MeatId, '2026-09-01');
   db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
     .run(day4MeatId, '2026-09-10', 15.0);
   db.prepare('INSERT INTO commissary_stock_receipts (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
@@ -503,6 +515,14 @@ test('carried beginning across uncounted days: daysCovered accumulates, beginnin
   assert.strictEqual(uncountedDay.beginningCarried, true);
   assert.strictEqual(uncountedDay.daysCovered, 2, 'Sept 29 (1) + Sept 30 (2)');
 
+  // Step 26a-ii: October is blocked until it has an opening. The October
+  // recount is declared on Oct 10 (80); it unblocks all of October, and the
+  // days before it still chain from September. The recount-difference test
+  // below reads that same opening.
+  assert.strictEqual(computeCommissaryMeatAudit(db, carryMeatId, '2026-10-03').status, 'MISSING_PERIOD_OPENING');
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(carryMeatId, '2026-10-10', 80);
+
   db.prepare('INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
     .run(carryMeatId, '2026-10-03', 90);
   const result = computeCommissaryMeatAudit(db, carryMeatId, '2026-10-03');
@@ -524,9 +544,7 @@ test('a LOSS adjustment dated on a carried day is still picked up by the count d
 });
 
 test('recount difference (option A): a declared opening on a date with a prior chain adds the difference into that day\'s Over/Short', () => {
-  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
-    .run(carryMeatId, '2026-10-10', 80);
-
+  // The Oct 10 opening (80) was declared in the carry test above.
   const beforeCount = computeCommissaryMeatAudit(db, carryMeatId, '2026-10-10');
   assert.strictEqual(beforeCount.beginning, 80);
   assert.strictEqual(beforeCount.recountDifference, 7, 'priorEnding (87) - opening (80) = 7');
@@ -555,6 +573,10 @@ test('a declared opening with NO prior chain (onboarding): recountDifference is 
 });
 
 test('MISSING_BEGINNING_STOCK reports daysCovered/beginningCarried/recountDifference as null/false/null', () => {
+  // Step 26a-ii: only reachable once the month has an opening dated later
+  // than this day (no opening at all is MISSING_PERIOD_OPENING instead).
+  db.prepare('INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (?, ?, ?)')
+    .run(bellyId, '2026-09-25', 10);
   const result = computeCommissaryMeatAudit(db, bellyId, '2026-09-20');
   assert.strictEqual(result.status, 'MISSING_BEGINNING_STOCK');
   assert.strictEqual(result.daysCovered, null);

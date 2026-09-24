@@ -10,7 +10,7 @@
 
 const { DatabaseSync } = require('node:sqlite');
 const assert = require('assert');
-const { migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateOpeningStockDateScoped } = require('./migrate.js');
+const { migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns } = require('./migrate.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -523,6 +523,78 @@ test('running the migration twice is idempotent - no data loss, second run is a 
   assert.strictEqual(secondResult.commissaryOpeningStock.ran, false);
   const count = db.prepare(`SELECT COUNT(*) AS n FROM opening_stock`).get().n;
   assert.strictEqual(count, 1);
+});
+
+console.log('\nMigration Tests: migrateMonthStartRecountColumns (step 26a-ii)\n');
+
+// The post-26a shapes of the four tables, without step 26a-ii's columns -
+// what an existing local inventory.db has before this migration runs.
+function makePreRecountDb() {
+  const db = new DatabaseSync(':memory:');
+  db.exec(`
+    CREATE TABLE meats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, restaurant_id INTEGER NOT NULL, meat_code TEXT NOT NULL,
+      name TEXT NOT NULL, unit TEXT NOT NULL, cost_per_unit REAL, active INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE commissary_meats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, commissary_id INTEGER NOT NULL, code TEXT NOT NULL,
+      name TEXT NOT NULL, unit TEXT NOT NULL, allowed_leeway_pct REAL NOT NULL, cost_per_unit REAL,
+      meat_type_id INTEGER, active INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE opening_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, restaurant_id INTEGER NOT NULL, meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL, quantity REAL NOT NULL, UNIQUE (restaurant_id, meat_id, business_date)
+    );
+    CREATE TABLE commissary_opening_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, commissary_meat_id INTEGER NOT NULL,
+      business_date TEXT NOT NULL, quantity REAL NOT NULL, UNIQUE (commissary_meat_id, business_date)
+    );
+  `);
+  db.prepare(`INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (1, 'M01', 'Pork Belly', 'kg')`).run();
+  db.prepare(`INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (1, 'C01', 'Whole Pig', 'kg', 0.1)`).run();
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity) VALUES (1, 1, '2026-09-01', 10)`).run();
+  db.prepare(`INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity) VALUES (1, '2026-09-01', 20)`).run();
+  return db;
+}
+
+test('fresh install (none of the four tables yet) is a no-op', () => {
+  const db = new DatabaseSync(':memory:');
+  assert.deepStrictEqual(migrateMonthStartRecountColumns(db).added, []);
+});
+
+test('adds all four columns to an existing database, keeping every row', () => {
+  const db = makePreRecountDb();
+  const result = migrateMonthStartRecountColumns(db);
+  assert.deepStrictEqual(result.added.sort(), [
+    'commissary_meats.recount_required', 'commissary_opening_stock.opening_source',
+    'meats.recount_required', 'opening_stock.opening_source'
+  ]);
+  assert.strictEqual(db.prepare(`SELECT recount_required FROM meats`).get().recount_required, 0, 'existing meats default to not required');
+  assert.strictEqual(db.prepare(`SELECT recount_required FROM commissary_meats`).get().recount_required, 0);
+  assert.strictEqual(db.prepare(`SELECT opening_source FROM opening_stock`).get().opening_source, null, 'openings from before this step are NULL');
+  assert.strictEqual(db.prepare(`SELECT quantity FROM commissary_opening_stock`).get().quantity, 20);
+});
+
+test('opening_source admits RECOUNT/COPY/NULL and rejects anything else', () => {
+  const db = makePreRecountDb();
+  migrateMonthStartRecountColumns(db);
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity, opening_source) VALUES (1, 1, '2026-10-01', 5, 'COPY')`).run();
+  db.prepare(`INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity, opening_source) VALUES (1, '2026-10-02', 5, 'RECOUNT')`).run();
+  assert.throws(() => db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity, opening_source) VALUES (1, 1, '2026-11-01', 5, 'GUESS')`).run(), /CHECK/);
+});
+
+test('running the migration twice is idempotent - the second run adds nothing', () => {
+  const db = makePreRecountDb();
+  migrateMonthStartRecountColumns(db);
+  assert.deepStrictEqual(migrateMonthStartRecountColumns(db).added, []);
+});
+
+test('runs cleanly after migrateOpeningStockDateScoped rebuilds a pre-26a opening table', () => {
+  const db = makePreOpeningStockDb();
+  migrateOpeningStockDateScoped(db);
+  const result = migrateMonthStartRecountColumns(db);
+  assert.ok(result.added.includes('opening_stock.opening_source'));
+  assert.ok(result.added.includes('commissary_opening_stock.opening_source'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

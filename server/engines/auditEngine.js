@@ -28,6 +28,10 @@ function addDays(dateStr, days) {
 // MISSING_BEGINNING_STOCK) instead of looping toward the epoch.
 const MAX_CARRY_WALK = 3660; // ~10 years of days
 
+// Step 26a-ii: the month-start block. monthOpening.js has its own date
+// math and never requires this file, so there is no circular require.
+const { isBlocked } = require('./monthOpening.js');
+
 /**
  * Finds the nearest anchor on or before `date` - 1: a date with either an
  * ending_actual (a physical count - that day's own newStock/usage are
@@ -109,7 +113,7 @@ function resolvePriorChain(db, restaurantId, meatId, date) {
  */
 function getBeginningStock(db, restaurantId, meatId, businessDate) {
   const declared = db.prepare(
-    `SELECT quantity FROM opening_stock WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
+    `SELECT quantity, opening_source FROM opening_stock WHERE restaurant_id = ? AND meat_id = ? AND business_date = ?`
   ).get(restaurantId, meatId, businessDate);
 
   if (declared) {
@@ -118,16 +122,18 @@ function getBeginningStock(db, restaurantId, meatId, businessDate) {
       value: declared.quantity,
       carried: false,
       daysCovered: priorChain ? priorChain.daysCovered : 1,
-      recountDifference: priorChain ? (priorChain.value - declared.quantity) : null
+      recountDifference: priorChain ? (priorChain.value - declared.quantity) : null,
+      // Step 26a-ii: RECOUNT/COPY, or null for an opening from before it.
+      openingSource: declared.opening_source
     };
   }
 
   const chain = resolvePriorChain(db, restaurantId, meatId, businessDate);
   if (!chain) {
-    return { value: null, carried: false, daysCovered: null, recountDifference: null };
+    return { value: null, carried: false, daysCovered: null, recountDifference: null, openingSource: null };
   }
 
-  return { value: chain.value, carried: chain.carried, daysCovered: chain.daysCovered, recountDifference: null };
+  return { value: chain.value, carried: chain.carried, daysCovered: chain.daysCovered, recountDifference: null, openingSource: null };
 }
 
 /**
@@ -224,19 +230,39 @@ function getEndingActual(db, restaurantId, meatId, businessDate) {
  * figure that reflects the covered window and any recount difference.
  */
 function computeMeatAudit(db, restaurantId, meatId, businessDate) {
-  const beginningInfo = getBeginningStock(db, restaurantId, meatId, businessDate);
-  const { value: beginning, carried: beginningCarried, daysCovered, recountDifference } = beginningInfo;
   const newStock = getNewStock(db, restaurantId, meatId, businessDate);
   const usage = getUsage(db, restaurantId, meatId, businessDate);
   const adjustments = getAdjustmentsTotal(db, restaurantId, meatId, businessDate);
   const actual = getEndingActual(db, restaurantId, meatId, businessDate);
+
+  // Step 26a-ii ("The block"): no declared opening anywhere in this date's
+  // calendar month -> every day of the month is blocked, computed fields
+  // null. Checked first, so a blocked day never reports a figure. The
+  // block is a status on the requested date only: getBeginningStock's
+  // backward walk is unchanged, so days before a mid-month opening still
+  // chain from the previous month (26a rules). `actual` is nulled too, so a
+  // stored ending on a blocked day can't leak a balance into the Dashboard
+  // rollup - the row isn't deleted and reappears once the month has an
+  // opening.
+  if (isBlocked(db, 'restaurant', restaurantId, meatId, businessDate)) {
+    return {
+      beginning: null, newStock, usage, adjustments, actual: null,
+      endingCalculated: null, variance: null, expectedEnding: null, unexplainedVariance: null,
+      status: 'MISSING_PERIOD_OPENING',
+      daysCovered: null, beginningCarried: false, recountDifference: null, windowAdjustments: null,
+      openingSource: null
+    };
+  }
+
+  const beginningInfo = getBeginningStock(db, restaurantId, meatId, businessDate);
+  const { value: beginning, carried: beginningCarried, daysCovered, recountDifference, openingSource } = beginningInfo;
 
   if (beginning === null) {
     return {
       beginning: null, newStock, usage, adjustments, actual,
       endingCalculated: null, variance: null, expectedEnding: null, unexplainedVariance: null,
       status: 'MISSING_BEGINNING_STOCK',
-      daysCovered, beginningCarried, recountDifference, windowAdjustments: null
+      daysCovered, beginningCarried, recountDifference, windowAdjustments: null, openingSource
     };
   }
 
@@ -249,7 +275,7 @@ function computeMeatAudit(db, restaurantId, meatId, businessDate) {
       beginning, newStock, usage, adjustments, actual: null,
       endingCalculated, expectedEnding, variance: null, unexplainedVariance: null,
       status: 'MISSING_ACTUAL_COUNT',
-      daysCovered, beginningCarried, recountDifference, windowAdjustments
+      daysCovered, beginningCarried, recountDifference, windowAdjustments, openingSource
     };
   }
 
@@ -265,7 +291,7 @@ function computeMeatAudit(db, restaurantId, meatId, businessDate) {
   return {
     beginning, newStock, usage, adjustments, actual,
     endingCalculated, expectedEnding, variance, unexplainedVariance, status,
-    daysCovered, beginningCarried, recountDifference, windowAdjustments
+    daysCovered, beginningCarried, recountDifference, windowAdjustments, openingSource
   };
 }
 

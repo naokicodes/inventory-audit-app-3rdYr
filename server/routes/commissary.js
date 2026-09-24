@@ -12,6 +12,7 @@ const db = require('../db/connection.js');
 const { computeYieldRow } = require('../engines/commissaryYieldEngine.js');
 const { computeCommissaryDailyAudit } = require('../engines/commissaryAuditEngine.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
+const { isIsoDate, isBlocked, getMonthOpeningStatus, recordRecount, copyAll } = require('../engines/monthOpening.js');
 
 const router = express.Router();
 
@@ -155,7 +156,7 @@ router.get('/commissary/daily-audit', (req, res) => {
 });
 
 // POST /api/commissary/daily-audit
-// Body: { commissary_id, business_date, actor?, rows: [{ commissary_meat_id, opening_stock, ending_actual, notes }] }
+// Body: { commissary_id, business_date, actor?, rows: [{ commissary_meat_id, ending_actual, notes }] }
 // Step 25b (session-status.md): the write side of GET /commissary/daily-audit
 // above, mirroring POST /api/daily-audit (dailyAudit.js) closely - same
 // "only write fields actually provided" convention (null/undefined/'' means
@@ -165,15 +166,14 @@ router.get('/commissary/daily-audit', (req, res) => {
 // already identifies its own commissary via commissary_meats.commissary_id)
 // - it is validated as present, never written.
 //
-// The two tables get deliberately different treatment, exactly like their
-// restaurant-side twins:
-// - commissary_opening_stock: INSERT OR IGNORE. Step 26a (session-
-//   status.md) gave UNIQUE(commissary_meat_id, business_date) a date in
-//   the key - a declared opening is now write-once PER DATE, not once
-//   ever for the meat's whole lifetime (that was finding 3/4). A later
-//   attempt for the SAME date is silently a no-op; a different date is a
-//   genuine new declared opening. See PATCH /commissary/opening-stock
-//   below for CORRECTING an already-declared value.
+// Step 26a-ii (session-status.md, "The block"): commissary_opening_stock is
+// no longer written here - the Month opening panel (POST
+// /commissary/month-opening and .../copy-all below) is the single way to
+// declare an opening. A commissary meat with no opening dated in
+// business_date's month is blocked: a row carrying a non-empty
+// ending_actual for it is refused and its id returned in `refused`; every
+// other row is saved normally (the page posts every row on every save).
+//
 // - commissary_ending_actual: real upsert, ON CONFLICT (commissary_meat_id,
 //   business_date) DO UPDATE - a physical count is per-day and corrigible,
 //   so a same-day recount overwrites rather than duplicating or failing.
@@ -191,11 +191,6 @@ router.post('/commissary/daily-audit', (req, res) => {
     return res.status(400).json({ error: 'commissary_id, business_date, and rows[] are required' });
   }
 
-  const insertOpeningStock = db.prepare(`
-    INSERT OR IGNORE INTO commissary_opening_stock (commissary_meat_id, business_date, quantity)
-    VALUES (?, ?, ?)
-  `);
-
   const upsertEndingActual = db.prepare(`
     INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity, notes, created_by)
     VALUES (?, ?, ?, ?, ?)
@@ -203,17 +198,60 @@ router.post('/commissary/daily-audit', (req, res) => {
   `);
 
   let saved = 0;
+  const refused = [];
   for (const row of rows) {
-    if (row.opening_stock !== null && row.opening_stock !== undefined && row.opening_stock !== '') {
-      insertOpeningStock.run(row.commissary_meat_id, business_date, Number(row.opening_stock));
-    }
     if (row.ending_actual !== null && row.ending_actual !== undefined && row.ending_actual !== '') {
+      if (isBlocked(db, 'commissary', null, row.commissary_meat_id, business_date)) {
+        refused.push(row.commissary_meat_id);
+        continue;
+      }
       upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), row.notes || null, actor || null);
     }
     saved++;
   }
 
-  res.json({ ok: true, saved });
+  res.json({ ok: true, saved, refused });
+});
+
+// GET /api/commissary/month-opening?commissary_id=1&date=2026-10-02
+// Step 26a-ii: the commissary Month opening panel's data - the twin of
+// GET /daily-audit/month-opening, through the same shared
+// server/engines/monthOpening.js.
+router.get('/commissary/month-opening', (req, res) => {
+  const commissaryId = Number(req.query.commissary_id);
+  const date = req.query.date;
+  if (!commissaryId || !isIsoDate(date)) {
+    return res.status(400).json({ error: 'commissary_id and date (YYYY-MM-DD) are required' });
+  }
+  res.json(getMonthOpeningStatus(db, 'commissary', commissaryId, date));
+});
+
+// POST /api/commissary/month-opening
+// Body: { commissary_id, commissary_meat_id, business_date, quantity }
+// Step 26a-ii: records a RECOUNT opening dated business_date. Twin of POST
+// /daily-audit/month-opening - 409 when the meat already has an opening
+// this month (correct it through PATCH /commissary/opening-stock).
+router.post('/commissary/month-opening', (req, res) => {
+  const { commissary_id, commissary_meat_id, business_date, quantity } = req.body || {};
+  if (!commissary_id || !commissary_meat_id || !isIsoDate(business_date)) {
+    return res.status(400).json({ error: 'commissary_id, commissary_meat_id, and business_date (YYYY-MM-DD) are required' });
+  }
+  const result = recordRecount(db, 'commissary', Number(commissary_id), Number(commissary_meat_id), business_date, quantity);
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.json({ ok: true });
+});
+
+// POST /api/commissary/month-opening/copy-all
+// Body: { commissary_id, business_date }
+// Step 26a-ii: Copy all for one commissary - twin of POST
+// /daily-audit/month-opening/copy-all.
+router.post('/commissary/month-opening/copy-all', (req, res) => {
+  const { commissary_id, business_date } = req.body || {};
+  if (!commissary_id || !isIsoDate(business_date)) {
+    return res.status(400).json({ error: 'commissary_id and business_date (YYYY-MM-DD) are required' });
+  }
+  const copied = copyAll(db, 'commissary', Number(commissary_id), business_date);
+  res.json({ ok: true, copied });
 });
 
 // PATCH /api/commissary/opening-stock
@@ -224,9 +262,9 @@ router.post('/commissary/daily-audit', (req, res) => {
 // null/undefined/'' clears (deletes) the declared opening; otherwise it
 // overwrites the existing value. Requires a row to already exist for this
 // exact (commissary_meat_id, date) - this corrects a declared opening, it
-// does not create a new one (that's POST /commissary/daily-audit above,
-// which the frontend only offers when beginning is null for the loaded
-// date).
+// does not create a new one (that's POST /commissary/month-opening and
+// .../copy-all above - step 26a-ii). Clearing a meat's only opening in a
+// month blocks that month again; opening_source is left unchanged.
 router.patch('/commissary/opening-stock', (req, res) => {
   const { commissary_meat_id, business_date, quantity } = req.body || {};
 
@@ -244,6 +282,11 @@ router.patch('/commissary/opening-stock', (req, res) => {
   const isClearing = quantity === null || quantity === undefined || quantity === '';
   if (!isClearing && (typeof quantity !== 'number' && isNaN(Number(quantity)))) {
     return res.status(400).json({ error: 'quantity must be a number, or null/omitted to clear the declared opening' });
+  }
+  // Step 26a-ii review: an opening count is never below zero (same guard
+  // as PATCH /daily-audit/opening-stock and recordRecount).
+  if (!isClearing && Number(quantity) < 0) {
+    return res.status(400).json({ error: 'quantity cannot be negative - an opening count is never below zero' });
   }
 
   if (isClearing) {

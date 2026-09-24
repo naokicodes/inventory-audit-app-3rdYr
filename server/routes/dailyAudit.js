@@ -6,6 +6,7 @@ const express = require('express');
 const db = require('../db/connection.js');
 const { computeMeatAudit, computeMixedDailyAudit } = require('../engines/auditEngine.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
+const { isIsoDate, isBlocked, getMonthOpeningStatus, recordRecount, copyAll } = require('../engines/monthOpening.js');
 
 const router = express.Router();
 
@@ -87,6 +88,8 @@ router.get('/daily-audit', (req, res) => {
       beginning_carried: audit.beginningCarried,
       recount_difference: audit.recountDifference,
       window_adjustments: audit.windowAdjustments,
+      // Step 26a-ii: RECOUNT/COPY on the opening's own day, else null.
+      opening_source: audit.openingSource,
       remarks: inputs.remarks
     };
   });
@@ -127,7 +130,7 @@ router.get('/daily-audit/mixed', (req, res) => {
 });
 
 // POST /api/daily-audit
-// Body: { restaurant_id, business_date, rows: [{ meat_id, ending_actual, remarks, opening_stock }] }
+// Body: { restaurant_id, business_date, rows: [{ meat_id, ending_actual, remarks }] }
 // Routes each field to its correct table. Only writes fields that were
 // actually provided (not null/empty) - leaves everything else untouched.
 // Note: new_stock is no longer accepted here - it's entered on the Stock
@@ -137,30 +140,20 @@ router.get('/daily-audit/mixed', (req, res) => {
 // Allocations page (server/routes/allocations.js) instead of Landing's
 // old three hardcoded per-type boxes.
 //
-// opening_stock (step 26a, session-status.md): a declared balance for
-// (restaurant, meat, business_date) - write-once PER DATE, not per meat
-// for its whole lifetime (that was the pre-26a bug, finding 3/4). The
-// frontend only ever offers this input when beginning is null for the
-// loaded date (see auditEngine.js's getBeginningStock), so a normal save
-// only ever attempts one date at a time; `INSERT OR IGNORE` against
-// opening_stock's UNIQUE(restaurant_id, meat_id, business_date) makes
-// that a DB-level fact too - a stale client resubmitting the same date's
-// value is silently a no-op, never a second write or an error. Declaring
-// a NEW date's opening (a recount, a new month) writes a fresh row - see
-// PATCH /daily-audit/opening-stock below for CORRECTING an already-
-// declared value on the same date. Deliberately not run through
-// activity_log per rule 9 - that logging is scoped to stock_receipts and
-// commissary_yield_log only, not silently extended to every input table.
+// Step 26a-ii (session-status.md, "The block"): opening_stock is no longer
+// accepted here - the Month opening panel (POST /daily-audit/month-opening
+// and .../copy-all below) is the single way to declare an opening, so every
+// new opening carries its RECOUNT/COPY source. And a meat with no opening
+// dated in business_date's month is blocked: a row carrying a non-empty
+// ending_actual for it is refused (not written) and its meat_id returned in
+// `refused`. The page posts every row on every save (the 25d-ii lesson), so
+// only rows that actually carry an ending are refused - the other rows,
+// blocked or not, are saved normally and the request still succeeds.
 router.post('/daily-audit', (req, res) => {
   const { restaurant_id, business_date, rows } = req.body;
   if (!restaurant_id || !business_date || !Array.isArray(rows)) {
     return res.status(400).json({ error: 'restaurant_id, business_date, and rows[] are required' });
   }
-
-  const insertOpeningStock = db.prepare(`
-    INSERT OR IGNORE INTO opening_stock (restaurant_id, meat_id, business_date, quantity)
-    VALUES (?, ?, ?, ?)
-  `);
 
   const upsertEndingActual = db.prepare(`
     INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity, notes)
@@ -169,17 +162,66 @@ router.post('/daily-audit', (req, res) => {
   `);
 
   let saved = 0;
+  const refused = [];
   for (const row of rows) {
-    if (row.opening_stock !== null && row.opening_stock !== undefined && row.opening_stock !== '') {
-      insertOpeningStock.run(restaurant_id, row.meat_id, business_date, Number(row.opening_stock));
-    }
     if (row.ending_actual !== null && row.ending_actual !== undefined && row.ending_actual !== '') {
+      if (isBlocked(db, 'restaurant', restaurant_id, row.meat_id, business_date)) {
+        refused.push(row.meat_id);
+        continue;
+      }
       upsertEndingActual.run(restaurant_id, row.meat_id, business_date, Number(row.ending_actual), row.remarks || null);
     }
     saved++;
   }
 
-  res.json({ ok: true, saved });
+  res.json({ ok: true, saved, refused });
+});
+
+// GET /api/daily-audit/month-opening?restaurant_id=1&date=2026-10-02
+// Step 26a-ii: the Month opening panel's data for the month containing
+// `date` - one row per active meat with its opening in that month (null =
+// blocked), must-count/copyable, reason tags, and the copy quantity. See
+// server/engines/monthOpening.js, shared with the commissary route and the
+// planned Terminal shortcut.
+router.get('/daily-audit/month-opening', (req, res) => {
+  const restaurantId = Number(req.query.restaurant_id);
+  const date = req.query.date;
+  if (!restaurantId || !isIsoDate(date)) {
+    return res.status(400).json({ error: 'restaurant_id and date (YYYY-MM-DD) are required' });
+  }
+  res.json(getMonthOpeningStatus(db, 'restaurant', restaurantId, date));
+});
+
+// POST /api/daily-audit/month-opening
+// Body: { restaurant_id, meat_id, business_date, quantity }
+// Step 26a-ii: records a RECOUNT opening dated business_date (the page's
+// selected date - the day the recount happens). Only for a meat with no
+// opening in that month yet (409 otherwise - correct an entered opening
+// through PATCH /daily-audit/opening-stock). Not activity_log-scoped, same
+// rule-9 reasoning as every other opening_stock write.
+router.post('/daily-audit/month-opening', (req, res) => {
+  const { restaurant_id, meat_id, business_date, quantity } = req.body || {};
+  if (!restaurant_id || !meat_id || !isIsoDate(business_date)) {
+    return res.status(400).json({ error: 'restaurant_id, meat_id, and business_date (YYYY-MM-DD) are required' });
+  }
+  const result = recordRecount(db, 'restaurant', Number(restaurant_id), Number(meat_id), business_date, quantity);
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.json({ ok: true });
+});
+
+// POST /api/daily-audit/month-opening/copy-all
+// Body: { restaurant_id, business_date }
+// Step 26a-ii: Copy all - every copyable meat with no opening in
+// business_date's month gets an opening dated the 1st, quantity = last
+// month's final real count, source COPY. Must-count meats are never
+// copied. Returns the meat ids copied; repeating it is a no-op.
+router.post('/daily-audit/month-opening/copy-all', (req, res) => {
+  const { restaurant_id, business_date } = req.body || {};
+  if (!restaurant_id || !isIsoDate(business_date)) {
+    return res.status(400).json({ error: 'restaurant_id and business_date (YYYY-MM-DD) are required' });
+  }
+  const copied = copyAll(db, 'restaurant', Number(restaurant_id), business_date);
+  res.json({ ok: true, copied });
 });
 
 // POST /api/daily-audit/portions
@@ -283,9 +325,10 @@ router.post('/daily-audit/portions', (req, res) => {
 // clears (deletes) the declared opening for this date; otherwise it
 // overwrites the existing value. Both require a row to already exist for
 // this exact (restaurant, meat, date) - this route corrects a declared
-// opening, it does not create a new one (that's POST /daily-audit, which
-// the frontend only offers when beginning is null for the loaded date -
-// see session-status.md "Also required").
+// opening, it does not create a new one (that's POST /daily-audit/month-
+// opening and .../copy-all above - step 26a-ii). Clearing a meat's only
+// opening in a month blocks that month again. opening_source is left as it
+// was - an edit corrects the number, not how the opening was entered.
 router.patch('/daily-audit/opening-stock', (req, res) => {
   const { restaurant_id, meat_id, business_date, quantity } = req.body || {};
 
@@ -303,6 +346,10 @@ router.patch('/daily-audit/opening-stock', (req, res) => {
   const isClearing = quantity === null || quantity === undefined || quantity === '';
   if (!isClearing && (typeof quantity !== 'number' && isNaN(Number(quantity)))) {
     return res.status(400).json({ error: 'quantity must be a number, or null/omitted to clear the declared opening' });
+  }
+  // Step 26a-ii review: an opening count is never below zero.
+  if (!isClearing && Number(quantity) < 0) {
+    return res.status(400).json({ error: 'quantity cannot be negative - an opening count is never below zero' });
   }
 
   if (isClearing) {

@@ -49,63 +49,110 @@ db.prepare(`INSERT INTO dishes (id, restaurant_id, dish_code, name, prep_type) V
 db.prepare(`INSERT INTO dishes (id, restaurant_id, dish_code, name, prep_type) VALUES (2, 1, 'D02', 'Chicken Skewers', 'BATCH_PREPPED')`).run();
 db.prepare(`INSERT INTO dishes (id, restaurant_id, dish_code, name, prep_type) VALUES (3, 1, 'D03', 'Beef Tapa', 'BATCH_PREPPED')`).run();
 
-const insertOpeningStock = db.prepare(`
-  INSERT OR IGNORE INTO opening_stock (restaurant_id, meat_id, business_date, quantity)
-  VALUES (?, ?, ?, ?)
-`);
+// Step 26a-ii: openings are declared through the Month opening panel's
+// shared code path (server/engines/monthOpening.js), called directly here -
+// the real function, not a mirror. POST /api/daily-audit no longer accepts
+// opening_stock at all.
+const { recordRecount, copyAll, isBlocked } = require('../engines/monthOpening.js');
 
-// Mirrors the opening_stock branch of POST /api/daily-audit's row loop.
-function saveOpeningStock(restaurantId, businessDate, rows) {
+// Mirrors POST /api/daily-audit (step 26a-ii shape): ending_actual only, and
+// a row carrying a non-empty ending for a month-blocked meat is refused,
+// not written, while every other row is saved.
+const upsertEndingActual = db.prepare(`
+  INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity, notes)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(restaurant_id, meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes
+`);
+function postDailyAudit(restaurantId, businessDate, rows) {
+  let saved = 0;
+  const refused = [];
   for (const row of rows) {
-    if (row.opening_stock !== null && row.opening_stock !== undefined && row.opening_stock !== '') {
-      insertOpeningStock.run(restaurantId, row.meat_id, businessDate, Number(row.opening_stock));
+    if (row.ending_actual !== null && row.ending_actual !== undefined && row.ending_actual !== '') {
+      if (isBlocked(db, 'restaurant', restaurantId, row.meat_id, businessDate)) {
+        refused.push(row.meat_id);
+        continue;
+      }
+      upsertEndingActual.run(restaurantId, row.meat_id, businessDate, Number(row.ending_actual), row.remarks || null);
     }
+    saved++;
   }
+  return { ok: true, saved, refused };
 }
 
 test('Before any write, beginning stock is null (nothing to carry forward, no opening count yet)', () => {
   assert.strictEqual(getBeginningStock(db, 1, 1, '2026-08-29').value, null);
 });
 
-test('A provided opening_stock value is written and becomes the beginning stock', () => {
-  saveOpeningStock(1, '2026-08-29', [{ meat_id: 1, opening_stock: '12.5' }]);
+test('A recount opening is written with source RECOUNT and becomes the beginning stock', () => {
+  const r = recordRecount(db, 'restaurant', 1, 1, '2026-08-29', '12.5');
+  assert.strictEqual(r.ok, true);
   assert.strictEqual(getBeginningStock(db, 1, 1, '2026-08-29').value, 12.5);
+  const row = db.prepare(`SELECT opening_source FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 1 AND business_date = '2026-08-29'`).get();
+  assert.strictEqual(row.opening_source, 'RECOUNT');
 });
 
-test('A second write for the SAME date is silently ignored (write-once per date, step 26a)', () => {
-  saveOpeningStock(1, '2026-08-29', [{ meat_id: 1, opening_stock: '999' }]);
-  assert.strictEqual(getBeginningStock(db, 1, 1, '2026-08-29').value, 12.5, 'must still be the original value, not overwritten');
-  const rows = db.prepare(`SELECT COUNT(*) as c FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 1 AND business_date = '2026-08-29'`).get();
-  assert.strictEqual(rows.c, 1, 'must still be exactly one row for this date');
+test('A second recount in the SAME month is refused (409), not an overwrite or a second opening', () => {
+  const r = recordRecount(db, 'restaurant', 1, 1, '2026-08-30', '999');
+  assert.strictEqual(r.status, 409);
+  assert.strictEqual(getBeginningStock(db, 1, 1, '2026-08-29').value, 12.5, 'must still be the original value');
+  const rows = db.prepare(`SELECT COUNT(*) as c FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 1`).get();
+  assert.strictEqual(rows.c, 1);
 });
 
-test('A declared opening on a DIFFERENT date for the same meat is a genuine new write, not silently ignored (step 26a fix)', () => {
-  saveOpeningStock(1, '2026-09-01', [{ meat_id: 1, opening_stock: '40' }]);
-  assert.strictEqual(getBeginningStock(db, 1, 1, '2026-09-01').value, 40, 'a declared opening on a later date must take effect, not be silently ignored - this was finding 4');
+test('A recount in a DIFFERENT month for the same meat is a genuine new opening (step 26a: date-scoped)', () => {
+  const r = recordRecount(db, 'restaurant', 1, 1, '2026-09-01', '40');
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(getBeginningStock(db, 1, 1, '2026-09-01').value, 40);
   const rows = db.prepare(`SELECT COUNT(*) as c FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 1`).get();
   assert.strictEqual(rows.c, 2, 'meat 1 must now have two declared openings - 08-29 and 09-01');
 });
 
-test('Rows with no opening_stock field (undefined/null/empty) write nothing', () => {
-  saveOpeningStock(1, '2026-08-29', [
-    { meat_id: 2 },
-    { meat_id: 2, opening_stock: null },
-    { meat_id: 2, opening_stock: '' }
-  ]);
+test('recordRecount rejects a blank or non-numeric quantity (400) and an unknown meat (404), writing nothing', () => {
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 2, '2026-08-29', '').status, 400);
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 2, '2026-08-29', 'abc').status, 400);
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 999, '2026-08-29', '5').status, 404);
   const row = db.prepare(`SELECT * FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 2`).get();
   assert.strictEqual(row, undefined);
-  assert.strictEqual(getBeginningStock(db, 1, 2, '2026-08-29').value, null);
 });
 
-test('opening_stock is per (restaurant, meat) - writing meat 2 does not touch meat 1', () => {
-  saveOpeningStock(1, '2026-08-29', [{ meat_id: 2, opening_stock: '3' }]);
-  assert.strictEqual(getBeginningStock(db, 1, 2, '2026-08-29').value, 3);
-  assert.strictEqual(getBeginningStock(db, 1, 1, '2026-08-29').value, 12.5, 'meat 1 unaffected');
+test('POST /daily-audit no longer writes an opening_stock field, even if a stale page sends one', () => {
+  postDailyAudit(1, '2026-08-29', [{ meat_id: 2, opening_stock: '3' }]);
+  const row = db.prepare(`SELECT * FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 2`).get();
+  assert.strictEqual(row, undefined);
 });
 
-test('Once ending_actual exists for a day, beginning for the next day comes from THAT, not opening_stock (opening_stock is only the fallback)', () => {
-  db.prepare(`INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity) VALUES (1, 2, '2026-08-29', 7)`).run();
+test('POST /daily-audit refuses an ending for a month-blocked meat and saves the other rows (every row is posted on every save)', () => {
+  // Meat 1 has an August opening; meat 2 has none -> blocked all August.
+  const r = postDailyAudit(1, '2026-08-29', [
+    { meat_id: 1, ending_actual: '11', remarks: 'counted' },
+    { meat_id: 2, ending_actual: '7' }
+  ]);
+  assert.deepStrictEqual(r.refused, [2]);
+  assert.strictEqual(r.saved, 1);
+  assert.strictEqual(db.prepare(`SELECT quantity FROM ending_actual WHERE meat_id = 1 AND business_date = '2026-08-29'`).get().quantity, 11);
+  assert.strictEqual(db.prepare(`SELECT * FROM ending_actual WHERE meat_id = 2 AND business_date = '2026-08-29'`).get(), undefined);
+});
+
+test('a blocked meat posted with a BLANK ending is not refused - only rows carrying a count are', () => {
+  const r = postDailyAudit(1, '2026-08-29', [{ meat_id: 2, ending_actual: '' }, { meat_id: 2 }]);
+  assert.deepStrictEqual(r.refused, []);
+  assert.strictEqual(r.saved, 2);
+});
+
+test('once the blocked meat gets an opening in the month, its ending saves, and the next day carries from it', () => {
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 2, '2026-08-29', '3').ok, true);
+  const r = postDailyAudit(1, '2026-08-29', [{ meat_id: 2, ending_actual: '7' }]);
+  assert.deepStrictEqual(r.refused, []);
   assert.strictEqual(getBeginningStock(db, 1, 2, '2026-08-30').value, 7);
+});
+
+test('copyAll through the same shared path: a meat counted on the last day of last month is copied to the 1st', () => {
+  // Meat 2's last August count is on Aug 31 -> copyable for September.
+  postDailyAudit(1, '2026-08-31', [{ meat_id: 2, ending_actual: '6' }]);
+  const copied = copyAll(db, 'restaurant', 1, '2026-09-14');
+  assert.deepStrictEqual(copied, [2], 'meat 1 already has a September opening, so only meat 2');
+  const row = db.prepare(`SELECT business_date, quantity, opening_source FROM opening_stock WHERE meat_id = 2 AND business_date LIKE '2026-09-%'`).get();
+  assert.deepStrictEqual({ ...row }, { business_date: '2026-09-01', quantity: 6, opening_source: 'COPY' });
 });
 
 // Mirrors POST /api/daily-audit/portions
@@ -300,6 +347,9 @@ function patchOpeningStock(restaurantId, meatId, businessDate, quantity) {
   if (!isClearing && (typeof quantity !== 'number' && isNaN(Number(quantity)))) {
     return { status: 400, body: { error: 'quantity must be a number, or null/omitted to clear the declared opening' } };
   }
+  if (!isClearing && Number(quantity) < 0) {
+    return { status: 400, body: { error: 'quantity cannot be negative - an opening count is never below zero' } };
+  }
 
   if (isClearing) {
     db.prepare(`DELETE FROM opening_stock WHERE id = ?`).run(existing.id);
@@ -310,29 +360,43 @@ function patchOpeningStock(restaurantId, meatId, businessDate, quantity) {
   return { status: 200, body: { ok: true, cleared: false, quantity: Number(quantity) } };
 }
 
-test('PATCH opening-stock: correcting an already-declared value overwrites it, one row', () => {
-  saveOpeningStock(1, '2026-09-10', [{ meat_id: 2, opening_stock: '20' }]);
-  const result = patchOpeningStock(1, 2, '2026-09-10', 35);
+// Meat 4: its own fixture, with no September opening before these tests.
+db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (4, 1, 'M04', 'PATCH Test Meat', 'kg')`).run();
+
+test('PATCH opening-stock: correcting an already-declared value overwrites it, one row, source unchanged', () => {
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 4, '2026-09-10', '20').ok, true);
+  const result = patchOpeningStock(1, 4, '2026-09-10', 35);
   assert.strictEqual(result.status, 200);
   assert.strictEqual(result.body.quantity, 35);
-  assert.strictEqual(getBeginningStock(db, 1, 2, '2026-09-10').value, 35);
-  const count = db.prepare(`SELECT COUNT(*) as c FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 2 AND business_date = '2026-09-10'`).get();
-  assert.strictEqual(count.c, 1);
+  assert.strictEqual(getBeginningStock(db, 1, 4, '2026-09-10').value, 35);
+  const rows = db.prepare(`SELECT * FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 4 AND business_date = '2026-09-10'`).all();
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].opening_source, 'RECOUNT', 'an edit corrects the number, not how the opening was entered');
 });
 
-test('PATCH opening-stock: quantity null clears (deletes) the declared opening', () => {
-  const result = patchOpeningStock(1, 2, '2026-09-10', null);
+test('PATCH opening-stock: quantity null clears (deletes) the declared opening, and clearing the month\'s only opening blocks it again (26a-ii)', () => {
+  assert.strictEqual(isBlocked(db, 'restaurant', 1, 4, '2026-09-20'), false);
+  const result = patchOpeningStock(1, 4, '2026-09-10', null);
   assert.strictEqual(result.status, 200);
   assert.strictEqual(result.body.cleared, true);
-  const row = db.prepare(`SELECT * FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 2 AND business_date = '2026-09-10'`).get();
+  const row = db.prepare(`SELECT * FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 4 AND business_date = '2026-09-10'`).get();
   assert.strictEqual(row, undefined);
+  assert.strictEqual(isBlocked(db, 'restaurant', 1, 4, '2026-09-20'), true);
 });
 
 test('PATCH opening-stock: correcting a date with no declared opening at all is a 404, not a silent create', () => {
-  const result = patchOpeningStock(1, 2, '2026-09-11', 50);
+  const result = patchOpeningStock(1, 4, '2026-09-11', 50);
   assert.strictEqual(result.status, 404);
-  const row = db.prepare(`SELECT * FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 2 AND business_date = '2026-09-11'`).get();
+  const row = db.prepare(`SELECT * FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 4 AND business_date = '2026-09-11'`).get();
   assert.strictEqual(row, undefined, 'must not have been created as a side effect of the failed correction');
+});
+
+test('PATCH opening-stock: a negative quantity is refused (400) and the declared value is unchanged (26a-ii review)', () => {
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 4, '2026-09-15', 20).ok, true);
+  const result = patchOpeningStock(1, 4, '2026-09-15', -5);
+  assert.strictEqual(result.status, 400);
+  assert.strictEqual(getBeginningStock(db, 1, 4, '2026-09-15').value, 20);
+  assert.strictEqual(patchOpeningStock(1, 4, '2026-09-15', 0).status, 200, 'zero is a real count, not refused');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

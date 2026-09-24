@@ -1107,8 +1107,10 @@ frontend rebuild is still ahead.
 - `server/routes/dashboard.js` — the `hasData` check must treat
   `MISSING_PERIOD_OPENING` like `MISSING_BEGINNING_STOCK` (flagged by the worker
   in issue #6).
-- `server/routes/commands.js` — sync-batch-stock branches on
-  `MISSING_BEGINNING_STOCK`; decide in the same way for the new status.
+- `server/routes/commands.js` — the `MISSING_BEGINNING_STOCK` handling is in
+  oversold-check, which runs on `computeDishAudit` (not sync-batch-stock, as
+  this note first said). `MISSING_PERIOD_OPENING` needs no branch there:
+  dishes have no month opening, so `computeDishAudit` never returns it.
 - Every other caller of `computeMeatAudit` / `computeCommissaryMeatAudit` (grep).
 
 ### The Terminal
