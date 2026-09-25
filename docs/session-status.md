@@ -1125,6 +1125,8 @@ implementations. Pillar 2.
 
 ## Step 26a-iii — explicit recount overwrite
 
+**CLOSED 2026-09-25, PR #9 (`de82714`).**
+
 **Pillar 1 (Core). Lane: DISPATCH only. No schema change.** Decided 2026-09-24
 (NaokiiVT): the recount rule in the PR #8 review conversation, the date rule in
 the 26a/26a-ii conversation.
@@ -1178,6 +1180,8 @@ Copy all; recount one meat on the same day with the same number → its tag read
 different number → that day's Over/Short shows `incl. X recount difference`.
 
 ## Step ui-viewport — viewport meta on every page
+
+**CLOSED 2026-09-25, PR #10 (`4d92634`).**
 
 **Beta-enabling UI (architecture draft 2026-09-24, §6). Lane: DISPATCH only. No
 schema change. Parallel-safe with 26a-iii — no shared files.**

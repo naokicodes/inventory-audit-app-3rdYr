@@ -38,25 +38,9 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 2b. Step 26a-ii — CLOSED 2026-09-24, PR #8 (`769a110`).
 
-### 2c. Step 26a-iii — explicit recount overwrite
-**Lane: DISPATCH only. No schema change.**
+### 2c. Step 26a-iii — CLOSED 2026-09-25, PR #9 (`de82714`).
 
-Touches: `server/engines/monthOpening.js`, `server/engines/monthOpening.test.js`,
-`server/routes/dailyAudit.js`, `server/routes/dailyAudit.test.js`,
-`server/routes/commissary.js`, `server/routes/commissary.test.js`,
-`public/month-opening.js`.
-
-Spec: `session-status.md`, section "Step 26a-iii".
-
-### 2d. Step ui-viewport — viewport meta on every page
-**Lane: DISPATCH only. Parallel-safe with 26a-iii.**
-
-Touches: `public/allocations.html`, `public/commissary-shipments.html`,
-`public/commissary.html`, `public/daily-audit.html`, `public/dashboard.html`,
-`public/history.html`, `public/index.html`, `public/sales.html`,
-`public/settings.html`, `public/stock-receipts.html`, `public/terminal.html`.
-
-Spec: `session-status.md`, section "Step ui-viewport".
+### 2d. Step ui-viewport — CLOSED 2026-09-25, PR #10 (`4d92634`).
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 
