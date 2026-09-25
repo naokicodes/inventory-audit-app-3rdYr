@@ -91,10 +91,10 @@ test('A recount opening is written with source RECOUNT and becomes the beginning
   assert.strictEqual(row.opening_source, 'RECOUNT');
 });
 
-test('A second recount in the SAME month is refused (409), not an overwrite or a second opening', () => {
-  const r = recordRecount(db, 'restaurant', 1, 1, '2026-08-30', '999');
-  assert.strictEqual(r.status, 409);
-  assert.strictEqual(getBeginningStock(db, 1, 1, '2026-08-29').value, 12.5, 'must still be the original value');
+test('A second recount on the SAME date overwrites that opening (step 26a-iii upsert), no second row', () => {
+  const r = recordRecount(db, 'restaurant', 1, 1, '2026-08-29', '12.75');
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(getBeginningStock(db, 1, 1, '2026-08-29').value, 12.75);
   const rows = db.prepare(`SELECT COUNT(*) as c FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 1`).get();
   assert.strictEqual(rows.c, 1);
 });
@@ -397,6 +397,15 @@ test('PATCH opening-stock: a negative quantity is refused (400) and the declared
   assert.strictEqual(result.status, 400);
   assert.strictEqual(getBeginningStock(db, 1, 4, '2026-09-15').value, 20);
   assert.strictEqual(patchOpeningStock(1, 4, '2026-09-15', 0).status, 200, 'zero is a real count, not refused');
+});
+
+test('PATCH opening-stock on a COPY opening corrects the number and keeps COPY; a recount on that date flips it (26a-iii)', () => {
+  db.prepare(`INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity, opening_source) VALUES (1, 4, '2026-10-01', 9, 'COPY')`).run();
+  assert.strictEqual(patchOpeningStock(1, 4, '2026-10-01', 8).status, 200);
+  const source = () => db.prepare(`SELECT opening_source FROM opening_stock WHERE restaurant_id = 1 AND meat_id = 4 AND business_date = '2026-10-01'`).get().opening_source;
+  assert.strictEqual(source(), 'COPY', 'a typo fix on a copy stays COPY');
+  assert.strictEqual(recordRecount(db, 'restaurant', 1, 4, '2026-10-01', 8).ok, true);
+  assert.strictEqual(source(), 'RECOUNT');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

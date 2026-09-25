@@ -195,10 +195,11 @@ router.get('/daily-audit/month-opening', (req, res) => {
 // POST /api/daily-audit/month-opening
 // Body: { restaurant_id, meat_id, business_date, quantity }
 // Step 26a-ii: records a RECOUNT opening dated business_date (the page's
-// selected date - the day the recount happens). Only for a meat with no
-// opening in that month yet (409 otherwise - correct an entered opening
-// through PATCH /daily-audit/opening-stock). Not activity_log-scoped, same
-// rule-9 reasoning as every other opening_stock write.
+// selected date - the day the recount happens). Step 26a-iii: an upsert -
+// an opening already on that date is overwritten as RECOUNT, otherwise a new
+// one is added and any earlier opening in the month stays. A typo fix that
+// keeps the source is PATCH /daily-audit/opening-stock. Not
+// activity_log-scoped, same rule-9 reasoning as every other opening_stock write.
 router.post('/daily-audit/month-opening', (req, res) => {
   const { restaurant_id, meat_id, business_date, quantity } = req.body || {};
   if (!restaurant_id || !meat_id || !isIsoDate(business_date)) {

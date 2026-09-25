@@ -53,8 +53,8 @@ function monthBounds(date) {
 
 /**
  * The earliest declared opening dated inside `date`'s month for one meat,
- * or null. "Any opening dated in M unblocks all of M" - the earliest is the
- * one the panel shows for editing.
+ * or null. "Any opening dated in M unblocks all of M" - so isBlocked needs
+ * only whether one exists; the panel shows findPanelOpening's pick instead.
  */
 function findMonthOpening(db, ledger, ownerId, meatId, date) {
   const L = LEDGERS[ledger];
@@ -64,6 +64,25 @@ function findMonthOpening(db, ledger, ownerId, meatId, date) {
      WHERE ${L.ownerWhere} AND business_date >= ? AND business_date <= ?
      ORDER BY business_date ASC LIMIT 1`
   ).get(...L.ownerParams(ownerId, meatId), start, end) || null;
+}
+
+/**
+ * Step 26a-iii: the opening the Month opening panel shows for one meat - the
+ * LATEST opening dated in `date`'s month on or before `date`, so a recount
+ * replaces the Copy-all opening on screen. When every opening in the month
+ * is dated after `date` there is none on or before it; this falls back to
+ * the month's earliest (what the panel showed before 26a-iii), so an opened
+ * meat always shows an opening. null exactly when isBlocked is true.
+ */
+function findPanelOpening(db, ledger, ownerId, meatId, date) {
+  const L = LEDGERS[ledger];
+  const { start } = monthBounds(date);
+  const latest = db.prepare(
+    `SELECT business_date, quantity, opening_source FROM ${L.openingTable}
+     WHERE ${L.ownerWhere} AND business_date >= ? AND business_date <= ?
+     ORDER BY business_date DESC LIMIT 1`
+  ).get(...L.ownerParams(ownerId, meatId), start, date);
+  return latest || findMonthOpening(db, ledger, ownerId, meatId, date);
 }
 
 /** True when this meat-date is blocked: no declared opening anywhere in its month. */
@@ -115,7 +134,8 @@ function classifyMeat(db, ledger, ownerId, meat, date) {
  * The Month opening panel's data for one restaurant/commissary and the
  * month containing `date`. One entry per active meat:
  *   { meat_id, code, name, unit, opening, must_count, reasons, copy_quantity }
- * `opening` is the earliest opening dated in the month (null = blocked);
+ * `opening` is findPanelOpening's pick - the latest opening in the month on
+ * or before `date` (null = blocked);
  * must_count/reasons/copy_quantity are always reported, so the panel can
  * render unopened rows and the edit list from one response.
  */
@@ -129,7 +149,7 @@ function getMonthOpeningStatus(db, ledger, ownerId, date) {
       code: meat.code,
       name: meat.name,
       unit: meat.unit,
-      opening: findMonthOpening(db, ledger, ownerId, meat.id, date),
+      opening: findPanelOpening(db, ledger, ownerId, meat.id, date),
       must_count: c.mustCount,
       reasons: c.reasons,
       copy_quantity: c.copyQuantity
@@ -162,10 +182,15 @@ function insertOpening(db, ledger, ownerId, meatId, date, quantity, source) {
 }
 
 /**
- * Records a RECOUNT opening dated `date` (the page's selected date - the
- * day the recount actually happens). Returns { ok } or { error, status }.
- * Only for a meat with no opening in the month yet: an entered opening is
- * corrected through 26a's PATCH routes, never re-declared here.
+ * Step 26a-iii: an upsert keyed on the ACT of recounting, not the number.
+ * Writes a RECOUNT opening dated `date` (the page's selected date - the day
+ * the recount actually happens). Returns { ok } or { error, status }.
+ *   - an opening already dated exactly `date` -> updated: new quantity,
+ *     source RECOUNT (a same-day COPY flips to RECOUNT, same number included)
+ *   - otherwise -> inserted. Any earlier opening in the month stays, and
+ *     26a's recount difference lands on `date`.
+ * Correcting a typo without re-declaring it a recount stays 26a's PATCH
+ * routes, which keep the source.
  */
 function recordRecount(db, ledger, ownerId, meatId, date, quantity) {
   if (!findMeat(db, ledger, ownerId, meatId)) {
@@ -177,10 +202,18 @@ function recordRecount(db, ledger, ownerId, meatId, date, quantity) {
   if (Number(quantity) < 0) {
     return { status: 400, error: 'quantity cannot be negative - an opening count is never below zero' };
   }
-  if (findMonthOpening(db, ledger, ownerId, meatId, date)) {
-    return { status: 409, error: 'This meat already has an opening this month - edit it instead' };
+  // Literal SQL per ledger, same reason as insertOpening.
+  if (ledger === 'restaurant') {
+    db.prepare(
+      `INSERT INTO opening_stock (restaurant_id, meat_id, business_date, quantity, opening_source) VALUES (?, ?, ?, ?, 'RECOUNT')
+       ON CONFLICT(restaurant_id, meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, opening_source = 'RECOUNT'`
+    ).run(ownerId, meatId, date, Number(quantity));
+  } else {
+    db.prepare(
+      `INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity, opening_source) VALUES (?, ?, ?, 'RECOUNT')
+       ON CONFLICT(commissary_meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, opening_source = 'RECOUNT'`
+    ).run(meatId, date, Number(quantity));
   }
-  insertOpening(db, ledger, ownerId, meatId, date, Number(quantity), 'RECOUNT');
   return { ok: true };
 }
 
@@ -209,6 +242,7 @@ module.exports = {
   isIsoDate,
   monthBounds,
   findMonthOpening,
+  findPanelOpening,
   isBlocked,
   classifyMeat,
   getMonthOpeningStatus,

@@ -229,8 +229,8 @@ router.get('/commissary/month-opening', (req, res) => {
 // POST /api/commissary/month-opening
 // Body: { commissary_id, commissary_meat_id, business_date, quantity }
 // Step 26a-ii: records a RECOUNT opening dated business_date. Twin of POST
-// /daily-audit/month-opening - 409 when the meat already has an opening
-// this month (correct it through PATCH /commissary/opening-stock).
+// /daily-audit/month-opening, including 26a-iii's upsert on that date (a
+// typo fix that keeps the source is PATCH /commissary/opening-stock).
 router.post('/commissary/month-opening', (req, res) => {
   const { commissary_id, commissary_meat_id, business_date, quantity } = req.body || {};
   if (!commissary_id || !commissary_meat_id || !isIsoDate(business_date)) {
