@@ -51,6 +51,11 @@
     return d.toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   }
 
+  function dayLabel(isoDate) {
+    const d = new Date(isoDate + 'T00:00:00Z');
+    return d.toLocaleString('en', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
   async function send(url, method, body) {
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const result = await res.json().catch(() => ({}));
@@ -79,11 +84,16 @@
     // Step 26a-iii: an opened row carries two intents, kept visibly apart.
     // Recount ("I counted") comes first and is dated the page's date;
     // Correct ("I typed it wrong") PATCHes the shown opening and keeps its source.
-    function openedRowHtml(r) {
+    // When nothing is opened on or before the page's date, findPanelOpening
+    // falls back to a later opening; say so, so it never reads as today's count.
+    function openedRowHtml(r, pageDate) {
+      const later = r.opening.business_date > pageDate
+        ? ` <span class="mo-tag mo-later">counted ${dayLabel(r.opening.business_date)} · after this date</span>`
+        : '';
       return `
         <tr data-mo-meat-id="${r.meat_id}" data-mo-date="${r.opening.business_date}">
           <td>${esc(r.name)} <span class="type-badge">(${esc(r.unit)})</span></td>
-          <td>${r.opening.business_date}${r.opening.opening_source ? ` <span class="mo-tag">${SOURCE_TAG[r.opening.opening_source]}</span>` : ''}</td>
+          <td>${r.opening.business_date}${r.opening.opening_source ? ` <span class="mo-tag">${SOURCE_TAG[r.opening.opening_source]}</span>` : ''}${later}</td>
           <td><input type="number" step="0.01" class="mo-recount" placeholder="count"> <button type="button" class="mo-save-recount">Save recount</button></td>
           <td><input type="number" step="0.01" class="mo-edit" value="${r.opening.quantity}"> <button type="button" class="mo-save-edit">Correct</button> <button type="button" class="mo-clear">Clear</button></td>
         </tr>`;
@@ -120,7 +130,7 @@
       const editTable = !editing ? (opened.length ? `<p><a href="#" class="mo-toggle-edit">edit entered openings (${opened.length})</a></p>` : '') : `
         <table class="mo-table">
           <thead><tr><th>Meat</th><th>Opened</th><th>Recount</th><th>Correct</th></tr></thead>
-          <tbody>${opened.map(openedRowHtml).join('')}</tbody>
+          <tbody>${opened.map(r => openedRowHtml(r, getDate())).join('')}</tbody>
         </table>
         <p><a href="#" class="mo-toggle-edit">done editing</a></p>`;
 

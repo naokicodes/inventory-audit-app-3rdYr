@@ -1118,11 +1118,13 @@ test('a recount opening (Month opening panel) establishes a beginning for that m
 });
 
 test('a second recount on the SAME date overwrites that opening (step 26a-iii upsert), no second row', () => {
-  const r = recordRecount(db, 'commissary', 1, 30, '2026-09-05', 50);
+  const rowsFor30 = () => db.prepare('SELECT quantity, opening_source FROM commissary_opening_stock WHERE commissary_meat_id = 30').all().map(r => ({ ...r }));
+  const r = recordRecount(db, 'commissary', 1, 30, '2026-09-05', 55);
   assert.strictEqual(r.ok, true);
-  const rows = db.prepare('SELECT quantity, opening_source FROM commissary_opening_stock WHERE commissary_meat_id = 30').all();
-  assert.strictEqual(rows.length, 1);
-  assert.deepStrictEqual({ ...rows[0] }, { quantity: 50, opening_source: 'RECOUNT' });
+  assert.deepStrictEqual(rowsFor30(), [{ quantity: 55, opening_source: 'RECOUNT' }]);
+  // Recount back to 50 - overwrites again, and the tests below expect beginning 50.
+  assert.strictEqual(recordRecount(db, 'commissary', 1, 30, '2026-09-05', 50).ok, true);
+  assert.deepStrictEqual(rowsFor30(), [{ quantity: 50, opening_source: 'RECOUNT' }]);
 });
 
 test('a recount for a meat of a DIFFERENT commissary is a 404, not a write', () => {
