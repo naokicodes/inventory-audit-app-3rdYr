@@ -1698,3 +1698,24 @@ one for a dispatched task. Verify each against the current repo before acting.
    exactly that is what 24b-iv does. The worker used direct SQL, disclosed it,
    and cleaned up. The rule needs an explicit carve-out for constructing states
    the current validation forbids.
+
+
+## Step daily-audit-mobile - Review/Enter phone layout (Beta entry)
+Two views over ONE fetch of the existing daily-audit data - no second page, no
+new save contract. Review: a card per item, display columns muted, ending-actual
+the only accented input, variance the only colored chip. Enter: a single-column
+count list, one input per row. A Review/Enter toggle switches them; mobile
+defaults to whichever, desktop keeps the table. Must carry the 26a tags -
+(carried), (N days), incl. X recount difference - and the blocked "needs month
+opening" state (input disabled; server already refuses it). Dish rows keep TWO
+inputs (prepped + portion actual). Build so a later per-sheet "who counted" field
+(one sheet-level field, not per-row) slots in without rework. Public step: live
+click-through before merge. Beta entry requirement per docs/testing-plan.md.
+
+## Step reseed-beta-db - clean reseed + disposable beta.db (Beta entry)
+Today seed.js is additive (INSERT OR IGNORE) - there is no clean reset. Add a
+`reseed` command that clears the tables in SQL, then re-runs schema + migrate +
+seed. Add an env-selectable DB path (e.g. DB_PATH) so Beta runs on a disposable
+beta.db, separate from the live inventory.db, enabling free resets when a tester
+breaks the data. One migration/DB-path change in flight - run solo. Beta entry
+requirement per docs/testing-plan.md.

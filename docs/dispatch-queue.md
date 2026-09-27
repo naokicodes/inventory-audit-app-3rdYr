@@ -42,6 +42,18 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 2d. Step ui-viewport — CLOSED 2026-09-25, PR #10 (`4d92634`).
 
+### 3a. Step daily-audit-mobile - Review/Enter phone layout  [Beta lane . runnable]
+Touches: public/daily-audit.html, public/style.css
+Beta entry requirement (docs/testing-plan.md). Two views over one fetch; carries
+the 26a tags and the blocked month-opening state. Public step -> needs a live
+click-through comment before merge. Parallel-safe. Full spec: session-status.md
+-> "Step daily-audit-mobile".
+
+### 3b. Step reseed-beta-db - clean reseed + disposable beta.db  [Beta lane . runnable]
+Touches: server/db/seed.js, server/db/connection.js, package.json
+Beta entry requirement. One-command reseed + env-selectable DB path. Solo (it's a
+DB-path change). Full spec: session-status.md -> "Step reseed-beta-db".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 
 **Note 2026-09-24:** the architecture draft cancels the intake weigh-in
