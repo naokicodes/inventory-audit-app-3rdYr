@@ -5,7 +5,8 @@
   "main": "server/index.js",
   "scripts": {
     "dev": "node server/index.js",
-    "test": "node scripts/run-tests.js",
+    "reseed": "node server/db/seed.js --reset",
+    "test":"node scripts/run-tests.js",
     "audit:write-paths": "node scripts/audit-write-paths.js",
     "verify": "node scripts/run-tests.js && node scripts/audit-write-paths.js"
   },

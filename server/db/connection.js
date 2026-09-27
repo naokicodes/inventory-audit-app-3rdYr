@@ -11,9 +11,13 @@
 const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
+const { resolveDbPath } = require('./dbPath.js');
 const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateCommissaryAdjustmentsTable, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns } = require('./migrate.js');
 
-const DB_PATH = path.join(__dirname, 'inventory.db');
+// Step reseed-beta-db (2026-09-27): DB_PATH env var selects the database
+// file, so Beta can run on a disposable beta.db. Unset = the live
+// inventory.db, exactly as before. See server/db/dbPath.js.
+const DB_PATH = resolveDbPath();
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 const db = new DatabaseSync(DB_PATH);
