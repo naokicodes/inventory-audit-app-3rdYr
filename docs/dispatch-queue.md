@@ -54,6 +54,13 @@ Touches: server/db/seed.js, server/db/connection.js, package.json
 Beta entry requirement. One-command reseed + env-selectable DB path. Solo (it's a
 DB-path change). Full spec: session-status.md -> "Step reseed-beta-db".
 
+### 3c. Step 24d-i - richer yield: output_quantity + miscut_weight + coherence guard  [runnable]
+Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, server/routes/commissary.js
+First slice of the richer commissary yield model. Supersedes standalone 24b-v (its guard
+becomes the coherence block). Server-only, no click-through. One migration in flight at a
+time; connection.js overlaps reseed-beta-db, so not both at once. Full spec:
+session-status.md -> "Step 24d-i".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 
 **Note 2026-09-24:** the architecture draft cancels the intake weigh-in
@@ -77,6 +84,8 @@ endorsement / PO-arrival receipt share ONE receipt shape or stay distinct. This
 is a domain reconciliation, still open — not the engineer's call.
 
 ### 4. Step 24b-v — the effective yield output must be kg-tracked
+**SUPERSEDED by Step 24d-i (2026-09-27).** The richer yield model redefines the guard from "output must be kg-tracked" to "the weight flow must close" (backed + miscut <= raw); 24d-i carries it. Close this when 24d-i lands.
+
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
 A live data-corruption guard. It changes what the code rejects, which is

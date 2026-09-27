@@ -64,7 +64,7 @@ eventually for the live wipe. **Approach chosen 2026-09-25 (core lane, not yet
 built):** a `reseed` command that clears the tables in SQL, then re-runs schema +
 migrate + seed (guard-friendly — no file deletion); plus an env-selectable DB
 path so Beta runs on a disposable `beta.db`, separate from the live
-`inventory.db`.
+`inventory.db`. The Beta->Live gate's "clean reseed of the live database" is a separate later step - reseed-beta-db deliberately refuses the live file, and that wipe gets its own command or explicit flag, decided at the gate.
 
 ---
 

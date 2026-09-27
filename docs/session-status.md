@@ -1704,8 +1704,7 @@ one for a dispatched task. Verify each against the current repo before acting.
 Two views over ONE fetch of the existing daily-audit data - no second page, no
 new save contract. Review: a card per item, display columns muted, ending-actual
 the only accented input, variance the only colored chip. Enter: a single-column
-count list, one input per row. A Review/Enter toggle switches them; mobile
-defaults to whichever, desktop keeps the table. Must carry the 26a tags -
+count list, one input per row. A Review/Enter toggle switches them. Resolved 2026-09-27 (#11): view on open = last-used per device (localStorage), first-ever load = Review (shows the blocked "needs month opening" state + carry tags). Remarks lives in Review only, un-accented, absent from Enter (still posted on save from either view). Breakpoint 768px: below = phone views + toggle; at/above = the existing table, no toggle (desktop keeps the table). These three seed docs/ui-conventions.md. Must carry the 26a tags -
 (carried), (N days), incl. X recount difference - and the blocked "needs month
 opening" state (input disabled; server already refuses it). Dish rows keep TWO
 inputs (prepped + portion actual). Build so a later per-sheet "who counted" field
@@ -1719,3 +1718,51 @@ seed. Add an env-selectable DB path (e.g. DB_PATH) so Beta runs on a disposable
 beta.db, separate from the live inventory.db, enabling free resets when a tester
 breaks the data. One migration/DB-path change in flight - run solo. Beta entry
 requirement per docs/testing-plan.md.
+Resolved 2026-09-27 (#12): reseed REFUSES to run against the live inventory.db - DB_PATH must be set and resolve to a non-live file, else non-zero exit. guard-db.js only catches rm/unlink, not a SQL clear, so the refusal lives in the reseed script. "Clears the tables" = every app table, FK-safe, then schema+migrate+seed. The live wipe on the Beta->Live gate is a SEPARATE later step (its own command or explicit flag), NOT delivered here.
+
+## Step 24d-i - richer yield: output_quantity + miscut_weight + coherence guard
+
+First slice of the richer commissary yield model (architect convo 2026-09-27). Makes a
+counted output first-class and records recoverable trim, WITHOUT touching the loss engine.
+SUPERSEDES standalone Step 24b-v - its coherence block becomes the new 24b-v; close/repoint
+24b-v when this lands.
+
+Schema (commissary_yield_log; both additive - plain ALTER ADD COLUMN, no rebuild):
+- output_quantity REAL - output meat's own unit; NULL = same as backed_weight_out. Required
+  (route-level) when the EFFECTIVE output meat, COALESCE(output_commissary_meat_id,
+  commissary_meat_id), is unit-tracked.
+- miscut_weight REAL NOT NULL DEFAULT 0 - kg recoverable trim. Recorded-in analytics ONLY;
+  NOT subtracted from loss%/Status (leave commissaryYieldEngine.js untouched).
+
+Migration: idempotent helper migrateYieldLogOutputQtyMiscut(db), same shape as
+migrateLocationsActiveColumn (pragma table_info guard + ALTER ADD COLUMN per absent column).
+Wire into connection.js with the other migrate calls, before schema.sql. Add both columns to
+the schema.sql CREATE TABLE too (for fresh DBs).
+
+Write-path: extend the shared validateYieldOutputAndInputQty(...) - used by POST AND PATCH,
+so this enforces forward AND on-edit (the #4 ruling, no retro-audit). Add:
+- effective output unit = output row if given else input row; if 'unit' and output_quantity
+  null -> 400 "output_quantity is required when the output meat is unit-tracked (unit)"; if
+  given and <=0 -> "output_quantity must be positive".
+- miscut_weight < 0 -> "miscut_weight cannot be negative".
+- coherence guard (the new 24b-v): backed_weight_out + miscut_weight > raw_weight_in + EPSILON
+  -> "backed_weight_out + miscut_weight cannot exceed raw_weight_in". Coherence-only, no leeway
+  beyond float epsilon.
+POST: parse the two fields (miscut defaults 0), validate, add to INSERT. PATCH: follow its
+absent=keep / explicit-null=clear convention for output_quantity; miscut_weight is NOT NULL so
+absent=keep and clear=0; run the coherence check on the MERGED post-patch values.
+
+Guard is route-level only - seeds/direct SQL bypass it, same carve-out as 24b-iv.
+
+Engine: UNCHANGED. Surfacing miscut (reads/dashboard) is slice 24d-ii; UI is 24d-iii.
+
+Tests (commissary.test.js, migrate.test.js): unit output missing output_quantity -> 400; with
+it -> 200+stored; backed+miscut>raw -> 400; within-gap miscut -> 200 AND loss/Status identical
+to the miscut-0 row (proves no engine effect); kg output needs no output_quantity; PATCH sets
+output_quantity on a unit output; PATCH into incoherent miscut -> 400 (on-edit); migration
+idempotent + adds columns to a pre-existing DB + preserves rows.
+
+Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js,
+server/routes/commissary.js (+ the two test files). Server-only, NO click-through. Sequencing:
+connection.js overlaps reseed-beta-db - not both in flight; one migration at a time.
+
