@@ -61,6 +61,16 @@
 
   <div id="month-opening"></div>
 
+  <!-- Sheet-level header, shared by every view and outside #grid-container
+       so a grid reload never re-renders it. A later per-sheet field (e.g.
+       who counted) belongs here, beside the phone-only Review/Enter toggle. -->
+  <div id="sheet-header" class="sheet-header">
+    <div class="view-toggle" role="group" aria-label="View">
+      <button type="button" data-view="review" aria-pressed="false">Review</button>
+      <button type="button" data-view="enter" aria-pressed="false">Enter</button>
+    </div>
+  </div>
+
   <div id="grid-container">Loading...</div>
 
   <div class="save-bar">
@@ -180,6 +190,102 @@
       `;
     }
 
+    // Phone views (below the 768px breakpoint - docs/ui-conventions.md).
+    // Rendered from the SAME rows as the table, in the same loadGrid() pass:
+    // no second fetch and no new save contract. Their inputs carry the same
+    // classes as the table's and are mirrored into it on every keystroke
+    // (see the input listener), so save() keeps reading the table rows as it
+    // always has - whichever view the auditor typed in.
+
+    // The variance chip: the one colored element on a Review card. Value
+    // plus status, colored by the same status-* class the table uses.
+    function chipText(variance, status) {
+      const s = status.replace(/_/g, ' ');
+      return variance === null || variance === undefined ? s : `${fmt(variance)} ${s}`;
+    }
+
+    // Review card for a meat row: display fields muted, ending-actual the
+    // only accented input, remarks un-accented (Review only), and the 26a
+    // tags - (carried)/(recount)/(copied) on Beginning, (N days, incl. X
+    // recount difference) beside the chip. A blocked row (no month opening)
+    // shows the blocked text in the chip and disables its input, same as
+    // the table.
+    function meatCardHtml(r) {
+      const blocked = r.status === 'MISSING_PERIOD_OPENING';
+      const chip = blocked ? BLOCKED_STATUS_TEXT : chipText(r.unexplainedVariance, r.status);
+      return `
+        <div class="audit-card" data-meat-id="${r.meat_id}">
+          <div class="card-name">${r.name} <span class="type-badge">(${r.unit})</span></div>
+          <dl class="card-fields">
+            <dt>Beginning</dt><dd>${fmt(r.beginning)}${r.beginning === null ? '' : beginningTag(r)}</dd>
+            <dt>New Stock</dt><dd>${fmt(r.newStock)}</dd>
+            <dt>Usage</dt><dd>${fmt(r.usage)}</dd>
+            <dt>Adjustments</dt><dd>${fmt(r.adjustments)}</dd>
+            <dt>Ending (calc)</dt><dd class="ending-calc">${fmt(r.endingCalculated)}</dd>
+          </dl>
+          <label class="card-field accent">Ending (actual)
+            <input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0"${blocked ? ' disabled' : ''}>
+          </label>
+          <div class="card-variance">Over/Short
+            <span class="variance-chip status-${r.status}">${chip}</span>${overShortTags(r)}
+          </div>
+          <label class="card-field stacked">Remarks
+            <input type="text" class="remarks" value="${r.remarks || ''}" placeholder="">
+          </label>
+        </div>
+      `;
+    }
+
+    // Review card for a dish row: both inputs kept (prepped + portion
+    // actual). Portion actual is the dish's ending-actual, so it is the
+    // accented one; prepped stays plain. No remarks - dishes have none.
+    function dishCardHtml(r) {
+      return `
+        <div class="audit-card dish-card" data-dish-id="${r.item_id}">
+          <div class="card-name">${r.name} <span class="type-badge">(portions)</span></div>
+          <dl class="card-fields">
+            <dt>Beginning</dt><dd>${fmt(r.portionBeginning)}</dd>
+            <dt>Sold</dt><dd>${fmt(r.sold)}</dd>
+            <dt>Ending (calc)</dt><dd class="portion-ending-calc">${fmt(r.portionEndingCalculated)}</dd>
+          </dl>
+          <label class="card-field">Prepped
+            <input type="number" step="0.01" class="prepped" value="${r.prepped ?? ''}" placeholder="0">
+          </label>
+          <label class="card-field accent">Ending (actual)
+            <input type="number" step="0.01" class="portion_actual" value="${r.portionActual ?? ''}" placeholder="0">
+          </label>
+          <div class="card-variance">Over/Short
+            <span class="variance-chip status-${r.status}">${chipText(r.portionVariance, r.status)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Enter row for a meat: one count input, nothing else. A blocked row
+    // keeps its input disabled and says why.
+    function meatEnterHtml(r) {
+      const blocked = r.status === 'MISSING_PERIOD_OPENING';
+      return `
+        <div class="enter-row" data-meat-id="${r.meat_id}">
+          <span class="enter-name">${r.name} <span class="type-badge">(${r.unit})</span>${blocked ? `<br><span class="card-blocked">${BLOCKED_STATUS_TEXT}</span>` : ''}</span>
+          <input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0" aria-label="${r.name} ending (actual)"${blocked ? ' disabled' : ''}>
+        </div>
+      `;
+    }
+
+    // Enter row for a dish: its two inputs, labelled.
+    function dishEnterHtml(r) {
+      return `
+        <div class="enter-row" data-dish-id="${r.item_id}">
+          <span class="enter-name">${r.name} <span class="type-badge">(portions)</span></span>
+          <span class="enter-inputs">
+            <label>Prepped<input type="number" step="0.01" class="prepped" value="${r.prepped ?? ''}" placeholder="0"></label>
+            <label>Ending (actual)<input type="number" step="0.01" class="portion_actual" value="${r.portionActual ?? ''}" placeholder="0"></label>
+          </span>
+        </div>
+      `;
+    }
+
     // Step 13: live recalculation of Ending(calc)/Over-Short/Status as a
     // meat row's editable inputs change, without a save+reload round trip.
     // Mirrors server/engines/auditEngine.js's computeMeatAudit exactly -
@@ -252,6 +358,15 @@
       overShortCell.innerHTML = fmt(unexplainedVariance) + overShortTagsFromRow(tr);
       statusCell.className = `row-status status-${status}`;
       statusCell.textContent = status.replace(/_/g, ' ');
+
+      // The same result onto this meat's Review card (phone view).
+      const card = gridContainer.querySelector(`.audit-card[data-meat-id="${tr.dataset.meatId}"]`);
+      if (card) {
+        card.querySelector('.ending-calc').textContent = fmt(endingCalculated);
+        const chip = card.querySelector('.variance-chip');
+        chip.className = `variance-chip status-${status}`;
+        chip.textContent = chipText(unexplainedVariance, status);
+      }
     }
 
     // Live recalculation for a dish row's Portion Ending(calc)/Variance/
@@ -291,19 +406,69 @@
       varianceCell.textContent = fmt(portionVariance);
       statusCell.className = `dish-row-status status-${status}`;
       statusCell.textContent = status.replace(/_/g, ' ');
+
+      // The same result onto this dish's Review card (phone view).
+      const card = gridContainer.querySelector(`.audit-card[data-dish-id="${tr.dataset.dishId}"]`);
+      if (card) {
+        card.querySelector('.portion-ending-calc').textContent = fmt(portionEndingCalculated);
+        const chip = card.querySelector('.variance-chip');
+        chip.className = `variance-chip status-${status}`;
+        chip.textContent = chipText(portionVariance, status);
+      }
     }
+
+    const MIRRORED_FIELDS = ['ending_actual', 'remarks', 'prepped', 'portion_actual'];
 
     // Delegated once, not re-attached per loadGrid() call - avoids stacking
     // duplicate listeners on every restaurant/date change.
+    // The table, the Review cards and the Enter list each hold an input for
+    // the same item/field. Whatever one the auditor types in, copy the value
+    // into the others first, so the table (which save() reads) and every
+    // view agree; then recalculate from the table row as before.
     gridContainer.addEventListener('input', (e) => {
-      if (e.target.matches('.ending_actual')) {
-        const tr = e.target.closest('tr[data-meat-id]');
-        if (tr) recalcMeatRow(tr);
-      } else if (e.target.matches('.prepped, .portion_actual')) {
-        const tr = e.target.closest('tr[data-dish-id]');
-        if (tr) recalcDishRow(tr);
-      }
+      const field = MIRRORED_FIELDS.find(c => e.target.classList.contains(c));
+      if (!field) return;
+      const holder = e.target.closest('[data-meat-id], [data-dish-id]');
+      if (!holder) return;
+      const isMeat = holder.dataset.meatId !== undefined;
+      const itemSelector = isMeat
+        ? `[data-meat-id="${holder.dataset.meatId}"]`
+        : `[data-dish-id="${holder.dataset.dishId}"]`;
+      gridContainer.querySelectorAll(`${itemSelector} .${field}`).forEach(el => {
+        if (el !== e.target) el.value = e.target.value;
+      });
+      if (field === 'remarks') return;
+      const tr = gridContainer.querySelector(`tr${itemSelector}`);
+      if (!tr) return;
+      if (isMeat) recalcMeatRow(tr);
+      else recalcDishRow(tr);
     });
+
+    // Review/Enter toggle (phone only - CSS hides it at/above 768px). The
+    // last-used view is remembered per device; first-ever load is Review
+    // (docs/ui-conventions.md). Storage can be unavailable (private mode,
+    // blocked site data) - the page still works, it just won't remember.
+    const VIEW_STORAGE_KEY = 'dailyAudit.view';
+    const viewButtons = document.querySelectorAll('.view-toggle button[data-view]');
+
+    function setView(view, remember) {
+      document.body.dataset.sheetView = view;
+      viewButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+      if (remember) {
+        try { localStorage.setItem(VIEW_STORAGE_KEY, view); } catch (e) { /* not remembered */ }
+      }
+    }
+
+    function initialView() {
+      try {
+        const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+        if (saved === 'review' || saved === 'enter') return saved;
+      } catch (e) { /* fall through to the default */ }
+      return 'review';
+    }
+
+    viewButtons.forEach(b => b.addEventListener('click', () => setView(b.dataset.view, true)));
+    setView(initialView(), false);
 
     async function loadGrid() {
       const restaurantId = restaurantSelect.value;
@@ -315,9 +480,15 @@
       const rows = await res.json();
 
       const tableRows = rows.map(r => r.type === 'MEAT' ? meatRowHtml(r) : dishRowHtml(r)).join('');
+      const reviewCards = rows.map(r => r.type === 'MEAT' ? meatCardHtml(r) : dishCardHtml(r)).join('');
+      const enterRows = rows.map(r => r.type === 'MEAT' ? meatEnterHtml(r) : dishEnterHtml(r)).join('');
 
+      // Desktop table (at/above 768px) and the two phone views (below it),
+      // all from this one fetch. CSS shows exactly one of them.
       gridContainer.innerHTML = `
-        <table>
+        <div class="sheet-view sheet-view-review">${reviewCards}</div>
+        <div class="sheet-view sheet-view-enter">${enterRows}</div>
+        <table class="desktop-only">
           <thead>
             <tr>
               <th>Item</th><th>Beginning</th><th>New Stock / Prepped</th><th>Usage / Sold</th>
