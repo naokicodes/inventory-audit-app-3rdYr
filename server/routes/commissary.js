@@ -708,6 +708,9 @@ router.put('/commissary/conversion-standards/:id', (req, res) => {
 // - input_quantity is REQUIRED for a unit-tracked source (every counted
 //   input is also weighed at intake, so it's always available) and optional
 //   otherwise; when given it must be positive.
+// - weights (24d-i): raw_weight_in / backed_weight_out / miscut_weight must
+//   be finite (a NaN would slip the coherence guard and 500 on insert), and
+//   miscut_weight must be >= 0 (a negative one defeats the coherence guard).
 // - coherence (24d-i): backed_weight_out + miscut_weight cannot exceed
 //   raw_weight_in - the output and the recoverable trim both come out of
 //   the raw weight.
@@ -715,6 +718,14 @@ router.put('/commissary/conversion-standards/:id', (req, res) => {
 const YIELD_WEIGHT_EPSILON = 1e-9; // float rounding tolerance only, matches commissaryYieldEngine.js
 
 function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inputQuantity, rawWeightIn, backedWeightOut, miscutWeight) {
+  if (!Number.isFinite(rawWeightIn) || !Number.isFinite(backedWeightOut) || !Number.isFinite(miscutWeight)) {
+    return 'raw_weight_in, backed_weight_out, and miscut_weight must be finite numbers';
+  }
+
+  if (miscutWeight < 0) {
+    return 'miscut_weight cannot be negative';
+  }
+
   let effectiveOutputMeat = sourceMeat;
   if (outputCommissaryMeatId !== null) {
     const outputMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(outputCommissaryMeatId);

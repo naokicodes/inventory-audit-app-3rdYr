@@ -834,6 +834,10 @@ db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, a
 // Mirrors validateYieldOutputAndInputQty in commissary.js (24b-iv + 24d-i)
 const YIELD_WEIGHT_EPSILON = 1e-9;
 function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inputQuantity, rawWeightIn, backedWeightOut, miscutWeight) {
+  if (!Number.isFinite(rawWeightIn) || !Number.isFinite(backedWeightOut) || !Number.isFinite(miscutWeight)) {
+    return 'raw_weight_in, backed_weight_out, and miscut_weight must be finite numbers';
+  }
+  if (miscutWeight < 0) return 'miscut_weight cannot be negative';
   let effectiveOutputMeat = sourceMeat;
   if (outputCommissaryMeatId !== null) {
     const outputMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(outputCommissaryMeatId);
@@ -1132,6 +1136,56 @@ test('PATCH raising backed_weight_out re-validates against the stored miscut', (
   assert.strictEqual(p.status, 400);
   assert.match(p.error, /cannot exceed raw_weight_in/);
   assert.strictEqual(db.prepare('SELECT backed_weight_out FROM commissary_yield_log WHERE id = ?').get(miscutRowId).backed_weight_out, 7);
+});
+
+test('POST miscut_weight null or empty string stores 0', () => {
+  for (const sentinel of [null, '']) {
+    const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-26', raw_weight_in: 10, backed_weight_out: 8, miscut_weight: sentinel });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(r.id).miscut_weight, 0);
+  }
+});
+
+test('PATCH miscut_weight null or empty string keeps the current value', () => {
+  for (const sentinel of [null, '']) {
+    const p = patchYieldLogEvent(miscutRowId, { miscut_weight: sentinel });
+    assert.strictEqual(p.status, 200);
+    assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId).miscut_weight, 3);
+  }
+});
+
+test('a negative miscut_weight is rejected on POST, even when backed + miscut <= raw', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-26', raw_weight_in: 10, backed_weight_out: 11, miscut_weight: -2 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /miscut_weight cannot be negative/);
+});
+
+test('a negative miscut_weight is rejected on PATCH - old value untouched', () => {
+  const p = patchYieldLogEvent(miscutRowId, { miscut_weight: -1 });
+  assert.strictEqual(p.status, 400);
+  assert.match(p.error, /miscut_weight cannot be negative/);
+  assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId).miscut_weight, 3);
+});
+
+test('a non-numeric weight is a 400 on POST, not a 500 (each of the three fields)', () => {
+  const base = { commissary_meat_id: 22, business_date: '2026-09-26', raw_weight_in: 10, backed_weight_out: 8, miscut_weight: 1 };
+  const before = db.prepare('SELECT COUNT(*) AS n FROM commissary_yield_log').get().n;
+  for (const field of ['raw_weight_in', 'backed_weight_out', 'miscut_weight']) {
+    const r = createYieldLogEvent({ ...base, [field]: 'abc' });
+    assert.strictEqual(r.status, 400, field);
+    assert.match(r.error, /must be finite numbers/);
+  }
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM commissary_yield_log').get().n, before);
+});
+
+test('a non-numeric weight is a 400 on PATCH - row untouched (each of the three fields)', () => {
+  const before = db.prepare('SELECT raw_weight_in, backed_weight_out, miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId);
+  for (const field of ['raw_weight_in', 'backed_weight_out', 'miscut_weight']) {
+    const p = patchYieldLogEvent(miscutRowId, { [field]: 'abc' });
+    assert.strictEqual(p.status, 400, field);
+    assert.match(p.error, /must be finite numbers/);
+  }
+  assert.deepStrictEqual(db.prepare('SELECT raw_weight_in, backed_weight_out, miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId), before);
 });
 
 console.log('\nCommissary Route Tests (24b-iv: GET /commissary/yield-log output code/name)\n');
