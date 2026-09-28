@@ -465,6 +465,20 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   route. Do not "fix" the engine to net internal moves to zero — that would be
   building the station feature by the back door.
 
+- **Commissary staging / conversion model - settled 2026-09-28 (resolves #16).** The commi yield
+  output is ALWAYS kg; unit-tracked stock at the commi is NOT a yield output but **restaurant meat
+  staged at the commi**, made by a **conversion**, then held (buffered) until the restaurant pulls
+  it. Four parts: (1) **Yield** unchanged - raw -> backed-up, kg out; shrinkage = the raw-backed
+  loss. (2) **Conversion** - processed commi kg -> restaurant units against a standard; the
+  **variance from the standard -> shrinkage (allocation)**; same operation reused at the restaurant
+  for kg received as raw; deliberately simpler than the yield engine (restaurants never run it).
+  (3) **Staging/buffer** - the converted restaurant-meat holds stock AT THE COMMI (a staging
+  location), so a restaurant meat's balance spans commi-staged vs restaurant-on-hand; new concept,
+  contradicts nothing settled. (4) **Shipment = the same event as staging**, released when the
+  restaurant pulls it - delivered in kg (lands as restaurant raw, converted later) or as a reported
+  piece count; NO transit shrinkage, transit loss is an ALLOCATION. NEW BUILD FAMILY, not yet
+  sliced - see dispatch-queue "Planned - commissary staging / conversion model". Confirmed by NaokiiVT.
+
 ## End-of-session checklist (every session, no exceptions)
 
 Since each session starts with zero memory of prior conversations and
@@ -1288,7 +1302,7 @@ openings is part of setting it up. No backfill of earlier months (decided
 
 ## Step 24b-v — REQUIRED: the effective yield output must be kg-tracked
 
-**REOPENED by #16 (2026-09-28).** The 2026-09-28 retirement assumed 24d-i supersedes this; #16 shows that is unresolved. This rule ("effective output must be kg-tracked") STANDS pending Naoki's #16 ruling - under Path 1 it is kept, not retired.
+**RESOLVED 2026-09-28 (#16 -> Path 1): this rule STANDS and is BUILT by Step 24d-i** (24d-i adds the kg-output guard 24b-v specified but never coded). Not superseded - kept and enforced. Mark closed when 24d-i lands. Kept here until the next archive pass.
 
 **Found 2026-09-02 by an architect trace, after step 24 was closed. This is a
 live data-corruption bug, not a nicety, and it should be fixed before
@@ -1725,147 +1739,59 @@ breaks the data. One migration/DB-path change in flight - run solo. Beta entry
 requirement per docs/testing-plan.md.
 Resolved 2026-09-27 (#12): reseed REFUSES to run against the live inventory.db - DB_PATH must be set and resolve to a non-live file, else non-zero exit. guard-db.js only catches rm/unlink, not a SQL clear, so the refusal lives in the reseed script. "Clears the tables" = every app table, FK-safe, then schema+migrate+seed. The live wipe on the Beta->Live gate is a SEPARATE later step (its own command or explicit flag), NOT delivered here.
 
-## Step 24d-i - richer yield: output_quantity + miscut_weight + coherence guard
+## Step 24d-i - richer yield: miscut_weight + coherence guard + kg-output guard (Path 1)
 
-**BLOCKED by #16 (2026-09-28) - DO NOT DISPATCH.** This spec accepts a unit-tracked effective output
-(output_quantity), which contradicts the settled "yield output is always kg" and "unit-to-unit yield must
-never be recorded" decisions, and it does NOT touch commissaryAuditEngine.js (getCommissaryBackedUp), which
-credits backed_weight_out (kg) to the effective output meat - so a unit output would credit kg to a unit
-meat, the exact 24b-v corruption. Awaiting Naoki's ruling: PATH 1 (keep kg-only outputs - drop
-output_quantity, keep miscut_weight + the coherence guard, 24b-v STANDS) or PATH 2 (reverse the settled
-rule - rework the ledger to credit output_quantity for unit outputs; a larger change). The draft below is
-the pre-#16 version and gets rewritten to the chosen path.
+RESOLVED 2026-09-28 to PATH 1 (#16): the commi yield output stays ALWAYS kg (settled rule holds).
+output_quantity is DROPPED - unit outputs are NOT commi yields; units at the commi are staged
+restaurant-meat from a conversion (see "Commissary staging / conversion model" in Things NOT to
+re-litigate), a separate build family. This slice does two things and never touches the ledger:
 
-First slice of the richer commissary yield model (architect convo 2026-09-27). Makes a
-counted output first-class and records recoverable trim, WITHOUT touching the loss engine.
-SUPERSEDES standalone Step 24b-v - its coherence block becomes the new 24b-v; close/repoint
-24b-v when this lands.
+1. Build the kg-output guard 24b-v specified but was never coded. In validateYieldOutputAndInputQty
+   (server/routes/commissary.js), reject a write whose EFFECTIVE output meat
+   COALESCE(output_commissary_meat_id, commissary_meat_id) is unit-tracked -> 400 "the yield output
+   meat must be kg-tracked". This closes the corruption at write time, so getCommissaryBackedUp
+   (commissaryAuditEngine.js) keeps crediting backed_weight_out (kg) safely - LEDGER UNCHANGED.
+   (This BUILDS 24b-v; mark 24b-v closed when this lands.)
+2. Add miscut tracking. New column miscut_weight REAL NOT NULL DEFAULT 0 on commissary_yield_log
+   (recoverable trim, kg; recorded-in analytics only, NOT subtracted from loss%). Coherence guard
+   in the same validator: backed_weight_out + miscut_weight > raw_weight_in + EPSILON -> 400.
+   Forward + on-edit (POST + PATCH share the validator).
 
-Schema (commissary_yield_log; both additive - plain ALTER ADD COLUMN, no rebuild):
-- output_quantity REAL - output meat's own unit; NULL = same as backed_weight_out. Required
-  (route-level) when the EFFECTIVE output meat, COALESCE(output_commissary_meat_id,
-  commissary_meat_id), is unit-tracked.
-- miscut_weight REAL NOT NULL DEFAULT 0 - kg recoverable trim. Recorded-in analytics ONLY;
-  NOT subtracted from loss%/Status (leave commissaryYieldEngine.js untouched).
-
-Migration: idempotent helper migrateYieldLogOutputQtyMiscut(db), same shape as
-migrateLocationsActiveColumn (pragma table_info guard + ALTER ADD COLUMN per absent column).
-Wire into connection.js with the other migrate calls, before schema.sql. Add both columns to
-the schema.sql CREATE TABLE too (for fresh DBs).
-
-Write-path: extend the shared validateYieldOutputAndInputQty(...) - used by POST AND PATCH,
-so this enforces forward AND on-edit (the #4 ruling, no retro-audit). Add:
-- effective output unit = output row if given else input row; if 'unit' and output_quantity
-  null -> 400 "output_quantity is required when the output meat is unit-tracked (unit)"; if
-  given and <=0 -> "output_quantity must be positive".
-- miscut_weight < 0 -> "miscut_weight cannot be negative".
-- coherence guard (the new 24b-v): backed_weight_out + miscut_weight > raw_weight_in + EPSILON
-  -> "backed_weight_out + miscut_weight cannot exceed raw_weight_in". Coherence-only, no leeway
-  beyond float epsilon.
-POST: parse the two fields (miscut defaults 0), validate, add to INSERT. PATCH: follow its
-absent=keep / explicit-null=clear convention for output_quantity; miscut_weight is NOT NULL so
-absent=keep and clear=0; run the coherence check on the MERGED post-patch values.
-
-Guard is route-level only - seeds/direct SQL bypass it, same carve-out as 24b-iv.
-
-Engine: UNCHANGED. Surfacing miscut (reads/dashboard) is slice 24d-ii; UI is 24d-iii.
-
-Tests (commissary.test.js, migrate.test.js): unit output missing output_quantity -> 400; with
-it -> 200+stored; backed+miscut>raw -> 400; within-gap miscut -> 200 AND loss/Status identical
-to the miscut-0 row (proves no engine effect); kg output needs no output_quantity; PATCH sets
-output_quantity on a unit output; PATCH into incoherent miscut -> 400 (on-edit); migration
-idempotent + adds columns to a pre-existing DB + preserves rows.
-
+Schema: ALTER ADD COLUMN miscut_weight (plain, no rebuild); add to schema.sql CREATE TABLE too.
+Migration: idempotent helper (migrateLocationsActiveColumn pattern), wired into connection.js.
+Engine: commissaryYieldEngine.js AND commissaryAuditEngine.js both UNCHANGED. Guard is route-level
+only - seeds/direct SQL bypass it (same carve-out as 24b-iv).
+Tests: unit-tracked effective output -> 400; backed+miscut>raw -> 400; within-gap miscut -> 200
+with loss/Status IDENTICAL to a miscut-0 row; migration idempotent + preserves rows.
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js,
-server/routes/commissary.js (+ the two test files). Server-only, NO click-through. Sequencing:
-connection.js overlaps reseed-beta-db - not both in flight; one migration at a time.
+server/routes/commissary.js (+ tests). Server-only, no click-through. Overlaps schema.sql with
+users-roles -> sequence. NO ledger change.
 
+## Step 24d-ii - richer yield: surface miscut + true-loss split (read layer, Path 1)
 
-## Step nav-mobile - contain shared nav below 768px (Beta, resolves #13)
-The shared top <nav> (public/style.css: display:flex; gap:1rem; no wrap; 11 links)
-is ~866px wide, so at a 390px phone width every page's documentElement.scrollWidth
-is 866 and the page scrolls sideways. This predates daily-audit-mobile (whose own
-views end at 359px) and is a cross-page defect, so it is its own step, not part of
-that one. #command-panel-toggle is position:fixed bottom-right; it only lands off-
-screen (right=850) because the nav widened the layout viewport, and it self-
-corrects once the nav is contained - command-panel.js is NOT touched.
-Fix: below the 768px breakpoint, contain the nav so the page body never scrolls
-sideways -
-  @media (max-width: 768px){ nav{ flex-wrap: nowrap; overflow-x: auto;
-    max-width: 100%; -webkit-overflow-scrolling: touch; } }
-The nav becomes a horizontally-scrollable strip. (Alternative, if every link should
-stay visible: flex-wrap: wrap - a taller block per page.) Also add the Navigation
-section to docs/ui-conventions.md. A fuller mobile nav (grouping/collapse) is
-deferred until the new pages land and the top-level set is known.
-Touches: public/style.css, docs/ui-conventions.md. daily-audit-mobile (PR #14) has
-merged, so the style.css overlap is clear; runnable. Public step: live click-through
-at 390px (scrollWidth <= innerWidth) before merge.
+Second yield slice. Surfaces miscut on reads; loss judgment unchanged. DEPENDS ON 24d-i. (Path 1:
+no output_quantity.) Engine (commissaryYieldEngine.js, computeYieldRow): add miscut_weight to the
+SELECT and return miscut_weight (recoverable, kg) + residualLoss = raw_weight_in -
+backed_weight_out - miscut_weight (true loss, kg). actualLossPct / status / excessLoss STAY AS
+THEY ARE (raw vs backed). The gap decomposes into miscut + residualLoss. Route auto-carries the
+fields (GET returns computeYieldRow). Dashboard split is a separate later analytics step.
+Tests: computeYieldRow returns miscut_weight + residualLoss; residualLoss == raw-backed-miscut; a
+miscut row has IDENTICAL loss/Status to the miscut-0 row.
+Touches: server/engines/commissaryYieldEngine.js (+ test). Server-only, no click-through. Depends
+on 24d-i.
 
-## Step 24d-ii - richer yield: surface miscut + true-loss split (read layer)
+## Step 24d-iii - richer yield: miscut on the commissary yield UI (Path 1)
 
-Second slice of the richer yield model. Makes miscut and the recoverable-vs-true-loss
-split available on reads, WITHOUT changing the loss judgment. DEPENDS ON 24d-i (needs
-its columns) - /start skips until 24d-i is merged.
-
-Engine (commissaryYieldEngine.js, computeYieldRow): add output_quantity and miscut_weight
-to the SELECT, and add to the returned object:
-- miscut_weight (recoverable trim, kg, passthrough),
-- residualLoss = raw_weight_in - backed_weight_out - miscut_weight (non-recoverable
-  "true loss", kg).
-actualLossPct / status / excessLoss STAY EXACTLY AS THEY ARE (computed from raw vs backed
-only) - miscut is NOT folded in. The split is additive analytics: the gap (raw - backed)
-decomposes into miscut (recoverable) + residualLoss (true loss).
-
-Route: GET yield-log / daily-audit return computeYieldRow output, so the new fields flow
-automatically - no route logic change (confirm the response carries them).
-
-Tests (commissaryYieldEngine.test.js): computeYieldRow returns miscut_weight + residualLoss;
-residualLoss == raw - backed - miscut; a row WITH miscut has IDENTICAL
-actualLossPct/status/excessLoss to the same row with miscut 0 (proves the engine judgment is
-untouched); output_quantity surfaced.
-
-Dashboard/report visualization of the split (a management "recoverable vs true loss" panel)
-is a SEPARATE later analytics step - dashboard.js does not surface yield loss today, so
-net-new UI is out of scope here.
-
-Touches: server/engines/commissaryYieldEngine.js (+ commissaryYieldEngine.test.js). Route
-auto-carries the fields; add a route-level assertion in commissary.test.js if convenient.
-Server-only, NO click-through. Depends on 24d-i.
-
-## Step 24d-iii - richer yield: output count + miscut in the commissary UI
-
-Third slice of the richer yield model. Exposes the 24d-i/ii fields in the commissary yield
-UI (public/commissary.html). DEPENDS ON 24d-ii (which needs 24d-i) - /start skips until
-24d-ii is merged. PUBLIC step -> requires a live click-through before merge.
-
-Entry form ("Log a yield event", public/commissary.html ~99-108):
-- Add an output-count input (output_quantity), shown/required only when the SELECTED output
-  meat is unit-tracked. Mirror the existing new-input-qty pattern (the new-input-qty-req hint
-  + the source-unit logic near line 151) but keyed on the output meat (new-output-meat; "Same
-  meat" means the source meat, so use its unit). Label e.g. "How many came out".
-- Add a miscut input (miscut_weight, kg), always shown, optional, defaults 0. Label e.g.
-  "Miscut / reusable trim (kg)".
-- Include both in the POST body; miscut defaults 0 when blank.
-
-Yield log table (render ~458-531 + edit-in-place ~585-586):
-- Add columns: output_quantity (show "-" when null) and miscut_weight (kg; the read returns
-  it once 24d-ii is in). Optionally a small "true loss" cell from residualLoss (24d-ii),
-  display only - the full recoverable-vs-true-loss management panel stays the later analytics
-  step.
-- Edit-in-place: add edit fields for output_quantity (mirror edit-input-qty) and miscut_weight;
-  send them on PATCH following the route's absent=keep / null=clear rules.
-
-Mobile: the form keeps the existing stacked-label style (no Review/Enter treatment - that
-pattern is the audit grid's, not this form). The widened yield-log table must scroll
-horizontally below 768px inside an overflow-x container (see ui-conventions.md "Tables"); do
-NOT card-ify it.
-
-Client validation is convenience only - the 24d-i server guard is authoritative
-(output_quantity required for unit output; backed+miscut <= raw). Don't duplicate the
-coherence math in the client beyond a friendly inline hint.
-
-Touches: public/commissary.html (+ public/style.css if the overflow wrapper needs it).
-Depends on 24d-ii. PUBLIC -> live click-through required before merge.
+Third yield slice. Exposes miscut on the commissary yield UI (public/commissary.html). DEPENDS ON
+24d-ii. PUBLIC -> click-through. (Path 1: no output-count field.) Entry form ("Log a yield event"):
+add a miscut input (miscut_weight, kg), always shown, optional, defaults 0 ("Miscut / reusable
+trim (kg)"); include it in the POST body. Yield log table: add a miscut_weight column (kg; read
+returns it once 24d-ii is in) and optionally a small residualLoss "true loss" cell (display only).
+Edit-in-place: a miscut field per the route's absent=keep convention. Mobile: keep the stacked
+form; the widened log table scrolls horizontally below 768px (ui-conventions.md "Tables"), do NOT
+card-ify it. Client validation is convenience only - the 24d-i server guards are authoritative.
+Touches: public/commissary.html (+ public/style.css if needed). PUBLIC -> live click-through.
+Depends on 24d-ii.
 
 ## Step users-roles - identity foundation: users + roles tables + role seed
 

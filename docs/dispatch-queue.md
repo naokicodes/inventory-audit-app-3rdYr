@@ -46,15 +46,12 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 3b. Step reseed-beta-db — CLOSED 2026-09-28, PR #15 (`9786dad`).
 
-### 3c. Step 24d-i - richer yield: output_quantity + miscut_weight + coherence guard  [BLOCKED: #16]
-**BLOCKED by #16 (2026-09-28)** - the spec accepts unit-tracked outputs, which contradicts the settled
-"yield output is always kg / unit-to-unit never recorded" decisions and would credit kg to a unit meat
-via commissaryAuditEngine.js. Needs Naoki's ruling before ANY yield slice dispatches. Do not dispatch.
+### 3c. Step 24d-i - richer yield: miscut_weight + coherence guard + kg-output guard (Path 1)  [runnable]
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, server/routes/commissary.js
-First slice of the richer commissary yield model. Supersedes standalone 24b-v (its guard
-becomes the coherence block). Server-only, no click-through. One migration in flight at a
-time; connection.js overlaps reseed-beta-db, so not both at once. Full spec:
-session-status.md -> "Step 24d-i".
+RESOLVED to Path 1 (#16): output_quantity DROPPED; commi yield stays kg-out, ledger untouched.
+Builds the kg-output guard 24b-v specified (reject a unit-tracked effective output) + adds
+miscut_weight + the coherence guard. Server-only, no click-through. Overlaps schema.sql with
+users-roles -> sequence. Full spec: session-status.md -> "Step 24d-i".
 
 ### 3d. Step nav-mobile - contain shared nav below 768px  [Beta lane . runnable]
 Touches: public/style.css, docs/ui-conventions.md
@@ -72,12 +69,11 @@ Read-layer only: computeYieldRow adds miscut_weight + residualLoss (raw-backed-m
 loss/status UNCHANGED. Route auto-carries. Depends on 24d-i (unmerged) -> skipped until it
 merges. Server-only, no click-through. Full spec: session-status.md -> "Step 24d-ii".
 
-### 3f. Step 24d-iii - richer yield: output count + miscut in the commissary UI  [blocked: 24d-ii]
+### 3f. Step 24d-iii - richer yield: miscut on the commissary UI (Path 1)  [blocked: 24d-ii]
 Touches: public/commissary.html, public/style.css
-Adds output_quantity + miscut_weight to the yield form and log table (display + edit),
-output-count conditional on the output meat's unit (mirrors new-input-qty). Wide table scrolls
-below 768px. Depends on 24d-ii (unmerged) -> skipped until it merges. PUBLIC -> click-through
-before merge. Full spec: session-status.md -> "Step 24d-iii".
+Adds a miscut_weight field to the yield form + a miscut column in the log table (Path 1: no
+output-count). Wide table scrolls below 768px. Depends on 24d-ii. PUBLIC -> click-through before
+merge. Full spec: session-status.md -> "Step 24d-iii".
 
 ### 3g. Step archive-pass-2 - trim session-status.md into session-history.md  [runnable]
 Touches: docs/session-status.md, docs/session-history.md
@@ -148,8 +144,7 @@ endorsement / PO-arrival receipt share ONE receipt shape or stay distinct. This
 is a domain reconciliation, still open — not the engineer's call.
 
 ### 4. Step 24b-v — the effective yield output must be kg-tracked
-**REOPENED by #16 (2026-09-28) — do not dispatch.** 24b-v's retirement assumed 24d-i supersedes it; #16 shows that is unresolved, so 24b-v's "output must be kg" rule STANDS pending Naoki's #16 ruling.
-**SUPERSEDED by Step 24d-i (2026-09-27).** The richer yield model redefines the guard from "output must be kg-tracked" to "the weight flow must close" (backed + miscut <= raw); 24d-i carries it. Close this when 24d-i lands.
+**RESOLVED 2026-09-28 (#16 -> Path 1): STANDS and is BUILT by Step 24d-i** (24d-i codes the kg-output guard this step specified). Not superseded - kept and enforced. Close when 24d-i lands.
 
 **Lane: DISPATCH only. Needs an architect-written prompt.**
 
@@ -228,6 +223,19 @@ initiative — that is still "inventing a step."
 Decisions: `session-status.md` -> "Things NOT to re-litigate" (2026-09-15).
 
 ---
+
+## Planned — commissary staging / conversion model (architect-defined 2026-09-28, NOT yet sliced)
+
+Resolves the kg<->units need without touching the commi yield ledger (#16 -> Path 1). See
+session-status "Things NOT to re-litigate -> Commissary staging / conversion model". Build family,
+sliced in a later architect turn:
+- **Conversion** op: processed commi kg -> restaurant units vs a standard; variance -> shrinkage
+  (allocation). Reused at the restaurant for kg received as raw.
+- **Staging**: restaurant meat holds stock at the commi (staging location); balance spans
+  commi-staged vs restaurant-on-hand.
+- **Shipment = the staged event released** when the restaurant pulls it (kg -> restaurant raw, or a
+  reported piece count). No transit shrinkage; transit loss = allocation.
+Leans on the conversion-standards + allocation machinery already in the schema.
 
 ## Available engineer-lane work
 
