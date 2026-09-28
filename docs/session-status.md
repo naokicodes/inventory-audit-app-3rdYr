@@ -783,6 +783,8 @@ route is the first scoping question of pillar 2.
 
 ## Step archive-pass — trim session-status.md
 
+**CLOSED (stale) — this pass was completed (see session-history "## Archived 2026-09-03 (pass 2)"); the 2026-09-28 trim was done by archive-pass-2 (PR #18). Kept until the next archive pass sweeps it.**
+
 **Lane: DISPATCH only. Docs only — no code, no schema, no test changes.**
 
 This file is ~1,300 lines. Rule 22 keeps it short because every worker session
@@ -1358,6 +1360,8 @@ one for a dispatched task. Verify each against the current repo before acting.
 ## Step reseed-beta-db — CLOSED 2026-09-28, PR #15. See docs/session-history.md.
 
 ## Step 24d-i - richer yield: miscut_weight + coherence guard + kg-output guard (Path 1)
+
+**CLOSED 2026-09-28, PR #20 (`17cad2c`).** Kept here until the next archive pass.
 
 RESOLVED 2026-09-28 to PATH 1 (#16): the commi yield output stays ALWAYS kg (settled rule holds).
 output_quantity is DROPPED - unit outputs are NOT commi yields; units at the commi are staged

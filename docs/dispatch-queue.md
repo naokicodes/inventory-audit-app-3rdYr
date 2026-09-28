@@ -46,22 +46,9 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 3b. Step reseed-beta-db — CLOSED 2026-09-28, PR #15 (`9786dad`).
 
-### 3c. Step 24d-i - richer yield: miscut_weight + coherence guard + kg-output guard (Path 1)  [runnable]
-Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, server/routes/commissary.js
-RESOLVED to Path 1 (#16): output_quantity DROPPED; commi yield stays kg-out, ledger untouched.
-Builds the kg-output guard 24b-v specified (reject a unit-tracked effective output) + adds
-miscut_weight + the coherence guard. Server-only, no click-through. Overlaps schema.sql with
-users-roles -> sequence. Full spec: session-status.md -> "Step 24d-i".
+### 3c. Step 24d-i — CLOSED 2026-09-28, PR #20 (`17cad2c`).
 
-### 3d. Step nav-mobile - contain shared nav below 768px  [Beta lane . runnable]
-Touches: public/style.css, docs/ui-conventions.md
-Resolves #13. Below 768px the shared nav (11 flex links, no wrap) widens the page
-to ~866px, so every page scrolls sideways at phone width; the fixed
-#command-panel-toggle self-corrects once the page stops widening (no JS change).
-Contain the nav to the viewport (flex-wrap: nowrap; overflow-x: auto; max-width:
-100%). daily-audit-mobile (PR #14) has merged, so the style.css overlap is clear.
-Cross-page -> live click-through at 390px on daily-audit + one other page,
-scrollWidth <= innerWidth. Full spec: session-status.md -> "Step nav-mobile".
+### 3d. Step nav-mobile — CLOSED 2026-09-28, PR #17 (`39dfcc6`).
 
 ### 3e. Step 24d-ii - richer yield: surface miscut + true-loss split (read layer)  [blocked: 24d-i]
 Touches: server/engines/commissaryYieldEngine.js (+ test)
@@ -75,9 +62,7 @@ Adds a miscut_weight field to the yield form + a miscut column in the log table 
 output-count). Wide table scrolls below 768px. Depends on 24d-ii. PUBLIC -> click-through before
 merge. Full spec: session-status.md -> "Step 24d-iii".
 
-### 3g. Step archive-pass-2 - trim session-status.md into session-history.md  [runnable]
-Touches: docs/session-status.md, docs/session-history.md
-Mechanical Class-A: session-status.md is ~1,800 lines. Move each CLOSED step section (those carrying a **CLOSED ...** stamp) into docs/session-history.md, leaving a one-line pointer; keep "Things NOT to re-litigate" and every open/active spec. Guard each move with assert count==1. Docs only, no click-through.
+### 3g. Step archive-pass-2 — CLOSED 2026-09-28, PR #18 (`971bf9c`).
 
 ### 3h. Step users-roles - identity foundation: users + roles tables + role seed  [runnable]
 **#19 resolved (2026-09-28):** seed one super-admin USER in seed.js so the users table has a write path (spec updated).
