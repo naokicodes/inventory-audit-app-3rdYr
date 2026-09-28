@@ -77,18 +77,25 @@ function getAllowedLeewayPct(db, commissaryMeatId) {
  * plus its meat's allowed leeway, and returns raw fields + computed
  * metrics together. Returns null if the row doesn't exist or is
  * soft-deleted.
+ *
+ * Step 24d-ii: also returns miscut_weight (recoverable trim, kg) and
+ * residualLoss = raw_weight_in - backed_weight_out - miscut_weight (true
+ * loss, kg) - the raw-vs-backed gap split into miscut + residualLoss.
+ * actualLossPct / status / excessLoss stay raw vs backed: miscut is
+ * recorded for analytics only and never softens the loss judgment.
  */
 function computeYieldRow(db, yieldLogId) {
   const row = db.prepare(
-    `SELECT id, commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes
+    `SELECT id, commissary_meat_id, business_date, raw_weight_in, backed_weight_out, miscut_weight, notes
      FROM commissary_yield_log WHERE id = ? AND deleted_at IS NULL`
   ).get(yieldLogId);
   if (!row) return null;
 
   const allowedLeewayPct = getAllowedLeewayPct(db, row.commissary_meat_id);
   const metrics = computeYieldMetrics(row.raw_weight_in, row.backed_weight_out, allowedLeewayPct);
+  const residualLoss = row.raw_weight_in - row.backed_weight_out - row.miscut_weight;
 
-  return { ...row, allowedLeewayPct, ...metrics };
+  return { ...row, allowedLeewayPct, ...metrics, residualLoss };
 }
 
 /** Runs computeYieldRow for every non-deleted yield log entry on one date. */

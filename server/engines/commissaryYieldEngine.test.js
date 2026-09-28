@@ -157,6 +157,45 @@ test('soft-deleted yield log rows are excluded from computeYieldLogForDate', () 
   assert.strictEqual(results.length, 0);
 });
 
+// --- Step 24d-ii: miscut + true-loss split on reads -----------------------
+
+test('computeYieldRow returns miscut_weight + residualLoss (raw - backed - miscut)', () => {
+  const id = db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, miscut_weight) VALUES (?, ?, ?, ?, ?)')
+    .run(jowlId, '2026-07-11', 20.5, 16.0, 1.5).lastInsertRowid;
+  const result = computeYieldRow(db, id);
+  assert.strictEqual(result.miscut_weight, 1.5);
+  assert.ok(Math.abs(result.residualLoss - (20.5 - 16.0 - 1.5)) < EPS);
+});
+
+test('a miscut row has IDENTICAL actualLossPct / status / excessLoss to the same row with miscut 0', () => {
+  const insert = db.prepare('INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, miscut_weight) VALUES (?, ?, ?, ?, ?)');
+  const plain = computeYieldRow(db, insert.run(shortplateId, '2026-07-12', 14.0, 7.5, 0).lastInsertRowid);
+  const miscut = computeYieldRow(db, insert.run(shortplateId, '2026-07-12', 14.0, 7.5, 3.0).lastInsertRowid);
+  assert.strictEqual(miscut.actualLossPct, plain.actualLossPct);
+  assert.strictEqual(miscut.status, plain.status);
+  assert.strictEqual(miscut.excessLoss, plain.excessLoss);
+  assert.strictEqual(miscut.status, 'Review');
+  // the gap decomposes: miscut + residualLoss == raw - backed
+  assert.ok(Math.abs((miscut.miscut_weight + miscut.residualLoss) - (14.0 - 7.5)) < EPS);
+  assert.ok(Math.abs(plain.residualLoss - (14.0 - 7.5)) < EPS);
+});
+
+test('a row written without miscut_weight reads miscut 0 and residualLoss == raw - backed', () => {
+  const jowlRowId = db.prepare('SELECT id FROM commissary_yield_log WHERE commissary_meat_id = ? AND business_date = ?').get(jowlId, '2026-07-02').id;
+  const result = computeYieldRow(db, jowlRowId);
+  assert.strictEqual(result.miscut_weight, 0);
+  assert.ok(Math.abs(result.residualLoss - 4.5) < EPS);
+});
+
+test('computeYieldLogForDate carries miscut_weight + residualLoss on every row', () => {
+  const results = computeYieldLogForDate(db, '2026-07-12');
+  assert.strictEqual(results.length, 2);
+  for (const r of results) {
+    assert.ok('miscut_weight' in r);
+    assert.ok(Math.abs(r.residualLoss - (r.raw_weight_in - r.backed_weight_out - r.miscut_weight)) < EPS);
+  }
+});
+
 // --- Part 3: commissary balance (backed-in minus shipped-out) -------------
 // Commi_Audit_Master.xlsx was available this session - these fixtures are
 // the REAL M03 Belly Slab rows from Yield_Log and Outbound_Log, and the
