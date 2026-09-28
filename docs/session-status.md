@@ -1756,6 +1756,11 @@ re-litigate), a separate build family. This slice does two things and never touc
    (recoverable trim, kg; recorded-in analytics only, NOT subtracted from loss%). Coherence guard
    in the same validator: backed_weight_out + miscut_weight > raw_weight_in + EPSILON -> 400.
    Forward + on-edit (POST + PATCH share the validator).
+   miscut_weight must be >= 0 (a negative value is nonsense AND defeats the coherence guard:
+   backed 11 + miscut -2 = 9 <= raw 10 would pass). AND raw_weight_in / backed_weight_out /
+   miscut_weight must be finite via Number.isFinite -> 400, else a non-numeric value (NaN) slips the
+   guard and 500s on insert - fix all three weight fields together. (Re-added 2026-09-28 after PR #20
+   review; the >=0 check was in the pre-#16 draft and got dropped in the Path-1 condense - my miss.)
 
 Schema: ALTER ADD COLUMN miscut_weight (plain, no rebuild); add to schema.sql CREATE TABLE too.
 Migration: idempotent helper (migrateLocationsActiveColumn pattern), wired into connection.js.
