@@ -87,6 +87,13 @@ No membership/login/authorship yet. Server-only, no click-through, no migration.
 24d-i on schema.sql -> not both in flight; sequence them. Full spec: session-status.md ->
 "Step users-roles".
 
+### 3i. Step user-sites - membership table + site resolver  [blocked: users-roles]
+Touches: server/db/schema.sql, server/db/siteAccess.js
+Membership model B (site_code text) + a resolver (getUserSiteCodes / userHasSite /
+resolveSiteCode). Data layer only, NO enforcement yet. Depends on users-roles (users table);
+overlaps schema.sql with 24d-i + users-roles -> sequence. Server-only, no click-through. Full
+spec: session-status.md -> "Step user-sites".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 

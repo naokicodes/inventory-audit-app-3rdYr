@@ -1894,3 +1894,38 @@ Touches: server/db/schema.sql, server/db/seed.js (+ tests). Server-only, no clic
 migration. NOTE: touches schema.sql, which Step 24d-i also touches -> not both in flight;
 sequence them.
 
+## Step user-sites - membership table + site resolver (model B)
+
+Second slice of the multi-user surface (architect 2026-09-28). Membership model B (site_code
+text) - proceeding on the lean; flipping to C (polymorphic) is a small doc change. Data layer
+only: the table + a resolver. NO enforcement/middleware yet (that needs the logged-in session
+user from the login slice). DEPENDS ON users-roles (needs the users table).
+
+Schema (schema.sql, new CREATE TABLE IF NOT EXISTS - no migrate helper):
+- user_sites: user_id (FK users), site_code TEXT, PRIMARY KEY (user_id, site_code). site_code
+  is a restaurant OR commissary code; no FK on site_code (model B's tradeoff), the resolver
+  validates it. Model B assumes codes are unique across restaurants + commissaries.
+
+Resolver (new module, e.g. server/db/siteAccess.js):
+- getUserSiteCodes(userId) -> string[] (union of the user's memberships).
+- userHasSite(userId, siteCode) -> boolean.
+- resolveSiteCode(siteCode) -> { type: 'restaurant'|'commissary', id } | null - looks the code
+  up in restaurants then commissaries; the ONE place the "code matches either table" logic
+  lives. Flag a collision if a code exists in both.
+Enforcement is NOT wired here - no session user exists yet. The query-layer site filter
+(management/admin/super-admin bypass; a checker filtered to memberships) is a LATER slice that
+depends on the login slice.
+
+Importer caveat (for slice 3): the workbook Sites tab uses codes like SIL/FC while
+Restaurant_Meats uses SILT/FCT - the importer must map memberships to the actual
+restaurants.code. The resolver works off whatever codes the real tables carry.
+
+Portability (MySQL note): standard types, no sqlite-only.
+
+Tests: user_sites created; getUserSiteCodes returns the union; userHasSite true/false;
+resolveSiteCode finds a restaurant code and a commissary code and returns null for an unknown.
+
+Touches: server/db/schema.sql, server/db/siteAccess.js (+ test). Server-only, no click-through,
+no migration. Depends on users-roles; overlaps schema.sql with 24d-i + users-roles -> sequence,
+not concurrent.
+
