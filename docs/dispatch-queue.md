@@ -42,17 +42,9 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 2d. Step ui-viewport — CLOSED 2026-09-25, PR #10 (`4d92634`).
 
-### 3a. Step daily-audit-mobile - Review/Enter phone layout  [Beta lane . runnable]
-Touches: public/daily-audit.html, public/style.css
-Beta entry requirement (docs/testing-plan.md). Two views over one fetch; carries
-the 26a tags and the blocked month-opening state. Public step -> needs a live
-click-through comment before merge. Parallel-safe. Full spec: session-status.md
--> "Step daily-audit-mobile".
+### 3a. Step daily-audit-mobile — CLOSED 2026-09-28, PR #14 (`c3c9575`).
 
-### 3b. Step reseed-beta-db - clean reseed + disposable beta.db  [Beta lane . runnable]
-Touches: server/db/seed.js, server/db/connection.js, package.json
-Beta entry requirement. One-command reseed + env-selectable DB path. Solo (it's a
-DB-path change). Full spec: session-status.md -> "Step reseed-beta-db".
+### 3b. Step reseed-beta-db — CLOSED 2026-09-28, PR #15 (`9786dad`).
 
 ### 3c. Step 24d-i - richer yield: output_quantity + miscut_weight + coherence guard  [runnable]
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, server/routes/commissary.js
@@ -60,6 +52,16 @@ First slice of the richer commissary yield model. Supersedes standalone 24b-v (i
 becomes the coherence block). Server-only, no click-through. One migration in flight at a
 time; connection.js overlaps reseed-beta-db, so not both at once. Full spec:
 session-status.md -> "Step 24d-i".
+
+### 3d. Step nav-mobile - contain shared nav below 768px  [Beta lane . runnable]
+Touches: public/style.css, docs/ui-conventions.md
+Resolves #13. Below 768px the shared nav (11 flex links, no wrap) widens the page
+to ~866px, so every page scrolls sideways at phone width; the fixed
+#command-panel-toggle self-corrects once the page stops widening (no JS change).
+Contain the nav to the viewport (flex-wrap: nowrap; overflow-x: auto; max-width:
+100%). daily-audit-mobile (PR #14) has merged, so the style.css overlap is clear.
+Cross-page -> live click-through at 390px on daily-audit + one other page,
+scrollWidth <= innerWidth. Full spec: session-status.md -> "Step nav-mobile".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 

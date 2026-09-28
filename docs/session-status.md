@@ -1766,3 +1766,23 @@ Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js,
 server/routes/commissary.js (+ the two test files). Server-only, NO click-through. Sequencing:
 connection.js overlaps reseed-beta-db - not both in flight; one migration at a time.
 
+
+## Step nav-mobile - contain shared nav below 768px (Beta, resolves #13)
+The shared top <nav> (public/style.css: display:flex; gap:1rem; no wrap; 11 links)
+is ~866px wide, so at a 390px phone width every page's documentElement.scrollWidth
+is 866 and the page scrolls sideways. This predates daily-audit-mobile (whose own
+views end at 359px) and is a cross-page defect, so it is its own step, not part of
+that one. #command-panel-toggle is position:fixed bottom-right; it only lands off-
+screen (right=850) because the nav widened the layout viewport, and it self-
+corrects once the nav is contained - command-panel.js is NOT touched.
+Fix: below the 768px breakpoint, contain the nav so the page body never scrolls
+sideways -
+  @media (max-width: 768px){ nav{ flex-wrap: nowrap; overflow-x: auto;
+    max-width: 100%; -webkit-overflow-scrolling: touch; } }
+The nav becomes a horizontally-scrollable strip. (Alternative, if every link should
+stay visible: flex-wrap: wrap - a taller block per page.) Also add the Navigation
+section to docs/ui-conventions.md. A fuller mobile nav (grouping/collapse) is
+deferred until the new pages land and the top-level set is known.
+Touches: public/style.css, docs/ui-conventions.md. daily-audit-mobile (PR #14) has
+merged, so the style.css overlap is clear; runnable. Public step: live click-through
+at 390px (scrollWidth <= innerWidth) before merge.

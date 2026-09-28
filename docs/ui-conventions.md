@@ -14,6 +14,19 @@ acknowledgment, sides) are known. Add to it; don't wait for it to be complete.
   the page keeps its desktop layout. Working value - revisit if a real device
   proves it wrong, but keep one number across pages.
 
+## Navigation
+
+- **Below 768px the shared top nav must not widen the page.** It stays a single
+  non-wrapping row contained to the viewport (`overflow-x: auto`), so the page body
+  never scrolls sideways - only the nav strip scrolls. (Issue #13: 11 flex links
+  with no wrap made every page ~866px wide at a 390px viewport.)
+- **`#command-panel-toggle` stays `position: fixed` bottom-right.** It only appeared
+  to overflow because the nav widened the page; a contained nav fixes it with no JS
+  change.
+- **A fuller mobile nav** (grouping or a collapse/menu) is deferred until the new
+  pages (login, roles admin, PO-request, acknowledgment, sides) land and the
+  top-level set is known.
+
 ## Daily audit (and any Review/Enter sheet)
 
 - **Two views over one fetch.** Review (read the state) and Enter (type counts)
