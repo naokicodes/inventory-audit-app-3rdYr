@@ -79,3 +79,186 @@ nav {
   display: flex;
   gap: 1rem;
 }
+
+/* Review/Enter sheet (docs/ui-conventions.md -> "Daily audit (and any
+   Review/Enter sheet)"). One fetch renders a desktop table plus two phone
+   views; the body's data-sheet-view attribute picks which phone view shows.
+   Hidden by default - only the phone breakpoint below reveals them. */
+.view-toggle,
+.sheet-view {
+  display: none;
+}
+
+.view-toggle {
+  gap: 0;
+  margin-bottom: 0.8rem;
+}
+
+.view-toggle button {
+  flex: 1;
+  border: 1px solid #999;
+  background: #fff;
+}
+
+.view-toggle button[aria-pressed="true"] {
+  background: #333;
+  color: #fff;
+  border-color: #333;
+}
+
+/* Review: a card per item. Display fields muted; ending-actual is the one
+   accented input; the variance is the one colored chip. */
+.audit-card {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.audit-card.dish-card {
+  border-left: 3px solid #ccc;
+}
+
+.audit-card .card-name {
+  font-weight: bold;
+}
+
+.audit-card .card-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0.4rem 0;
+  color: #777;
+  font-size: 0.85rem;
+}
+
+.audit-card .card-fields dt {
+  font-weight: normal;
+}
+
+.audit-card .card-fields dd {
+  margin: 0;
+  text-align: right;
+}
+
+.audit-card .card-variance {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.3rem 0;
+  font-size: 0.85rem;
+  color: #777;
+}
+
+.variance-chip {
+  display: inline-block;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  font-size: 0.85rem;
+}
+
+.audit-card .card-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: #777;
+}
+
+.audit-card .card-field input[type="number"] {
+  width: 7rem;
+  padding: 0.4rem;
+  font-size: 1rem;
+}
+
+.audit-card .card-field.accent {
+  color: #111;
+  font-weight: bold;
+}
+
+.audit-card .card-field.accent input[type="number"] {
+  border: 2px solid #1a5fb4;
+  border-radius: 3px;
+}
+
+/* A blocked row (no month opening) cannot take a count - don't let the
+   accent suggest otherwise. */
+.audit-card .card-field.accent input[type="number"]:disabled {
+  border-color: #ccc;
+  background: #f3f3f3;
+}
+
+.audit-card .card-field.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+}
+
+.audit-card .card-field.stacked input[type="text"] {
+  width: auto;
+  padding: 0.4rem;
+  font-size: 0.95rem;
+}
+
+.card-blocked {
+  color: #999;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* Enter: a single-column count list, one input per row (dish rows keep
+   their two). */
+.enter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.enter-row .enter-name {
+  flex: 1;
+}
+
+.enter-row .enter-inputs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.enter-row label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: #777;
+  gap: 0.15rem;
+}
+
+.enter-row input[type="number"] {
+  width: 6rem;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+/* Phone vs desktop cutover - docs/ui-conventions.md -> Breakpoints (768px,
+   one number across pages). Below it: phone views + toggle; at/above it:
+   the desktop layout, no toggle. */
+@media (max-width: 767.98px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .view-toggle {
+    display: flex;
+  }
+
+  body[data-sheet-view="review"] .sheet-view-review,
+  body[data-sheet-view="enter"] .sheet-view-enter {
+    display: block;
+  }
+}
