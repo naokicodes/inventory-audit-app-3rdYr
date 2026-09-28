@@ -700,11 +700,22 @@ router.put('/commissary/conversion-standards/:id', (req, res) => {
 //   meat_type_id/unit match, unlike ALLOCATION's destination rule - the
 //   yield log is the one place a unit legitimately changes. An output equal
 //   to the input is accepted (identical to NULL via the engine's COALESCE).
+// - the EFFECTIVE output meat, COALESCE(output_commissary_meat_id,
+//   commissary_meat_id), must be kg-tracked (24b-v, built by 24d-i). Yield
+//   output is always kg; a unit-tracked effective output would credit kg
+//   onto a count balance (getCommissaryBackedUp). So a unit source needs an
+//   explicit kg output meat, and unit-to-unit is rejected.
 // - input_quantity is REQUIRED for a unit-tracked source (every counted
 //   input is also weighed at intake, so it's always available) and optional
 //   otherwise; when given it must be positive.
+// - coherence (24d-i): backed_weight_out + miscut_weight cannot exceed
+//   raw_weight_in - the output and the recoverable trim both come out of
+//   the raw weight.
 // Returns an error string, or null if valid.
-function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inputQuantity) {
+const YIELD_WEIGHT_EPSILON = 1e-9; // float rounding tolerance only, matches commissaryYieldEngine.js
+
+function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inputQuantity, rawWeightIn, backedWeightOut, miscutWeight) {
+  let effectiveOutputMeat = sourceMeat;
   if (outputCommissaryMeatId !== null) {
     const outputMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(outputCommissaryMeatId);
     if (!outputMeat) {
@@ -713,6 +724,11 @@ function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inpu
     if (outputMeat.commissary_id !== sourceMeat.commissary_id) {
       return "output_commissary_meat_id must belong to the same commissary as the input meat";
     }
+    effectiveOutputMeat = outputMeat;
+  }
+
+  if (effectiveOutputMeat.unit !== 'kg') {
+    return 'the yield output meat must be kg-tracked - choose a kg output meat (create one in the catalog first if none exists)';
   }
 
   if (inputQuantity === null) {
@@ -723,17 +739,21 @@ function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inpu
     return 'input_quantity must be positive';
   }
 
+  if (backedWeightOut + miscutWeight > rawWeightIn + YIELD_WEIGHT_EPSILON) {
+    return 'backed_weight_out plus miscut_weight cannot exceed raw_weight_in';
+  }
+
   return null;
 }
 
 // POST /api/commissary/yield-log
 // Body: { commissary_meat_id, business_date, raw_weight_in, backed_weight_out,
-//         output_commissary_meat_id?, input_quantity?, notes, actor }
+//         output_commissary_meat_id?, input_quantity?, miscut_weight?, notes, actor }
 // output_commissary_meat_id/input_quantity are both optional and default to
 // NULL, preserving prior behavior exactly - see validateYieldOutputAndInputQty
-// above for their rules.
+// above for their rules. miscut_weight is optional and defaults to 0 (24d-i).
 router.post('/commissary/yield-log', (req, res) => {
-  const { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, notes, actor } = req.body;
+  const { commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, miscut_weight, notes, actor } = req.body;
 
   if (!commissary_meat_id || !business_date || raw_weight_in === undefined || raw_weight_in === null || raw_weight_in === ''
       || backed_weight_out === undefined || backed_weight_out === null || backed_weight_out === '') {
@@ -749,8 +769,10 @@ router.post('/commissary/yield-log', (req, res) => {
     ? output_commissary_meat_id : null;
   const inputQty = (input_quantity !== undefined && input_quantity !== null && input_quantity !== '')
     ? Number(input_quantity) : null;
+  const miscutWeight = (miscut_weight !== undefined && miscut_weight !== null && miscut_weight !== '')
+    ? Number(miscut_weight) : 0;
 
-  const validationError = validateYieldOutputAndInputQty(meat, outputId, inputQty);
+  const validationError = validateYieldOutputAndInputQty(meat, outputId, inputQty, Number(raw_weight_in), Number(backed_weight_out), miscutWeight);
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
@@ -758,9 +780,9 @@ router.post('/commissary/yield-log', (req, res) => {
   try {
     const id = withTransaction(db, () => {
       const result = db.prepare(`
-        INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), outputId, inputQty, notes || null, actor || null);
+        INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, miscut_weight, output_commissary_meat_id, input_quantity, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), miscutWeight, outputId, inputQty, notes || null, actor || null);
 
       const after = getYieldLogRow(result.lastInsertRowid);
       logActivity(db, {
@@ -783,7 +805,7 @@ router.post('/commissary/yield-log', (req, res) => {
 
 // PATCH /api/commissary/yield-log/:id
 // Body: { raw_weight_in?, backed_weight_out?, business_date?,
-//         output_commissary_meat_id?, input_quantity?, notes?, actor }
+//         output_commissary_meat_id?, input_quantity?, miscut_weight?, notes?, actor }
 // commissary_meat_id is not editable here - a different meat is a
 // different event; delete + re-create instead.
 //
@@ -791,10 +813,12 @@ router.post('/commissary/yield-log', (req, res) => {
 // both ("output is the same meat" / "input qty equals raw_weight_in"), so
 // this can't reuse the undefined/null/''-all-mean-"keep" pattern the other
 // fields use. Convention: an ABSENT key keeps the current value; an
-// explicit `null` (or `''`) CLEARS it to NULL.
+// explicit `null` (or `''`) CLEARS it to NULL. miscut_weight is NOT NULL
+// (0 = no miscut), so it follows the weight fields' pattern instead:
+// undefined/null/'' all keep the current value.
 router.patch('/commissary/yield-log/:id', (req, res) => {
   const id = Number(req.params.id);
-  const { raw_weight_in, backed_weight_out, business_date, output_commissary_meat_id, input_quantity, notes, actor } = req.body;
+  const { raw_weight_in, backed_weight_out, business_date, output_commissary_meat_id, input_quantity, miscut_weight, notes, actor } = req.body;
 
   const existing = getYieldLogRow(id);
   if (!existing || existing.deleted_at) {
@@ -803,6 +827,7 @@ router.patch('/commissary/yield-log/:id', (req, res) => {
 
   const nextRawIn = raw_weight_in !== undefined && raw_weight_in !== null && raw_weight_in !== '' ? Number(raw_weight_in) : existing.raw_weight_in;
   const nextBackedOut = backed_weight_out !== undefined && backed_weight_out !== null && backed_weight_out !== '' ? Number(backed_weight_out) : existing.backed_weight_out;
+  const nextMiscut = miscut_weight !== undefined && miscut_weight !== null && miscut_weight !== '' ? Number(miscut_weight) : existing.miscut_weight;
   const nextDate = business_date || existing.business_date;
   const nextNotes = notes !== undefined ? (notes || null) : existing.notes;
 
@@ -817,7 +842,7 @@ router.patch('/commissary/yield-log/:id', (req, res) => {
   // PATCH that clears input_quantity on a unit-tracked source must be
   // rejected exactly like omitting it at creation.
   const meat = db.prepare('SELECT * FROM commissary_meats WHERE id = ?').get(existing.commissary_meat_id);
-  const validationError = validateYieldOutputAndInputQty(meat, nextOutputId, nextInputQty);
+  const validationError = validateYieldOutputAndInputQty(meat, nextOutputId, nextInputQty, nextRawIn, nextBackedOut, nextMiscut);
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
@@ -825,9 +850,9 @@ router.patch('/commissary/yield-log/:id', (req, res) => {
   try {
     withTransaction(db, () => {
       db.prepare(`
-        UPDATE commissary_yield_log SET raw_weight_in = ?, backed_weight_out = ?, business_date = ?, output_commissary_meat_id = ?, input_quantity = ?, notes = ?
+        UPDATE commissary_yield_log SET raw_weight_in = ?, backed_weight_out = ?, miscut_weight = ?, business_date = ?, output_commissary_meat_id = ?, input_quantity = ?, notes = ?
         WHERE id = ?
-      `).run(nextRawIn, nextBackedOut, nextDate, nextOutputId, nextInputQty, nextNotes, id);
+      `).run(nextRawIn, nextBackedOut, nextMiscut, nextDate, nextOutputId, nextInputQty, nextNotes, id);
 
       const after = getYieldLogRow(id);
       logActivity(db, {

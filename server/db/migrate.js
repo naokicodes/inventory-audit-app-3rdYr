@@ -754,3 +754,39 @@ function migrateMonthStartRecountColumns(db) {
 }
 
 module.exports.migrateMonthStartRecountColumns = migrateMonthStartRecountColumns;
+
+// ----------------------------------------------------------------------
+// Step 24d-i (2026-09-28): commissary_yield_log.miscut_weight - see
+// docs/session-status.md's "Step 24d-i". Recoverable trim in kg,
+// recorded for analytics only; NOT subtracted from loss%. NOT NULL
+// DEFAULT 0, so every existing row reads as "no miscut". Same plain
+// ALTER TABLE ADD COLUMN shape as migrateYieldLogInputQuantityColumn
+// above - no rebuild needed.
+//
+// Must run BEFORE schema.sql - see connection.js.
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ ran: boolean }}
+ */
+function migrateYieldLogMiscutWeightColumn(db) {
+  const tableExists = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'commissary_yield_log'`
+  ).get();
+  if (!tableExists) {
+    // Fresh install - schema.sql creates it with the column already
+    // present. Nothing to migrate.
+    return { ran: false };
+  }
+
+  const columns = db.prepare(`PRAGMA table_info(commissary_yield_log)`).all();
+  const hasColumn = columns.some(c => c.name === 'miscut_weight');
+  if (hasColumn) {
+    return { ran: false };
+  }
+
+  db.exec(`ALTER TABLE commissary_yield_log ADD COLUMN miscut_weight REAL NOT NULL DEFAULT 0`);
+  return { ran: true };
+}
+
+module.exports.migrateYieldLogMiscutWeightColumn = migrateYieldLogMiscutWeightColumn;
