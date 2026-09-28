@@ -69,6 +69,13 @@ Read-layer only: computeYieldRow adds miscut_weight + residualLoss (raw-backed-m
 loss/status UNCHANGED. Route auto-carries. Depends on 24d-i (unmerged) -> skipped until it
 merges. Server-only, no click-through. Full spec: session-status.md -> "Step 24d-ii".
 
+### 3f. Step 24d-iii - richer yield: output count + miscut in the commissary UI  [blocked: 24d-ii]
+Touches: public/commissary.html, public/style.css
+Adds output_quantity + miscut_weight to the yield form and log table (display + edit),
+output-count conditional on the output meat's unit (mirrors new-input-qty). Wide table scrolls
+below 768px. Depends on 24d-ii (unmerged) -> skipped until it merges. PUBLIC -> click-through
+before merge. Full spec: session-status.md -> "Step 24d-iii".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 
 **Note 2026-09-24:** the architecture draft cancels the intake weigh-in

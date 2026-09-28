@@ -1818,3 +1818,38 @@ Touches: server/engines/commissaryYieldEngine.js (+ commissaryYieldEngine.test.j
 auto-carries the fields; add a route-level assertion in commissary.test.js if convenient.
 Server-only, NO click-through. Depends on 24d-i.
 
+## Step 24d-iii - richer yield: output count + miscut in the commissary UI
+
+Third slice of the richer yield model. Exposes the 24d-i/ii fields in the commissary yield
+UI (public/commissary.html). DEPENDS ON 24d-ii (which needs 24d-i) - /start skips until
+24d-ii is merged. PUBLIC step -> requires a live click-through before merge.
+
+Entry form ("Log a yield event", public/commissary.html ~99-108):
+- Add an output-count input (output_quantity), shown/required only when the SELECTED output
+  meat is unit-tracked. Mirror the existing new-input-qty pattern (the new-input-qty-req hint
+  + the source-unit logic near line 151) but keyed on the output meat (new-output-meat; "Same
+  meat" means the source meat, so use its unit). Label e.g. "How many came out".
+- Add a miscut input (miscut_weight, kg), always shown, optional, defaults 0. Label e.g.
+  "Miscut / reusable trim (kg)".
+- Include both in the POST body; miscut defaults 0 when blank.
+
+Yield log table (render ~458-531 + edit-in-place ~585-586):
+- Add columns: output_quantity (show "-" when null) and miscut_weight (kg; the read returns
+  it once 24d-ii is in). Optionally a small "true loss" cell from residualLoss (24d-ii),
+  display only - the full recoverable-vs-true-loss management panel stays the later analytics
+  step.
+- Edit-in-place: add edit fields for output_quantity (mirror edit-input-qty) and miscut_weight;
+  send them on PATCH following the route's absent=keep / null=clear rules.
+
+Mobile: the form keeps the existing stacked-label style (no Review/Enter treatment - that
+pattern is the audit grid's, not this form). The widened yield-log table must scroll
+horizontally below 768px inside an overflow-x container (see ui-conventions.md "Tables"); do
+NOT card-ify it.
+
+Client validation is convenience only - the 24d-i server guard is authoritative
+(output_quantity required for unit output; backed+miscut <= raw). Don't duplicate the
+coherence math in the client beyond a friendly inline hint.
+
+Touches: public/commissary.html (+ public/style.css if the overflow wrapper needs it).
+Depends on 24d-ii. PUBLIC -> live click-through required before merge.
+

@@ -41,3 +41,11 @@ acknowledgment, sides) are known. Add to it; don't wait for it to be complete.
   view, so switching views never blanks it.
 - **Desktop keeps its table.** Above the breakpoint there is no Review/Enter toggle;
   the phone views and the toggle exist below the breakpoint only.
+
+## Tables
+
+- **Wide tables scroll, they don't reflow.** A table too wide for the phone (the yield log,
+  and any dense grid that isn't the daily-audit sheet) sits in a horizontal-scroll container
+  (overflow-x:auto) below 768px so the page body never scrolls sideways. Do not card-ify it -
+  the Review/Enter card treatment is the daily-audit sheet's only.
+
