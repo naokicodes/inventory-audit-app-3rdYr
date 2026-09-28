@@ -76,7 +76,12 @@ output-count conditional on the output meat's unit (mirrors new-input-qty). Wide
 below 768px. Depends on 24d-ii (unmerged) -> skipped until it merges. PUBLIC -> click-through
 before merge. Full spec: session-status.md -> "Step 24d-iii".
 
+### 3g. Step archive-pass-2 - trim session-status.md into session-history.md  [runnable]
+Touches: docs/session-status.md, docs/session-history.md
+Mechanical Class-A: session-status.md is ~1,800 lines. Move each CLOSED step section (those carrying a **CLOSED ...** stamp) into docs/session-history.md, leaving a one-line pointer; keep "Things NOT to re-litigate" and every open/active spec. Guard each move with assert count==1. Docs only, no click-through.
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
+**REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 
 **Note 2026-09-24:** the architecture draft cancels the intake weigh-in
 (`weight_kg`) — 25a shrinks to quantity-only receipts. Do not build from the
@@ -99,6 +104,7 @@ endorsement / PO-arrival receipt share ONE receipt shape or stay distinct. This
 is a domain reconciliation, still open — not the engineer's call.
 
 ### 4. Step 24b-v — the effective yield output must be kg-tracked
+**RETIRED 2026-09-28 — do not dispatch; folded into Step 24d-i.**
 **SUPERSEDED by Step 24d-i (2026-09-27).** The richer yield model redefines the guard from "output must be kg-tracked" to "the weight flow must close" (backed + miscut <= raw); 24d-i carries it. Close this when 24d-i lands.
 
 **Lane: DISPATCH only. Needs an architect-written prompt.**
@@ -109,6 +115,7 @@ red by default. Must land before soft-launch.
 Spec: `session-status.md`, section "Step 24b-v".
 
 ### 5. Step 25d-i and 25d-iii — record who did the count
+**RETIRED 2026-09-28 — do not dispatch; superseded by the forward-clean users table.**
 **Lane: DISPATCH only. Needs no schema change; the columns exist.**
 
 Adds a per-sheet auditor name to both audit pages and writes it to

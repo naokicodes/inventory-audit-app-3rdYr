@@ -141,19 +141,15 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   (ending stock x the cost price set in settings), for meats and sides. Sales
   revenue / margin / profit never enters this app.
 - **Side inventory is simple counting**, separate from the meat engine: beginning
-  + receipts − ending, no recipe / no variance, valued at price as a guide. Must
-  NOT route through `auditEngine`.
+  + receipts − ending, no recipe / no variance, valued at price as a guide. Must NOT route through `auditEngine`. Build now from the workbook's transcribed Side_Items catalog; **units are unverified** and need a data investigation / re-setup pass later — don't block the build on it (2026-09-28).
 - **Sahog / no-standard consumption is a derived residual** at day-close (total
   consumed − what the direct + prep standards explain), labeled "unstandardized"
   (NOT "staff meals"), ONE bucket. A reclassification of the already-computed
   variance, not a new real-time entry.
 - **Endorsement IS the receipt** — confirming an arrival writes the stock receipt
   (one record), capturing arrived / short (qty) / none. Record-only, non-blocking.
-- **Running-low is user-configured** (par level = a settings field); watches the
-  real ending count with a calculated-ending fallback the checker can overwrite.
-- **Roles are configurable (GitHub-style)**, with server-side per-capability
-  enforcement (never client-side hide-the-button) and a safe bootstrap
-  (un-lockable super-admin + default roles). Roles are station-AGNOSTIC.
+- **Running-low is user-configured** (par level = a settings field); watches the real ending count with a calculated-ending fallback the checker can overwrite. Both modes are BUILT — PERCENT (ending < X% of par) and ABSOLUTE (ending <= N) — but only **ABSOLUTE threshold 0** is seeded/used for now (2026-09-28); percent thresholds need a data investigation and are deferred (feature present, unused).
+- **Roles are configurable (GitHub-style)**, with server-side per-capability enforcement (never client-side hide-the-button) and a safe bootstrap (un-lockable super-admin + default roles). Roles are site-scoped, station-AGNOSTIC. CONFIRMED 2026-09-26: five roles — super-admin, admin, management (read-only), head-chef/ops, checker; checker is differentiated by site membership, not role; cashier is not an app user. Decision C (2026-09-28): a **roles table seeded from the settings workbook** carries the capability flags (can_enter_counts / can_finalize / can_admin / read_only); the five names are fixed; super-admin is seeded and never lockable.
 - **Identity now, passwords later.** A thin `users` table (id, name, role) that
   `created_by` points at is built now; login is a stub (pick-your-name, no
   password) until the recycled auth lands. Phased beta: P0 open -> P1
@@ -161,9 +157,8 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
 - **Station scoping is structural**, via multi-station membership (membership and
   permission are SEPARATE facts). Floaters belong to both; access = union;
   schedule is informational + a copy-button. Never fuse station into the role.
-- **Finalization is mark-and-warn** per (site, date) sheet — soft, not a hard
-  lock; any checker marks done (logged); reopening is a logged edit. First-time
-  entry is not logged; changing stored data is.
+- **Finalization is two-step, soft** per (site, category, date) sheet (CLOSED 2026-09-26): the owner (assigned cook) marks **Done**; head-chef/admin **Closes**; reopening is logged. State model: Not started -> In progress -> Done -> Closed. Never a hard lock. First-time entry is not logged; changing stored data is.
+- **Sheets are a first-class two-tier entity, overlay-not-churn** (CLOSED 2026-09-26). Tier 1 = definition (site, category, engine_type MEAT|SIDE, active), admin-fed per site from the settings workbook's Sheet_Definitions. Tier 2 = dated instance (site, category, date) with owner_user_id + finalization_status, **lazy-created** (row on first touch, no cron). The tested engines stay untouched; the status/ownership row sits over them.
 - **Concurrency is optimistic** (a version / `updated_at` column + "changed under
   you — reload"), paired with `busy_timeout` and one-owner-per-sheet. NOT
   last-write-wins, NOT a waitlist.
@@ -176,9 +171,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
 - **Data volume: no PC upgrade.** Speed is an index problem, not hardware or
   pruning. Archive, don't delete. CSV export yes; CSV import deferred.
 - **Pin Node forward** (recent version, suite green, then lock the exact version).
-- **Configure-from-the-ground-up posture**, with the honest caveat that it needs
-  a written **definition-of-done** — still OWED (Naoki's to draft; it is the
-  bound on "solid / no more features").
+- **Configure-from-the-ground-up posture.** Definition-of-done stays **directional through alpha, firmed at beta** (2026-09-28, decision B) — intentionally not drafted now, not a gap. Context: this work may later **migrate to MySQL and merge onto a separate app** (repo to come from Naoki), so the final target can shift; keep new schema and the settings importer **portable where it's free** (avoid sqlite-only features in the users/roles layer). Reopen definition-of-done at beta / when that repo lands.
 
 - **The app records what is physically on hand, not what was invoiced.**
   Confirmed by NaokiiVT 2026-09-02. On a delivery the commissary weigh-checks
@@ -1236,6 +1229,8 @@ piece has a working restaurant-side equivalent to mirror.
 ### 25b — CLOSED 2026-09-02. See docs/session-history.md.
 
 ### 25a — commissary stock receipts. Raw meat arriving from suppliers. NEXT.
+
+**REVISED 2026-09-28 — quantity-only.** The intake weigh-in is CANCELLED (kg is measured at production via raw_weight_in, not at rest). 25a is a quantity-only receipt — no weigh-in here. Rewrite the spec below to drop any weigh-in before dispatch.
 Bigger than a route-and-UI mirror of `stockReceipts.js`, because
 **`commissary_stock_receipts` has a single `quantity` column and cannot record
 what is actually measured.**
@@ -1293,6 +1288,8 @@ openings is part of setting it up. No backfill of earlier months (decided
 
 ## Step 24b-v — REQUIRED: the effective yield output must be kg-tracked
 
+**RETIRED 2026-09-28 — folded into Step 24d-i.** The richer yield model redefines this guard from "output must be kg-tracked" to "the weight flow must close" (backed_weight_out + miscut_weight <= raw_weight_in); 24d-i carries it. Kept here until the next archive pass.
+
 **Found 2026-09-02 by an architect trace, after step 24 was closed. This is a
 live data-corruption bug, not a nicety, and it should be fixed before
 soft-launch.**
@@ -1340,6 +1337,8 @@ Chicken" has nothing to select, and today that silently degrades to the broken
 same-meat case instead of saying so. Catalog work belongs in the tagging pass.
 
 ## Step 25d — record who did the count
+
+**RETIRED 2026-09-28 — superseded by the forward-clean users table.** New writes carry user_id (the thin users table); free-text created_by drops at the pre-launch wipe, no backfill. Do not build free-text naming. Kept here until the next archive pass.
 
 **Lane: DISPATCH only. Operator-visible, so not engineer-lane. No schema
 change — every column already exists.**
