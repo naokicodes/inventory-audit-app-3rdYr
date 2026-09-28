@@ -80,6 +80,13 @@ before merge. Full spec: session-status.md -> "Step 24d-iii".
 Touches: docs/session-status.md, docs/session-history.md
 Mechanical Class-A: session-status.md is ~1,800 lines. Move each CLOSED step section (those carrying a **CLOSED ...** stamp) into docs/session-history.md, leaving a one-line pointer; keep "Things NOT to re-litigate" and every open/active spec. Guard each move with assert count==1. Docs only, no click-through.
 
+### 3h. Step users-roles - identity foundation: users + roles tables + role seed  [runnable]
+Touches: server/db/schema.sql, server/db/seed.js
+First multi-user slice: the two tables + the 5-role seed with capability flags (decision C).
+No membership/login/authorship yet. Server-only, no click-through, no migration. Overlaps
+24d-i on schema.sql -> not both in flight; sequence them. Full spec: session-status.md ->
+"Step users-roles".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 

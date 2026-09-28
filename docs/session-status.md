@@ -1858,3 +1858,39 @@ coherence math in the client beyond a friendly inline hint.
 Touches: public/commissary.html (+ public/style.css if the overflow wrapper needs it).
 Depends on 24d-ii. PUBLIC -> live click-through required before merge.
 
+## Step users-roles - identity foundation: users + roles tables + role seed
+
+First slice of the multi-user surface (architect 2026-09-28). Just the two tables and the
+role seed - NO membership, NO login, NO authorship rewrite yet (later slices; membership has
+an open design question - see the handoff / dispatch note). Decision C: roles carry capability
+flags; five names fixed; super-admin seeded and unlockable.
+
+Schema (schema.sql, new CREATE TABLE IF NOT EXISTS - handles fresh AND existing DBs, so no
+migrate helper needed):
+- roles: id, name UNIQUE, can_enter_counts, can_finalize, can_admin, read_only (INTEGER 0/1),
+  active (default 1). Match the existing tables' id / boolean conventions.
+- users: id, name UNIQUE, default_role_id (FK roles), active (default 1), created_at (same
+  default convention as existing tables). Forward-clean authorship (user_id on new writes) is
+  a LATER slice - do NOT rewire created_by here.
+
+Seed (seed.js, INSERT OR IGNORE - idempotent): the five confirmed roles with default flags
+from the workbook Roles tab -
+  super-admin (enter 1, finalize 1, admin 1, read_only 0),
+  admin       (enter 1, finalize 1, admin 1, read_only 0),
+  management  (enter 0, finalize 0, admin 0, read_only 1),
+  head-chef   (enter 1, finalize 1, admin 0, read_only 0),
+  checker     (enter 1, finalize 0, admin 0, read_only 0).
+import-settings.js (later) becomes the source of truth and may UPDATE these; seed.js only
+guarantees safe defaults so the app runs pre-import. The "super-admin cannot be locked out"
+guard belongs to the roles-admin slice, not here.
+
+Portability (MySQL note): keep types standard - INTEGER flags, TEXT names; avoid sqlite-only
+defaults where a portable one is free.
+
+Tests: schema creates roles + users; role seed idempotent (5 rows, re-run safe);
+users.default_role_id FKs roles.
+
+Touches: server/db/schema.sql, server/db/seed.js (+ tests). Server-only, no click-through, NO
+migration. NOTE: touches schema.sql, which Step 24d-i also touches -> not both in flight;
+sequence them.
+
