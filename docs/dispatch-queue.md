@@ -46,7 +46,10 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 3b. Step reseed-beta-db — CLOSED 2026-09-28, PR #15 (`9786dad`).
 
-### 3c. Step 24d-i - richer yield: output_quantity + miscut_weight + coherence guard  [runnable]
+### 3c. Step 24d-i - richer yield: output_quantity + miscut_weight + coherence guard  [BLOCKED: #16]
+**BLOCKED by #16 (2026-09-28)** - the spec accepts unit-tracked outputs, which contradicts the settled
+"yield output is always kg / unit-to-unit never recorded" decisions and would credit kg to a unit meat
+via commissaryAuditEngine.js. Needs Naoki's ruling before ANY yield slice dispatches. Do not dispatch.
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, server/routes/commissary.js
 First slice of the richer commissary yield model. Supersedes standalone 24b-v (its guard
 becomes the coherence block). Server-only, no click-through. One migration in flight at a
@@ -81,6 +84,7 @@ Touches: docs/session-status.md, docs/session-history.md
 Mechanical Class-A: session-status.md is ~1,800 lines. Move each CLOSED step section (those carrying a **CLOSED ...** stamp) into docs/session-history.md, leaving a one-line pointer; keep "Things NOT to re-litigate" and every open/active spec. Guard each move with assert count==1. Docs only, no click-through.
 
 ### 3h. Step users-roles - identity foundation: users + roles tables + role seed  [runnable]
+**#19 resolved (2026-09-28):** seed one super-admin USER in seed.js so the users table has a write path (spec updated).
 Touches: server/db/schema.sql, server/db/seed.js
 First multi-user slice: the two tables + the 5-role seed with capability flags (decision C).
 No membership/login/authorship yet. Server-only, no click-through, no migration. Overlaps
@@ -144,7 +148,7 @@ endorsement / PO-arrival receipt share ONE receipt shape or stay distinct. This
 is a domain reconciliation, still open — not the engineer's call.
 
 ### 4. Step 24b-v — the effective yield output must be kg-tracked
-**RETIRED 2026-09-28 — do not dispatch; folded into Step 24d-i.**
+**REOPENED by #16 (2026-09-28) — do not dispatch.** 24b-v's retirement assumed 24d-i supersedes it; #16 shows that is unresolved, so 24b-v's "output must be kg" rule STANDS pending Naoki's #16 ruling.
 **SUPERSEDED by Step 24d-i (2026-09-27).** The richer yield model redefines the guard from "output must be kg-tracked" to "the weight flow must close" (backed + miscut <= raw); 24d-i carries it. Close this when 24d-i lands.
 
 **Lane: DISPATCH only. Needs an architect-written prompt.**

@@ -1288,7 +1288,7 @@ openings is part of setting it up. No backfill of earlier months (decided
 
 ## Step 24b-v — REQUIRED: the effective yield output must be kg-tracked
 
-**RETIRED 2026-09-28 — folded into Step 24d-i.** The richer yield model redefines this guard from "output must be kg-tracked" to "the weight flow must close" (backed_weight_out + miscut_weight <= raw_weight_in); 24d-i carries it. Kept here until the next archive pass.
+**REOPENED by #16 (2026-09-28).** The 2026-09-28 retirement assumed 24d-i supersedes this; #16 shows that is unresolved. This rule ("effective output must be kg-tracked") STANDS pending Naoki's #16 ruling - under Path 1 it is kept, not retired.
 
 **Found 2026-09-02 by an architect trace, after step 24 was closed. This is a
 live data-corruption bug, not a nicety, and it should be fixed before
@@ -1727,6 +1727,15 @@ Resolved 2026-09-27 (#12): reseed REFUSES to run against the live inventory.db -
 
 ## Step 24d-i - richer yield: output_quantity + miscut_weight + coherence guard
 
+**BLOCKED by #16 (2026-09-28) - DO NOT DISPATCH.** This spec accepts a unit-tracked effective output
+(output_quantity), which contradicts the settled "yield output is always kg" and "unit-to-unit yield must
+never be recorded" decisions, and it does NOT touch commissaryAuditEngine.js (getCommissaryBackedUp), which
+credits backed_weight_out (kg) to the effective output meat - so a unit output would credit kg to a unit
+meat, the exact 24b-v corruption. Awaiting Naoki's ruling: PATH 1 (keep kg-only outputs - drop
+output_quantity, keep miscut_weight + the coherence guard, 24b-v STANDS) or PATH 2 (reverse the settled
+rule - rework the ledger to credit output_quantity for unit outputs; a larger change). The draft below is
+the pre-#16 version and gets rewritten to the chosen path.
+
 First slice of the richer commissary yield model (architect convo 2026-09-27). Makes a
 counted output first-class and records recoverable trim, WITHOUT touching the loss engine.
 SUPERSEDES standalone Step 24b-v - its coherence block becomes the new 24b-v; close/repoint
@@ -1883,6 +1892,11 @@ from the workbook Roles tab -
 import-settings.js (later) becomes the source of truth and may UPDATE these; seed.js only
 guarantees safe defaults so the app runs pre-import. The "super-admin cannot be locked out"
 guard belongs to the roles-admin slice, not here.
+Also seed ONE super-admin USER (#19 fix, 2026-09-28): INSERT OR IGNORE a single super-admin user
+(Naoki's account - confirm the exact name so import-settings.js upserts the same row, not a duplicate),
+default_role_id = the super-admin role, active. This gives the users table its write path so npm run
+verify's write-path audit passes, and it satisfies the settled "super-admin is seeded and unlockable"
+decision. Membership/login/authorship still NOT here.
 
 Portability (MySQL note): keep types standard - INTEGER flags, TEXT names; avoid sqlite-only
 defaults where a portable one is free.
