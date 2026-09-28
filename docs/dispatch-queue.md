@@ -94,6 +94,13 @@ resolveSiteCode). Data layer only, NO enforcement yet. Depends on users-roles (u
 overlaps schema.sql with 24d-i + users-roles -> sequence. Server-only, no click-through. Full
 spec: session-status.md -> "Step user-sites".
 
+### 3j. Step import-identity - import-settings.js identity slice (Roles/Users/memberships)  [blocked: user-sites]
+Touches: scripts/import-settings.js, package.json
+Standalone importer (decision A), identity tabs only, UPSERT/idempotent, uses siteAccess.js to
+validate memberships. Depends on users-roles + user-sites. OPEN before dispatch: reader = A
+(SheetJS devDep) or B (CSV, zero-dep; lean) behind a loadTab() adapter. Server/scripts only, no
+click-through. Full spec: session-status.md -> "Step import-identity".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 

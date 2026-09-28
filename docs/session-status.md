@@ -1929,3 +1929,47 @@ Touches: server/db/schema.sql, server/db/siteAccess.js (+ test). Server-only, no
 no migration. Depends on users-roles; overlaps schema.sql with 24d-i + users-roles -> sequence,
 not concurrent.
 
+## Step import-identity - import-settings.js, identity slice (Roles, Users, memberships)
+
+Third slice of the multi-user surface (architect 2026-09-28). Decision A: a standalone
+scripts/import-settings.js. This FIRST cut imports only the IDENTITY tabs - Roles, Users,
+site_memberships - into the tables slices 1-2 created; it does NOT touch catalog / par / sides
+(those tables don't all exist yet - the importer grows to cover them as those features land).
+DEPENDS ON users-roles + user-sites (needs the tables + siteAccess.js resolver).
+
+OPEN DECISION before dispatch - how it reads the workbook (this project has ONE dependency,
+express, and no build step, so a reader is a real choice):
+- A: add SheetJS (`xlsx`) as a devDependency; the importer reads the .xlsx directly. Smoothest,
+  but the FIRST devDependency in the project.
+- B (lean): read per-tab CSVs (Naoki exports the 3 identity tabs), parse with a tiny built-in
+  CSV reader - zero new deps, portable. Fine for 3 tabs; upgrade to A if the later full-catalog
+  import makes manual export annoying.
+Isolate this behind ONE adapter, loadTab(name) -> row objects[], so the choice touches one
+function and the import logic below is reader-agnostic.
+
+Import logic (all UPSERT by natural key - re-runnable/idempotent; the workbook becomes the
+source of truth over slice-1's seed defaults):
+- Roles: upsert by name, setting the capability flags (can_enter_counts / can_finalize /
+  can_admin / read_only) from the workbook. Never delete a role absent from the sheet; never
+  touch super-admin's unlockable status.
+- Users: upsert by name; resolve default_role (name) -> roles.id; set active.
+- Memberships: split site_memberships (comma-separated) per user; for each code call
+  resolveSiteCode() (siteAccess.js) - insert (user_id, site_code) when it resolves, WARN and
+  skip when it doesn't (this is where the SIL vs SILT mismatch surfaces; the fix is a workbook
+  or code-mapping correction, not a crash).
+- Validation report at the end: unknown role names, unresolved site codes, duplicate names -
+  print, don't throw.
+
+Portability (MySQL note): do upserts as SELECT-then-INSERT/UPDATE (portable), not sqlite-only
+ON CONFLICT - this script is a prime candidate to survive the MySQL move.
+
+Run: node scripts/import-settings.js <path-to-workbook-or-csv-dir>. Standalone, OFF the runtime
+path. Wire into reseed LATER (per the earlier decision: A now, reseed later).
+
+Tests: importer upserts role flags; resolves a user's default_role; parses memberships and warns
+on an unresolved code; a second run is a no-op (idempotent).
+
+Touches: scripts/import-settings.js (new), package.json (an import:settings script; + the
+devDependency IF option A), + a test. Depends on users-roles + user-sites. Server/scripts only,
+no click-through, no migration.
+
