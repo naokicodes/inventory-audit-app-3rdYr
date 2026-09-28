@@ -154,9 +154,12 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   `created_by` points at is built now; login is a stub (pick-your-name, no
   password) until the recycled auth lands. Phased beta: P0 open -> P1
   identity+roles -> P2 passwords.
-- **Station scoping is structural**, via multi-station membership (membership and
-  permission are SEPARATE facts). Floaters belong to both; access = union;
-  schedule is informational + a copy-button. Never fuse station into the role.
+- **Site scoping is structural**, via multi-SITE membership (membership and permission are
+  SEPARATE facts). Floaters belong to several sites; access = union; schedule is informational
+  + a copy-button. Never fuse site into the role. (Reworded 2026-09-28: "station" here always
+  meant the SITE tier - Silingan / FC / Commissary - NOT a sub-site kitchen station, which is
+  ruled out entirely per "Station-to-station transfer is out of scope." user-sites / site-filter
+  are built on site membership, model B.)
 - **Finalization is two-step, soft** per (site, category, date) sheet (CLOSED 2026-09-26): the owner (assigned cook) marks **Done**; head-chef/admin **Closes**; reopening is logged. State model: Not started -> In progress -> Done -> Closed. Never a hard lock. First-time entry is not logged; changing stored data is. Done is **mark-and-warn** (2026-09-28): the owner may mark Done anytime; incomplete/uncounted rows are flagged, never blocked. Those flags surface to the head-chef, who **acknowledges** them as part of Close - so the record shows the chef saw them.
 - **Sheets are a first-class two-tier entity, overlay-not-churn** (CLOSED 2026-09-26). Tier 1 = definition (site, category, engine_type MEAT|SIDE, active), admin-fed per site from the settings workbook's Sheet_Definitions. Tier 2 = dated instance (site, category, date) with owner_user_id + finalization_status, **lazy-created** (row on first touch, no cron). The tested engines stay untouched; the status/ownership row sits over them.
 - **Concurrency is optimistic** (a version / `updated_at` column + "changed under
@@ -1574,6 +1577,18 @@ stub-login (needs req.user) + users-roles.
   created_by TEXT as-is - retired at the pre-launch wipe, NO backfill (forward-clean).
 - LEAN (flag): a NEW column rather than repurposing created_by (clean INTEGER FK vs free-text).
   Open sub-decision; worker can park it.
+- **created_by has TWO deliberate meanings (settled - see "created_by means two different
+  things") - respect it.** On ending_actual / portion_ending_actual / commissary_ending_actual
+  and the other authorship tables, created_by = IDENTITY (who did it) -> these get
+  created_by_user_id, the identity successor. On `prepped` created_by = PROVENANCE
+  (SYSTEM:sync-batch-stock = inferred, NULL = a human typed it) -> do NOT touch
+  prepped.created_by; if prepped gets created_by_user_id at all it is only "who typed it, if
+  human" (NULL for SYSTEM) and does NOT replace the provenance signal. Never write a name into a
+  provenance created_by.
+- **Allowlist coordination:** this step is the write path that lets you DELETE the
+  ending_actual.created_by and portion_ending_actual.created_by "UNVERIFIED" entries in
+  scripts/write-path-allowlist.json (allowlisted because the restaurant-side count did not record
+  who entered it - this step records it). Remove those two entries when this lands.
 
 The invasive slice (many write routes) - one authorship pass, not per-surface.
 Portability (MySQL note): plain ALTER ADD COLUMN + standard INSERTs.
