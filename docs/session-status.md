@@ -1973,3 +1973,68 @@ Touches: scripts/import-settings.js (new), package.json (an import:settings scri
 devDependency IF option A), + a test. Depends on users-roles + user-sites. Server/scripts only,
 no click-through, no migration.
 
+## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
+
+Multi-user slice 4a. Identity WITHOUT passwords (phase 1). No enforcement here - just "who am I."
+DEPENDS ON users-roles (tables) and users being present (import-identity, or a dev seed).
+
+- Login page (public/login.html): lists ACTIVE users, pick your name -> POST sets a cookie with
+  the user id -> redirect. Logout clears it. A small "current user + logout" indicator in the
+  shared nav.
+- Session mechanism (LEAN, flag): a plain cookie holding user_id, hand-parsed from
+  req.headers.cookie - NO new dependency, NO signing. Deliberately insecure for alpha (identity,
+  not security); it hardens when the recycled auth / passwords land. If you'd rather add a
+  session/cookie dep, the worker can park it.
+- currentUser middleware: reads the cookie, loads the user + its role capability flags (join
+  roles), attaches req.user = { id, name, role, can_* }. No cookie -> req.user = null (routes stay
+  open until slice 5 enforces).
+
+Portability: cookie/session is app-layer, DB-agnostic.
+Tests: login sets the cookie; currentUser attaches the right capabilities; logout clears it.
+Touches: public/login.html (new), the shared nav, server/routes/auth.js (new) + the currentUser
+middleware, server/app.js (wire it) (+ tests). PUBLIC -> click-through before merge. Depends on
+users-roles.
+
+## Step user-id-authorship - new writes carry user_id (slice 4b)
+
+Multi-user slice 4b. Forward-clean authorship: new writes stamp the logged-in user. DEPENDS ON
+stub-login (needs req.user) + users-roles.
+
+- Add created_by_user_id INTEGER (FK users), nullable, to the tables that carry the legacy
+  created_by TEXT today (~10 of them). Idempotent ALTER ADD COLUMN per table (plain-add migrate
+  pattern); add to schema.sql for fresh DBs too.
+- Write routes: populate created_by_user_id from req.user.id on every new insert. Leave the old
+  created_by TEXT as-is - retired at the pre-launch wipe, NO backfill (forward-clean).
+- LEAN (flag): a NEW column rather than repurposing created_by (clean INTEGER FK vs free-text).
+  Open sub-decision; worker can park it.
+
+The invasive slice (many write routes) - one authorship pass, not per-surface.
+Portability (MySQL note): plain ALTER ADD COLUMN + standard INSERTs.
+Tests: a write while logged in stamps created_by_user_id; the column FKs users; migration
+idempotent + preserves rows.
+Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, the write routes
+carrying created_by (+ tests). Server-only, no click-through. Big migration -> sequences with the
+other schema/migration steps (24d-i, users-roles, user-sites).
+
+## Step site-filter - query-layer site scoping enforcement (slice 5)
+
+Multi-user slice 5. The scoping teeth: a checker sees only their sites; management / admin /
+super-admin see all. DEPENDS ON stub-login (req.user) + user-sites (siteAccess.js).
+
+- A requireSiteAccess middleware on the site-scoped route groups: read the requested site
+  (param/query) and, unless req.user has a bypass capability (can_admin / management read_only /
+  super-admin), require userHasSite(req.user.id, site) -> 403 otherwise. The filter lives in ONE
+  middleware so it can't be forgotten per-route - never a hand-written WHERE.
+- For LIST endpoints with no single site param, narrow results to getUserSiteCodes(req.user.id)
+  (union) for scoped users; bypass roles get the full set.
+- Enumerate which routes are site-scoped (worker task with the route list) - park any ambiguous
+  one as a needs-architect issue rather than guessing.
+- LEAN (flag): middleware guard on route groups over a per-query wrapper - matches "applies to
+  every read automatically." Open if the route shapes make a wrapper cleaner; worker can park it.
+
+Portability: app-layer guard, DB-agnostic.
+Tests: a checker is 403'd / filtered off a non-member site; bypass roles see all; union access
+for a floater.
+Touches: server/middleware/requireSiteAccess.js (new), the site-scoped routes, server/app.js
+(+ tests). Server-only (a click-through only if UI changes). Depends on stub-login + user-sites.
+

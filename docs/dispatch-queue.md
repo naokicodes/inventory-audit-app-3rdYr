@@ -101,6 +101,25 @@ validate memberships. Depends on users-roles + user-sites. OPEN before dispatch:
 (SheetJS devDep) or B (CSV, zero-dep; lean) behind a loadTab() adapter. Server/scripts only, no
 click-through. Full spec: session-status.md -> "Step import-identity".
 
+### 3k. Step stub-login - pick-your-name login + currentUser middleware  [blocked: users-roles]
+Touches: public/login.html, server/routes/auth.js, server/app.js
+Phase-1 identity, no passwords: pick-your-name -> cookie -> req.user with capability flags. No
+enforcement yet. LEAN: plain cookie, no new dep (flag). Needs users present (import-identity or a
+dev seed). PUBLIC -> click-through. Full spec: session-status.md -> "Step stub-login".
+
+### 3l. Step user-id-authorship - new writes carry user_id  [blocked: stub-login]
+Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, write routes
+Add created_by_user_id (FK users) to the ~10 created_by tables; stamp it from req.user on new
+writes; legacy created_by retired at wipe, no backfill. Invasive (many routes), one pass. Big
+migration -> sequences with other schema/migration steps. Full spec: session-status.md ->
+"Step user-id-authorship".
+
+### 3m. Step site-filter - query-layer site scoping enforcement  [blocked: stub-login, user-sites]
+Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/app.js
+requireSiteAccess middleware: checker scoped to memberships (siteAccess.js), management/admin/
+super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped routes; park
+ambiguous ones. Full spec: session-status.md -> "Step site-filter".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 
