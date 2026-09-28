@@ -63,6 +63,12 @@ Contain the nav to the viewport (flex-wrap: nowrap; overflow-x: auto; max-width:
 Cross-page -> live click-through at 390px on daily-audit + one other page,
 scrollWidth <= innerWidth. Full spec: session-status.md -> "Step nav-mobile".
 
+### 3e. Step 24d-ii - richer yield: surface miscut + true-loss split (read layer)  [blocked: 24d-i]
+Touches: server/engines/commissaryYieldEngine.js (+ test)
+Read-layer only: computeYieldRow adds miscut_weight + residualLoss (raw-backed-miscut);
+loss/status UNCHANGED. Route auto-carries. Depends on 24d-i (unmerged) -> skipped until it
+merges. Server-only, no click-through. Full spec: session-status.md -> "Step 24d-ii".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 
 **Note 2026-09-24:** the architecture draft cancels the intake weigh-in

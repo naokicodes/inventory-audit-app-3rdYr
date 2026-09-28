@@ -1786,3 +1786,35 @@ deferred until the new pages land and the top-level set is known.
 Touches: public/style.css, docs/ui-conventions.md. daily-audit-mobile (PR #14) has
 merged, so the style.css overlap is clear; runnable. Public step: live click-through
 at 390px (scrollWidth <= innerWidth) before merge.
+
+## Step 24d-ii - richer yield: surface miscut + true-loss split (read layer)
+
+Second slice of the richer yield model. Makes miscut and the recoverable-vs-true-loss
+split available on reads, WITHOUT changing the loss judgment. DEPENDS ON 24d-i (needs
+its columns) - /start skips until 24d-i is merged.
+
+Engine (commissaryYieldEngine.js, computeYieldRow): add output_quantity and miscut_weight
+to the SELECT, and add to the returned object:
+- miscut_weight (recoverable trim, kg, passthrough),
+- residualLoss = raw_weight_in - backed_weight_out - miscut_weight (non-recoverable
+  "true loss", kg).
+actualLossPct / status / excessLoss STAY EXACTLY AS THEY ARE (computed from raw vs backed
+only) - miscut is NOT folded in. The split is additive analytics: the gap (raw - backed)
+decomposes into miscut (recoverable) + residualLoss (true loss).
+
+Route: GET yield-log / daily-audit return computeYieldRow output, so the new fields flow
+automatically - no route logic change (confirm the response carries them).
+
+Tests (commissaryYieldEngine.test.js): computeYieldRow returns miscut_weight + residualLoss;
+residualLoss == raw - backed - miscut; a row WITH miscut has IDENTICAL
+actualLossPct/status/excessLoss to the same row with miscut 0 (proves the engine judgment is
+untouched); output_quantity surfaced.
+
+Dashboard/report visualization of the split (a management "recoverable vs true loss" panel)
+is a SEPARATE later analytics step - dashboard.js does not surface yield loss today, so
+net-new UI is out of scope here.
+
+Touches: server/engines/commissaryYieldEngine.js (+ commissaryYieldEngine.test.js). Route
+auto-carries the fields; add a route-level assertion in commissary.test.js if convenient.
+Server-only, NO click-through. Depends on 24d-i.
+
