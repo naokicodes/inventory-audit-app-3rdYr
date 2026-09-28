@@ -304,6 +304,7 @@ CREATE TABLE IF NOT EXISTS commissary_yield_log (
   input_quantity REAL,             -- step 24b-i: input meat's own unit (e.g. count). NULL = same as raw_weight_in.
   raw_weight_in REAL NOT NULL,
   backed_weight_out REAL NOT NULL,
+  miscut_weight REAL NOT NULL DEFAULT 0,  -- step 24d-i: recoverable trim, kg. Analytics only - NOT subtracted from loss%.
   notes TEXT,
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),

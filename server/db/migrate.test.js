@@ -10,7 +10,7 @@
 
 const { DatabaseSync } = require('node:sqlite');
 const assert = require('assert');
-const { migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns } = require('./migrate.js');
+const { migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns, migrateYieldLogMiscutWeightColumn } = require('./migrate.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -595,6 +595,52 @@ test('runs cleanly after migrateOpeningStockDateScoped rebuilds a pre-26a openin
   const result = migrateMonthStartRecountColumns(db);
   assert.ok(result.added.includes('opening_stock.opening_source'));
   assert.ok(result.added.includes('commissary_opening_stock.opening_source'));
+});
+
+console.log('\nMigration Tests: migrateYieldLogMiscutWeightColumn (step 24d-i)\n');
+
+// The pre-24d-i commissary_yield_log shape (24a + 24b-i columns, no miscut_weight).
+function makePreMiscutDb() {
+  const db = new DatabaseSync(':memory:');
+  db.exec(`
+    CREATE TABLE commissary_yield_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, commissary_meat_id INTEGER NOT NULL,
+      output_commissary_meat_id INTEGER, business_date TEXT NOT NULL, input_quantity REAL,
+      raw_weight_in REAL NOT NULL, backed_weight_out REAL NOT NULL, notes TEXT, created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')), deleted_at TEXT
+    );
+  `);
+  db.prepare(`INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, notes) VALUES (1, '2026-09-01', 10, 8, 'pre-24d-i row')`).run();
+  db.prepare(`INSERT INTO commissary_yield_log (commissary_meat_id, output_commissary_meat_id, business_date, input_quantity, raw_weight_in, backed_weight_out) VALUES (2, 3, '2026-09-02', 40, 32.5, 30)`).run();
+  return db;
+}
+
+test('fresh install (no commissary_yield_log table yet) is a no-op', () => {
+  const db = new DatabaseSync(':memory:');
+  assert.deepStrictEqual(migrateYieldLogMiscutWeightColumn(db), { ran: false });
+});
+
+test('adds miscut_weight to an existing table, keeping every row with miscut 0', () => {
+  const db = makePreMiscutDb();
+  assert.deepStrictEqual(migrateYieldLogMiscutWeightColumn(db), { ran: true });
+  const rows = db.prepare(`SELECT * FROM commissary_yield_log ORDER BY id`).all();
+  assert.strictEqual(rows.length, 2);
+  assert.strictEqual(rows[0].miscut_weight, 0);
+  assert.strictEqual(rows[1].miscut_weight, 0);
+  assert.strictEqual(rows[0].notes, 'pre-24d-i row');
+  assert.strictEqual(rows[1].input_quantity, 40);
+  assert.strictEqual(rows[1].backed_weight_out, 30);
+  const col = db.prepare(`PRAGMA table_info(commissary_yield_log)`).all().find(c => c.name === 'miscut_weight');
+  assert.strictEqual(col.notnull, 1, 'miscut_weight is NOT NULL');
+});
+
+test('running the migration twice is idempotent - the second run is a no-op, rows unchanged', () => {
+  const db = makePreMiscutDb();
+  migrateYieldLogMiscutWeightColumn(db);
+  db.prepare(`UPDATE commissary_yield_log SET miscut_weight = 1.5 WHERE id = 1`).run();
+  assert.deepStrictEqual(migrateYieldLogMiscutWeightColumn(db), { ran: false });
+  assert.strictEqual(db.prepare(`SELECT miscut_weight FROM commissary_yield_log WHERE id = 1`).get().miscut_weight, 1.5);
+  assert.strictEqual(db.prepare(`SELECT COUNT(*) AS n FROM commissary_yield_log`).get().n, 2);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

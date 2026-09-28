@@ -828,24 +828,39 @@ db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, a
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (22, 1, 'CM22', 'Raw Belly (kg)', 'kg', 0.1)`).run();
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct, active) VALUES (23, 1, 'CM23', 'Retired Output', 'kg', 0.1, 0)`).run();
 db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (24, 2, 'CM24', 'Other Commissary Output', 'kg', 0.1)`).run();
+// 24d-i: a second unit-tracked meat in Commissary A, for the unit-to-unit rejection.
+db.prepare(`INSERT INTO commissary_meats (id, commissary_id, code, name, unit, allowed_leeway_pct) VALUES (25, 1, 'CM25', 'Portioned Chicken (unit)', 'unit', 0.1)`).run();
 
-// Mirrors validateYieldOutputAndInputQty in commissary.js
-function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inputQuantity) {
+// Mirrors validateYieldOutputAndInputQty in commissary.js (24b-iv + 24d-i)
+const YIELD_WEIGHT_EPSILON = 1e-9;
+function validateYieldOutputAndInputQty(sourceMeat, outputCommissaryMeatId, inputQuantity, rawWeightIn, backedWeightOut, miscutWeight) {
+  if (!Number.isFinite(rawWeightIn) || !Number.isFinite(backedWeightOut) || !Number.isFinite(miscutWeight)) {
+    return 'raw_weight_in, backed_weight_out, and miscut_weight must be finite numbers';
+  }
+  if (miscutWeight < 0) return 'miscut_weight cannot be negative';
+  let effectiveOutputMeat = sourceMeat;
   if (outputCommissaryMeatId !== null) {
     const outputMeat = db.prepare('SELECT * FROM commissary_meats WHERE id = ? AND active = 1').get(outputCommissaryMeatId);
     if (!outputMeat) return 'Unknown or inactive output_commissary_meat_id';
     if (outputMeat.commissary_id !== sourceMeat.commissary_id) return 'output_commissary_meat_id must belong to the same commissary as the input meat';
+    effectiveOutputMeat = outputMeat;
+  }
+  if (effectiveOutputMeat.unit !== 'kg') {
+    return 'the yield output meat must be kg-tracked - choose a kg output meat (create one in the catalog first if none exists)';
   }
   if (inputQuantity === null) {
     if (sourceMeat.unit === 'unit') return 'input_quantity is required when the source meat is unit-tracked (unit)';
   } else if (inputQuantity <= 0) {
     return 'input_quantity must be positive';
   }
+  if (backedWeightOut + miscutWeight > rawWeightIn + YIELD_WEIGHT_EPSILON) {
+    return 'backed_weight_out plus miscut_weight cannot exceed raw_weight_in';
+  }
   return null;
 }
 
-// Mirrors POST /api/commissary/yield-log (24b-iv)
-function createYieldLogEvent({ commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, notes, actor }) {
+// Mirrors POST /api/commissary/yield-log (24b-iv + 24d-i)
+function createYieldLogEvent({ commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, miscut_weight, notes, actor }) {
   if (!commissary_meat_id || !business_date || raw_weight_in === undefined || raw_weight_in === null || raw_weight_in === ''
       || backed_weight_out === undefined || backed_weight_out === null || backed_weight_out === '') {
     return { status: 400, error: 'commissary_meat_id, business_date, raw_weight_in, and backed_weight_out are required' };
@@ -855,15 +870,16 @@ function createYieldLogEvent({ commissary_meat_id, business_date, raw_weight_in,
 
   const outputId = (output_commissary_meat_id !== undefined && output_commissary_meat_id !== null && output_commissary_meat_id !== '') ? output_commissary_meat_id : null;
   const inputQty = (input_quantity !== undefined && input_quantity !== null && input_quantity !== '') ? Number(input_quantity) : null;
+  const miscutWeight = (miscut_weight !== undefined && miscut_weight !== null && miscut_weight !== '') ? Number(miscut_weight) : 0;
 
-  const err = validateYieldOutputAndInputQty(meat, outputId, inputQty);
+  const err = validateYieldOutputAndInputQty(meat, outputId, inputQty, Number(raw_weight_in), Number(backed_weight_out), miscutWeight);
   if (err) return { status: 400, error: err };
 
   const id = withTransaction(db, () => {
     const result = db.prepare(`
-      INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, output_commissary_meat_id, input_quantity, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), outputId, inputQty, notes || null, actor || null);
+      INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, miscut_weight, output_commissary_meat_id, input_quantity, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), miscutWeight, outputId, inputQty, notes || null, actor || null);
     const after = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(result.lastInsertRowid);
     logActivity(db, { actor: actor || null, entityType: 'commissary_yield_log', entityId: result.lastInsertRowid, action: 'CREATE', before: null, after, source: 'MANUAL' });
     return result.lastInsertRowid;
@@ -871,13 +887,14 @@ function createYieldLogEvent({ commissary_meat_id, business_date, raw_weight_in,
   return { status: 200, id };
 }
 
-// Mirrors PATCH /api/commissary/yield-log/:id (24b-iv)
-function patchYieldLogEvent(id, { raw_weight_in, backed_weight_out, business_date, output_commissary_meat_id, input_quantity, notes, actor }) {
+// Mirrors PATCH /api/commissary/yield-log/:id (24b-iv + 24d-i)
+function patchYieldLogEvent(id, { raw_weight_in, backed_weight_out, business_date, output_commissary_meat_id, input_quantity, miscut_weight, notes, actor }) {
   const existing = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(id);
   if (!existing || existing.deleted_at) return { status: 404, error: 'Yield log entry not found' };
 
   const nextRawIn = raw_weight_in !== undefined && raw_weight_in !== null && raw_weight_in !== '' ? Number(raw_weight_in) : existing.raw_weight_in;
   const nextBackedOut = backed_weight_out !== undefined && backed_weight_out !== null && backed_weight_out !== '' ? Number(backed_weight_out) : existing.backed_weight_out;
+  const nextMiscut = miscut_weight !== undefined && miscut_weight !== null && miscut_weight !== '' ? Number(miscut_weight) : existing.miscut_weight;
   const nextDate = business_date || existing.business_date;
   const nextNotes = notes !== undefined ? (notes || null) : existing.notes;
   const nextOutputId = output_commissary_meat_id !== undefined
@@ -888,14 +905,14 @@ function patchYieldLogEvent(id, { raw_weight_in, backed_weight_out, business_dat
     : existing.input_quantity;
 
   const meat = db.prepare('SELECT * FROM commissary_meats WHERE id = ?').get(existing.commissary_meat_id);
-  const err = validateYieldOutputAndInputQty(meat, nextOutputId, nextInputQty);
+  const err = validateYieldOutputAndInputQty(meat, nextOutputId, nextInputQty, nextRawIn, nextBackedOut, nextMiscut);
   if (err) return { status: 400, error: err };
 
   withTransaction(db, () => {
     db.prepare(`
-      UPDATE commissary_yield_log SET raw_weight_in = ?, backed_weight_out = ?, business_date = ?, output_commissary_meat_id = ?, input_quantity = ?, notes = ?
+      UPDATE commissary_yield_log SET raw_weight_in = ?, backed_weight_out = ?, miscut_weight = ?, business_date = ?, output_commissary_meat_id = ?, input_quantity = ?, notes = ?
       WHERE id = ?
-    `).run(nextRawIn, nextBackedOut, nextDate, nextOutputId, nextInputQty, nextNotes, id);
+    `).run(nextRawIn, nextBackedOut, nextMiscut, nextDate, nextOutputId, nextInputQty, nextNotes, id);
     const after = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(id);
     logActivity(db, { actor: actor || null, entityType: 'commissary_yield_log', entityId: id, action: 'UPDATE', before: existing, after, source: 'MANUAL' });
   });
@@ -985,12 +1002,22 @@ test('PATCH with an absent key keeps the existing output_commissary_meat_id and 
   assert.strictEqual(row.notes, 'just a note change');
 });
 
-test('PATCH with output_commissary_meat_id: null explicitly clears it', () => {
-  const r = patchYieldLogEvent(unitYieldId, { output_commissary_meat_id: null });
+test('PATCH with output_commissary_meat_id: null explicitly clears it (kg source)', () => {
+  const kgRow = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-20', raw_weight_in: 10, backed_weight_out: 9, output_commissary_meat_id: 21, input_quantity: 10 });
+  assert.strictEqual(kgRow.status, 200);
+  const r = patchYieldLogEvent(kgRow.id, { output_commissary_meat_id: null });
   assert.strictEqual(r.status, 200);
-  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(unitYieldId);
+  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(kgRow.id);
   assert.strictEqual(row.output_commissary_meat_id, null);
-  assert.strictEqual(row.input_quantity, 40, 'input_quantity must be untouched by clearing the unrelated output field');
+  assert.strictEqual(row.input_quantity, 10, 'input_quantity must be untouched by clearing the unrelated output field');
+});
+
+test('PATCH clearing the output on a unit-tracked source is rejected (24b-v) - old value untouched', () => {
+  const r = patchYieldLogEvent(unitYieldId, { output_commissary_meat_id: null });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /must be kg-tracked/);
+  const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(unitYieldId);
+  assert.strictEqual(row.output_commissary_meat_id, 21, 'the rejected PATCH must not have taken effect');
 });
 
 test('PATCH cannot clear input_quantity on a unit-tracked source - rejected, old value untouched', () => {
@@ -1009,6 +1036,156 @@ test('PATCH can clear input_quantity on a kg-tracked source', () => {
   assert.strictEqual(r.status, 200);
   const row = db.prepare('SELECT * FROM commissary_yield_log WHERE id = ?').get(kgRow.id);
   assert.strictEqual(row.input_quantity, null);
+});
+
+console.log('\nCommissary Route Tests (24d-i: kg-output guard + miscut_weight + coherence guard)\n');
+
+test('a unit-tracked source with a blank output is rejected - it would credit kg onto a count (24b-v)', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 20, business_date: '2026-09-21', raw_weight_in: 32.5, backed_weight_out: 28, input_quantity: 40 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /must be kg-tracked/);
+  const n = db.prepare(`SELECT COUNT(*) AS n FROM commissary_yield_log WHERE commissary_meat_id = 20 AND business_date = '2026-09-21'`).get().n;
+  assert.strictEqual(n, 0, 'nothing written');
+});
+
+test('a unit-tracked source with an explicit same-meat output is rejected too', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 20, business_date: '2026-09-21', raw_weight_in: 32.5, backed_weight_out: 28, input_quantity: 40, output_commissary_meat_id: 20 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /must be kg-tracked/);
+});
+
+test('unit source -> unit output is rejected (unit-to-unit yield does not occur)', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 20, business_date: '2026-09-21', raw_weight_in: 32.5, backed_weight_out: 28, input_quantity: 40, output_commissary_meat_id: 25 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /must be kg-tracked/);
+});
+
+test('a kg source -> unit output is rejected (the effective output is what must be kg)', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-21', raw_weight_in: 10, backed_weight_out: 9, output_commissary_meat_id: 25 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /must be kg-tracked/);
+});
+
+test('miscut_weight defaults to 0 when absent', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-22', raw_weight_in: 10, backed_weight_out: 8 });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(r.id).miscut_weight, 0);
+});
+
+test('backed + miscut > raw is rejected on POST', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-23', raw_weight_in: 10, backed_weight_out: 8, miscut_weight: 2.5 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /cannot exceed raw_weight_in/);
+});
+
+test('backed > raw with no miscut is rejected on POST', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-23', raw_weight_in: 10, backed_weight_out: 10.5 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /cannot exceed raw_weight_in/);
+});
+
+test('backed + miscut exactly equal to raw is accepted (float-safe: 0.1 + 0.2 vs 0.3)', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-23', raw_weight_in: 0.3, backed_weight_out: 0.1, miscut_weight: 0.2 });
+  assert.strictEqual(r.status, 200);
+});
+
+test('a within-gap miscut is accepted and leaves loss % / Status / excess IDENTICAL to a miscut-0 row', () => {
+  const noMiscut = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-24', raw_weight_in: 10, backed_weight_out: 7 });
+  const withMiscut = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-24', raw_weight_in: 10, backed_weight_out: 7, miscut_weight: 1.5 });
+  assert.strictEqual(noMiscut.status, 200);
+  assert.strictEqual(withMiscut.status, 200);
+  assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(withMiscut.id).miscut_weight, 1.5);
+  const a = computeYieldRow(db, noMiscut.id);
+  const b = computeYieldRow(db, withMiscut.id);
+  assert.strictEqual(b.actualLossPct, a.actualLossPct);
+  assert.strictEqual(b.status, a.status);
+  assert.strictEqual(b.excessLoss, a.excessLoss);
+  assert.strictEqual(b.status, 'Review', 'a 30% loss vs a 10% leeway is still Review - miscut is not subtracted from loss');
+});
+
+test('the ledger credit is unchanged by miscut - backed_weight_out only', () => {
+  // two rows on 2026-09-24, both backed 7 kg -> 14; miscut is not credited
+  assert.strictEqual(getCommissaryBackedUp(db, 22, '2026-09-24'), 14);
+});
+
+let miscutRowId;
+test('PATCH absent miscut_weight keeps the current value', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-25', raw_weight_in: 10, backed_weight_out: 7, miscut_weight: 1 });
+  assert.strictEqual(r.status, 200);
+  miscutRowId = r.id;
+  const p = patchYieldLogEvent(miscutRowId, { notes: 'note only' });
+  assert.strictEqual(p.status, 200);
+  assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId).miscut_weight, 1);
+});
+
+test('PATCH can set miscut_weight within the gap', () => {
+  const p = patchYieldLogEvent(miscutRowId, { miscut_weight: 3 });
+  assert.strictEqual(p.status, 200);
+  assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId).miscut_weight, 3);
+});
+
+test('PATCH raising miscut past the gap is rejected - old value untouched', () => {
+  const p = patchYieldLogEvent(miscutRowId, { miscut_weight: 3.5 });
+  assert.strictEqual(p.status, 400);
+  assert.match(p.error, /cannot exceed raw_weight_in/);
+  assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId).miscut_weight, 3);
+});
+
+test('PATCH raising backed_weight_out re-validates against the stored miscut', () => {
+  const p = patchYieldLogEvent(miscutRowId, { backed_weight_out: 8 });
+  assert.strictEqual(p.status, 400);
+  assert.match(p.error, /cannot exceed raw_weight_in/);
+  assert.strictEqual(db.prepare('SELECT backed_weight_out FROM commissary_yield_log WHERE id = ?').get(miscutRowId).backed_weight_out, 7);
+});
+
+test('POST miscut_weight null or empty string stores 0', () => {
+  for (const sentinel of [null, '']) {
+    const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-26', raw_weight_in: 10, backed_weight_out: 8, miscut_weight: sentinel });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(r.id).miscut_weight, 0);
+  }
+});
+
+test('PATCH miscut_weight null or empty string keeps the current value', () => {
+  for (const sentinel of [null, '']) {
+    const p = patchYieldLogEvent(miscutRowId, { miscut_weight: sentinel });
+    assert.strictEqual(p.status, 200);
+    assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId).miscut_weight, 3);
+  }
+});
+
+test('a negative miscut_weight is rejected on POST, even when backed + miscut <= raw', () => {
+  const r = createYieldLogEvent({ commissary_meat_id: 22, business_date: '2026-09-26', raw_weight_in: 10, backed_weight_out: 11, miscut_weight: -2 });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.error, /miscut_weight cannot be negative/);
+});
+
+test('a negative miscut_weight is rejected on PATCH - old value untouched', () => {
+  const p = patchYieldLogEvent(miscutRowId, { miscut_weight: -1 });
+  assert.strictEqual(p.status, 400);
+  assert.match(p.error, /miscut_weight cannot be negative/);
+  assert.strictEqual(db.prepare('SELECT miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId).miscut_weight, 3);
+});
+
+test('a non-numeric weight is a 400 on POST, not a 500 (each of the three fields)', () => {
+  const base = { commissary_meat_id: 22, business_date: '2026-09-26', raw_weight_in: 10, backed_weight_out: 8, miscut_weight: 1 };
+  const before = db.prepare('SELECT COUNT(*) AS n FROM commissary_yield_log').get().n;
+  for (const field of ['raw_weight_in', 'backed_weight_out', 'miscut_weight']) {
+    const r = createYieldLogEvent({ ...base, [field]: 'abc' });
+    assert.strictEqual(r.status, 400, field);
+    assert.match(r.error, /must be finite numbers/);
+  }
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM commissary_yield_log').get().n, before);
+});
+
+test('a non-numeric weight is a 400 on PATCH - row untouched (each of the three fields)', () => {
+  const before = db.prepare('SELECT raw_weight_in, backed_weight_out, miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId);
+  for (const field of ['raw_weight_in', 'backed_weight_out', 'miscut_weight']) {
+    const p = patchYieldLogEvent(miscutRowId, { [field]: 'abc' });
+    assert.strictEqual(p.status, 400, field);
+    assert.match(p.error, /must be finite numbers/);
+  }
+  assert.deepStrictEqual(db.prepare('SELECT raw_weight_in, backed_weight_out, miscut_weight FROM commissary_yield_log WHERE id = ?').get(miscutRowId), before);
 });
 
 console.log('\nCommissary Route Tests (24b-iv: GET /commissary/yield-log output code/name)\n');

@@ -12,7 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 const { resolveDbPath } = require('./dbPath.js');
-const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateCommissaryAdjustmentsTable, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns } = require('./migrate.js');
+const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateYieldLogMiscutWeightColumn, migrateCommissaryAdjustmentsTable, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns } = require('./migrate.js');
 
 // Step reseed-beta-db (2026-09-27): DB_PATH env var selects the database
 // file, so Beta can run on a disposable beta.db. Unset = the live
@@ -67,6 +67,11 @@ migrateYieldLogOutputMeatColumn(db);
 // the nullable input-quantity column for anyone with a pre-existing
 // local database from before this feature. See server/db/migrate.js.
 migrateYieldLogInputQuantityColumn(db);
+
+// Step 24d-i (2026-09-28): commissary_yield_log.miscut_weight - adds the
+// NOT NULL DEFAULT 0 miscut column for anyone with a pre-existing local
+// database from before this feature. See server/db/migrate.js.
+migrateYieldLogMiscutWeightColumn(db);
 
 // Step 24b-ii (2026-09-02): commissary_adjustments - creates the table for
 // anyone with a pre-existing local database from before this feature. See
