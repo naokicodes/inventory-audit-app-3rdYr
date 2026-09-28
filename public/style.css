@@ -249,6 +249,20 @@ nav {
    one number across pages). Below it: phone views + toggle; at/above it:
    the desktop layout, no toggle. */
 @media (max-width: 767.98px) {
+  /* docs/ui-conventions.md -> Navigation: the shared nav stays one row and
+     scrolls inside itself, so it never widens the page (issue #13). */
+  nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  nav a {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
   .desktop-only {
     display: none !important;
   }
