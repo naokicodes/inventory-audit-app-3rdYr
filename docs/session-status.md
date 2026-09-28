@@ -1701,6 +1701,9 @@ one for a dispatched task. Verify each against the current repo before acting.
 
 
 ## Step daily-audit-mobile - Review/Enter phone layout (Beta entry)
+
+**CLOSED 2026-09-28, PR #14 (`c3c9575`).** Kept here until the next archive pass.
+
 Two views over ONE fetch of the existing daily-audit data - no second page, no
 new save contract. Review: a card per item, display columns muted, ending-actual
 the only accented input, variance the only colored chip. Enter: a single-column
@@ -1712,6 +1715,9 @@ inputs (prepped + portion actual). Build so a later per-sheet "who counted" fiel
 click-through before merge. Beta entry requirement per docs/testing-plan.md.
 
 ## Step reseed-beta-db - clean reseed + disposable beta.db (Beta entry)
+
+**CLOSED 2026-09-28, PR #15 (`9786dad`).** Kept here until the next archive pass.
+
 Today seed.js is additive (INSERT OR IGNORE) - there is no clean reset. Add a
 `reseed` command that clears the tables in SQL, then re-runs schema + migrate +
 seed. Add an env-selectable DB path (e.g. DB_PATH) so Beta runs on a disposable
