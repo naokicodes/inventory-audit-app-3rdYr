@@ -16,10 +16,66 @@
 // twice won't create duplicates.
 //
 // Run with: node server/db/seed.js
+//
+// Step reseed-beta-db (2026-09-27): `--reset` (npm run reseed) first clears
+// every app table in SQL, then re-runs schema.sql and this seed - a clean
+// reset for the disposable Beta database. It REFUSES unless DB_PATH is set
+// and resolves to something other than the live inventory.db (#12). No file
+// is ever deleted. The live wipe at the Beta->Live gate is a separate step.
+//
+// Run with: DB_PATH=server/db/beta.db npm run reseed
 
 const fs = require('fs');
 const path = require('path');
+
+const { reseedRefusal } = require('./dbPath.js');
+
+const RESET = process.argv.includes('--reset');
+
+// Checked BEFORE connection.js is required, so a refused reset never opens
+// (or migrates) the live file.
+if (RESET) {
+  const refusal = reseedRefusal();
+  if (refusal) {
+    console.error(refusal);
+    process.exit(1);
+  }
+}
+
 const db = require('./connection.js');
+
+// Clears every app table, FK-safe, then re-runs schema.sql so its own
+// INSERT OR IGNORE reference rows come back. Migrations already ran when
+// connection.js opened the file (idempotent), so the tables are current.
+function clearAllTables() {
+  const tables = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+  ).all().map(r => r.name);
+
+  // foreign_keys cannot change inside a transaction - toggle it outside.
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.exec('BEGIN');
+    try {
+      for (const t of tables) db.exec(`DELETE FROM "${t}"`);
+      const hasSequence = db.prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'"
+      ).get();
+      if (hasSequence) db.exec('DELETE FROM sqlite_sequence');
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
+
+  db.exec(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
+  console.log(`Reseed: cleared ${tables.length} tables in ${process.env.DB_PATH}`);
+}
+
+if (RESET) clearAllTables();
 
 function seedRestaurant(data) {
   // 1. Restaurant
@@ -151,3 +207,15 @@ for (const cm of commissaryData.commissary_meats) {
   if (result.changes > 0) commissaryMeatsInserted++;
 }
 console.log(`Commissary meats: ${commissaryMeatsInserted} inserted (of ${commissaryData.commissary_meats.length} in file - full real Meats sheet, M01-M15)`);
+
+// A reset must end on a consistent file: any dangling reference means the
+// clear or the reseed went wrong, so fail loudly rather than hand Beta a
+// broken database.
+if (RESET) {
+  const dangling = db.prepare('PRAGMA foreign_key_check').all();
+  if (dangling.length > 0) {
+    console.error(`Reseed: ${dangling.length} foreign-key violation(s) after reseed`, dangling);
+    process.exit(1);
+  }
+  console.log('Reseed: done, foreign keys consistent');
+}
