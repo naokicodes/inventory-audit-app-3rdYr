@@ -50,7 +50,7 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 3d. Step nav-mobile — CLOSED 2026-09-28, PR #17 (`39dfcc6`).
 
-### 3e. Step 24d-ii - richer yield: surface miscut + true-loss split (read layer)  [blocked: 24d-i]
+### 3e. Step 24d-ii - richer yield: surface miscut + true-loss split (read layer)  [runnable]
 Touches: server/engines/commissaryYieldEngine.js (+ test)
 Read-layer only: computeYieldRow adds miscut_weight + residualLoss (raw-backed-miscut);
 loss/status UNCHANGED. Route auto-carries. Depends on 24d-i (unmerged) -> skipped until it
@@ -82,8 +82,7 @@ spec: session-status.md -> "Step user-sites".
 ### 3j. Step import-identity - import-settings.js identity slice (Roles/Users/memberships)  [blocked: user-sites]
 Touches: scripts/import-settings.js, package.json
 Standalone importer (decision A), identity tabs only, UPSERT/idempotent, uses siteAccess.js to
-validate memberships. Depends on users-roles + user-sites. OPEN before dispatch: reader = A
-(SheetJS devDep) or B (CSV, zero-dep; lean) behind a loadTab() adapter. Server/scripts only, no
+validate memberships. Depends on users-roles + user-sites. DECIDED 2026-09-28: reader = B (CSV, zero-dep) behind a loadTab() adapter; PLUS an export mode (dump the DB to the template shape) so it round-trips export->edit->import. Server/scripts only, no
 click-through. Full spec: session-status.md -> "Step import-identity".
 
 ### 3k. Step stub-login - pick-your-name login + currentUser middleware  [blocked: users-roles]
@@ -209,18 +208,20 @@ Decisions: `session-status.md` -> "Things NOT to re-litigate" (2026-09-15).
 
 ---
 
-## Planned — commissary staging / conversion model (architect-defined 2026-09-28, NOT yet sliced)
+## Planned — commissary staging + restaurant conversion (architect-defined 2026-09-28, corrected, NOT yet sliced)
 
-Resolves the kg<->units need without touching the commi yield ledger (#16 -> Path 1). See
-session-status "Things NOT to re-litigate -> Commissary staging / conversion model". Build family,
-sliced in a later architect turn:
-- **Conversion** op: processed commi kg -> restaurant units vs a standard; variance -> shrinkage
-  (allocation). Reused at the restaurant for kg received as raw.
-- **Staging**: restaurant meat holds stock at the commi (staging location); balance spans
-  commi-staged vs restaurant-on-hand.
-- **Shipment = the staged event released** when the restaurant pulls it (kg -> restaurant raw, or a
-  reported piece count). No transit shrinkage; transit loss = allocation.
-Leans on the conversion-standards + allocation machinery already in the schema.
+Three stages (the kg<->units RATIO conversion is the RESTAURANT's, not the commi's - #16-class
+correction). See session-status "Things NOT to re-litigate -> Commissary staging + restaurant
+conversion model". Family:
+- **Commi staging/packing** (Stage 2): commi meat -> ready-to-ship restaurant meat via
+  commissary_meat_map (a MAP, no ratio); staged at the commi; released by a shipment (staged ->
+  released). Restaurant-meat balance spans commi-staged vs on-hand. Delivered in kg or a reported
+  piece count. No transit shrinkage; transit loss = allocation.
+- **Restaurant conversion** (Stage 3, OPTIONAL): received meat -> portions/quarters/skewers/sahog
+  vs a ratio standard; variance -> shrinkage. Extends existing allocations/conversion +
+  commissary_conversion_standards (multiple standards per conversion + costing-default + per-log
+  override). Optional - most goods received proper; conversion is the on-the-spot exception.
+Commi yield (Stage 1) is built (24d-i). Leans on commissary_meat_map + allocation machinery already in schema.
 
 ## Available engineer-lane work
 

@@ -468,19 +468,16 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   route. Do not "fix" the engine to net internal moves to zero — that would be
   building the station feature by the back door.
 
-- **Commissary staging / conversion model - settled 2026-09-28 (resolves #16).** The commi yield
-  output is ALWAYS kg; unit-tracked stock at the commi is NOT a yield output but **restaurant meat
-  staged at the commi**, made by a **conversion**, then held (buffered) until the restaurant pulls
-  it. Four parts: (1) **Yield** unchanged - raw -> backed-up, kg out; shrinkage = the raw-backed
-  loss. (2) **Conversion** - processed commi kg -> restaurant units against a standard; the
-  **variance from the standard -> shrinkage (allocation)**; same operation reused at the restaurant
-  for kg received as raw; deliberately simpler than the yield engine (restaurants never run it).
-  (3) **Staging/buffer** - the converted restaurant-meat holds stock AT THE COMMI (a staging
-  location), so a restaurant meat's balance spans commi-staged vs restaurant-on-hand; new concept,
-  contradicts nothing settled. (4) **Shipment = the same event as staging**, released when the
-  restaurant pulls it - delivered in kg (lands as restaurant raw, converted later) or as a reported
-  piece count; NO transit shrinkage, transit loss is an ALLOCATION. NEW BUILD FAMILY, not yet
-  sliced - see dispatch-queue "Planned - commissary staging / conversion model". Confirmed by NaokiiVT.
+- **Commissary staging + restaurant conversion model - settled 2026-09-28 (resolves #16; CORRECTED 2026-09-28).** The commi yield output is ALWAYS kg. THREE stages, not two - the kg<->units RATIO conversion is the RESTAURANT's, not the commi's (confirmed: commissary_conversion_standards is restaurant-scoped, and POST /api/allocations/conversion already exists restaurant-side):
+  (1) **Commi processing (yield)** - raw -> backed-up, kg out; shrinkage = the raw-backed loss. [built - 24d-i]
+  (2) **Commi staging / packing** - commi meat -> ready-to-ship RESTAURANT meat via commissary_meat_map (a direct correspondence, NO ratio - a MAP + pack, NOT a conversion); held staged AT THE COMMI, released by a shipment (staged -> released). A restaurant meat's balance spans commi-staged vs restaurant-on-hand. Delivered in kg (lands as restaurant raw) or as a reported piece count. NO transit shrinkage; transit loss is an ALLOCATION.
+  (3) **Restaurant conversion - OPTIONAL, on the spot** - the restaurant converts received meat -> portions / quarters / skewers / sahog against a ratio standard; **variance from the standard -> shrinkage (allocation)**. OPTIONAL: most goods are received proper and used as-is; conversion is the exception (Silingan makes on the spot; FC batch-preps). Standards: settings-defined + a log-time dropdown of active conversions (raw -> dish meat) + staff may OVERRIDE the standard per log (it is a guide) + MULTIPLE standards per conversion (per upper-order) + one flagged as the COSTING default. Extends the existing allocations/conversion + commissary_conversion_standards (drop its single-ratio UNIQUE, add a costing-default flag; the log records the standard/ratio used).
+  (Earlier version wrongly put the ratio-conversion at the commi - same class of error as #16.) NEW BUILD FAMILY, not yet sliced. Confirmed by NaokiiVT.
+- **Architecture Q2-Q6 decisions (2026-09-28).**
+  - **Sheets (Q2):** first slice = tier-1 sheet_definitions (site, category, engine_type, active; workbook-fed); "In progress" is AUTO on the day's first count; the commissary's own sheet finalizes too (same two-step owner->close).
+  - **Sides (Q3):** "received" is a FIELD on the side-sheet row (usage = prior ending + received - today's ending); minimal, no separate receipts log.
+  - **PO (Q4):** the internal request is its OWN record; the commi's fulfilling shipment carries request_id (4a-B). Endorsement = an ACK field on the shipment (acknowledged_by/at); the multi-coworker witness/vouch ledger stays DEFERRED (4b-A).
+  - **Import reader (Q6):** reader = per-tab CSV, zero-dep, behind loadTab() (B); PLUS an EXPORT mode - dump the current DB to the same template shape so it round-trips (export -> edit -> import).
 
 ## End-of-session checklist (every session, no exceptions)
 
@@ -1448,8 +1445,9 @@ from the workbook Roles tab -
 import-settings.js (later) becomes the source of truth and may UPDATE these; seed.js only
 guarantees safe defaults so the app runs pre-import. The "super-admin cannot be locked out"
 guard belongs to the roles-admin slice, not here.
-Also seed ONE super-admin USER (#19 fix, 2026-09-28): INSERT OR IGNORE a single super-admin user
-(Naoki's account - confirm the exact name so import-settings.js upserts the same row, not a duplicate),
+Also seed ONE super-admin USER (#19 fix, 2026-09-28): INSERT OR IGNORE a single bootstrap super-admin named "superadmin"
+(a break-glass/bootstrap login, NOT a real person's name - keeps real names out of the public repo; the
+real owner name enters only via the off-repo workbook at import; name resolved #22 2026-09-28),
 default_role_id = the super-admin role, active. This gives the users table its write path so npm run
 verify's write-path audit passes, and it satisfies the settled "super-admin is seeded and unlockable"
 decision. Membership/login/authorship still NOT here.
@@ -1523,6 +1521,10 @@ source of truth over slice-1's seed defaults):
   can_admin / read_only) from the workbook. Never delete a role absent from the sheet; never
   touch super-admin's unlockable status.
 - Users: upsert by name; resolve default_role (name) -> roles.id; set active.
+- Super-admin reconciliation (#22): the workbook's super-admin row does NOT insert a second
+  super-admin. Exactly one exists (the seeded bootstrap "superadmin"); match it by ROLE (default_role
+  = super-admin) and UPDATE its name/details to the workbook owner. All OTHER users upsert by name.
+  Keeps one unlockable super-admin; the real name enters via the workbook, never the repo.
 - Memberships: split site_memberships (comma-separated) per user; for each code call
   resolveSiteCode() (siteAccess.js) - insert (user_id, site_code) when it resolves, WARN and
   skip when it doesn't (this is where the SIL vs SILT mismatch surfaces; the fix is a workbook
