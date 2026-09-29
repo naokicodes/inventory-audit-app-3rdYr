@@ -50,13 +50,9 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 3d. Step nav-mobile — CLOSED 2026-09-28, PR #17 (`39dfcc6`).
 
-### 3e. Step 24d-ii - richer yield: surface miscut + true-loss split (read layer)  [runnable]
-Touches: server/engines/commissaryYieldEngine.js (+ test)
-Read-layer only: computeYieldRow adds miscut_weight + residualLoss (raw-backed-miscut);
-loss/status UNCHANGED. Route auto-carries. Depends on 24d-i (unmerged) -> skipped until it
-merges. Server-only, no click-through. Full spec: session-status.md -> "Step 24d-ii".
+### 3e. Step 24d-ii — CLOSED 2026-09-28, PR #21 (`546386d`).
 
-### 3f. Step 24d-iii - richer yield: miscut on the commissary UI (Path 1)  [blocked: 24d-ii]
+### 3f. Step 24d-iii - richer yield: miscut on the commissary UI (Path 1)  [runnable]
 Touches: public/commissary.html, public/style.css
 Adds a miscut_weight field to the yield form + a miscut column in the log table (Path 1: no
 output-count). Wide table scrolls below 768px. Depends on 24d-ii. PUBLIC -> click-through before

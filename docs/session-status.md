@@ -1404,6 +1404,8 @@ users-roles -> sequence. NO ledger change.
 
 ## Step 24d-ii - richer yield: surface miscut + true-loss split (read layer, Path 1)
 
+**CLOSED 2026-09-28, PR #21 (`546386d`).** Kept here until the next archive pass.
+
 Second yield slice. Surfaces miscut on reads; loss judgment unchanged. DEPENDS ON 24d-i. (Path 1:
 no output_quantity.) Engine (commissaryYieldEngine.js, computeYieldRow): add miscut_weight to the
 SELECT and return miscut_weight (recoverable, kg) + residualLoss = raw_weight_in -
