@@ -82,7 +82,7 @@ validate memberships. Depends on users-roles + user-sites. DECIDED 2026-09-28: r
 click-through. Full spec: session-status.md -> "Step import-identity".
 
 ### 3k. Step stub-login - pick-your-name login + currentUser middleware  [blocked: users-roles]
-Touches: public/login.html, server/routes/auth.js, server/app.js
+Touches: public/login.html, server/routes/auth.js, server/index.js
 Phase-1 identity, no passwords: pick-your-name -> cookie -> req.user with capability flags. No
 enforcement yet. LEAN: plain cookie, no new dep (flag). Needs users present (import-identity or a
 dev seed). PUBLIC -> click-through. Full spec: session-status.md -> "Step stub-login".
@@ -95,7 +95,7 @@ migration -> sequences with other schema/migration steps. Full spec: session-sta
 "Step user-id-authorship".
 
 ### 3m. Step site-filter - query-layer site scoping enforcement  [blocked: stub-login, user-sites]
-Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/app.js
+Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/index.js
 requireSiteAccess middleware: checker scoped to memberships (siteAccess.js), management/admin/
 super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped routes; park
 ambiguous ones. Full spec: session-status.md -> "Step site-filter".
@@ -124,6 +124,27 @@ Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1
 A `preview` label on a PR serves that PR's code from a separate worktree on port 3100 with a
 reseeded throwaway DB, reachable over Tailscale. Never port 3000, never the live DB. Full
 spec: session-status.md -> "Step autopilot-preview".
+
+### 3r. Step loyverse-preview-i - Loyverse sales preview: engine + route, writes nothing  [runnable]
+Touches: server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, server/index.js, .env.example
+Read-only dry run of the Loyverse port (decided 2026-10-03, 1b + 2a): both accounts, one business
+date, per-dish Silingan / Likod / total + unmatched. Writes nothing, no migration. Tokens via .env
+(gitignored, loaded by server/index.js). Server-only, no click-through. Parallel-safe with
+users-roles, 24d-iii and autopilot 3n-3q. Full spec: session-status.md -> "Step loyverse-preview-i".
+
+### 3s. Step loyverse-preview-ii - Kitchen Sales page (temporary)  [blocked: loyverse-preview-i]
+Touches: public/kitchen-sales.html, public/index.html, public/style.css
+Dish | Likod | Silingan | Total, an unmatched list, Copy as text with a LAN-safe fallback; a
+failed account shows "-", never 0. Linked from Home only. Overlaps 24d-iii on style.css ->
+sequence. PUBLIC -> click-through before merge. Full spec: session-status.md -> "Step
+loyverse-preview-ii".
+
+### 3t. Step loyverse-preview-iii - wildcard-match report (terminal, you-only)  [blocked: loyverse-preview-i]
+Touches: server/engines/loyverseReport.js, server/engines/loyverseReport.test.js, scripts/loyverse-matches.js, package.json
+`npm run loyverse:matches -- --date YYYY-MM-DD`: lists every wildcard pattern's catches (raw
+Loyverse names + quantities), unmatched items and account status, by calling the SAME engine as
+the route. Writes nothing. Not in the UI. Parallel-safe with loyverse-preview-ii. Full spec:
+session-status.md -> "Step loyverse-preview-iii".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
@@ -196,13 +217,11 @@ into whichever step next touches `allocations.js`.
 
 Spec: `session-status.md`, section "Step 25e".
 
-### 7. Nothing.
-**This is deliberate. Do not invent a step 25.**
-
-After 24b-v the plan is a soft launch against real output, so that actual
-use decides what gets built next rather than guesswork. This is the same
-reasoning that deferred the per-meat next-stage config. An idle assistant
-costs far less than an invented step.
+### 7. No invented steps.
+**Updated 2026-10-03.** The "nothing after 24b-v" stop is retired: 24b-v landed (built by
+24d-i), and the architect now slices the designed families (identity chain, Loyverse preview and
+port, sheets, sides, PO, staging) into this queue. The rule underneath stands: only an architect
+adds a step, and an idle assistant costs far less than an invented one.
 
 ---
 
@@ -272,5 +291,6 @@ are genuinely useful and genuinely safe.
   build task, and not a bug. Do not "fix" it in code.
 - **Restaurant C (Likod) onboarding.** No workbook exists yet. Blocked on
   real-world data, not on code.
-- **MySQL migration / POS integration.** Parked. Real work, not a config
-  flip.
+- **MySQL migration.** Not planned: hybrid A (2026-10-03) keeps inventory on
+  SQLite and SPOS on MySQL, connected by API. **SPOS integration** comes after
+  the Loyverse + inventory web app is finished.

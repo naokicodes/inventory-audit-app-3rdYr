@@ -485,7 +485,21 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   - **Sides:** one side_items catalog + a per-site availability join (B1); ONE SIDE sheet PER CATEGORY - Veggies/Pantry/Pizza/Bar/Scullery (B2); simple prior-ending usage, NO 26a carry (B3) - accepted skew: an empty ending skews the monthly report by ~1/30, tolerated.
   - **PO:** internal request (loop) first, supplier order (terminal) later (C1); manual-editable request first, running-low auto-suggest later (C2); request status = requested -> fulfilled -> acknowledged -> **cancelled** (C3), cancelled covering a PO line that did NOT arrive (mirror of an off-list arrival).
   - **Staging:** Stage-2 = extend commissary_shipments with a status (staged -> released); it already carries restaurant-meat lines (D1). Shipment gains the commi's authoritative weight + photo (photo_path exists) + the ack field; restaurant acknowledges (D2). Stage-3 variance -> shrinkage reuses existing restaurant allocation/adjustment machinery (allocations/conversion +/- pairs) (D4). Stage-3 standards (D3, resolved 2026-09-28): commissary_conversion_standards drops its single-ratio UNIQUE and gains a per-standard LABEL/name (D3c) + is_costing_default (exactly one per raw->dish pair; costing always uses it regardless of what staff logged - D3d). At log time staff pick from a dropdown of active standards for the (raw->dish) pair and may OVERRIDE the ratio for that log (D3a); the conversion log stores the chosen standard_id AND the actual ratio used (D3b).
-- **POS integration target = SPOS (github.com/princeravenver01/SPOS) - concretizes Q5.** SPOS is Node/Express + **MySQL** (InnoDB, mysql2) - two apps (admin + pos), its own access_roles (permissions JSON), a PO concept. The POS is the source of truth for MONEY/SALES: our app hands info OUT to the POS and pulls SALES IN. **DB target becomes MySQL on the eventual merge** - the portability bias in the users/roles/importer specs is for this. Sales: Loyverse on `main` for now; a BRANCH completes the SPOS sales integration; switch main HEAD when SPOS deploys. Do NOT migrate to MySQL on main yet - branch/merge work, after the current agenda.
+- **POS integration target = SPOS (github.com/princeravenver01/SPOS) - concretizes Q5.** **[DB target SUPERSEDED 2026-10-03 by hybrid A - see the next entry.]** SPOS is Node/Express + **MySQL** (InnoDB, mysql2) - two apps (admin + pos), its own access_roles (permissions JSON), a PO concept. The POS is the source of truth for MONEY/SALES: our app hands info OUT to the POS and pulls SALES IN. **DB target becomes MySQL on the eventual merge** - the portability bias in the users/roles/importer specs is for this. Sales: Loyverse on `main` for now; a BRANCH completes the SPOS sales integration; switch main HEAD when SPOS deploys. Do NOT migrate to MySQL on main yet - branch/merge work, after the current agenda.
+- **SPOS integration - settled 2026-10-03 (architect conversation; supersedes the MySQL target above).**
+  - **Domain split.** Prince (SPOS) owns finance and service: orders, payments, shifts/cash, prices, discounts, the POS. This app owns inventory, and its logic is the inventory core. Our position (Prince to confirm): SPOS's own inventory screens (counts, productions, transfers, stock adjustments, `products.in_stock`) are retired at these sites.
+  - **Hybrid A - two services, two databases.** Inventory stays on SQLite; SPOS stays on MySQL; they connect by API. No MySQL port of this app is planned. Supersedes "DB target becomes MySQL on the eventual merge". Portability-where-free stays a habit, not a migration plan.
+  - **Only quantities cross.** SPOS exposes sales quantities per order line (branch, product, variant, qty, paid time, a stable line id). No price or total ever enters the inventory DB, so the 09-15 "sales confidentiality is a data-layer fact" holds by structure.
+  - **SPOS is a second sales source**, through the same source-agnostic intake as Loyverse: source SPOS, an explicit product-id map, one row per order line, OUR business-date rules (never SPOS's `DATE(created_at)`).
+  - **Logic stays on the server.** Browsers (and any later phone app) are API clients; every rule is enforced server-side.
+  - **Phones use the web app.** Native apps: later, if at all. Order: finish the Loyverse + inventory web app first, then connect SPOS.
+  - **Recyclable-logic rule (new work):** business rules go in engine modules, not routes or pages - pages display, routes validate shape and call, the engine decides. With the already-settled single sales intake and portable SQL, this keeps the logic portable to any later architecture.
+  - **Likod and Silingan's kitchen.** Likod is Silingan's backyard restaurant: Likod customers can order the Silingan menu, cooked in Silingan's kitchen and served in the back. So Likod's Loyverse sales of Silingan-menu dishes count toward Silingan's kitchen usage (the real port maps them to Silingan dishes). Likod's own unique menu: open (being finalized).
+  - **Loyverse preview first (1b + 2a).** A read-only preview ships before the real port: a tested engine module plus a view that writes nothing (= `loyverse-sync.md`'s dry-run tool). The real port later adds the write into `sales` (source LOYVERSE), a Sync button and the nightly run on the SAME module. The name map lives temporarily in `server/db/loyverse-name-map.json` (account-keyed, mirrors the GAS Name_Map); its permanent storage is decided in the real port. Preview business date = the Manila calendar date of `receipt_date` (same as the GAS); the per-restaurant day-start hour comes with the port.
+  - **Our own curated name map - confirmed 2026-10-03.** The preview resolves Loyverse item names to dish codes through `server/db/loyverse-name-map.json`; the engines only ever see dish codes and quantities. The 09-15 rule "map by explicit product_id, never by name" governs the sync step that WRITES `sales`, so it does not touch the read-only preview. Before the real port writes, decide its key - this curated name map, or the Loyverse `item_id` / `variant_id` the preview reports behind every match. The risk to weigh then: a wildcard can silently catch a NEW item ("Braised Beef*" would also catch a future "Braised Beef Tapa"); a rename is loud (it lands in unmatched). Wildcard catches are checked from a terminal command (Step loyverse-preview-iii), not the daily UI - matching `loyverse-sync.md`'s "debug tools are you-only".
+  - **Refund receipts.** Loyverse REFUND receipts carry positive amounts, and the GAS does not check receipt type, so it likely counts a refund as a sale. The preview keeps the GAS numbers but reports refund receipts per account; the real port decides how refunds subtract.
+  - **Coordination.** The integration doc shared with Prince lives in a Google Doc (+ the Facebook chat); every decision still lands here.
+  - **Open for Prince:** identity link (lean: map a person's two accounts on our side); SPOS server-side auth for its own safety; product<->dish map (lean: ours, by explicit id); branch<->site (lean: a site_code on SPOS branches); cost-price owner; supplier POs (lean: SPOS owns the money side, we record arrivals); combined analytics (lean: finance side reads our valuation); SPOS asks - void instead of hard-delete, item-level refunds, modifiers on order lines, paid_at, a quantities endpoint.
 - **Autopilot (solo workflow) - settled 2026-10-04; NOT ACTIVE until the server install.** The dispatcher role (typing /start) is replaced by the unattended runner (scripts/run-queue.ps1 + .claude/commands/run-step.md) on the restaurant server PC - the SAME PC that hosts the live app - under a STANDARD Windows user `engineer` with its own clone, write/delete on the live app folder DENIED by Windows permissions (the guard-db hook is not the only lock), and PORT=3100 so it never collides with the live app.
   - **Identity:** a dedicated GitHub machine account (collaborator, Write, NOT admin) opens the PRs, so the architect can approve them - workflow-guide "Job 2" stands (the worker opens the PR, the architect approves). The engineer's Claude account is the bot's own (same email), upgraded to Pro.
   - **Triggers:** Task Scheduler runs at 16:00 / 21:00 / 03:00 (-MaxSteps 2) - the architect's class and sleep hours, when no architect work happens anyway; each >= 5 h apart = a fresh usage window + a 15-minute doorbell (a `run-now` label or a new `architect-docs` issue, naokicodes only, -MaxSteps 1). Pause = any open `autopilot-pause` issue by naokicodes.
@@ -1581,7 +1595,7 @@ DEPENDS ON users-roles (tables) and users being present (import-identity, or a d
 Portability: cookie/session is app-layer, DB-agnostic.
 Tests: login sets the cookie; currentUser attaches the right capabilities; logout clears it.
 Touches: public/login.html (new), the shared nav, server/routes/auth.js (new) + the currentUser
-middleware, server/app.js (wire it) (+ tests). PUBLIC -> click-through before merge. Depends on
+middleware, server/index.js (wire it) (+ tests). PUBLIC -> click-through before merge. Depends on
 users-roles.
 
 ## Step user-id-authorship - new writes carry user_id (slice 4b)
@@ -1636,7 +1650,7 @@ super-admin see all. DEPENDS ON stub-login (req.user) + user-sites (siteAccess.j
 Portability: app-layer guard, DB-agnostic.
 Tests: a checker is 403'd / filtered off a non-member site; bypass roles see all; union access
 for a floater.
-Touches: server/middleware/requireSiteAccess.js (new), the site-scoped routes, server/app.js
+Touches: server/middleware/requireSiteAccess.js (new), the site-scoped routes, server/index.js
 (+ tests). Server-only (a click-through only if UI changes). Depends on stub-login + user-sites.
 
 ## Step autopilot-runner - runner lock, run log, pause switch, review drafts
@@ -1825,3 +1839,120 @@ the live inventory.db untouched; show the guards refusing -Port 3000 and an inve
 Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1. No app code; the preview runs the
 PR's code as-is. No click-through for this step itself.
 
+## Step loyverse-preview-i - Loyverse sales preview: engine + route (writes nothing)
+
+First slice of the Loyverse port, built as its dry run (`loyverse-sync.md` -> "Dry-run sync for a
+date"). Decided 2026-10-03 (1b + 2a). Replaces Naoki's nightly Apps Script run for Silingan's
+kitchen: per-dish sales from BOTH Loyverse accounts (Silingan, Likod) for one business date.
+WRITES NOTHING - no table, no migration, not on the audit engine's path (rule 14).
+
+Engine - server/engines/loyversePreview.js (new). Pure logic + an injected fetch, so tests never
+touch the network:
+- Config: server/db/loyverse-name-map.json (committed by the architect - read it, do not edit).
+  accounts[] = {label, tokenEnv}; dishes[] = {dish_code, name, silingan, likod, note}; an empty
+  string = that account doesn't sell the dish.
+- Window: created_at from <date>T00:00:00+08:00 to +7 days (LOOKBACK_DAYS = 7). A late-synced
+  receipt's created_at is AFTER its receipt_date, never before.
+- Fetch: GET https://api.loyverse.com/v1.0/receipts?created_at_min=&created_at_max=&limit=250
+  [&cursor=], header Authorization: Bearer <token>; follow `cursor` until null. Non-200 -> that
+  account fails (error text, never the token); the other account still computes.
+- Keep a receipt only if cancelled_at is empty AND its receipt_date, as a calendar date in
+  Asia/Manila (Intl, no deps), equals the target date.
+- Read ONLY item_name, quantity, item_id, variant_id and variant_name from line_items - never a
+  price or total field.
+- Resolve per account: normalize (trim, lowercase, collapse whitespace); exact match first, then
+  wildcard ('*' -> '.*', anchored, every other regex metachar escaped - the GAS escapeRegex fix).
+  No match -> the unmatched list (account, raw name, summed qty), never silently dropped.
+- Otherwise port the GAS behaviour faithfully. Diagnostic only: per account, count receipts by
+  `receipt_type` (SALE / REFUND) when the field is present. REFUND receipts carry positive
+  amounts and the GAS counts them like sales; the preview keeps that (numbers match tonight's
+  message) and REPORTS the refund count - the real port decides how refunds subtract.
+- Id evidence for the real port: every matched line also carries the Loyverse `item_id` and
+  `variant_id` (+ `variant_name` when present). Aggregate them per (dish_code, account, item_id,
+  variant_id) into idCandidates, keeping the raw item_name, matchedBy ('exact' | 'wildcard') and
+  the map pattern that matched (so preview-iii can report each wildcard's catches). The preview
+  writes nothing, so the 09-15 "never by name" rule does not bind it; this evidence lets the
+  real port choose its key (the curated name map or explicit ids) before it writes `sales`.
+
+Route - server/routes/loyverse.js (new), mounted in server/index.js:
+GET /api/loyverse/preview?date=YYYY-MM-DD (default: today in Manila; malformed -> 400). Tokens
+from process.env (LOYVERSE_SILINGAN_TOKEN, LOYVERSE_LIKOD_TOKEN); a missing token -> that account
+{ ok:false, error:'token not set' }.
+Response: { date, accounts:[{label, ok, error?, receiptsScanned, receiptsKept, receiptTypes}],
+dishes:[{dish_code, name, silingan, likod, total}] (every map row, zeros included, map order; a
+failed account's column is null, not 0), unmatched:[{account, item_name, quantity}],
+idCandidates:[{dish_code, account, item_id, variant_id, item_name, variant_name, matchedBy,
+pattern, quantity}] }.
+No money field anywhere.
+
+Env: server/index.js loads .env at startup with Node's built-in process.loadEnvFile() when the file
+exists (no dotenv) - so it works however the server starts: npm run dev, the autopilot's scheduled
+`node server/index.js`, or a preview. .env.example (new) lists both names with no values. .env is
+already gitignored: tokens are never committed, never logged, never sent to the browser.
+
+Tests (no network - stub fetch): a late-synced receipt is counted; the UTC->Manila boundary
+(2026-10-02T17:30:00Z counts for 10-03); cancelled skipped; two-page cursor; wildcard 'Name*' and
+'Name (*)' forms + names with regex metachars; exact beats wildcard; case/whitespace
+normalization; unmatched summed; a missing token and a non-200 each fail ONE account with a null
+column; REFUND receipts counted in receiptTypes; idCandidates aggregated per item_id/variant_id,
+a wildcard hit carrying matchedBy 'wildcard' + its pattern;
+no price/total key anywhere in the output; zero rows present; malformed date -> 400.
+
+Touches: server/engines/loyversePreview.js (new), server/engines/loyversePreview.test.js (new),
+server/routes/loyverse.js (new), server/routes/loyverse.test.js (new), server/index.js,
+.env.example (new). Server-only, no click-through, no migration. Parallel-safe with users-roles,
+24d-iii and the autopilot steps 3n-3q.
+
+## Step loyverse-preview-ii - the Kitchen Sales page (temporary)
+
+The page for loyverse-preview-i. Depends on it. PUBLIC -> live click-through (390px) before merge.
+
+- public/kitchen-sales.html (new): title "Kitchen Sales (Loyverse)" and one line "Preview -
+  read-only, nothing is saved". Date picker (default today, Manila) + Load; a loading state.
+- Table: Dish | Likod | Silingan | Total - every dish, map order, zero rows muted. A failed account
+  shows "-" in its column plus a banner naming it ("Likod could not be fetched: <error>"): a
+  failure must never look like zero sales.
+- Under the table: one status line per account ("Silingan: 142 receipts, 1 refund") and the
+  unmatched section (account, item name, qty), hidden when empty. idCandidates stay API-only.
+- "Copy as text" for Messenger: a header line with the date, one line per NON-ZERO dish
+  ("Meatball Pasta - Likod 4, Silingan 9, Total 13"), then "Unmatched: N items (see app)" when
+  N > 0, and the failed-account warning if any. navigator.clipboard needs HTTPS or localhost, so
+  on a LAN http:// address fall back to a selected textarea + execCommand('copy'); if that fails,
+  show the textarea for manual copy.
+- Link it from Home (public/index.html) only - the shared nav is duplicated across 11 pages and
+  this page is temporary.
+- Phone first: viewport meta; the table fits or scrolls inside its own container at 390px.
+- Click-through note: an autopilot preview (port 3100, its own worktree) has no .env, so the page
+  shows "token not set" for both accounts there. That banner path is part of what the
+  click-through checks; the live-data path is checked on the server's own instance.
+
+Touches: public/kitchen-sales.html (new), public/index.html, public/style.css. Overlaps 24d-iii on
+style.css -> sequence. PUBLIC -> click-through before merge.
+
+## Step loyverse-preview-iii - wildcard-match report (terminal, you-only)
+
+The debug tool `loyverse-sync.md` asks for ("dry-run sync" / "search items across a date"), kept
+out of the daily UI on purpose. Decided 2026-10-03. Depends on loyverse-preview-i. Its job: show
+what every wildcard row in the name map actually caught, so the six UNCERTAIN rows (and any
+future over-capture, e.g. a new "Braised Beef Tapa" under "braised beef*") are checked before
+anything feeds an audit.
+
+- server/engines/loyverseReport.js (new): a PURE formatter - takes the engine's preview result,
+  returns the report text. Sections: (1) wildcard matches grouped by account, then pattern ->
+  dish code + name + subtotal, each raw item_name (+ variant_name) with its quantity; (2)
+  unmatched (account, raw name, qty); (3) one status line per account (receipts kept, refunds,
+  or the error). An `all` option also lists exact matches.
+- scripts/loyverse-matches.js (new): thin CLI. `--date YYYY-MM-DD` (default today in Manila),
+  `--all`. Calls the SAME engine function as GET /api/loyverse/preview - never a second copy of
+  the fetch/match logic - then prints loyverseReport's text. Exit 1 if an account failed, else 0.
+- package.json: "loyverse:matches": "node scripts/loyverse-matches.js". The CLI loads .env itself
+  with process.loadEnvFile() when the file exists (same as server/index.js).
+- Writes nothing. Prints quantities and names only - never a price, never a token.
+
+Tests (pure, no network - a canned preview result): grouping by account then pattern;
+subtotals equal the sum of their lines; variant names shown; the unmatched section appears only
+when non-empty; `all` adds exact matches; a failed account prints its error line.
+
+Touches: server/engines/loyverseReport.js (new), server/engines/loyverseReport.test.js (new),
+scripts/loyverse-matches.js (new), package.json. Server/scripts only, no click-through, no
+migration. Parallel-safe with loyverse-preview-ii.

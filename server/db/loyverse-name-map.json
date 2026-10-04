@@ -1,0 +1,292 @@
+{
+  "_about": "Loyverse item name -> dish map for the read-only Kitchen Sales preview (Step loyverse-preview-i). Transcribed from the Apps Script scaffoldNameMap. '*' is a wildcard; an empty string means that account does not sell the dish. Temporary home - permanent storage is decided in the real Loyverse port. Tokens are NEVER stored here; they live in .env (gitignored).",
+  "lookbackDays": 7,
+  "timezone": "Asia/Manila",
+  "accounts": [
+    {
+      "label": "Silingan",
+      "key": "silingan",
+      "tokenEnv": "LOYVERSE_SILINGAN_TOKEN"
+    },
+    {
+      "label": "Likod",
+      "key": "likod",
+      "tokenEnv": "LOYVERSE_LIKOD_TOKEN"
+    }
+  ],
+  "dishes": [
+    {
+      "dish_code": "D001",
+      "name": "Mozarella Sticks",
+      "silingan": "Mozzarella stick",
+      "likod": "Mozarella Sticks",
+      "note": ""
+    },
+    {
+      "dish_code": "D002",
+      "name": "Kalabasa Hummus",
+      "silingan": "Kalabasa Hummus",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D003",
+      "name": "Bagnet Sisig",
+      "silingan": "Bagnet Sisig",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D004",
+      "name": "Golabki",
+      "silingan": "Chinese Golabki",
+      "likod": "",
+      "note": ""
+    },
+    {
+      "dish_code": "D005",
+      "name": "Mini Buratta",
+      "silingan": "Mini Buratta Salad",
+      "likod": "Mini Buratta Salad",
+      "note": ""
+    },
+    {
+      "dish_code": "D006",
+      "name": "Chef's Salad",
+      "silingan": "Chefs Salad",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D007",
+      "name": "Pako Salad",
+      "silingan": "Pako Salad",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D008",
+      "name": "Pasta Negra",
+      "silingan": "Pasta Negra",
+      "likod": "Pasta Negra",
+      "note": ""
+    },
+    {
+      "dish_code": "D009",
+      "name": "Meatball Pasta",
+      "silingan": "Meatballs Pasta",
+      "likod": "Meat Ball Pasta",
+      "note": ""
+    },
+    {
+      "dish_code": "D010",
+      "name": "Bolognese Pasta",
+      "silingan": "Bolognese Pasta",
+      "likod": "Bolognese Pasta",
+      "note": ""
+    },
+    {
+      "dish_code": "D011",
+      "name": "Caccio e Pepe",
+      "silingan": "Caccio E Pepe",
+      "likod": "Caccio e Pepe",
+      "note": ""
+    },
+    {
+      "dish_code": "D012",
+      "name": "Croquettes",
+      "silingan": "Potato Croquettes",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D013",
+      "name": "Pan Fry Pork Steak",
+      "silingan": "Pan Fry Pork Steak*",
+      "likod": "Pan Fry Pork Steak (*)",
+      "note": "UNCERTAIN - weight variants, verify"
+    },
+    {
+      "dish_code": "D014",
+      "name": "French Pork Chop",
+      "silingan": "French Pork Chop*",
+      "likod": "Grilled French Cut Pork Chop (*)",
+      "note": "UNCERTAIN - weight variants, verify"
+    },
+    {
+      "dish_code": "D015",
+      "name": "Braised Beef Short Plate",
+      "silingan": "Braised Beef*",
+      "likod": "Braised Beef Short Plate",
+      "note": "UNCERTAIN - weight variants, verify"
+    },
+    {
+      "dish_code": "D016",
+      "name": "Pork Bagnet",
+      "silingan": "Pork Slab Bagnet",
+      "likod": "Pork Bagnet",
+      "note": ""
+    },
+    {
+      "dish_code": "D017",
+      "name": "Chopsuey - Chicken",
+      "silingan": "Chopsuey Chicken",
+      "likod": "Chopsuey - Chicken",
+      "note": ""
+    },
+    {
+      "dish_code": "D018",
+      "name": "Chopsuey - Jowl",
+      "silingan": "Chopsuey Pork",
+      "likod": "Chopsuey - Pork",
+      "note": "Verify Jowl = Pork equivalence"
+    },
+    {
+      "dish_code": "D019",
+      "name": "Pork Pinakbet",
+      "silingan": "Pork Pinakbet",
+      "likod": "Pork Pinakbet",
+      "note": ""
+    },
+    {
+      "dish_code": "D020",
+      "name": "Cabbage Sinutey",
+      "silingan": "Cabbage Sinutey Pork",
+      "likod": "Cabbage Sutey",
+      "note": ""
+    },
+    {
+      "dish_code": "D021",
+      "name": "Chicken Dereta",
+      "silingan": "Chicken Dereta",
+      "likod": "Chicken Dereta",
+      "note": ""
+    },
+    {
+      "dish_code": "D022",
+      "name": "Whole Chicken",
+      "silingan": "Whole Chicken",
+      "likod": "Whole Fried Chicken",
+      "note": ""
+    },
+    {
+      "dish_code": "D023",
+      "name": "Bagnet sa Ginamos - BSG",
+      "silingan": "Bagnet sa Ginamos",
+      "likod": "Bagnet sa Ginamos",
+      "note": ""
+    },
+    {
+      "dish_code": "D024",
+      "name": "Pata Ka",
+      "silingan": "Pata Ka*",
+      "likod": "",
+      "note": "UNCERTAIN - weight variants, no Likod"
+    },
+    {
+      "dish_code": "D025",
+      "name": "Pompano",
+      "silingan": "Pompano*",
+      "likod": "Pompano (*)",
+      "note": "UNCERTAIN - weight variants, verify"
+    },
+    {
+      "dish_code": "D026",
+      "name": "Bah Mi - Chicken",
+      "silingan": "Bah-Mi Chicken",
+      "likod": "Bah Mi - Chicken",
+      "note": ""
+    },
+    {
+      "dish_code": "D027",
+      "name": "Bah Mi - Pork",
+      "silingan": "Bah-Mi Pork",
+      "likod": "Bah Mi - Pork",
+      "note": ""
+    },
+    {
+      "dish_code": "D028",
+      "name": "Stir Fry - Chicken",
+      "silingan": "Stir-Fry Noodles Chicken",
+      "likod": "Stir Fry Noodles - Chicken",
+      "note": ""
+    },
+    {
+      "dish_code": "D029",
+      "name": "Stir Fry - Pork",
+      "silingan": "Stir-Fry Pork",
+      "likod": "Stir Fry Noodles - Pork",
+      "note": ""
+    },
+    {
+      "dish_code": "D030",
+      "name": "Lomi Daw - Chicken",
+      "silingan": "Lomi Daw Chicken",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D031",
+      "name": "Lomi Daw - Pork",
+      "silingan": "Lomi Daw Pork",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D032",
+      "name": "Homemade Burger",
+      "silingan": "Homemade Burger",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D033",
+      "name": "Fillet Burger",
+      "silingan": "Chicken fillet Burger",
+      "likod": "Chicken Fillet Burger",
+      "note": ""
+    },
+    {
+      "dish_code": "D034",
+      "name": "Chicken Sandwich",
+      "silingan": "Grilled Chicken Sandwich",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D035",
+      "name": "Above Pounder",
+      "silingan": "Above Pounder",
+      "likod": "",
+      "note": "No Likod version"
+    },
+    {
+      "dish_code": "D036",
+      "name": "Salmon Tinola",
+      "silingan": "Salmon Belly Tinola",
+      "likod": "Salmon Tinola",
+      "note": ""
+    },
+    {
+      "dish_code": "D037",
+      "name": "Beef Short Plate Nilaga",
+      "silingan": "Beef Short Plate*",
+      "likod": "Short Plate Nilaga",
+      "note": "UNCERTAIN - verify Beef Nilaga vs Short Plate 450g are the same dish"
+    },
+    {
+      "dish_code": "D038",
+      "name": "Sinigang na Inihaw",
+      "silingan": "Sinigang na Inihaw",
+      "likod": "Sinigang na Inihaw",
+      "note": ""
+    },
+    {
+      "dish_code": "D039",
+      "name": "Adobo Rice Platter",
+      "silingan": "Adobo Rice Platter",
+      "likod": "",
+      "note": "No Likod version"
+    }
+  ]
+}
