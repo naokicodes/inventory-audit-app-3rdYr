@@ -146,6 +146,14 @@ Loyverse names + quantities), unmatched items and account status, by calling the
 the route. Writes nothing. Not in the UI. Parallel-safe with loyverse-preview-ii. Full spec:
 session-status.md -> "Step loyverse-preview-iii".
 
+### 3u. Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)  [blocked: user-sites]
+Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js
+First Sheets slice: the sheet_definitions table (site_code, category, engine_type MEAT|SIDE,
+active) + a validating module + a seed of one Landing per restaurant and one Commi per
+commissary. Config only - no dated instances, owner, finalization, routes or UI. Server-only, no
+click-through, no migration. Shares schema.sql + seed.js with 3h/3i -> sequenced after them.
+Full spec: session-status.md -> "Step sheets-tier1".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 

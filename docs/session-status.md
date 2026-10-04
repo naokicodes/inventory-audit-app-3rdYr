@@ -492,7 +492,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   - **Only quantities cross.** SPOS exposes sales quantities per order line (branch, product, variant, qty, paid time, a stable line id). No price or total ever enters the inventory DB, so the 09-15 "sales confidentiality is a data-layer fact" holds by structure.
   - **SPOS is a second sales source**, through the same source-agnostic intake as Loyverse: source SPOS, an explicit product-id map, one row per order line, OUR business-date rules (never SPOS's `DATE(created_at)`).
   - **Logic stays on the server.** Browsers (and any later phone app) are API clients; every rule is enforced server-side.
-  - **Phones use the web app.** Native apps: later, if at all. Order: finish the Loyverse + inventory web app first, then connect SPOS.
+  - **Phones use the web app.** Native apps: later, if at all. Order: finish the Loyverse + inventory web app first, then connect SPOS. **[2026-10-05: a mobile port is now planned after the web app, driven by printing - see "Core app + integration shape" below.]**
   - **Recyclable-logic rule (new work):** business rules go in engine modules, not routes or pages - pages display, routes validate shape and call, the engine decides. With the already-settled single sales intake and portable SQL, this keeps the logic portable to any later architecture.
   - **Likod and Silingan's kitchen.** Likod is Silingan's backyard restaurant: Likod customers can order the Silingan menu, cooked in Silingan's kitchen and served in the back. So Likod's Loyverse sales of Silingan-menu dishes count toward Silingan's kitchen usage (the real port maps them to Silingan dishes). Likod's own unique menu: open (being finalized).
   - **Loyverse preview first (1b + 2a).** A read-only preview ships before the real port: a tested engine module plus a view that writes nothing (= `loyverse-sync.md`'s dry-run tool). The real port later adds the write into `sales` (source LOYVERSE), a Sync button and the nightly run on the SAME module. The name map lives temporarily in `server/db/loyverse-name-map.json` (account-keyed, mirrors the GAS Name_Map); its permanent storage is decided in the real port. Preview business date = the Manila calendar date of `receipt_date` (same as the GAS); the per-restaurant day-start hour comes with the port.
@@ -500,6 +500,11 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   - **Refund receipts.** Loyverse REFUND receipts carry positive amounts, and the GAS does not check receipt type, so it likely counts a refund as a sale. The preview keeps the GAS numbers but reports refund receipts per account; the real port decides how refunds subtract.
   - **Coordination.** The integration doc shared with Prince lives in a Google Doc (+ the Facebook chat); every decision still lands here.
   - **Open for Prince:** identity link (lean: map a person's two accounts on our side); SPOS server-side auth for its own safety; product<->dish map (lean: ours, by explicit id); branch<->site (lean: a site_code on SPOS branches); cost-price owner; supplier POs (lean: SPOS owns the money side, we record arrivals); combined analytics (lean: finance side reads our valuation); SPOS asks - void instead of hard-delete, item-level refunds, modifiers on order lines, paid_at, a quantities endpoint.
+  - **Core app + integration shape - settled 2026-10-05 (Naoki; Prince agreed).**
+    - **This web app is the core app.** SPOS is integrated onto it gradually, our own way: the usual architect -> slice -> build -> review flow, at our pace. Hybrid A stands (two services, two databases, an API between them).
+    - **Selective, two-way contract.** The integration covers only what each side needs: we pull from SPOS what inventory needs (sales quantities per order line), and we expose what SPOS asks of us (the list is agreed with Prince - e.g. stock/availability). Nothing else of SPOS is mirrored here. "Only quantities cross" INTO the inventory DB still holds: no price, total or payment enters it. What goes OUT of this app is decided per field by the architect.
+    - **Demo first, finalize later.** We finish our side first, then build a TEMPORARY test UI in this app that demonstrates the contract as it would work inside SPOS (the Loyverse-preview pattern: a dry run on the real engine module). The contract is finalized only after SPOS has the matching work (done by Prince or by us). The test UI is scaffolding: it shows contract fields only, holds no money data, and is retired once SPOS hosts the real screens.
+    - **Then collaboration, then mobile.** Once the web app is finished, the SPOS side becomes joint work with Prince. A mobile port comes only after the web app has few bugs, inventory and SPOS work well together, and the app is about 80% runnable for Live testing. The driver is printing: ESC/POS to network printers needs a raw TCP socket, which a browser cannot open. Open until then: a native Android app vs a print relay on the server PC (Node can open the socket); and which side owns printing (service is SPOS's domain).
 - **Autopilot (solo workflow) - settled 2026-10-04; NOT ACTIVE until the server install.** The dispatcher role (typing /start) is replaced by the unattended runner (scripts/run-queue.ps1 + .claude/commands/run-step.md) on the restaurant server PC - the SAME PC that hosts the live app - under a STANDARD Windows user `engineer` with its own clone, write/delete on the live app folder DENIED by Windows permissions (the guard-db hook is not the only lock), and PORT=3100 so it never collides with the live app.
   - **Identity:** a dedicated GitHub machine account (collaborator, Write, NOT admin) opens the PRs, so the architect can approve them - workflow-guide "Job 2" stands (the worker opens the PR, the architect approves). The engineer's Claude account is the bot's own (same email), upgraded to Pro.
   - **Triggers:** Task Scheduler runs at 16:00 / 21:00 / 03:00 (-MaxSteps 2) - the architect's class and sleep hours, when no architect work happens anyway; each >= 5 h apart = a fresh usage window + a 15-minute doorbell (a `run-now` label or a new `architect-docs` issue, naokicodes only, -MaxSteps 1). Pause = any open `autopilot-pause` issue by naokicodes.
@@ -1956,3 +1961,59 @@ when non-empty; `all` adds exact matches; a failed account prints its error line
 Touches: server/engines/loyverseReport.js (new), server/engines/loyverseReport.test.js (new),
 scripts/loyverse-matches.js (new), package.json. Server/scripts only, no click-through, no
 migration. Parallel-safe with loyverse-preview-ii.
+
+## Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)
+
+First slice of the Sheets family (architect 2026-10-05). Decisions: "Sheets are a first-class
+two-tier entity, overlay-not-churn" (2026-09-26); Q2 (tier-1 first); round-2 S (site keying =
+site_code via siteAccess.js) and A1 (category is free text, admin-fed per site). Tier 1 is CONFIG
+ONLY: the list of sheets a site has and which engine each uses. NO dated instances, NO owner, NO
+finalization, NO routes or UI. DEPENDS ON user-sites (reuses its resolveSiteCode()).
+
+Schema (schema.sql, new CREATE TABLE IF NOT EXISTS - no migrate helper):
+- sheet_definitions: id, site_code TEXT NOT NULL, category TEXT NOT NULL, engine_type TEXT NOT
+  NULL, active INTEGER NOT NULL DEFAULT 1, created_at (existing convention), UNIQUE (site_code,
+  category). No FK on site_code (model B) - the module validates it.
+- engine_type is NOT a schema CHECK; the module validates it. Reason: SQLite cannot widen a CHECK
+  without a table rebuild (the 25e cost), and the engine set is a module concern. Values today:
+  MEAT, SIDE.
+
+Module (new, server/engines/sheetDefinitions.js - recyclable-logic rule: the rules live here; the
+seed now, and the importer and routes later, call it). Uses the shared connection the same way
+siteAccess.js does.
+- createSheetDefinition({ siteCode, category, engineType, active = 1 }) -> the new row. Validates:
+  siteCode resolves via resolveSiteCode() (null -> error); category trimmed and non-empty;
+  engineType is MEAT or SIDE; no existing definition on the same site whose category matches
+  case-insensitively (a LOWER() comparison in the module, not COLLATE NOCASE, which is
+  sqlite-only). A failed check throws a clear error and writes nothing.
+- listSheetDefinitions({ siteCode, activeOnly = true } = {}) -> rows ordered by site_code,
+  category.
+- ensureDefaultSheets() -> { inserted }: one MEAT "Landing" per active restaurant and one MEAT
+  "Commi" per active commissary; skips any that already exist (case-insensitive). Idempotent.
+- The INSERT names every column (site_code, category, engine_type, active) so the write-path
+  audit sees each one. No allowlist entry.
+- Touches no existing engine or table (overlay-not-churn). The "SIDE never routes through
+  auditEngine" guard belongs to the first slice that routes anything (sides); tier 1 routes
+  nothing.
+
+Seed (seed.js): call ensureDefaultSheets() after restaurants and commissaries are seeded. NO SIDE
+rows here - the side categories (Veggies, Pantry, Pizza, Bar, Scullery FC-only) arrive with the
+sides slice or the workbook import.
+
+Not in scope: tier-2 dated instances (owner, Not started -> In progress -> Done -> Closed) - a
+later slice after the identity chain, since it needs user_id; any route or page; the workbook
+Sheet_Definitions tab import (a later slice on import-settings.js, after import-identity); side
+items and the side engine; renaming or deactivating a definition (no admin surface yet).
+
+Portability (MySQL note): standard types; no sqlite-only syntax in the new table or module.
+
+Tests (sheetDefinitions.test.js, same DB setup as the existing tests): create a MEAT and a SIDE
+definition; reject an unknown site_code, an empty or whitespace category, an unknown engine_type;
+reject a case-insensitive duplicate on the same site ("landing" after "Landing"); allow the same
+category on two sites; list filters by site and by activeOnly; ensureDefaultSheets creates one
+Landing per active restaurant + one Commi per active commissary, a second run inserts 0, and an
+inactive restaurant gets none. reseed.test.js stays green.
+
+Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js (new),
+server/engines/sheetDefinitions.test.js (new). Server-only, no click-through, no migration.
+Shares schema.sql + seed.js with users-roles and user-sites -> sequenced after them.
