@@ -58,7 +58,8 @@ Write a short comment the architect can post as-is or edit: what's good, what (i
 anything) to change, and the domain question from step 4.
 
 If the PR touches `public/`, check for a human click-through note: a PR comment
-beginning `Click-through:`, from the dispatcher (`gh pr view $ARGUMENTS --comments`).
+beginning `Click-through:`, from a human — the dispatcher or the architect
+(`gh pr view $ARGUMENTS --comments`).
 Report whether it is there. A worker's own "verified live" in the PR body does not
 count — that is the worker checking itself.
 

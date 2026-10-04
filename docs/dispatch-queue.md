@@ -100,6 +100,31 @@ requireSiteAccess middleware: checker scoped to memberships (siteAccess.js), man
 super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped routes; park
 ambiguous ones. Full spec: session-status.md -> "Step site-filter".
 
+### 3n. Step autopilot-runner - runner lock, run log, pause switch, review drafts  [runnable]
+Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md (new)
+First of the AUTOPILOT family (settled 2026-10-04; inert until the server install in
+docs/autopilot-guide.md - the interactive /start flow is unchanged). Makes the unattended
+runner safe to schedule. Scripts + a command file only, no app code, no click-through.
+Full spec: session-status.md -> "Step autopilot-runner".
+
+### 3o. Step architect-docs-pickup - apply architect doc edits filed as an issue  [runnable]
+Touches: .claude/commands/run-step.md
+The runner's first job each run: an open `architect-docs` issue by naokicodes becomes a docs
+PR, applied verbatim, all-or-nothing, docs/ only. Independent of 3n (no shared file). Full
+spec: session-status.md -> "Step architect-docs-pickup".
+
+### 3p. Step autopilot-doorbell - start a run from the phone  [blocked: autopilot-runner]
+Touches: scripts/doorbell.ps1 (new)
+A 15-minute poll: a `run-now` label or a new `architect-docs` issue (naokicodes only) starts a
+1-step run. Calls no Claude itself. Needs 3n's lock, -Trigger and pause switch. Full spec:
+session-status.md -> "Step autopilot-doorbell".
+
+### 3q. Step autopilot-preview - serve a PR on port 3100 for phone click-throughs  [blocked: autopilot-doorbell]
+Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1
+A `preview` label on a PR serves that PR's code from a separate worktree on port 3100 with a
+reseeded throwaway DB, reachable over Tailscale. Never port 3000, never the live DB. Full
+spec: session-status.md -> "Step autopilot-preview".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 
