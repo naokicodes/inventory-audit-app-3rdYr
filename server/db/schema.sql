@@ -525,6 +525,29 @@ CREATE TABLE IF NOT EXISTS activity_log (
   source TEXT NOT NULL CHECK (source IN ('SYSTEM', 'MANUAL'))
 );
 
+-- 12. roles + users (step users-roles - identity foundation)
+-- Roles carry capability flags; the five role names and their default flags
+-- are seeded by seed.js (import-settings.js may later UPDATE them). No
+-- membership, login, or created_by rewiring here - those are later slices.
+CREATE TABLE IF NOT EXISTS roles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  can_enter_counts INTEGER NOT NULL DEFAULT 0,  -- boolean: 0 or 1
+  can_finalize INTEGER NOT NULL DEFAULT 0,
+  can_admin INTEGER NOT NULL DEFAULT 0,
+  read_only INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  default_role_id INTEGER NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (default_role_id) REFERENCES roles(id)
+);
+
 -- Seed a reasonable starting set of adjustment types (admin can add more
 -- via the UI later - this is just a sensible default, not a fixed list).
 INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requires_conversion_target) VALUES
