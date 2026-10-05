@@ -103,6 +103,7 @@
     <label>How many went in <input type="number" step="1" id="new-input-qty" placeholder="0"> <span id="new-input-qty-req" class="hint"></span></label>
     <label>What they weighed (kg in) <input type="number" step="0.01" id="new-raw" placeholder="0"></label>
     <label>Backed weight out <input type="number" step="0.01" id="new-backed" placeholder="0"></label>
+    <label>Miscut / reusable trim (kg) <input type="number" step="0.01" id="new-miscut" placeholder="0"></label>
     <label>What this became <select id="new-output-meat"><option value="">Same meat</option></select></label>
     <label>Notes <input type="text" id="new-notes" placeholder="optional"></label>
     <button id="add-yield">Log Event</button>
@@ -126,6 +127,7 @@
     const newMeat = document.getElementById('new-meat');
     const newRaw = document.getElementById('new-raw');
     const newBacked = document.getElementById('new-backed');
+    const newMiscut = document.getElementById('new-miscut');
     const newOutputMeat = document.getElementById('new-output-meat');
     const newInputQty = document.getElementById('new-input-qty');
     const newInputQtyReq = document.getElementById('new-input-qty-req');
@@ -524,6 +526,7 @@
           <td class="cell-input-qty">${r.input_quantity === null || r.input_quantity === undefined ? '-' : r.input_quantity}</td>
           <td class="cell-raw">${fmt(r.raw_weight_in)}</td>
           <td class="cell-backed">${fmt(r.backed_weight_out)}</td>
+          <td class="cell-miscut">${fmt(r.miscut_weight)}</td>
           <td class="cell-output">${r.output_code ? `${r.output_code} - ${r.output_name}` : '(same)'}</td>
           <td>${fmtPct(r.actualLossPct)}</td>
           <td class="${r.status ? 'status-' + r.status : ''}">${r.status || '-'}</td>
@@ -552,16 +555,20 @@
         return;
       }
 
+      // Wide table: scrolls horizontally below 768px, never card-ified
+      // (docs/ui-conventions.md -> Tables).
       document.getElementById('yield-table').innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th><th>Meat</th><th>Input Count</th><th>Raw In (kg)</th><th>Backed Out</th><th>Output</th>
-              <th>Actual Loss %</th><th>Status</th><th>Excess Loss</th><th>Notes</th><th></th>
-            </tr>
-          </thead>
-          <tbody>${lastRows.map(renderRow).join('')}</tbody>
-        </table>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Meat</th><th>Input Count</th><th>Raw In (kg)</th><th>Backed Out</th><th>Miscut (kg)</th><th>Output</th>
+                <th>Actual Loss %</th><th>Status</th><th>Excess Loss</th><th>Notes</th><th></th>
+              </tr>
+            </thead>
+            <tbody>${lastRows.map(renderRow).join('')}</tbody>
+          </table>
+        </div>
       `;
 
       attachRowHandlers();
@@ -586,6 +593,7 @@
       tr.querySelector('.cell-input-qty').innerHTML = `<input type="number" step="1" class="edit-input-qty" value="${row.input_quantity === null || row.input_quantity === undefined ? '' : row.input_quantity}" placeholder="0">`;
       tr.querySelector('.cell-raw').innerHTML = `<input type="number" step="0.01" class="edit-raw" value="${row.raw_weight_in}">`;
       tr.querySelector('.cell-backed').innerHTML = `<input type="number" step="0.01" class="edit-backed" value="${row.backed_weight_out}">`;
+      tr.querySelector('.cell-miscut').innerHTML = `<input type="number" step="0.01" class="edit-miscut" value="${row.miscut_weight}" placeholder="0">`;
       tr.querySelector('.cell-output').innerHTML = `<select class="edit-output-meat"></select>`;
       populateOutputOptions(tr.querySelector('.edit-output-meat'), row.commissary_meat_id, row.output_commissary_meat_id || '');
       tr.querySelector('.cell-notes').innerHTML = `<input type="text" class="edit-notes" value="${row.notes || ''}">`;
@@ -601,6 +609,7 @@
       const business_date = tr.querySelector('.edit-date').value;
       const raw_weight_in = tr.querySelector('.edit-raw').value;
       const backed_weight_out = tr.querySelector('.edit-backed').value;
+      const miscut_val = tr.querySelector('.edit-miscut').value;
       const input_qty_val = tr.querySelector('.edit-input-qty').value;
       const output_val = tr.querySelector('.edit-output-meat').value;
       const notes = tr.querySelector('.edit-notes').value.trim();
@@ -611,6 +620,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             business_date, raw_weight_in, backed_weight_out,
+            // Blank = leave the stored miscut alone (the route's absent=keep
+            // convention); undefined drops the key from the JSON body.
+            miscut_weight: miscut_val === '' ? undefined : miscut_val,
             input_quantity: input_qty_val === '' ? null : input_qty_val,
             output_commissary_meat_id: output_val === '' ? null : Number(output_val),
             notes: notes || null, actor: actor()
@@ -648,6 +660,7 @@
       const business_date = newDate.value;
       const raw_weight_in = newRaw.value;
       const backed_weight_out = newBacked.value;
+      const miscut_weight = newMiscut.value;
       const input_quantity = newInputQty.value;
       const output_commissary_meat_id = newOutputMeat.value ? Number(newOutputMeat.value) : null;
       const notes = newNotes.value.trim();
@@ -672,6 +685,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             commissary_meat_id, business_date, raw_weight_in, backed_weight_out,
+            // Optional: blank is omitted and the server defaults it to 0.
+            miscut_weight: miscut_weight === '' ? undefined : miscut_weight,
             input_quantity: input_quantity === '' ? null : input_quantity,
             output_commissary_meat_id,
             notes: notes || null, actor: actor()
@@ -684,6 +699,7 @@
         addStatus.className = 'status-message success';
         newRaw.value = '';
         newBacked.value = '';
+        newMiscut.value = '';
         newInputQty.value = '';
         newOutputMeat.value = '';
         newNotes.value = '';
