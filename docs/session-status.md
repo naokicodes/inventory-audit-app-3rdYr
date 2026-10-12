@@ -504,7 +504,14 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
     - **This web app is the core app.** SPOS is integrated onto it gradually, our own way: the usual architect -> slice -> build -> review flow, at our pace. Hybrid A stands (two services, two databases, an API between them).
     - **Selective, two-way contract.** The integration covers only what each side needs: we pull from SPOS what inventory needs (sales quantities per order line), and we expose what SPOS asks of us (the list is agreed with Prince - e.g. stock/availability). Nothing else of SPOS is mirrored here. "Only quantities cross" INTO the inventory DB still holds: no price, total or payment enters it. What goes OUT of this app is decided per field by the architect.
     - **Demo first, finalize later.** We finish our side first, then build a TEMPORARY test UI in this app that demonstrates the contract as it would work inside SPOS (the Loyverse-preview pattern: a dry run on the real engine module). The contract is finalized only after SPOS has the matching work (done by Prince or by us). The test UI is scaffolding: it shows contract fields only, holds no money data, and is retired once SPOS hosts the real screens.
-    - **Then collaboration, then mobile.** Once the web app is finished, the SPOS side becomes joint work with Prince. A mobile port comes only after the web app has few bugs, inventory and SPOS work well together, and the app is about 80% runnable for Live testing. The driver is printing: ESC/POS to network printers needs a raw TCP socket, which a browser cannot open. Open until then: a native Android app vs a print relay on the server PC (Node can open the socket); and which side owns printing (service is SPOS's domain).
+    - **Then collaboration, then mobile.** Once the web app is finished, the SPOS side becomes joint work with Prince. A mobile port comes only after the web app has few bugs, inventory and SPOS work well together, and the app is about 80% runnable for Live testing. The driver is printing: ESC/POS to network printers needs a raw TCP socket, which a browser cannot open. **Resolved 2026-10-05:** printing, and offline receipts/open tickets synced when internet returns, live on the phone and are SPOS's - Prince is building them (see the next entry).
+- **Hosting, auth order, offline and the revised roadmap - settled 2026-10-05 (Naoki).** Changes the END state from "single local machine / one PC on the LAN"; tech-stack.md and scope.md still describe local hosting, which stays true until the hosting step is specced (update them then).
+  - **Hosted later, local now.** Live runs on a hosted server so it doesn't go down with one PC. Today there is only a domain (Hostinger); no hosting product is chosen. Lean: a VPS, because the SQLite file needs a persistent disk and one long-running process (Hostinger's managed Node apps run on demand - unverified for SQLite). All testing stays local until then.
+  - **Auth order.** When the app first goes on the domain, Beta runs behind one shared server-level password, with sample data only. Real per-user passwords land BEFORE Live - so the recycled auth repo is needed before Live, not "later". Stub login (pick-your-name) is a local/Beta convenience and is never exposed on the domain without the gate.
+  - **Inventory is online-only.** An outage means waiting or paper. But the phone keeps unsaved entries so a refresh, a crash or Android killing the tab doesn't lose a count pass: drafts only, never auto-submitted, the server stays the record (step count-drafts).
+  - **Offline-first receipts/tickets and phone printing are SPOS's** (Prince is building them). Not designed or built here.
+  - **Autopilot runner stays on the old PC** - a build machine, separate from the future live host.
+  - **Revised roadmap: work as if SPOS isn't there yet.** (1) Finish Loyverse + the inventory core; the real Loyverse port (write into sales, Sync button, nightly run) sits here, right after the preview steps 3r-3t. (2) Then the UI pass - the aesthetics from the 2026-09-27/28 mockups (dashboard + Landing screen), growing ui-conventions.md. (3) Then a SPOS demo with Prince using SPOS's resources (the temporary test UI in the Core-app entry). Hosting + real passwords gate Live.
 - **Autopilot (solo workflow) - settled 2026-10-04; NOT ACTIVE until the server install.** The dispatcher role (typing /start) is replaced by the unattended runner (scripts/run-queue.ps1 + .claude/commands/run-step.md) on the restaurant server PC - the SAME PC that hosts the live app - under a STANDARD Windows user `engineer` with its own clone, write/delete on the live app folder DENIED by Windows permissions (the guard-db hook is not the only lock), and PORT=3100 so it never collides with the live app.
   - **Identity:** a dedicated GitHub machine account (collaborator, Write, NOT admin) opens the PRs, so the architect can approve them - workflow-guide "Job 2" stands (the worker opens the PR, the architect approves). The engineer's Claude account is the bot's own (same email), upgraded to Pro.
   - **Triggers:** Task Scheduler runs at 16:00 / 21:00 / 03:00 (-MaxSteps 2) - the architect's class and sleep hours, when no architect work happens anyway; each >= 5 h apart = a fresh usage window + a 15-minute doorbell (a `run-now` label or a new `architect-docs` issue, naokicodes only, -MaxSteps 1). Pause = any open `autopilot-pause` issue by naokicodes.
@@ -2017,3 +2024,36 @@ inactive restaurant gets none. reseed.test.js stays green.
 Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js (new),
 server/engines/sheetDefinitions.test.js (new). Server-only, no click-through, no migration.
 Shares schema.sql + seed.js with users-roles and user-sites -> sequenced after them.
+
+## Step count-drafts - keep unsaved count entries on the phone
+
+Decided 2026-10-05 (inventory online-only, but a refresh must not lose a count pass). Browser
+only: the server is untouched and stays the record. A draft is never submitted by itself.
+
+- public/draft-store.js (new, plain script like month-opening.js): a small helper over
+  localStorage (not sessionStorage - Android may kill a background tab). Key:
+  `draft:v1:<page>:<site>:<business_date>`, built by one function that also accepts an
+  optional user part, so the key can gain the user when login lands. Value: { savedAt, fields }
+  where a field key is `<meat|dish>:<id>:<field class>` - keyed by item id and field, never by
+  DOM position, so the table, Review and Enter views share one draft. Every storage call is in
+  try/catch: if storage fails, there are no drafts and the page works as today. On load, drop
+  draft keys older than 3 days.
+- public/daily-audit.html: on input in ending_actual, remarks, prepped or portion_actual, update
+  the draft (debounced, about 300 ms). After the rows render (initial load and every
+  site/date/view change), fill drafted fields into their inputs, mark them (a small "unsaved"
+  tag in the existing style), and show one line: "Restored N unsaved entries from <time> - not
+  saved yet." with a Discard button. Disabled (month-blocked) inputs are never filled. Clear the
+  draft only after Save Day fully succeeds (meat and dish POSTs both ok); any failure keeps it.
+- public/month-opening.js: the same for the recount and correct inputs; a field leaves the draft
+  when its own row saves.
+- Not here: commissary.html (24d-iii is on it - follow-up once that lands); stock receipts,
+  allocations and terminal; anything server-side.
+
+Click-through (390px): type counts, refresh -> restored and tagged, nothing saved on the server
+until Save Day; switch Review/Enter -> same values; Discard -> inputs back to server values; Save
+Day -> refresh shows no restore line; a month-blocked row never gets a value; a private window
+(storage blocked) still saves normally.
+
+Touches: public/draft-store.js (new), public/daily-audit.html, public/month-opening.js. No
+server change, no migration. PUBLIC -> click-through before merge. Parallel-safe with the
+current queue (no Touches overlap).

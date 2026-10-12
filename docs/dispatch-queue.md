@@ -154,6 +154,13 @@ commissary. Config only - no dated instances, owner, finalization, routes or UI.
 click-through, no migration. Shares schema.sql + seed.js with 3h/3i -> sequenced after them.
 Full spec: session-status.md -> "Step sheets-tier1".
 
+### 3v. Step count-drafts - keep unsaved count entries on the phone  [runnable]
+Touches: public/draft-store.js, public/daily-audit.html, public/month-opening.js
+Unsaved count entries on the daily audit (and the month-opening panel) are kept in localStorage
+per page + site + date, restored with an "unsaved" tag and a Discard button after a refresh,
+and cleared only after Save succeeds. Never auto-submits; server untouched. PUBLIC ->
+click-through before merge. Full spec: session-status.md -> "Step count-drafts".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 
