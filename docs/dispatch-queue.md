@@ -102,6 +102,7 @@ super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped ro
 ambiguous ones. Full spec: session-status.md -> "Step site-filter".
 
 ### 3n. Step autopilot-runner - runner lock, run log, pause switch, review drafts  [runnable]
+**CLOSED 2026-10-13, PR #25 (`1cf1c2a`).**
 Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md (new)
 First of the AUTOPILOT family (settled 2026-10-04; inert until the server install in
 docs/autopilot-guide.md - the interactive /start flow is unchanged). Makes the unattended
@@ -109,6 +110,7 @@ runner safe to schedule. Scripts + a command file only, no app code, no click-th
 Full spec: session-status.md -> "Step autopilot-runner".
 
 ### 3o. Step architect-docs-pickup - apply architect doc edits filed as an issue  [runnable]
+**CLOSED 2026-10-13, PR #26 (`eac8789`).**
 Touches: .claude/commands/run-step.md
 The runner's first job each run: an open `architect-docs` issue by naokicodes becomes a docs
 PR, applied verbatim, all-or-nothing, docs/ only. Independent of 3n (no shared file). Full

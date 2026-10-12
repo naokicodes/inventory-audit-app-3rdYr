@@ -1667,6 +1667,7 @@ Touches: server/middleware/requireSiteAccess.js (new), the site-scoped routes, s
 (+ tests). Server-only (a click-through only if UI changes). Depends on stub-login + user-sites.
 
 ## Step autopilot-runner - runner lock, run log, pause switch, review drafts
+**CLOSED 2026-10-13, PR #25 (`1cf1c2a`).**
 
 AUTOPILOT family, slice 1 of 4 (decision: "Things NOT to re-litigate" -> "Autopilot (solo
 workflow)", 2026-10-04). Inert until the server install (docs/autopilot-guide.md section 6):
@@ -1732,6 +1733,7 @@ Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md (new). No app c
 click-through, no migration.
 
 ## Step architect-docs-pickup - apply architect doc edits filed as an issue
+**CLOSED 2026-10-13, PR #26 (`eac8789`).**
 
 AUTOPILOT family, slice 2 of 4. Inert until install. The architect has no PC: decisions
 travel from the architect chat as an issue (template `.github/ISSUE_TEMPLATE/architect-docs.md`,
