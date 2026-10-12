@@ -197,7 +197,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   a number was never physically counted. A future column rename on one side is
   the acceptable resolution, not unifying the meaning.
 
-- **Every intake records BOTH a count and a weight when the meat is
+- **[SUPERSEDED 2026-10-13 by the 2026-09-24 intake weigh-in cancellation: intake receipts are quantity-only (25a); kg is recorded at production (raw_weight_in). The commi's weight on shipments (staging D2) is a separate decision and stands. Kept for history.]** **Every intake records BOTH a count and a weight when the meat is
   unit-tracked.** Confirmed by NaokiiVT 2026-09-02 for purchasing, and it is
   the same measurement pattern already settled for processing. This has now
   surfaced three times in three different places, so treat it as a general rule
@@ -519,6 +519,13 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   - **Architect docs travel as issues:** `architect-docs` issues (template .github/ISSUE_TEMPLATE/architect-docs.md) are applied VERBATIM, all-or-nothing, docs/ only, each OLD exactly once, into a docs PR. CLOSED stamps ride in the next architect-docs issue (start.md already treats a merged PR as done).
   - **Click-throughs stay human (the architect)**, against a preview of the PR's own code on port 3100 with a reseeded throwaway DB, over Tailscale.
   - **Steps:** autopilot-runner, architect-docs-pickup, autopilot-doorbell, autopilot-preview. Guide: docs/autopilot-guide.md. Open until install: creating the bot's GitHub account, upgrading its Claude account to Pro, the live app folder path.
+- **Architecture review 2026-10-13 (Naoki) - carry-overs from PRs #23-#28.**
+  - **Loyverse total when an account fails (#27): Reading B.** A dish's total sums the accounts that succeeded AND sell the dish (map column not ''). It is null only when every account that sells the dish failed (both down, or a one-account dish with that account down), so a failure never reads as 0. No special case for '' columns: a dish the failed account doesn't sell already gets an exact total. Copy as text omits null-total dishes (the failed-account warning covers them). No per-row `partial` flag now; it may be added later, in the engine, never computed in a page. Specs: Steps loyverse-preview-i and -ii.
+  - **True loss is shown to both audiences.** The commissary sees it on the yield log as it logs (24d-iii: a display-only "True loss (kg)" column = the read's residualLoss). Management gets the split in the later analytics/dashboard step (unchanged from 24d-ii). Loss %, Status and Excess Loss stay raw vs backed: miscut never softens the judgment.
+  - **Portability vs convention.** Hybrid A keeps portability-where-free as a habit; when it conflicts with an existing in-file convention, the convention wins. users.created_at keeps datetime('now'). Applies to every "Portability (MySQL note)" in the step specs (user-sites, import-identity, user-id-authorship, sheets-tier1).
+  - **One bootstrap super-admin, seed side.** seed.js inserts the bootstrap "superadmin" only when no user holds the super-admin role, so a plain (non --reset) seed run after the import renames it never adds a second. Built in import-identity (which starts the rename); the import-side reconciliation (#22) is unchanged.
+  - **Role matrix confirmed as seeded (PR #24).** Admin keeps can_enter_counts = 1: "hands-off operationally" is a practice, not a permission.
+  - **Autopilot: harden before the doorbell.** autopilot-doorbell waits for autopilot-hardening (the lock race only bites once a second trigger exists). Click-through recency, both review commands: a `Click-through:` comment counts only if posted after the PR's latest commit touching public/. The `Closes #<n>` skip-check stays literal (Fixes/Resolves may be added later if human-written PRs ever close architect-docs issues). The architect-docs trust gate stays `--author naokicodes`, and that account keeps 2FA on.
 
 ## End-of-session checklist (every session, no exceptions)
 
@@ -1456,12 +1463,16 @@ Third yield slice. Exposes miscut on the commissary yield UI (public/commissary.
 24d-ii. PUBLIC -> click-through. (Path 1: no output-count field.) Entry form ("Log a yield event"):
 add a miscut input (miscut_weight, kg), always shown, optional, defaults 0 ("Miscut / reusable
 trim (kg)"); include it in the POST body. Yield log table: add a miscut_weight column (kg; read
-returns it once 24d-ii is in) and optionally a small residualLoss "true loss" cell (display only).
+returns it once 24d-ii is in) and a "True loss (kg)" column showing the read's residualLoss (display only, never an input;
+REQUIRED - decided 2026-10-13, was optional).
 Edit-in-place: a miscut field per the route's absent=keep convention. Mobile: keep the stacked
 form; the widened log table scrolls horizontally below 768px (ui-conventions.md "Tables"), do NOT
 card-ify it. Client validation is convenience only - the 24d-i server guards are authoritative.
 Touches: public/commissary.html (+ public/style.css if needed). PUBLIC -> live click-through.
 Depends on 24d-ii.
+**2026-10-13:** PR #23 sent back (request changes) to add the True loss column. The click-through
+(not done yet) then covers it with the rest: the form field, both new columns, edit Save/Cancel,
+the server's miscut error text, and the sideways scroll below 768px.
 
 ## Step users-roles - identity foundation: users + roles tables + role seed
 **CLOSED 2026-10-13, PR #24 (`74ea2ba`).**
@@ -1549,7 +1560,8 @@ site_memberships - into the tables slices 1-2 created; it does NOT touch catalog
 (those tables don't all exist yet - the importer grows to cover them as those features land).
 DEPENDS ON users-roles + user-sites (needs the tables + siteAccess.js resolver).
 
-OPEN DECISION before dispatch - how it reads the workbook (this project has ONE dependency,
+**DECIDED 2026-09-28 (Q6): option B, behind loadTab()** - options kept for the record.
+Was: OPEN DECISION before dispatch - how it reads the workbook (this project has ONE dependency,
 express, and no build step, so a reader is a real choice):
 - A: add SheetJS (`xlsx`) as a devDependency; the importer reads the .xlsx directly. Smoothest,
   but the FIRST devDependency in the project.
@@ -1569,6 +1581,9 @@ source of truth over slice-1's seed defaults):
   super-admin. Exactly one exists (the seeded bootstrap "superadmin"); match it by ROLE (default_role
   = super-admin) and UPDATE its name/details to the workbook owner. All OTHER users upsert by name.
   Keeps one unlockable super-admin; the real name enters via the workbook, never the repo.
+- Seed side (decided 2026-10-13): seed.js inserts the bootstrap "superadmin" only when no user
+  holds the super-admin role, so a plain (non --reset) seed run after the rename never adds a
+  second. Test: rename the bootstrap user, re-run seed -> still exactly one super-admin user.
 - Memberships: split site_memberships (comma-separated) per user; for each code call
   resolveSiteCode() (siteAccess.js) - insert (user_id, site_code) when it resolves, WARN and
   skip when it doesn't (this is where the SIL vs SILT mismatch surfaces; the fix is a workbook
@@ -1585,8 +1600,8 @@ path. Wire into reseed LATER (per the earlier decision: A now, reseed later).
 Tests: importer upserts role flags; resolves a user's default_role; parses memberships and warns
 on an unresolved code; a second run is a no-op (idempotent).
 
-Touches: scripts/import-settings.js (new), package.json (an import:settings script; + the
-devDependency IF option A), + a test. Depends on users-roles + user-sites. Server/scripts only,
+Touches: scripts/import-settings.js (new), server/db/seed.js (the bootstrap guard), package.json
+(an import:settings script), + a test. Shares seed.js with sheets-tier1 -> sequence. Depends on users-roles + user-sites. Server/scripts only,
 no click-through, no migration.
 
 ## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
@@ -1783,7 +1798,8 @@ autopilot-runner (no shared file); the runner already handles BUILT and STOPPED.
 
 ## Step autopilot-doorbell - start a run from the phone
 
-AUTOPILOT family, slice 3 of 4. Depends on autopilot-runner (the lock, -Trigger, -Owner, the
+AUTOPILOT family, slice 3 of 4. Waits for autopilot-hardening (2026-10-13).
+Depends on autopilot-runner (the lock, -Trigger, -Owner, the
 pause switch). Inert until install. New `scripts/doorbell.ps1`, run by Task Scheduler every 15
 minutes as the `engineer` Windows user. It calls NO Claude itself - it only reads GitHub and,
 at most once per invocation, starts the runner. Windows PowerShell 5.1, no modules.
@@ -1895,10 +1911,16 @@ from process.env (LOYVERSE_SILINGAN_TOKEN, LOYVERSE_LIKOD_TOKEN); a missing toke
 { ok:false, error:'token not set' }.
 Response: { date, accounts:[{label, ok, error?, receiptsScanned, receiptsKept, receiptTypes}],
 dishes:[{dish_code, name, silingan, likod, total}] (every map row, zeros included, map order; a
-failed account's column is null, not 0), unmatched:[{account, item_name, quantity}],
+failed account's column is null, not 0; total follows the rule below), unmatched:[{account, item_name, quantity}],
 idCandidates:[{dish_code, account, item_id, variant_id, item_name, variant_name, matchedBy,
 pattern, quantity}] }.
 No money field anywhere.
+Total (decided 2026-10-13, #27 - Reading B): a dish's total sums the accounts that succeeded AND
+sell it (map column not ''); null only when every account that sells the dish failed. No special
+case for '' columns. dishTotal() implements it. Tests: one account failed -> a dish both sell
+totals the survivor; a dish only the failed account sells -> null; both failed -> every total null;
+a dish the failed account doesn't sell -> the survivor's number. No per-row partial flag (may be
+added later, in the engine).
 
 Env: server/index.js loads .env at startup with Node's built-in process.loadEnvFile() when the file
 exists (no dotenv) - so it works however the server starts: npm run dev, the autopilot's scheduled
@@ -1926,11 +1948,11 @@ The page for loyverse-preview-i. Depends on it. PUBLIC -> live click-through (39
   read-only, nothing is saved". Date picker (default today, Manila) + Load; a loading state.
 - Table: Dish | Likod | Silingan | Total - every dish, map order, zero rows muted. A failed account
   shows "-" in its column plus a banner naming it ("Likod could not be fetched: <error>"): a
-  failure must never look like zero sales.
+  failure must never look like zero sales. A null total (#27) shows "-" too.
 - Under the table: one status line per account ("Silingan: 142 receipts, 1 refund") and the
   unmatched section (account, item name, qty), hidden when empty. idCandidates stay API-only.
 - "Copy as text" for Messenger: a header line with the date, one line per NON-ZERO dish
-  ("Meatball Pasta - Likod 4, Silingan 9, Total 13"), then "Unmatched: N items (see app)" when
+  ("Meatball Pasta - Likod 4, Silingan 9, Total 13"; a null-total dish is omitted - the warning covers it, #27), then "Unmatched: N items (see app)" when
   N > 0, and the failed-account warning if any. navigator.clipboard needs HTTPS or localhost, so
   on a LAN http:// address fall back to a selected textarea + execCommand('copy'); if that fails,
   show the textarea for manual copy.
@@ -2060,3 +2082,45 @@ Day -> refresh shows no restore line; a month-blocked row never gets a value; a 
 Touches: public/draft-store.js (new), public/daily-audit.html, public/month-opening.js. No
 server change, no migration. PUBLIC -> click-through before merge. Parallel-safe with the
 current queue (no Touches overlap).
+
+## Step autopilot-hardening - close the runner review findings before the doorbell
+
+Decided 2026-10-13 (architect review of PRs #25 and #26, cubic findings). AUTOPILOT family; inert
+until install like the rest of it. Windows PowerShell 5.1, no modules, no npm dependency. Five
+small fixes:
+
+1. Lock (scripts/run-queue.ps1). Required property: two runners started at any moment - with or
+   without a stale lock - never both proceed. Today two runs that both judge the same lock stale
+   can each delete and recreate it. Lean: hold a named OS mutex (Global\inventory-audit-run-queue,
+   WaitOne(0); an AbandonedMutexException counts as acquired) for the whole run and release it in
+   the existing finally - the OS frees it when the holder dies, so there is no stale state to
+   judge. run.lock may stay as an informational PID + time file, or go. The mechanism is the
+   engineer's call as long as the property holds; say which and why.
+2. Public run-log lines (scripts/run-queue.ps1). The comment on the public repo is rebuilt from
+   the RESULT kind plus at most one `#<digits>` - never the model's free text (a STOPPED reason
+   can carry a path). Review-draft lines the same. The full lines stay in the local log.
+3. No merge on red (.claude/commands/review-draft.md). Explicit rule: if `npm run verify` is not
+   SUITE GREEN + AUDIT CLEAN, the draft must not say `Recommendation: merge`; it says
+   `Recommendation: needs your call - verify not green`.
+4. Click-through recency (.claude/commands/review-draft.md AND .claude/commands/review.md). A
+   `Click-through:` comment counts only if posted after the PR's latest commit that touches
+   public/ (compare the comment's created_at with that commit's date, via gh). An older one is
+   reported as stale, never counted. review-draft keeps its naokicodes-only rule; review.md keeps
+   "a human".
+5. architect-docs pickup (.claude/commands/run-step.md, section 1b): add `--limit 100` to the
+   `gh issue list`; and when verify is not green after branching, do what a failed check does -
+   comment the reason, relabel `architect-docs-failed`, return to main and delete the local
+   `docs/architect-docs-<n>` branch - then `RESULT: STOPPED architect-docs #<n>: verify not green`.
+
+Not here: broadening `Closes #<n>` (stays literal), the trust gate (stays --author naokicodes),
+the doorbell itself.
+
+Verification: there is no PowerShell harness - say so. Show with stand-ins: two runners against a
+deliberately stale lock -> exactly one proceeds; a STOPPED reason containing a path -> the
+dry-run (-LogIssue 0) body shows no path; a walk-through of review-draft on a red verify and on a
+click-through older than the last public/ commit; the run-step verify-fail path leaves no branch
+and a relabeled issue.
+
+Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md, .claude/commands/review.md,
+.claude/commands/run-step.md. No app code, no click-through, no migration. Blocks
+autopilot-doorbell.
