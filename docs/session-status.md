@@ -1464,6 +1464,7 @@ Touches: public/commissary.html (+ public/style.css if needed). PUBLIC -> live c
 Depends on 24d-ii.
 
 ## Step users-roles - identity foundation: users + roles tables + role seed
+**CLOSED 2026-10-13, PR #24 (`74ea2ba`).**
 
 First slice of the multi-user surface (architect 2026-09-28). Just the two tables and the
 role seed - NO membership, NO login, NO authorship rewrite yet (later slices; membership has

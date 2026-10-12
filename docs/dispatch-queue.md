@@ -61,6 +61,7 @@ merge. Full spec: session-status.md -> "Step 24d-iii".
 ### 3g. Step archive-pass-2 — CLOSED 2026-09-28, PR #18 (`971bf9c`).
 
 ### 3h. Step users-roles - identity foundation: users + roles tables + role seed  [runnable]
+**CLOSED 2026-10-13, PR #24 (`74ea2ba`).**
 **#19 resolved (2026-09-28):** seed one super-admin USER in seed.js so the users table has a write path (spec updated).
 Touches: server/db/schema.sql, server/db/seed.js
 First multi-user slice: the two tables + the 5-role seed with capability flags (decision C).
