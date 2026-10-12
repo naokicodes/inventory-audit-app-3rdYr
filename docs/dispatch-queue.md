@@ -53,6 +53,7 @@ is. Read the step's own section in `session-status.md` before starting.
 ### 3e. Step 24d-ii — CLOSED 2026-09-28, PR #21 (`546386d`).
 
 ### 3f. Step 24d-iii - richer yield: miscut on the commissary UI (Path 1)  [runnable]
+**CLOSED 2026-10-13, PR #23 (`f20aefd`).**
 Touches: public/commissary.html, public/style.css
 Adds a miscut_weight field to the yield form + a miscut column in the log table (Path 1: no
 output-count). Wide table scrolls below 768px. Depends on 24d-ii. PUBLIC -> click-through before

@@ -1458,6 +1458,7 @@ Touches: server/engines/commissaryYieldEngine.js (+ test). Server-only, no click
 on 24d-i.
 
 ## Step 24d-iii - richer yield: miscut on the commissary yield UI (Path 1)
+**CLOSED 2026-10-13, PR #23 (`f20aefd`).**
 
 Third yield slice. Exposes miscut on the commissary yield UI (public/commissary.html). DEPENDS ON
 24d-ii. PUBLIC -> click-through. (Path 1: no output-count field.) Entry form ("Log a yield event"):
