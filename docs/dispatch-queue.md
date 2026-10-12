@@ -57,18 +57,13 @@ Touches: public/commissary.html, public/style.css
 Adds a miscut_weight field to the yield form + a miscut column in the log table (Path 1: no
 output-count). Wide table scrolls below 768px. Depends on 24d-ii. PUBLIC -> click-through before
 merge. Full spec: session-status.md -> "Step 24d-iii".
+**2026-10-13:** PR #23 sent back (request changes) for a required "True loss (kg)" column; click-through after that.
 
 ### 3g. Step archive-pass-2 — CLOSED 2026-09-28, PR #18 (`971bf9c`).
 
-### 3h. Step users-roles - identity foundation: users + roles tables + role seed  [runnable]
-**#19 resolved (2026-09-28):** seed one super-admin USER in seed.js so the users table has a write path (spec updated).
-Touches: server/db/schema.sql, server/db/seed.js
-First multi-user slice: the two tables + the 5-role seed with capability flags (decision C).
-No membership/login/authorship yet. Server-only, no click-through, no migration. Overlaps
-24d-i on schema.sql -> not both in flight; sequence them. Full spec: session-status.md ->
-"Step users-roles".
+### 3h. Step users-roles — CLOSED 2026-10-13, PR #24 (`74ea2ba`).
 
-### 3i. Step user-sites - membership table + site resolver  [blocked: users-roles]
+### 3i. Step user-sites - membership table + site resolver  [runnable]
 Touches: server/db/schema.sql, server/db/siteAccess.js
 Membership model B (site_code text) + a resolver (getUserSiteCodes / userHasSite /
 resolveSiteCode). Data layer only, NO enforcement yet. Depends on users-roles (users table);
@@ -76,13 +71,14 @@ overlaps schema.sql with 24d-i + users-roles -> sequence. Server-only, no click-
 spec: session-status.md -> "Step user-sites".
 
 ### 3j. Step import-identity - import-settings.js identity slice (Roles/Users/memberships)  [blocked: user-sites]
-Touches: scripts/import-settings.js, package.json
+Touches: scripts/import-settings.js, server/db/seed.js, package.json
+**2026-10-13:** + the seed.js bootstrap guard (one super-admin). Shares seed.js with 3u -> sequence.
 Standalone importer (decision A), identity tabs only, UPSERT/idempotent, uses siteAccess.js to
 validate memberships. Depends on users-roles + user-sites. DECIDED 2026-09-28: reader = B (CSV, zero-dep) behind a loadTab() adapter; PLUS an export mode (dump the DB to the template shape) so it round-trips export->edit->import. Server/scripts only, no
 click-through. Full spec: session-status.md -> "Step import-identity".
 
-### 3k. Step stub-login - pick-your-name login + currentUser middleware  [blocked: users-roles]
-Touches: public/login.html, server/routes/auth.js, server/app.js
+### 3k. Step stub-login - pick-your-name login + currentUser middleware  [runnable]
+Touches: public/login.html, server/routes/auth.js, server/index.js
 Phase-1 identity, no passwords: pick-your-name -> cookie -> req.user with capability flags. No
 enforcement yet. LEAN: plain cookie, no new dep (flag). Needs users present (import-identity or a
 dev seed). PUBLIC -> click-through. Full spec: session-status.md -> "Step stub-login".
@@ -95,10 +91,71 @@ migration -> sequences with other schema/migration steps. Full spec: session-sta
 "Step user-id-authorship".
 
 ### 3m. Step site-filter - query-layer site scoping enforcement  [blocked: stub-login, user-sites]
-Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/app.js
+Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/index.js
 requireSiteAccess middleware: checker scoped to memberships (siteAccess.js), management/admin/
 super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped routes; park
 ambiguous ones. Full spec: session-status.md -> "Step site-filter".
+
+### 3n. Step autopilot-runner — CLOSED 2026-10-13, PR #25 (`1cf1c2a`).
+
+### 3o. Step architect-docs-pickup — CLOSED 2026-10-13, PR #26 (`eac8789`).
+
+### 3p. Step autopilot-doorbell - start a run from the phone  [blocked: autopilot-hardening]
+Touches: scripts/doorbell.ps1 (new)
+A 15-minute poll: a `run-now` label or a new `architect-docs` issue (naokicodes only) starts a
+1-step run. Calls no Claude itself. Needs 3n's lock, -Trigger and pause switch. Full spec:
+session-status.md -> "Step autopilot-doorbell".
+
+### 3q. Step autopilot-preview - serve a PR on port 3100 for phone click-throughs  [blocked: autopilot-doorbell]
+Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1
+A `preview` label on a PR serves that PR's code from a separate worktree on port 3100 with a
+reseeded throwaway DB, reachable over Tailscale. Never port 3000, never the live DB. Full
+spec: session-status.md -> "Step autopilot-preview".
+
+### 3r. Step loyverse-preview-i - Loyverse sales preview: engine + route, writes nothing  [runnable]
+Touches: server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, server/index.js, .env.example
+Read-only dry run of the Loyverse port (decided 2026-10-03, 1b + 2a): both accounts, one business
+date, per-dish Silingan / Likod / total + unmatched. Writes nothing, no migration. Tokens via .env
+(gitignored, loaded by server/index.js). Server-only, no click-through. Parallel-safe with
+users-roles, 24d-iii and autopilot 3n-3q. Full spec: session-status.md -> "Step loyverse-preview-i".
+**2026-10-13:** #27 decided (Reading B - see the spec); PR #28 sent back (request changes) to implement it.
+
+### 3s. Step loyverse-preview-ii - Kitchen Sales page (temporary)  [blocked: loyverse-preview-i]
+Touches: public/kitchen-sales.html, public/index.html, public/style.css
+Dish | Likod | Silingan | Total, an unmatched list, Copy as text with a LAN-safe fallback; a
+failed account shows "-", never 0. Linked from Home only. Overlaps 24d-iii on style.css ->
+sequence. PUBLIC -> click-through before merge. Full spec: session-status.md -> "Step
+loyverse-preview-ii".
+
+### 3t. Step loyverse-preview-iii - wildcard-match report (terminal, you-only)  [blocked: loyverse-preview-i]
+Touches: server/engines/loyverseReport.js, server/engines/loyverseReport.test.js, scripts/loyverse-matches.js, package.json
+`npm run loyverse:matches -- --date YYYY-MM-DD`: lists every wildcard pattern's catches (raw
+Loyverse names + quantities), unmatched items and account status, by calling the SAME engine as
+the route. Writes nothing. Not in the UI. Parallel-safe with loyverse-preview-ii. Full spec:
+session-status.md -> "Step loyverse-preview-iii".
+
+### 3u. Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)  [blocked: user-sites]
+Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js
+First Sheets slice: the sheet_definitions table (site_code, category, engine_type MEAT|SIDE,
+active) + a validating module + a seed of one Landing per restaurant and one Commi per
+commissary. Config only - no dated instances, owner, finalization, routes or UI. Server-only, no
+click-through, no migration. Shares schema.sql + seed.js with 3h/3i -> sequenced after them.
+Full spec: session-status.md -> "Step sheets-tier1".
+
+### 3v. Step count-drafts - keep unsaved count entries on the phone  [runnable]
+Touches: public/draft-store.js, public/daily-audit.html, public/month-opening.js
+Unsaved count entries on the daily audit (and the month-opening panel) are kept in localStorage
+per page + site + date, restored with an "unsaved" tag and a Discard button after a refresh,
+and cleared only after Save succeeds. Never auto-submits; server untouched. PUBLIC ->
+click-through before merge. Full spec: session-status.md -> "Step count-drafts".
+
+### 3w. Step autopilot-hardening - lock, public log lines, review gates, docs-pickup cleanup  [runnable]
+Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md, .claude/commands/review.md, .claude/commands/run-step.md
+Decided 2026-10-13 (review of #25/#26): a lock two runners can never both win, public run-log
+lines without model free text, no merge recommendation on red verify, a click-through must
+postdate the last public/ commit, docs-pickup --limit 100 + verify-fail cleanup. Inert until
+install. Blocks 3p. No app code, no click-through. Full spec: session-status.md -> "Step
+autopilot-hardening".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
@@ -171,13 +228,11 @@ into whichever step next touches `allocations.js`.
 
 Spec: `session-status.md`, section "Step 25e".
 
-### 7. Nothing.
-**This is deliberate. Do not invent a step 25.**
-
-After 24b-v the plan is a soft launch against real output, so that actual
-use decides what gets built next rather than guesswork. This is the same
-reasoning that deferred the per-meat next-stage config. An idle assistant
-costs far less than an invented step.
+### 7. No invented steps.
+**Updated 2026-10-03.** The "nothing after 24b-v" stop is retired: 24b-v landed (built by
+24d-i), and the architect now slices the designed families (identity chain, Loyverse preview and
+port, sheets, sides, PO, staging) into this queue. The rule underneath stands: only an architect
+adds a step, and an idle assistant costs far less than an invented one.
 
 ---
 
@@ -247,5 +302,6 @@ are genuinely useful and genuinely safe.
   build task, and not a bug. Do not "fix" it in code.
 - **Restaurant C (Likod) onboarding.** No workbook exists yet. Blocked on
   real-world data, not on code.
-- **MySQL migration / POS integration.** Parked. Real work, not a config
-  flip.
+- **MySQL migration.** Not planned: hybrid A (2026-10-03) keeps inventory on
+  SQLite and SPOS on MySQL, connected by API. **SPOS integration** comes after
+  the Loyverse + inventory web app is finished.

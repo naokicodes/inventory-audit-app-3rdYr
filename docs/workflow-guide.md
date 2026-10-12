@@ -131,9 +131,12 @@ an open PR (its `Touches:` line). Only one migration is in flight at a time. So 
 dependent chain moves one link per morning merge; independent steps can all be
 built the same evening.
 
-**`scripts/run-queue.ps1` — not in use.** An unattended version of the same
-routine, kept for later. It runs silently until each step finishes, which read as
-frozen to a first-time user (2026-09-24). The slash commands are the default.
+**`scripts/run-queue.ps1` — not in use yet; planned as AUTOPILOT.** An unattended
+version of the same routine. It runs silently until each step finishes, which read
+as frozen to a first-time user (2026-09-24). Decided 2026-10-04: after the four
+autopilot steps and the install on the restaurant server, it replaces the
+dispatcher — see `docs/autopilot-guide.md`. Until that install, the slash commands
+above are the routine.
 
 ## The loop
 

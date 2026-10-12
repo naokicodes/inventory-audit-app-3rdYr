@@ -11,6 +11,12 @@ worth remembering if they happen again.
 
 ---
 
+## 2026-10-04 (architect) — Autopilot planned: the queue runs itself on the restaurant server
+
+Decided to replace the dispatcher (typing `/start`) with the unattended runner, ahead of Marble's Claude subscription ending. Nothing is active yet: four build steps are queued (autopilot-runner, architect-docs-pickup, autopilot-doorbell, autopilot-preview) and the install is a manual checklist in `docs/autopilot-guide.md`. Why: the architect has no PC and does architect work once a day; everything after that conversation should be doable from a phone. Constraints carried over, not loosened: merge stays human, branch protection stays, the worker identity is a separate GitHub account so approval still works, and the live app's folder is locked away from the engineer by Windows permissions, not only by the guard-db hook. Not built yet: all of it - this entry records the decision and the specs.
+
+---
+
 ## 2026-09-02 (Claude Code session) — Step 25b: commissary opening stock + physical count
 
 Closes the gap the 2026-09-02 architect audit found: `commissary_opening_stock` and `commissary_ending_actual` existed in `schema.sql` and were read correctly by `commissaryAuditEngine.js`, but nothing wrote either table, so every commissary balance rendered `-` and variance could never compute. This is the write side.
