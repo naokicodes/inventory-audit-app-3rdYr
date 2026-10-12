@@ -263,6 +263,14 @@ nav {
     white-space: nowrap;
   }
 
+  /* docs/ui-conventions.md -> Tables: a wide table scrolls inside its own
+     container instead of reflowing, so the page body never scrolls sideways. */
+  .table-scroll {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .desktop-only {
     display: none !important;
   }
