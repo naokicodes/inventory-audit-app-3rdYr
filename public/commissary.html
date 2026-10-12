@@ -171,7 +171,9 @@
     function actor() { return actorInput.value.trim() || null; }
 
     function fmt(n) {
-      return (n === null || n === undefined) ? '-' : Number(n).toFixed(2);
+      if (n === null || n === undefined) return '-';
+      const s = Number(n).toFixed(2);
+      return s === '-0.00' ? '0.00' : s; // float noise, not a real negative
     }
     function fmtPct(n) {
       return (n === null || n === undefined) ? '-' : (Number(n) * 100).toFixed(1) + '%';
@@ -518,6 +520,9 @@
       });
     }
 
+    // True loss = the read's residualLoss (raw - backed - miscut), computed by
+    // commissaryYieldEngine.js since 24d-ii. Display only: the page never
+    // calculates it, and Loss % / Status / Excess Loss stay raw vs backed.
     function renderRow(r) {
       return `
         <tr data-id="${r.id}">
@@ -527,6 +532,7 @@
           <td class="cell-raw">${fmt(r.raw_weight_in)}</td>
           <td class="cell-backed">${fmt(r.backed_weight_out)}</td>
           <td class="cell-miscut">${fmt(r.miscut_weight)}</td>
+          <td class="cell-true-loss">${fmt(r.residualLoss)}</td>
           <td class="cell-output">${r.output_code ? `${r.output_code} - ${r.output_name}` : '(same)'}</td>
           <td>${fmtPct(r.actualLossPct)}</td>
           <td class="${r.status ? 'status-' + r.status : ''}">${r.status || '-'}</td>
@@ -562,7 +568,7 @@
           <table>
             <thead>
               <tr>
-                <th>Date</th><th>Meat</th><th>Input Count</th><th>Raw In (kg)</th><th>Backed Out</th><th>Miscut (kg)</th><th>Output</th>
+                <th>Date</th><th>Meat</th><th>Input Count</th><th>Raw In (kg)</th><th>Backed Out</th><th>Miscut (kg)</th><th>True loss (kg)</th><th>Output</th>
                 <th>Actual Loss %</th><th>Status</th><th>Excess Loss</th><th>Notes</th><th></th>
               </tr>
             </thead>
