@@ -30,6 +30,11 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ## Queue
 
+> **Beta week (2026-10-19 -> 2026-10-26).** Beta starts Monday 2026-10-26 on the restaurant's
+> Wi-Fi; the completed UI is shown Sunday 2026-10-25. Order this week: **3x ui-pass and 3v
+> count-drafts (parallel), then 3y ui-pass-ii, then 3k stub-login (optional)**. Everything else
+> at normal pace. See session-status "Beta date + UI pass".
+
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
 ### 1. Step 25d-ii — CLOSED 2026-09-22, PR #5 (`6c21238`).
@@ -52,13 +57,7 @@ is. Read the step's own section in `session-status.md` before starting.
 
 ### 3e. Step 24d-ii — CLOSED 2026-09-28, PR #21 (`546386d`).
 
-### 3f. Step 24d-iii - richer yield: miscut on the commissary UI (Path 1)  [runnable]
-**CLOSED 2026-10-13, PR #23 (`f20aefd`).**
-Touches: public/commissary.html, public/style.css
-Adds a miscut_weight field to the yield form + a miscut column in the log table (Path 1: no
-output-count). Wide table scrolls below 768px. Depends on 24d-ii. PUBLIC -> click-through before
-merge. Full spec: session-status.md -> "Step 24d-iii".
-**2026-10-13:** PR #23 sent back (request changes) for a required "True loss (kg)" column; click-through after that.
+### 3f. Step 24d-iii — CLOSED 2026-10-13, PR #23 (`f20aefd`).
 
 ### 3g. Step archive-pass-2 — CLOSED 2026-09-28, PR #18 (`971bf9c`).
 
@@ -158,8 +157,22 @@ postdate the last public/ commit, docs-pickup --limit 100 + verify-fail cleanup.
 install. Blocks 3p. No app code, no click-through. Full spec: session-status.md -> "Step
 autopilot-hardening".
 
+### 3x. Step ui-pass - restyle the existing pages to the mockup look (style.css only)  [runnable]
+Touches: public/style.css
+Presentation only: the 2026-09-28 mockup tokens (ui-conventions "Look"), Archivo with a
+system-font fallback, quiet buttons with one accent action, tables/inputs/cards/status restyled.
+No HTML/JS change, no dependency, light only. PUBLIC -> click-through at 390px and desktop.
+Sequence with 3s (style.css). Full spec: session-status.md -> "Step ui-pass".
+
+### 3y. Step ui-pass-ii - page colors onto the Look tokens  [blocked: ui-pass, count-drafts]
+Touches: public/allocations.html, public/commissary-shipments.html, public/commissary.html, public/daily-audit.html, public/dashboard.html, public/history.html, public/sales.html, public/settings.html, public/stock-receipts.html, public/terminal.html
+Colors only: each page's own <style> block and style= attributes move from hard-coded colors to
+the Look tokens, by meaning. No layout, markup or JS change. PUBLIC -> click-through. Full spec:
+session-status.md -> "Step ui-pass-ii".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
+**2026-10-19:** the rewrite folds into the supply family (see Planned below): an arrival links to a supplier-order line.
 
 **Note 2026-09-24:** the architecture draft cancels the intake weigh-in
 (`weight_kg`) — 25a shrinks to quantity-only receipts. Do not build from the
@@ -274,6 +287,20 @@ conversion model". Family:
   commissary_conversion_standards (multiple standards per conversion + costing-default + per-log
   override). Optional - most goods received proper; conversion is the on-the-spot exception.
 Commi yield (Stage 1) is built (24d-i). Leans on commissary_meat_map + allocation machinery already in schema.
+
+## Planned — supply, cost and SPOS sales (architect-defined 2026-10-19, NOT yet sliced)
+
+Decided in session-status "Supply, cost and SPOS integration" and "Management dashboard".
+Family, roughly in order:
+- **Suppliers catalog** (one list for meat and sides).
+- **Supplier orders** + the PNG / Copy text send (browser canvas, no dependency).
+- **Arrivals against an order line** (25a's quantity-only rewrite folds in; sides pre-fill the
+  sheet's received field).
+- **Bills** (cost in, per arrival) + the bills-only role.
+- **Valuation engine** (unit cost: last bill, settings fallback; the peso formulas).
+- **Management dashboard** + the sales sneak peek (needs loyverse-preview-i).
+- **SPOS sales adapter** (column-limited read-only MySQL user, source SPOS) - after the real
+  Loyverse port.
 
 ## Available engineer-lane work
 

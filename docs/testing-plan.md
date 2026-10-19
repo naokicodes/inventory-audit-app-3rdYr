@@ -27,11 +27,11 @@ later.
 ## Beta entry requirements
 
 - **Viewport meta on every page — DONE** (ui-viewport, PR #10).
-- **Daily-audit mobile layout (Review ⇄ Enter) — in progress, UI lane.** The
+- **Daily-audit mobile layout (Review ⇄ Enter) — DONE** (daily-audit-mobile, PR #14). The
   phone is the device testers hold; without it the nightly count pass isn't
   testable on a phone.
 - **A resettable beta database seeded with sample data, plus a one-command
-  reseed** so a tester who breaks it can reset (see Reseed).
+  reseed — DONE** (reseed-beta-db, PR #15) so a tester who breaks it can reset (see Reseed).
 
 **Not required for Beta (kept loose):** users table / attribution, finalization,
 PO screens, sides. Beta is about breaking the daily-audit workflow on a phone,
@@ -71,6 +71,11 @@ path so Beta runs on a disposable `beta.db`, separate from the live
 ## Target
 
 Testing plan finalized and Beta-ready within ~1 week (≈ **2026-10-02**).
+
+**Scheduled 2026-10-19:** Beta starts **Monday 2026-10-26** at the restaurant, on its Wi-Fi,
+against a local server (no domain yet, so no shared-password gate). The completed UI is
+shown Sunday 2026-10-25. A trial on Prince's Hostinger Business hosting may follow once its
+details are in.
 
 ---
 
