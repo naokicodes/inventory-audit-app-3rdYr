@@ -129,6 +129,13 @@ the runner reads the last count line in each file.
 
 ## Things NOT to re-litigate (already decided, stable)
 
+**Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
+`docs/decisions/` (one file each, with the why); retired handoffs live in
+`docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
+decision records; ADR-002 definition of done (Beta and Final); ADR-003 staff
+meals as quantities; ADR-004 SPOS ownership. If an entry here and an ADR
+disagree, that is a bug: ask Naoki and fix both the same day.
+
 ### 2026-09-15 multi-user scoping — decided (direction; build is gated/Planned)
 
 The app is pivoting from single-user local to multi-user with roles. These are
@@ -174,7 +181,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
 - **Data volume: no PC upgrade.** Speed is an index problem, not hardware or
   pruning. Archive, don't delete. CSV export yes; CSV import deferred.
 - **Pin Node forward** (recent version, suite green, then lock the exact version).
-- **Configure-from-the-ground-up posture.** Definition-of-done stays **directional through alpha, firmed at beta** (2026-09-28, decision B) — intentionally not drafted now, not a gap. Context: this work may later **migrate to MySQL and merge onto a separate app** (repo to come from Naoki), so the final target can shift; keep new schema and the settings importer **portable where it's free** (avoid sqlite-only features in the users/roles layer). Reopen definition-of-done at beta / when that repo lands.
+- **Configure-from-the-ground-up posture.** Definition-of-done stays **directional through alpha, firmed at beta** (2026-09-28, decision B) — intentionally not drafted now, not a gap. Context: this work may later **migrate to MySQL and merge onto a separate app** (repo to come from Naoki), so the final target can shift; keep new schema and the settings importer **portable where it's free** (avoid sqlite-only features in the users/roles layer). Reopen definition-of-done at beta / when that repo lands. **[Superseded in part 2026-10-20: the definition of done is firmed by ADR-002 (`docs/decisions/`). The MySQL-merge context is stale - hybrid A and the core-app line (2026-10-05) replaced it.]**
 
 - **The app records what is physically on hand, not what was invoiced.**
   Confirmed by NaokiiVT 2026-09-02. On a delivery the commissary weigh-checks
