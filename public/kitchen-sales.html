@@ -123,7 +123,7 @@
       document.getElementById('account-status').innerHTML = data.accounts.map(a => {
         if (!a.ok) return `<p class="ks-note">${esc(a.label)}: could not be fetched</p>`;
         const refunds = (a.receiptTypes && a.receiptTypes.REFUND) || 0;
-        return `<p class="ks-note">${esc(a.label)}: ${a.receiptsKept} receipts, ${refunds} refund${refunds === 1 ? '' : 's'}</p>`;
+        return `<p class="ks-note">${esc(a.label)}: ${a.receiptsKept} receipt${a.receiptsKept === 1 ? '' : 's'}, ${refunds} refund${refunds === 1 ? '' : 's'}</p>`;
       }).join('');
 
       const unmatchedEl = document.getElementById('unmatched');
@@ -145,7 +145,8 @@
       bannersEl.innerHTML = '';
       try {
         const res = await fetch(`/api/loyverse/preview?date=${encodeURIComponent(dateInput.value)}`);
-        const body = await res.json();
+        // A proxy or crash page may not be JSON: report the HTTP status, not a parse error.
+        const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
         current = body;
         render(body);
