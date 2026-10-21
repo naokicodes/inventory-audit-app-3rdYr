@@ -1,10 +1,43 @@
-/* Minimal structural CSS - layout, spacing, and clear buttons only.
-   No fonts/colors/animations beyond what's needed to navigate easily.
-   This is intentionally basic - see docs/scope.md, visual polish is a
-   later phase, not now. */
+/* Presentation layer for the existing pages (Step ui-pass, 2026-10-19).
+   The look is docs/ui-conventions.md -> "Look": a precise digital ledger -
+   ruled lines, tabular numerals, calm surfaces, colour only where action is
+   needed. This file is style.css only - no HTML, JS, route or engine change,
+   no new dependency, light mode only. Each page still carries its own inline
+   colours in its <style> block; Step ui-pass-ii moves those onto the tokens. */
+
+/* Archivo from Google Fonts. @import must stay at the very top (after nothing
+   but a @charset). display=swap + the system-ui fallback below mean that with
+   no internet the system font is used and nothing breaks. */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+
+  --paper: #FBFAF7;
+  --card: #FFFFFF;
+  --ink: #232019;
+  --ink2: #6B655B;
+  --ink3: #9A9488;
+  --line: #E9E5DC;
+  --line2: #D8D3C7;
+  --accent: #1B5A72;
+  --accent-ink: #0E3D4E;
+  --accent-tint: #E2EDF1;
+  --danger: #A8321E;
+  --danger-tint: #F6E4DF;
+  --ok: #2C6E49;
+  --ok-tint: #E2EFE7;
+  --warn: #B26B12;
+  --warn-tint: #F6EAD6;
+}
 
 body {
-  font-family: sans-serif;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  background: var(--paper);
+  color: var(--ink);
   max-width: 700px;
   margin: 0 auto;
   padding: 1rem;
@@ -30,7 +63,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--line);
 }
 
 .meat-row .name {
@@ -38,7 +71,7 @@ body {
 }
 
 .meat-row .unit {
-  color: #666;
+  color: var(--ink2);
   font-size: 0.85rem;
   width: 3rem;
 }
@@ -49,10 +82,66 @@ body {
   font-size: 1rem;
 }
 
+/* The default button is the quiet secondary look: a card surface with a line2
+   hairline, ink text. The one accent action per view (the save bar, and the
+   pressed phone view toggle) is filled with the accent below. */
 button {
   padding: 0.6rem 1.2rem;
   font-size: 1rem;
   cursor: pointer;
+  font-family: inherit;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+}
+
+.save-bar button {
+  background: var(--accent);
+  color: var(--card);
+  border-color: var(--accent);
+}
+
+/* Inputs, selects and textareas share the card surface, a line2 hairline and
+   tabular figures; focus draws a 2px accent outline. Per-field width and
+   padding stay with the individual rules below. */
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+/* Tables read as a ledger: a quiet header row on paper, body rows ruled with a
+   line hairline. Colours, borders, padding and font only - no alignment or
+   layout change (ui-conventions "Tables" keeps wide tables scrolling). */
+table {
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+th {
+  background: var(--paper);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+  border-bottom: 1px solid var(--line2);
 }
 
 .save-bar {
@@ -67,17 +156,38 @@ button {
 }
 
 .status-message.success {
-  color: green;
+  color: var(--ok);
+  background: var(--ok-tint);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
 }
 
 .status-message.error {
-  color: crimson;
+  color: var(--danger);
+  background: var(--danger-tint);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
 }
 
 nav {
   margin-bottom: 1.5rem;
   display: flex;
   gap: 1rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Links sit in ink2 at 500; hover lifts a tinted pill. */
+nav a {
+  color: var(--ink2);
+  font-weight: 500;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+}
+
+nav a:hover {
+  background: var(--accent-tint);
+  color: var(--accent-ink);
 }
 
 /* Review/Enter sheet (docs/ui-conventions.md -> "Daily audit (and any
@@ -96,27 +206,29 @@ nav {
 
 .view-toggle button {
   flex: 1;
-  border: 1px solid #999;
-  background: #fff;
+  border: 1px solid var(--line2);
+  background: var(--card);
 }
 
+/* The pressed phone view is this view's one accent action. */
 .view-toggle button[aria-pressed="true"] {
-  background: #333;
-  color: #fff;
-  border-color: #333;
+  background: var(--accent);
+  color: var(--card);
+  border-color: var(--accent);
 }
 
 /* Review: a card per item. Display fields muted; ending-actual is the one
    accented input; the variance is the one colored chip. */
 .audit-card {
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.6rem;
 }
 
 .audit-card.dish-card {
-  border-left: 3px solid #ccc;
+  border-left: 3px solid var(--line2);
 }
 
 .audit-card .card-name {
@@ -128,7 +240,7 @@ nav {
   grid-template-columns: auto 1fr;
   gap: 0.15rem 0.75rem;
   margin: 0.4rem 0;
-  color: #777;
+  color: var(--ink2);
   font-size: 0.85rem;
 }
 
@@ -148,9 +260,12 @@ nav {
   gap: 0.4rem;
   margin: 0.3rem 0;
   font-size: 0.85rem;
-  color: #777;
+  color: var(--ink2);
 }
 
+/* The chip keeps which state gets which colour - that mapping lives in each
+   page's .status-* rules (Step ui-pass-ii) and flows in through currentColor.
+   Here it is only pill-shaped. */
 .variance-chip {
   display: inline-block;
   border: 1px solid currentColor;
@@ -166,7 +281,7 @@ nav {
   gap: 0.75rem;
   margin-top: 0.4rem;
   font-size: 0.85rem;
-  color: #777;
+  color: var(--ink2);
 }
 
 .audit-card .card-field input[type="number"] {
@@ -176,20 +291,20 @@ nav {
 }
 
 .audit-card .card-field.accent {
-  color: #111;
+  color: var(--ink);
   font-weight: bold;
 }
 
 .audit-card .card-field.accent input[type="number"] {
-  border: 2px solid #1a5fb4;
-  border-radius: 3px;
+  border: 2px solid var(--accent);
+  border-radius: 7px;
 }
 
 /* A blocked row (no month opening) cannot take a count - don't let the
    accent suggest otherwise. */
 .audit-card .card-field.accent input[type="number"]:disabled {
-  border-color: #ccc;
-  background: #f3f3f3;
+  border-color: var(--line2);
+  background: var(--line);
 }
 
 .audit-card .card-field.stacked {
@@ -205,9 +320,19 @@ nav {
 }
 
 .card-blocked {
-  color: #999;
+  color: var(--warn);
+  background: var(--warn-tint);
+  border-radius: 6px;
+  padding: 0.1rem 0.4rem;
   font-style: italic;
   font-size: 0.85rem;
+}
+
+/* A plain content card on the home page and anywhere else .box is used. */
+.box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 
 /* Enter: a single-column count list, one input per row (dish rows keep
@@ -219,7 +344,7 @@ nav {
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.55rem 0;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--line);
 }
 
 .enter-row .enter-name {
@@ -235,7 +360,7 @@ nav {
   display: flex;
   flex-direction: column;
   font-size: 0.75rem;
-  color: #777;
+  color: var(--ink2);
   gap: 0.15rem;
 }
 
