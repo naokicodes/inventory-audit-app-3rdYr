@@ -370,6 +370,22 @@ nav a:hover {
   font-size: 1rem;
 }
 
+/* Kitchen Sales (Loyverse) preview page. Zero rows are muted so the dishes
+   that sold stand out. */
+.ks-note {
+  color: var(--ink2);
+  font-size: 0.85rem;
+}
+
+.ks-zero td {
+  color: var(--ink3);
+}
+
+th.num,
+td.num {
+  text-align: right;
+}
+
 /* Phone vs desktop cutover - docs/ui-conventions.md -> Breakpoints (768px,
    one number across pages). Below it: phone views + toggle; at/above it:
    the desktop layout, no toggle. */

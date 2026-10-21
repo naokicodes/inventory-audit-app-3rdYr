@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kitchen Sales (Loyverse) - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="commissary-shipments.html">Shipments</a>
+    <a href="sales.html">Sales</a>
+    <a href="terminal.html">Terminal</a>
+    <a href="allocations.html">Allocations</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="settings.html">Settings</a>
+    <a href="history.html">History</a>
+  </nav>
+
+  <h1>Kitchen Sales (Loyverse)</h1>
+  <p class="ks-note">Preview - read-only, nothing is saved</p>
+
+  <div class="controls">
+    <label>
+      Date
+      <input type="date" id="date-input">
+    </label>
+    <button id="load-btn">Load</button>
+  </div>
+
+  <div id="banners"></div>
+  <p id="loading" class="ks-note" hidden>Loading...</p>
+
+  <div id="result" hidden>
+    <div class="table-scroll">
+      <table id="sales-table">
+        <thead>
+          <tr><th>Dish</th><th class="num">Likod</th><th class="num">Silingan</th><th class="num">Total</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="account-status"></div>
+
+    <div id="unmatched" hidden>
+      <h2>Unmatched</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Account</th><th>Item name</th><th class="num">Qty</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="save-bar">
+      <button id="copy-btn">Copy as text</button>
+      <span id="copy-status" class="status-message"></span>
+    </div>
+    <textarea id="copy-text" rows="8" readonly hidden></textarea>
+  </div>
+
+  <script>
+    // Step loyverse-preview-ii: the page for GET /api/loyverse/preview.
+    // Temporary - linked from Home only, not from the shared nav.
+    const COLUMNS = [
+      { key: 'likod', label: 'Likod' },
+      { key: 'silingan', label: 'Silingan' },
+    ];
+
+    const dateInput = document.getElementById('date-input');
+    const loadBtn = document.getElementById('load-btn');
+    const bannersEl = document.getElementById('banners');
+    const loadingEl = document.getElementById('loading');
+    const resultEl = document.getElementById('result');
+    const copyBtn = document.getElementById('copy-btn');
+    const copyStatus = document.getElementById('copy-status');
+    const copyText = document.getElementById('copy-text');
+
+    let current = null;
+
+    // Today in Manila, not the phone's UTC date.
+    dateInput.value = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // A null value is a failed account or a null total: "-", never 0.
+    function show(v) {
+      return v === null || v === undefined ? '-' : String(v);
+    }
+
+    function failedAccounts(data) {
+      return data.accounts.filter(a => !a.ok);
+    }
+
+    function failureLine(a) {
+      return `${a.label} could not be fetched: ${a.error}`;
+    }
+
+    function banner(text) {
+      bannersEl.insertAdjacentHTML('beforeend', `<p class="status-message error">${esc(text)}</p>`);
+    }
+
+    function render(data) {
+      bannersEl.innerHTML = '';
+      failedAccounts(data).forEach(a => banner(failureLine(a)));
+
+      document.querySelector('#sales-table tbody').innerHTML = data.dishes.map(d => {
+        const zero = d.total === 0;
+        return `<tr${zero ? ' class="ks-zero"' : ''}><td>${esc(d.name)}</td>` +
+          COLUMNS.map(c => `<td class="num">${show(d[c.key])}</td>`).join('') +
+          `<td class="num">${show(d.total)}</td></tr>`;
+      }).join('');
+
+      document.getElementById('account-status').innerHTML = data.accounts.map(a => {
+        if (!a.ok) return `<p class="ks-note">${esc(a.label)}: could not be fetched</p>`;
+        const refunds = (a.receiptTypes && a.receiptTypes.REFUND) || 0;
+        return `<p class="ks-note">${esc(a.label)}: ${a.receiptsKept} receipts, ${refunds} refund${refunds === 1 ? '' : 's'}</p>`;
+      }).join('');
+
+      const unmatchedEl = document.getElementById('unmatched');
+      unmatchedEl.hidden = data.unmatched.length === 0;
+      unmatchedEl.querySelector('tbody').innerHTML = data.unmatched.map(u =>
+        `<tr><td>${esc(u.account)}</td><td>${esc(u.item_name)}</td><td class="num">${esc(u.quantity)}</td></tr>`
+      ).join('');
+
+      copyStatus.textContent = '';
+      copyStatus.className = 'status-message';
+      copyText.hidden = true;
+      resultEl.hidden = false;
+    }
+
+    async function load() {
+      loadBtn.disabled = true;
+      loadingEl.hidden = false;
+      resultEl.hidden = true;
+      bannersEl.innerHTML = '';
+      try {
+        const res = await fetch(`/api/loyverse/preview?date=${encodeURIComponent(dateInput.value)}`);
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        current = body;
+        render(body);
+      } catch (err) {
+        current = null;
+        banner(`Could not load sales: ${err.message}`);
+      } finally {
+        loadBtn.disabled = false;
+        loadingEl.hidden = true;
+      }
+    }
+
+    // Messenger text: non-zero dishes only; a null-total dish is left out
+    // because the failed-account warning covers it (#27).
+    function asText(data) {
+      const lines = [`Kitchen Sales (Loyverse) - ${data.date}`];
+      data.dishes.filter(d => d.total !== null && d.total > 0).forEach(d => {
+        lines.push(`${d.name} - ${COLUMNS.map(c => `${c.label} ${show(d[c.key])}`).join(', ')}, Total ${d.total}`);
+      });
+      if (data.unmatched.length > 0) lines.push(`Unmatched: ${data.unmatched.length} items (see app)`);
+      failedAccounts(data).forEach(a => lines.push(failureLine(a)));
+      return lines.join('\n');
+    }
+
+    // navigator.clipboard needs HTTPS or localhost; a LAN http:// address
+    // falls back to execCommand, then to a textarea for manual copy.
+    function execCopy(text) {
+      copyText.value = text;
+      copyText.hidden = false;
+      copyText.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      if (ok) copyText.hidden = true;
+      return ok;
+    }
+
+    async function copy() {
+      if (!current) return;
+      const text = asText(current);
+      let ok = false;
+      if (navigator.clipboard && window.isSecureContext) {
+        try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }
+      }
+      if (!ok) ok = execCopy(text);
+      copyStatus.className = ok ? 'status-message success' : 'status-message error';
+      copyStatus.textContent = ok ? 'Copied' : 'Copy failed - select the text below and copy it';
+    }
+
+    loadBtn.addEventListener('click', load);
+    copyBtn.addEventListener('click', copy);
+    load();
+  </script>
+</body>
+</html>
