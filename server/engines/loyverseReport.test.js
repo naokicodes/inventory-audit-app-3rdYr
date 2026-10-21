@@ -102,8 +102,8 @@ test('unmatched section appears only when non-empty', () => {
 test('one status line per account, with receipts kept and refunds', () => {
   const lines = formatReport(preview()).trimEnd().split('\n');
   assert.deepStrictEqual(lines.slice(lines.indexOf('Accounts') + 1), [
-    '  Silingan: 7 receipts kept, 1 refunds',
-    '  Likod: 3 receipts kept, 0 refunds',
+    '  Silingan: 7 receipts kept, 1 refund receipts',
+    '  Likod: 3 receipts kept, 0 refund receipts',
   ]);
 });
 

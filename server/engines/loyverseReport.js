@@ -49,7 +49,7 @@ function matchSection(title, preview, matchedBy, dishNames) {
 function statusLine(account) {
   if (!account.ok) return `  ${account.label}: FAILED - ${account.error}`;
   const refunds = (account.receiptTypes && account.receiptTypes.REFUND) || 0;
-  return `  ${account.label}: ${account.receiptsKept} receipts kept, ${refunds} refunds`;
+  return `  ${account.label}: ${account.receiptsKept} receipts kept, ${refunds} refund receipts`;
 }
 
 // preview: computePreview()'s result. { all: true } also lists exact matches.
