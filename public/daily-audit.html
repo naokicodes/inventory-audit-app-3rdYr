@@ -71,6 +71,8 @@
     </div>
   </div>
 
+  <div id="draft-notice" class="status-message" hidden></div>
+
   <div id="grid-container">Loading...</div>
 
   <div class="save-bar">
@@ -78,6 +80,7 @@
     <span id="status" class="status-message"></span>
   </div>
 
+  <script src="draft-store.js"></script>
   <script src="month-opening.js"></script>
   <script>
     const restaurantSelect = document.getElementById('restaurant');
@@ -437,6 +440,10 @@
       gridContainer.querySelectorAll(`${itemSelector} .${field}`).forEach(el => {
         if (el !== e.target) el.value = e.target.value;
       });
+      if (gridDraftKey) {
+        const id = isMeat ? holder.dataset.meatId : holder.dataset.dishId;
+        DraftStore.set(gridDraftKey, `${isMeat ? 'meat' : 'dish'}:${id}:${field}`, e.target.value);
+      }
       if (field === 'remarks') return;
       const tr = gridContainer.querySelector(`tr${itemSelector}`);
       if (!tr) return;
@@ -476,6 +483,7 @@
       if (!restaurantId || !date) return;
 
       gridContainer.innerHTML = 'Loading...';
+      draftNotice.hidden = true;
       const res = await fetch(`/api/daily-audit/mixed?restaurant_id=${restaurantId}&date=${date}`);
       const rows = await res.json();
 
@@ -500,7 +508,46 @@
           <tbody>${tableRows}</tbody>
         </table>
       `;
+      gridDraftKey = DraftStore.key('daily-audit', restaurantId, date);
+      restoreDraft();
     }
+
+    // Step count-drafts: unsaved entries (public/draft-store.js) for the grid
+    // on screen, per restaurant + date. Filled back in after every render,
+    // tagged, and cleared only once Save Day fully succeeds.
+    const draftNotice = document.getElementById('draft-notice');
+    let gridDraftKey = null;
+
+    function restoreDraft() {
+      draftNotice.hidden = true;
+      const draft = DraftStore.load(gridDraftKey);
+      if (!draft) return;
+      let restored = 0;
+      for (const [fieldKey, value] of Object.entries(draft.fields)) {
+        const [kind, id, field] = fieldKey.split(':');
+        if (!/^\d+$/.test(id) || !MIRRORED_FIELDS.includes(field) || (kind !== 'meat' && kind !== 'dish')) continue;
+        const itemSelector = `[data-${kind}-id="${id}"]`;
+        const inputs = Array.from(gridContainer.querySelectorAll(`${itemSelector} .${field}`));
+        // A month-blocked row's input is disabled - never filled.
+        if (inputs.length === 0 || inputs.some(el => el.disabled) || inputs[0].value === value) continue;
+        inputs.forEach(el => {
+          el.value = value;
+          el.insertAdjacentHTML('beforebegin', '<span class="carry-tag draft-tag">(unsaved)</span> ');
+        });
+        const tr = gridContainer.querySelector(`tr${itemSelector}`);
+        if (tr && field !== 'remarks') (kind === 'meat' ? recalcMeatRow : recalcDishRow)(tr);
+        restored++;
+      }
+      if (restored === 0) return;
+      draftNotice.innerHTML = `${DraftStore.restoredText(restored, draft.savedAt)} <button type="button" id="draft-discard">Discard</button>`;
+      draftNotice.hidden = false;
+    }
+
+    draftNotice.addEventListener('click', (e) => {
+      if (e.target.id !== 'draft-discard') return;
+      DraftStore.clear(gridDraftKey);
+      loadGrid(); // back to the server's values
+    });
 
     // Unchanged from before this step: only meat rows carry
     // data-meat-id, so this naturally skips dish rows - nothing to save
@@ -508,6 +555,7 @@
     async function save() {
       const restaurantId = Number(restaurantSelect.value);
       const date = dateInput.value;
+      const saveDraftKey = gridDraftKey;
       const trs = gridContainer.querySelectorAll('tr[data-meat-id]');
 
       const rows = Array.from(trs).map(tr => ({
@@ -550,6 +598,10 @@
           portionsSaved = portionsResult.saved;
         }
 
+        // Both POSTs ok - only now is the draft safe to drop. Any failure
+        // above throws first and keeps it.
+        DraftStore.clear(saveDraftKey);
+
         // Step 26a-ii: the server refuses an ending for a meat whose month
         // has no opening yet, and says which - named here so it's not lost.
         const refusedNames = (result.refused || []).map(id => {
@@ -577,7 +629,8 @@
       ledger: 'restaurant',
       getOwnerId: () => restaurantSelect.value,
       getDate: () => dateInput.value,
-      onChange: loadGrid
+      onChange: loadGrid,
+      draftPage: 'daily-audit-month-opening'
     });
 
     function loadAll() {
