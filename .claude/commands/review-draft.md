@@ -39,9 +39,24 @@ gh pr comment $ARGUMENTS --body-file <file>
   - `Recommendation: request changes - <one line>`
   - `Recommendation: needs your call - <the domain question from section 4>`
 
+**A red verify is never a merge.** If your own `npm run verify` did not print
+both `SUITE GREEN` and `AUDIT CLEAN`, the last line is exactly:
+
+`Recommendation: needs your call - verify not green`
+
 **A PR touching `public/`** may be recommended for merge ONLY if a PR comment
-beginning `Click-through:` by **naokicodes** already exists
-(`gh pr view $ARGUMENTS --comments`). Otherwise its last line is exactly:
+beginning `Click-through:` by **naokicodes** already exists **and was posted
+after the PR's latest commit that touches `public/`**. Check both with `gh`:
+
+```
+gh pr view $ARGUMENTS --json comments --jq '.comments[] | select(.author.login=="naokicodes" and (.body|startswith("Click-through:"))) | .createdAt | fromdateiso8601'
+git log -1 --format=%ct origin/main..HEAD -- public/
+```
+
+Both print Unix seconds; compare those numbers, never the date text (GitHub's
+time is UTC, git's is local). A `Click-through:` older than that commit is
+**stale**: say so in the draft and do not count it. With no current one, the
+last line is exactly:
 
 `Recommendation: needs your call - click-through needed (add the preview label)`
 

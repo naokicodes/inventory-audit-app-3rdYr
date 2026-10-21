@@ -63,6 +63,14 @@ beginning `Click-through:`, from a human — the dispatcher or the architect
 Report whether it is there. A worker's own "verified live" in the PR body does not
 count — that is the worker checking itself.
 
+It counts only if it was posted **after the PR's latest commit that touches
+`public/`** — a screen changed after the click-through was never looked at.
+Compare the comment's time
+(`gh pr view $ARGUMENTS --json comments --jq '.comments[] | select(.body|startswith("Click-through:")) | [.author.login, (.createdAt|fromdateiso8601)] | @tsv'`)
+with that commit's (`git log -1 --format=%ct origin/main..HEAD -- public/`).
+Both are Unix seconds; compare the numbers, never the date text (GitHub's time
+is UTC, git's is local). An older one is reported as **stale** and never counted.
+
 Then end with exactly:
 
 > Draft review ready for PR #$ARGUMENTS. I have NOT approved, merged, or posted

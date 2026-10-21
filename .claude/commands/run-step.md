@@ -58,7 +58,7 @@ to turn it into one docs PR the architect can approve from the phone. This is
 interpreting them is how a settled decision drifts (#16).
 
 ```
-gh issue list --state open --label architect-docs --author naokicodes --json number,title,body
+gh issue list --state open --label architect-docs --author naokicodes --limit 100 --json number,title,body
 ```
 
 - None, or the label does not exist → go to section 2.
@@ -108,7 +108,17 @@ and end with `RESULT: STOPPED architect-docs #<n>: <reason>`.
    the issue did not say. Keep each file's existing line endings and UTF-8
    encoding (no BOM added or removed). A CREATE file uses the same line
    endings as the existing `docs/` files in this checkout.
-3. `npm run verify` — `SUITE GREEN` and `AUDIT CLEAN`, else
+3. `npm run verify` — `SUITE GREEN` and `AUDIT CLEAN`. If not, do what a failed
+   check does, and leave nothing behind:
+   ```
+   gh issue comment <n> --body "verify not green after applying the edits: <the failing line>"
+   gh issue edit <n> --remove-label architect-docs --add-label architect-docs-failed
+   git checkout -- <each file an OLD/NEW edit named>
+   git clean -f -- <each file a CREATE edit named>
+   git checkout main
+   git branch -D docs/architect-docs-<n>
+   ```
+   then
    `RESULT: STOPPED architect-docs #<n>: verify not green`.
 4. `git add` only the files the edits named, then
    `git commit -m "docs(architect-docs): <Summary> (#<n>)"` and `git push -u origin docs/architect-docs-<n>`.
