@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    #user-list { display: flex; flex-direction: column; gap: 0.5rem; max-width: 20rem; }
+    #user-list button { text-align: left; }
+  </style>
+</head>
+<body>
+  <!-- Step stub-login: pick your name, no password. Identity only. -->
+  <div class="box">
+    <h1>Log in</h1>
+    <p>Pick your name.</p>
+    <div id="user-list"></div>
+    <p id="login-message" class="status-message"></p>
+  </div>
+  <script>
+    const listEl = document.getElementById('user-list');
+    const messageEl = document.getElementById('login-message');
+
+    function showError(text) {
+      messageEl.textContent = text;
+      messageEl.classList.add('error');
+    }
+
+    async function logIn(user) {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+      if (res.ok) {
+        location.href = 'index.html';
+      } else {
+        showError((await res.json()).error || 'Could not log in.');
+      }
+    }
+
+    fetch('/api/auth/users')
+      .then(res => res.json())
+      .then(users => {
+        if (users.length === 0) {
+          listEl.textContent = 'No active users.';
+          return;
+        }
+        for (const user of users) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = user.name;
+          btn.addEventListener('click', () => logIn(user));
+          listEl.appendChild(btn);
+        }
+      })
+      .catch(() => showError('Could not load the user list.'));
+  </script>
+</body>
+</html>

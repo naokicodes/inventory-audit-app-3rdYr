@@ -108,10 +108,41 @@
     }
   }
 
+  // Step stub-login: current user + log out (or a log-in link) at the end
+  // of the shared nav. Rides on this script because every page with the
+  // nav already loads it, so no page's HTML changes.
+  async function renderNavUser() {
+    const nav = document.querySelector('nav');
+    if (!nav) return;
+    let user = null;
+    try {
+      user = (await (await fetch('/api/auth/me')).json()).user;
+    } catch (err) {
+      return;
+    }
+    const link = document.createElement('a');
+    link.style.marginLeft = 'auto';
+    link.style.whiteSpace = 'nowrap';
+    if (user) {
+      link.href = '#';
+      link.textContent = `${user.name} · Log out`;
+      link.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await fetch('/api/auth/logout', { method: 'POST' });
+        location.href = 'login.html';
+      });
+    } else {
+      link.href = 'login.html';
+      link.textContent = 'Log in';
+    }
+    nav.appendChild(link);
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(toggleBtn);
     document.body.appendChild(panel);
     renderList();
+    renderNavUser();
   });
 
   window.CommandPanel = { register, list };
