@@ -113,6 +113,7 @@ reseeded throwaway DB, reachable over Tailscale. Never port 3000, never the live
 spec: session-status.md -> "Step autopilot-preview".
 
 ### 3r. Step loyverse-preview-i - Loyverse sales preview: engine + route, writes nothing  [runnable]
+**CLOSED 2026-10-21, PR #28 (`4592207`).**
 Touches: server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, server/index.js, .env.example
 Read-only dry run of the Loyverse port (decided 2026-10-03, 1b + 2a): both accounts, one business
 date, per-dish Silingan / Likod / total + unmatched. Writes nothing, no migration. Tokens via .env

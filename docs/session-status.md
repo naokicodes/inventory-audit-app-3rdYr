@@ -1900,6 +1900,7 @@ Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1. No app code; the previ
 PR's code as-is. No click-through for this step itself.
 
 ## Step loyverse-preview-i - Loyverse sales preview: engine + route (writes nothing)
+**CLOSED 2026-10-21, PR #28 (`4592207`).**
 
 First slice of the Loyverse port, built as its dry run (`loyverse-sync.md` -> "Dry-run sync for a
 date"). Decided 2026-10-03 (1b + 2a). Replaces Naoki's nightly Apps Script run for Silingan's
