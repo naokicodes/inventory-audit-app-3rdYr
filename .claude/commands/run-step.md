@@ -111,7 +111,7 @@ and end with `RESULT: STOPPED architect-docs #<n>: <reason>`.
 3. `npm run verify` — `SUITE GREEN` and `AUDIT CLEAN`. If not, do what a failed
    check does, and leave nothing behind:
    ```
-   gh issue comment <n> --body "verify not green after applying the edits: <the failing line>"
+   gh issue comment <n> --body "verify not green after applying the edits (SUITE GREEN or AUDIT CLEAN missing)"
    gh issue edit <n> --remove-label architect-docs --add-label architect-docs-failed
    git checkout -- <each file an OLD/NEW edit named>
    git clean -f -- <each file a CREATE edit named>

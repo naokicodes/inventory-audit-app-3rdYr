@@ -65,11 +65,13 @@ count — that is the worker checking itself.
 
 It counts only if it was posted **after the PR's latest commit that touches
 `public/`** — a screen changed after the click-through was never looked at.
-Compare the comment's time
-(`gh pr view $ARGUMENTS --json comments --jq '.comments[] | select(.body|startswith("Click-through:")) | [.author.login, (.createdAt|fromdateiso8601)] | @tsv'`)
-with that commit's (`git log -1 --format=%ct origin/main..HEAD -- public/`).
-Both are Unix seconds; compare the numbers, never the date text (GitHub's time
-is UTC, git's is local). An older one is reported as **stale** and never counted.
+Find that commit (`git log -1 --format=%H origin/main..HEAD -- public/`), then
+compare its time
+(`gh api repos/naokicodes/inventory-audit-app-3rdYr/commits/<that hash> --jq '.commit.committer.date | fromdateiso8601'`)
+with the comment's
+(`gh pr view $ARGUMENTS --json comments --jq '.comments[] | select(.body|startswith("Click-through:")) | [.author.login, (.createdAt|fromdateiso8601)] | @tsv'`).
+Both are Unix seconds; compare the numbers, never date text written in two time
+zones. An older one is reported as **stale** and never counted.
 
 Then end with exactly:
 
