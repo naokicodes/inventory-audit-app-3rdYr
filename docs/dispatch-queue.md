@@ -159,6 +159,7 @@ install. Blocks 3p. No app code, no click-through. Full spec: session-status.md 
 autopilot-hardening".
 
 ### 3x. Step ui-pass - restyle the existing pages to the mockup look (style.css only)  [runnable]
+**CLOSED 2026-10-21, PR #29 (`e5dc987`).**
 Touches: public/style.css
 Presentation only: the 2026-09-28 mockup tokens (ui-conventions "Look"), Archivo with a
 system-font fallback, quiet buttons with one accent action, tables/inputs/cards/status restyled.

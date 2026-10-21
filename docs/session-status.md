@@ -2156,6 +2156,7 @@ Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md, .claude/comman
 autopilot-doorbell.
 
 ## Step ui-pass - restyle the existing pages to the mockup look (style.css only)
+**CLOSED 2026-10-21, PR #29 (`e5dc987`).**
 
 Decided 2026-10-19 (completed UI shown Sunday 2026-10-25, Beta Monday 2026-10-26). Presentation
 only: no HTML, JS, route or engine change, no new dependency, no build step. The look is
