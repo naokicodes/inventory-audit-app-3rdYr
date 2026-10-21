@@ -3,6 +3,9 @@
 A local meat-inventory audit tool covering 3 restaurants. See `docs/` for
 the full spec — start with `docs/scope.md` if you're new to this project.
 
+For a plain-language description of what the app is and how it fits with SPOS, read
+`docs/official/` first.
+
 If you are joining as a collaborator, read `docs/engineer-role.md` before
 you change anything. It defines what you may fix on your own and what has
 to wait for an architect.

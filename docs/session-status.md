@@ -129,6 +129,13 @@ the runner reads the last count line in each file.
 
 ## Things NOT to re-litigate (already decided, stable)
 
+**Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
+`docs/decisions/` (one file each, with the why); retired handoffs live in
+`docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
+decision records; ADR-002 definition of done (Beta and Final); ADR-003 staff
+meals as quantities; ADR-004 SPOS ownership. If an entry here and an ADR
+disagree, that is a bug: ask Naoki and fix both the same day.
+
 ### 2026-09-15 multi-user scoping — decided (direction; build is gated/Planned)
 
 The app is pivoting from single-user local to multi-user with roles. These are
@@ -139,7 +146,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
 - **Sales confidentiality is a data-layer fact, not access control.** Only sales
   *quantities* enter the app. "Cash" for management = inventory *valuation*
   (ending stock x the cost price set in settings), for meats and sides. Sales
-  revenue / margin / profit never enters this app.
+  revenue / margin / profit never enters this app. **[Amended 2026-10-19: the cost price is the item's last billed arrival unit cost, with the settings cost as fallback - see "Supply, cost and SPOS integration".]**
 - **Side inventory is simple counting**, separate from the meat engine: beginning
   + receipts − ending, no recipe / no variance, valued at price as a guide. Must NOT route through `auditEngine`. Build now from the workbook's transcribed Side_Items catalog; **units are unverified** and need a data investigation / re-setup pass later — don't block the build on it (2026-09-28).
 - **Sahog / no-standard consumption is a derived residual** at day-close (total
@@ -149,7 +156,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
 - **Endorsement IS the receipt** — confirming an arrival writes the stock receipt
   (one record), capturing arrived / short (qty) / none. Record-only, non-blocking.
 - **Running-low is user-configured** (par level = a settings field); watches the real ending count with a calculated-ending fallback the checker can overwrite. Both modes are BUILT — PERCENT (ending < X% of par) and ABSOLUTE (ending <= N) — but only **ABSOLUTE threshold 0** is seeded/used for now (2026-09-28); percent thresholds need a data investigation and are deferred (feature present, unused).
-- **Roles are configurable (GitHub-style)**, with server-side per-capability enforcement (never client-side hide-the-button) and a safe bootstrap (un-lockable super-admin + default roles). Roles are site-scoped, station-AGNOSTIC. CONFIRMED 2026-09-26: five roles — super-admin, admin, management (read-only), head-chef/ops, checker; checker is differentiated by site membership, not role; cashier is not an app user. Decision C (2026-09-28): a **roles table seeded from the settings workbook** carries the capability flags (can_enter_counts / can_finalize / can_admin / read_only); the five names are fixed; super-admin is seeded and never lockable.
+- **Roles are configurable (GitHub-style)**, with server-side per-capability enforcement (never client-side hide-the-button) and a safe bootstrap (un-lockable super-admin + default roles). Roles are site-scoped, station-AGNOSTIC. CONFIRMED 2026-09-26: five roles — super-admin, admin, management (read-only), head-chef/ops, checker; checker is differentiated by site membership, not role; cashier is not an app user. **[2026-10-19: one scoped exception - a bills-only role while SPOS is frozen; see "Supply, cost and SPOS integration".]** Decision C (2026-09-28): a **roles table seeded from the settings workbook** carries the capability flags (can_enter_counts / can_finalize / can_admin / read_only); the five names are fixed; super-admin is seeded and never lockable.
 - **Identity now, passwords later.** A thin `users` table (id, name, role) that
   `created_by` points at is built now; login is a stub (pick-your-name, no
   password) until the recycled auth lands. Phased beta: P0 open -> P1
@@ -174,7 +181,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
 - **Data volume: no PC upgrade.** Speed is an index problem, not hardware or
   pruning. Archive, don't delete. CSV export yes; CSV import deferred.
 - **Pin Node forward** (recent version, suite green, then lock the exact version).
-- **Configure-from-the-ground-up posture.** Definition-of-done stays **directional through alpha, firmed at beta** (2026-09-28, decision B) — intentionally not drafted now, not a gap. Context: this work may later **migrate to MySQL and merge onto a separate app** (repo to come from Naoki), so the final target can shift; keep new schema and the settings importer **portable where it's free** (avoid sqlite-only features in the users/roles layer). Reopen definition-of-done at beta / when that repo lands.
+- **Configure-from-the-ground-up posture.** Definition-of-done stays **directional through alpha, firmed at beta** (2026-09-28, decision B) — intentionally not drafted now, not a gap. Context: this work may later **migrate to MySQL and merge onto a separate app** (repo to come from Naoki), so the final target can shift; keep new schema and the settings importer **portable where it's free** (avoid sqlite-only features in the users/roles layer). Reopen definition-of-done at beta / when that repo lands. **[Superseded in part 2026-10-20: the definition of done is firmed by ADR-002 (`docs/decisions/`). The MySQL-merge context is stale - hybrid A and the core-app line (2026-10-05) replaced it.]**
 
 - **The app records what is physically on hand, not what was invoiced.**
   Confirmed by NaokiiVT 2026-09-02. On a delivery the commissary weigh-checks
@@ -197,7 +204,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   a number was never physically counted. A future column rename on one side is
   the acceptable resolution, not unifying the meaning.
 
-- **Every intake records BOTH a count and a weight when the meat is
+- **[SUPERSEDED 2026-10-13 by the 2026-09-24 intake weigh-in cancellation: intake receipts are quantity-only (25a); kg is recorded at production (raw_weight_in). The commi's weight on shipments (staging D2) is a separate decision and stands. Kept for history.]** **Every intake records BOTH a count and a weight when the meat is
   unit-tracked.** Confirmed by NaokiiVT 2026-09-02 for purchasing, and it is
   the same measurement pattern already settled for processing. This has now
   surfaced three times in three different places, so treat it as a general rule
@@ -499,12 +506,19 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   - **Our own curated name map - confirmed 2026-10-03.** The preview resolves Loyverse item names to dish codes through `server/db/loyverse-name-map.json`; the engines only ever see dish codes and quantities. The 09-15 rule "map by explicit product_id, never by name" governs the sync step that WRITES `sales`, so it does not touch the read-only preview. Before the real port writes, decide its key - this curated name map, or the Loyverse `item_id` / `variant_id` the preview reports behind every match. The risk to weigh then: a wildcard can silently catch a NEW item ("Braised Beef*" would also catch a future "Braised Beef Tapa"); a rename is loud (it lands in unmatched). Wildcard catches are checked from a terminal command (Step loyverse-preview-iii), not the daily UI - matching `loyverse-sync.md`'s "debug tools are you-only".
   - **Refund receipts.** Loyverse REFUND receipts carry positive amounts, and the GAS does not check receipt type, so it likely counts a refund as a sale. The preview keeps the GAS numbers but reports refund receipts per account; the real port decides how refunds subtract.
   - **Coordination.** The integration doc shared with Prince lives in a Google Doc (+ the Facebook chat); every decision still lands here.
-  - **Open for Prince:** identity link (lean: map a person's two accounts on our side); SPOS server-side auth for its own safety; product<->dish map (lean: ours, by explicit id); branch<->site (lean: a site_code on SPOS branches); cost-price owner; supplier POs (lean: SPOS owns the money side, we record arrivals); combined analytics (lean: finance side reads our valuation); SPOS asks - void instead of hard-delete, item-level refunds, modifiers on order lines, paid_at, a quantities endpoint.
+  - **Open for Prince:** identity link (lean: map a person's two accounts on our side); SPOS server-side auth for its own safety; product<->dish map (lean: ours, by explicit id); branch<->site (lean: a site_code on SPOS branches); cost-price owner; supplier POs (lean: SPOS owns the money side, we record arrivals); combined analytics (lean: finance side reads our valuation); SPOS asks - void instead of hard-delete, item-level refunds, modifiers on order lines, paid_at, a quantities endpoint. **[2026-10-19: supplier POs and the cost-price owner are RESOLVED, and the quantities endpoint is replaced by a column-limited read-only MySQL user - see "Supply, cost and SPOS integration".]**
   - **Core app + integration shape - settled 2026-10-05 (Naoki; Prince agreed).**
     - **This web app is the core app.** SPOS is integrated onto it gradually, our own way: the usual architect -> slice -> build -> review flow, at our pace. Hybrid A stands (two services, two databases, an API between them).
     - **Selective, two-way contract.** The integration covers only what each side needs: we pull from SPOS what inventory needs (sales quantities per order line), and we expose what SPOS asks of us (the list is agreed with Prince - e.g. stock/availability). Nothing else of SPOS is mirrored here. "Only quantities cross" INTO the inventory DB still holds: no price, total or payment enters it. What goes OUT of this app is decided per field by the architect.
     - **Demo first, finalize later.** We finish our side first, then build a TEMPORARY test UI in this app that demonstrates the contract as it would work inside SPOS (the Loyverse-preview pattern: a dry run on the real engine module). The contract is finalized only after SPOS has the matching work (done by Prince or by us). The test UI is scaffolding: it shows contract fields only, holds no money data, and is retired once SPOS hosts the real screens.
-    - **Then collaboration, then mobile.** Once the web app is finished, the SPOS side becomes joint work with Prince. A mobile port comes only after the web app has few bugs, inventory and SPOS work well together, and the app is about 80% runnable for Live testing. The driver is printing: ESC/POS to network printers needs a raw TCP socket, which a browser cannot open. Open until then: a native Android app vs a print relay on the server PC (Node can open the socket); and which side owns printing (service is SPOS's domain).
+    - **Then collaboration, then mobile.** Once the web app is finished, the SPOS side becomes joint work with Prince. A mobile port comes only after the web app has few bugs, inventory and SPOS work well together, and the app is about 80% runnable for Live testing. The driver is printing: ESC/POS to network printers needs a raw TCP socket, which a browser cannot open. **Resolved 2026-10-05:** printing, and offline receipts/open tickets synced when internet returns, live on the phone and are SPOS's - Prince is building them (see the next entry).
+- **Hosting, auth order, offline and the revised roadmap - settled 2026-10-05 (Naoki).** Changes the END state from "single local machine / one PC on the LAN"; tech-stack.md and scope.md still describe local hosting, which stays true until the hosting step is specced (update them then).
+  - **Hosted later, local now.** Live runs on a hosted server so it doesn't go down with one PC. Today there is only a domain (Hostinger); no hosting product is chosen. Lean: a VPS, because the SQLite file needs a persistent disk and one long-running process (Hostinger's managed Node apps run on demand - unverified for SQLite). All testing stays local until then.
+  - **Auth order.** When the app first goes on the domain, Beta runs behind one shared server-level password, with sample data only. Real per-user passwords land BEFORE Live - so the recycled auth repo is needed before Live, not "later". Stub login (pick-your-name) is a local/Beta convenience and is never exposed on the domain without the gate.
+  - **Inventory is online-only.** An outage means waiting or paper. But the phone keeps unsaved entries so a refresh, a crash or Android killing the tab doesn't lose a count pass: drafts only, never auto-submitted, the server stays the record (step count-drafts).
+  - **Offline-first receipts/tickets and phone printing are SPOS's** (Prince is building them). Not designed or built here.
+  - **Autopilot runner stays on the old PC** - a build machine, separate from the future live host.
+  - **Revised roadmap: work as if SPOS isn't there yet.** (1) Finish Loyverse + the inventory core; the real Loyverse port (write into sales, Sync button, nightly run) sits here, right after the preview steps 3r-3t. (2) Then the UI pass - the aesthetics from the 2026-09-27/28 mockups (dashboard + Landing screen), growing ui-conventions.md. (3) Then a SPOS demo with Prince using SPOS's resources (the temporary test UI in the Core-app entry). Hosting + real passwords gate Live. **[Amended 2026-10-19: the UI pass moves ahead of finishing the core, for the 2026-10-25 demo - see "Beta date + UI pass".]**
 - **Autopilot (solo workflow) - settled 2026-10-04; NOT ACTIVE until the server install.** The dispatcher role (typing /start) is replaced by the unattended runner (scripts/run-queue.ps1 + .claude/commands/run-step.md) on the restaurant server PC - the SAME PC that hosts the live app - under a STANDARD Windows user `engineer` with its own clone, write/delete on the live app folder DENIED by Windows permissions (the guard-db hook is not the only lock), and PORT=3100 so it never collides with the live app.
   - **Identity:** a dedicated GitHub machine account (collaborator, Write, NOT admin) opens the PRs, so the architect can approve them - workflow-guide "Job 2" stands (the worker opens the PR, the architect approves). The engineer's Claude account is the bot's own (same email), upgraded to Pro.
   - **Triggers:** Task Scheduler runs at 16:00 / 21:00 / 03:00 (-MaxSteps 2) - the architect's class and sleep hours, when no architect work happens anyway; each >= 5 h apart = a fresh usage window + a 15-minute doorbell (a `run-now` label or a new `architect-docs` issue, naokicodes only, -MaxSteps 1). Pause = any open `autopilot-pause` issue by naokicodes.
@@ -512,6 +526,34 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   - **Architect docs travel as issues:** `architect-docs` issues (template .github/ISSUE_TEMPLATE/architect-docs.md) are applied VERBATIM, all-or-nothing, docs/ only, each OLD exactly once, into a docs PR. CLOSED stamps ride in the next architect-docs issue (start.md already treats a merged PR as done).
   - **Click-throughs stay human (the architect)**, against a preview of the PR's own code on port 3100 with a reseeded throwaway DB, over Tailscale.
   - **Steps:** autopilot-runner, architect-docs-pickup, autopilot-doorbell, autopilot-preview. Guide: docs/autopilot-guide.md. Open until install: creating the bot's GitHub account, upgrading its Claude account to Pro, the live app folder path.
+- **Architecture review 2026-10-13 (Naoki) - carry-overs from PRs #23-#28.**
+  - **Loyverse total when an account fails (#27): Reading B.** A dish's total sums the accounts that succeeded AND sell the dish (map column not ''). It is null only when every account that sells the dish failed (both down, or a one-account dish with that account down), so a failure never reads as 0. No special case for '' columns: a dish the failed account doesn't sell already gets an exact total. Copy as text omits null-total dishes (the failed-account warning covers them). No per-row `partial` flag now; it may be added later, in the engine, never computed in a page. Specs: Steps loyverse-preview-i and -ii.
+  - **True loss is shown to both audiences.** The commissary sees it on the yield log as it logs (24d-iii: a display-only "True loss (kg)" column = the read's residualLoss). Management gets the split in the later analytics/dashboard step (unchanged from 24d-ii). Loss %, Status and Excess Loss stay raw vs backed: miscut never softens the judgment.
+  - **Portability vs convention.** Hybrid A keeps portability-where-free as a habit; when it conflicts with an existing in-file convention, the convention wins. users.created_at keeps datetime('now'). Applies to every "Portability (MySQL note)" in the step specs (user-sites, import-identity, user-id-authorship, sheets-tier1).
+  - **One bootstrap super-admin, seed side.** seed.js inserts the bootstrap "superadmin" only when no user holds the super-admin role, so a plain (non --reset) seed run after the import renames it never adds a second. Built in import-identity (which starts the rename); the import-side reconciliation (#22) is unchanged.
+  - **Role matrix confirmed as seeded (PR #24).** Admin keeps can_enter_counts = 1: "hands-off operationally" is a practice, not a permission.
+  - **Autopilot: harden before the doorbell.** autopilot-doorbell waits for autopilot-hardening (the lock race only bites once a second trigger exists). Click-through recency, both review commands: a `Click-through:` comment counts only if posted after the PR's latest commit touching public/. The `Closes #<n>` skip-check stays literal (Fixes/Resolves may be added later if human-written PRs ever close architect-docs issues). The architect-docs trust gate stays `--author naokicodes`, and that account keeps 2FA on.
+- **Supply, cost and SPOS integration - settled 2026-10-19 (Naoki).** Supersedes the 10-03 leans on supplier POs and the cost-price owner.
+  - **Working assumption: SPOS is frozen at `5950238`** (the copy Naoki was handed). We write every connector and change nothing in SPOS. If Prince keeps building, the bill screen and the POS stock patch below go back to him; nothing else changes.
+  - **Supplier orders and arrivals are ours.** The commi (raw meat) and the podium (side items) make supplier orders here: supplier, lines (item, qty, unit), date needed - no prices. One supplier catalog for meat and sides. Manual first; running-low pre-fill later (C2 unchanged). SPOS's Suppliers and Purchase Orders screens go unused at these sites, like the rest of its Inventory menu.
+  - **Sending an order = a picture + text.** Suppliers prefer a picture of the list (today: the paper PO, photographed and cropped). The page draws the saved order on a canvas and exports a PNG in the browser (no new dependency, no server change), beside a Copy text button. On HTTPS a Share button opens the phone's share sheet; on plain-http LAN (Beta) it falls back to Download image + the legacy copy. The PNG carries no prices; its layout may mirror the paper PO.
+  - **Arrival against the order.** Quantity-only (25a stands), a photo of the supplier's receipt, off-list lines tagged, lines that never came cancelled (mirror of C3). Meat: a commissary_stock_receipts row linked to the order line (25a's rewrite folds in here). Sides: the arrival pre-fills the side sheet's "received" field, and that field stays the record (Q3 unchanged).
+  - **The bill.** The cashier enters what was paid against an arrival, reading the receipt photo. Unit cost = paid / received quantity, stored PER ARRIVAL. How and when the supplier was paid is never stored here. While SPOS is frozen the bill screen is a narrow Bills page in THIS app behind a bills-only role - a deliberate, scoped exception to "cashier is not an app user". If Prince continues SPOS, it becomes a SPOS screen.
+  - **Cost amendment (amends the 09-15 "Cash" line).** Valuation uses the item's LAST billed arrival unit cost; the settings cost_per_unit is the fallback, and the only source until bills exist (Beta runs on it). Every arrival keeps its own price, so a monthly average can be added later without re-entry. Sales revenue, margin and profit still never enter.
+  - **Pesos are computed here, in an engine module.** Commi shrinkage = (raw - backed) x raw unit cost; backed cost per kg = amount paid / backed kg; wastage and other allocations = qty x unit cost; variance = over/short x unit cost; stock value = ending x unit cost. Rejected: all money in SPOS (SPOS lacks our item catalog, the loss logic would be duplicated and drift, and kilos and pesos would sit in different apps).
+  - **POS availability (D2-c).** SPOS's POS refuses a sale when products.in_stock <= 0 regardless of track_stock, and no sale ever lowers in_stock. Target: the POS checks stock only when track_stock is on, dishes default off, and running out is the manual 86 (is_available). Later: an advisory running-low badge from our par levels, never a block. We never push a live portion count - our counts are daily. Bridge while SPOS is unpatched: set every dish's in_stock high once.
+  - **Sales in, without changing SPOS.** Our server reads SPOS's MySQL through a read-only user with COLUMN-level grants: order_items (id, order_id, product_id, variant_id, quantity), orders (id, branch_id, status), payments (order_id, payment_date). Price, cost and amount columns are never granted, so "only quantities cross" is enforced by MySQL itself. Paid orders only; refunded excluded. Same intake as Loyverse (source SPOS), our business-date rules. The product -> dish and branch -> site maps are ours. SPOS's MySQL is never exposed to the internet; we reach it over Tailscale.
+- **Separate apps - settled 2026-10-19 (D3).** Staff use this app; cashiers use the SPOS POS; management uses both - SPOS's back office for money in (sales, revenue, receipts) and this app's read-only management dashboard for stock and losses in pesos. SPOS holds none of our data (finance may read our API later - the 10-03 lean stands). A plain link each way. This app keeps its own look and stack (plain CSS, no build step).
+- **Management dashboard + the 10pm sneak peek - settled 2026-10-19.** Silingan sells until 9pm, Likod until 12am; management wants the day's picture around 9-10pm.
+  - Everything staff enter (arrivals, yields, allocations, bills, counts) is read straight from our DB: live with no sync.
+  - Sales are the only outside stream: pulled when the dashboard opens, held about 5 minutes, stored nowhere, tagged "as of HH:MM - partial" (+ "Likod open until 12am"). Same engine module as the Loyverse preview (3r): Loyverse now, SPOS's MySQL later. The official numbers come from the nightly sync (the real port) after the business day; a sale after midnight belongs to the previous business date.
+  - It shows: sales so far per site; meat used by recipe (sales x recipe_bom) and "should be left" (beginning + arrivals - usage); arrivals with cost ("Est." at the settings cost until billed); losses in pesos; stock value from the last count. Over/short appears only after the ending counts are saved. Revenue never appears - a link goes to SPOS's back office (Loyverse until then).
+  - The usage, should-be-left and peso math live in an engine module (recyclable-logic rule), never in the page.
+- **Beta date + UI pass - settled 2026-10-19.**
+  - **Beta starts Monday 2026-10-26** at the restaurant, on its Wi-Fi, against a local server - no domain, so the shared-password gate is not needed yet. Prince's Hostinger Business hosting is a possible deployment trial once Naoki brings its details; until then, local. Beta still needs no users, PO or sides (testing-plan.md); its entry list is met.
+  - **The completed UI is shown Sunday 2026-10-25**, in two parts: the real pages restyled (Steps ui-pass + ui-pass-ii: the 2026-09-28 mockup look, tokens in ui-conventions.md "Look"), and a clickable prototype of the planned pages (supplier order + PNG, arrival, bills, sides, management dashboard) on sample data, labeled as a preview. The prototype is an architect-built artifact OUTSIDE the repo: not app code, never dispatched.
+  - **Roadmap amended:** the UI pass (was phase 2) moves ahead of finishing the core. Beta-week order: ui-pass and count-drafts in parallel, then ui-pass-ii (page colors), then stub-login (optional). Everything else continues at normal pace. The ui-pass is light-only; dark mode is a later step.
+- **Official documentation - settled 2026-10-19.** `docs/official/` holds the plain-language description of the app for people outside the build loop (owners, management, Prince, trainers, future maintainers). Its README sets the rules: built or settled only, each page marking Built / Planned; session-status wins on any conflict; public-safe (no real prices, credentials or staff details); the architect maintains it, and a step edits it only when its spec says so.
 
 ## End-of-session checklist (every session, no exceptions)
 
@@ -1444,19 +1486,25 @@ Touches: server/engines/commissaryYieldEngine.js (+ test). Server-only, no click
 on 24d-i.
 
 ## Step 24d-iii - richer yield: miscut on the commissary yield UI (Path 1)
+**CLOSED 2026-10-13, PR #23 (`f20aefd`).**
 
 Third yield slice. Exposes miscut on the commissary yield UI (public/commissary.html). DEPENDS ON
 24d-ii. PUBLIC -> click-through. (Path 1: no output-count field.) Entry form ("Log a yield event"):
 add a miscut input (miscut_weight, kg), always shown, optional, defaults 0 ("Miscut / reusable
 trim (kg)"); include it in the POST body. Yield log table: add a miscut_weight column (kg; read
-returns it once 24d-ii is in) and optionally a small residualLoss "true loss" cell (display only).
+returns it once 24d-ii is in) and a "True loss (kg)" column showing the read's residualLoss (display only, never an input;
+REQUIRED - decided 2026-10-13, was optional).
 Edit-in-place: a miscut field per the route's absent=keep convention. Mobile: keep the stacked
 form; the widened log table scrolls horizontally below 768px (ui-conventions.md "Tables"), do NOT
 card-ify it. Client validation is convenience only - the 24d-i server guards are authoritative.
 Touches: public/commissary.html (+ public/style.css if needed). PUBLIC -> live click-through.
 Depends on 24d-ii.
+**2026-10-13:** PR #23 sent back (request changes) to add the True loss column. The click-through
+(not done yet) then covers it with the rest: the form field, both new columns, edit Save/Cancel,
+the server's miscut error text, and the sideways scroll below 768px.
 
 ## Step users-roles - identity foundation: users + roles tables + role seed
+**CLOSED 2026-10-13, PR #24 (`74ea2ba`).**
 
 First slice of the multi-user surface (architect 2026-09-28). Just the two tables and the
 role seed - NO membership, NO login, NO authorship rewrite yet (later slices; membership has
@@ -1541,7 +1589,8 @@ site_memberships - into the tables slices 1-2 created; it does NOT touch catalog
 (those tables don't all exist yet - the importer grows to cover them as those features land).
 DEPENDS ON users-roles + user-sites (needs the tables + siteAccess.js resolver).
 
-OPEN DECISION before dispatch - how it reads the workbook (this project has ONE dependency,
+**DECIDED 2026-09-28 (Q6): option B, behind loadTab()** - options kept for the record.
+Was: OPEN DECISION before dispatch - how it reads the workbook (this project has ONE dependency,
 express, and no build step, so a reader is a real choice):
 - A: add SheetJS (`xlsx`) as a devDependency; the importer reads the .xlsx directly. Smoothest,
   but the FIRST devDependency in the project.
@@ -1561,6 +1610,9 @@ source of truth over slice-1's seed defaults):
   super-admin. Exactly one exists (the seeded bootstrap "superadmin"); match it by ROLE (default_role
   = super-admin) and UPDATE its name/details to the workbook owner. All OTHER users upsert by name.
   Keeps one unlockable super-admin; the real name enters via the workbook, never the repo.
+- Seed side (decided 2026-10-13): seed.js inserts the bootstrap "superadmin" only when no user
+  holds the super-admin role, so a plain (non --reset) seed run after the rename never adds a
+  second. Test: rename the bootstrap user, re-run seed -> still exactly one super-admin user.
 - Memberships: split site_memberships (comma-separated) per user; for each code call
   resolveSiteCode() (siteAccess.js) - insert (user_id, site_code) when it resolves, WARN and
   skip when it doesn't (this is where the SIL vs SILT mismatch surfaces; the fix is a workbook
@@ -1577,8 +1629,8 @@ path. Wire into reseed LATER (per the earlier decision: A now, reseed later).
 Tests: importer upserts role flags; resolves a user's default_role; parses memberships and warns
 on an unresolved code; a second run is a no-op (idempotent).
 
-Touches: scripts/import-settings.js (new), package.json (an import:settings script; + the
-devDependency IF option A), + a test. Depends on users-roles + user-sites. Server/scripts only,
+Touches: scripts/import-settings.js (new), server/db/seed.js (the bootstrap guard), package.json
+(an import:settings script), + a test. Shares seed.js with sheets-tier1 -> sequence. Depends on users-roles + user-sites. Server/scripts only,
 no click-through, no migration.
 
 ## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
@@ -1659,6 +1711,7 @@ Touches: server/middleware/requireSiteAccess.js (new), the site-scoped routes, s
 (+ tests). Server-only (a click-through only if UI changes). Depends on stub-login + user-sites.
 
 ## Step autopilot-runner - runner lock, run log, pause switch, review drafts
+**CLOSED 2026-10-13, PR #25 (`1cf1c2a`).**
 
 AUTOPILOT family, slice 1 of 4 (decision: "Things NOT to re-litigate" -> "Autopilot (solo
 workflow)", 2026-10-04). Inert until the server install (docs/autopilot-guide.md section 6):
@@ -1724,6 +1777,7 @@ Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md (new). No app c
 click-through, no migration.
 
 ## Step architect-docs-pickup - apply architect doc edits filed as an issue
+**CLOSED 2026-10-13, PR #26 (`eac8789`).**
 
 AUTOPILOT family, slice 2 of 4. Inert until install. The architect has no PC: decisions
 travel from the architect chat as an issue (template `.github/ISSUE_TEMPLATE/architect-docs.md`,
@@ -1773,7 +1827,8 @@ autopilot-runner (no shared file); the runner already handles BUILT and STOPPED.
 
 ## Step autopilot-doorbell - start a run from the phone
 
-AUTOPILOT family, slice 3 of 4. Depends on autopilot-runner (the lock, -Trigger, -Owner, the
+AUTOPILOT family, slice 3 of 4. Waits for autopilot-hardening (2026-10-13).
+Depends on autopilot-runner (the lock, -Trigger, -Owner, the
 pause switch). Inert until install. New `scripts/doorbell.ps1`, run by Task Scheduler every 15
 minutes as the `engineer` Windows user. It calls NO Claude itself - it only reads GitHub and,
 at most once per invocation, starts the runner. Windows PowerShell 5.1, no modules.
@@ -1885,10 +1940,16 @@ from process.env (LOYVERSE_SILINGAN_TOKEN, LOYVERSE_LIKOD_TOKEN); a missing toke
 { ok:false, error:'token not set' }.
 Response: { date, accounts:[{label, ok, error?, receiptsScanned, receiptsKept, receiptTypes}],
 dishes:[{dish_code, name, silingan, likod, total}] (every map row, zeros included, map order; a
-failed account's column is null, not 0), unmatched:[{account, item_name, quantity}],
+failed account's column is null, not 0; total follows the rule below), unmatched:[{account, item_name, quantity}],
 idCandidates:[{dish_code, account, item_id, variant_id, item_name, variant_name, matchedBy,
 pattern, quantity}] }.
 No money field anywhere.
+Total (decided 2026-10-13, #27 - Reading B): a dish's total sums the accounts that succeeded AND
+sell it (map column not ''); null only when every account that sells the dish failed. No special
+case for '' columns. dishTotal() implements it. Tests: one account failed -> a dish both sell
+totals the survivor; a dish only the failed account sells -> null; both failed -> every total null;
+a dish the failed account doesn't sell -> the survivor's number. No per-row partial flag (may be
+added later, in the engine).
 
 Env: server/index.js loads .env at startup with Node's built-in process.loadEnvFile() when the file
 exists (no dotenv) - so it works however the server starts: npm run dev, the autopilot's scheduled
@@ -1916,11 +1977,11 @@ The page for loyverse-preview-i. Depends on it. PUBLIC -> live click-through (39
   read-only, nothing is saved". Date picker (default today, Manila) + Load; a loading state.
 - Table: Dish | Likod | Silingan | Total - every dish, map order, zero rows muted. A failed account
   shows "-" in its column plus a banner naming it ("Likod could not be fetched: <error>"): a
-  failure must never look like zero sales.
+  failure must never look like zero sales. A null total (#27) shows "-" too.
 - Under the table: one status line per account ("Silingan: 142 receipts, 1 refund") and the
   unmatched section (account, item name, qty), hidden when empty. idCandidates stay API-only.
 - "Copy as text" for Messenger: a header line with the date, one line per NON-ZERO dish
-  ("Meatball Pasta - Likod 4, Silingan 9, Total 13"), then "Unmatched: N items (see app)" when
+  ("Meatball Pasta - Likod 4, Silingan 9, Total 13"; a null-total dish is omitted - the warning covers it, #27), then "Unmatched: N items (see app)" when
   N > 0, and the failed-account warning if any. navigator.clipboard needs HTTPS or localhost, so
   on a LAN http:// address fall back to a selected textarea + execCommand('copy'); if that fails,
   show the textarea for manual copy.
@@ -2017,3 +2078,144 @@ inactive restaurant gets none. reseed.test.js stays green.
 Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js (new),
 server/engines/sheetDefinitions.test.js (new). Server-only, no click-through, no migration.
 Shares schema.sql + seed.js with users-roles and user-sites -> sequenced after them.
+
+## Step count-drafts - keep unsaved count entries on the phone
+
+Decided 2026-10-05 (inventory online-only, but a refresh must not lose a count pass). Browser
+only: the server is untouched and stays the record. A draft is never submitted by itself.
+
+- public/draft-store.js (new, plain script like month-opening.js): a small helper over
+  localStorage (not sessionStorage - Android may kill a background tab). Key:
+  `draft:v1:<page>:<site>:<business_date>`, built by one function that also accepts an
+  optional user part, so the key can gain the user when login lands. Value: { savedAt, fields }
+  where a field key is `<meat|dish>:<id>:<field class>` - keyed by item id and field, never by
+  DOM position, so the table, Review and Enter views share one draft. Every storage call is in
+  try/catch: if storage fails, there are no drafts and the page works as today. On load, drop
+  draft keys older than 3 days.
+- public/daily-audit.html: on input in ending_actual, remarks, prepped or portion_actual, update
+  the draft (debounced, about 300 ms). After the rows render (initial load and every
+  site/date/view change), fill drafted fields into their inputs, mark them (a small "unsaved"
+  tag in the existing style), and show one line: "Restored N unsaved entries from <time> - not
+  saved yet." with a Discard button. Disabled (month-blocked) inputs are never filled. Clear the
+  draft only after Save Day fully succeeds (meat and dish POSTs both ok); any failure keeps it.
+- public/month-opening.js: the same for the recount and correct inputs; a field leaves the draft
+  when its own row saves.
+- Not here: commissary.html (24d-iii is on it - follow-up once that lands); stock receipts,
+  allocations and terminal; anything server-side.
+
+Click-through (390px): type counts, refresh -> restored and tagged, nothing saved on the server
+until Save Day; switch Review/Enter -> same values; Discard -> inputs back to server values; Save
+Day -> refresh shows no restore line; a month-blocked row never gets a value; a private window
+(storage blocked) still saves normally.
+
+Touches: public/draft-store.js (new), public/daily-audit.html, public/month-opening.js. No
+server change, no migration. PUBLIC -> click-through before merge. Parallel-safe with the
+current queue (no Touches overlap).
+
+## Step autopilot-hardening - close the runner review findings before the doorbell
+
+Decided 2026-10-13 (architect review of PRs #25 and #26, cubic findings). AUTOPILOT family; inert
+until install like the rest of it. Windows PowerShell 5.1, no modules, no npm dependency. Five
+small fixes:
+
+1. Lock (scripts/run-queue.ps1). Required property: two runners started at any moment - with or
+   without a stale lock - never both proceed. Today two runs that both judge the same lock stale
+   can each delete and recreate it. Lean: hold a named OS mutex (Global\inventory-audit-run-queue,
+   WaitOne(0); an AbandonedMutexException counts as acquired) for the whole run and release it in
+   the existing finally - the OS frees it when the holder dies, so there is no stale state to
+   judge. run.lock may stay as an informational PID + time file, or go. The mechanism is the
+   engineer's call as long as the property holds; say which and why.
+2. Public run-log lines (scripts/run-queue.ps1). The comment on the public repo is rebuilt from
+   the RESULT kind plus at most one `#<digits>` - never the model's free text (a STOPPED reason
+   can carry a path). Review-draft lines the same. The full lines stay in the local log.
+3. No merge on red (.claude/commands/review-draft.md). Explicit rule: if `npm run verify` is not
+   SUITE GREEN + AUDIT CLEAN, the draft must not say `Recommendation: merge`; it says
+   `Recommendation: needs your call - verify not green`.
+4. Click-through recency (.claude/commands/review-draft.md AND .claude/commands/review.md). A
+   `Click-through:` comment counts only if posted after the PR's latest commit that touches
+   public/ (compare the comment's created_at with that commit's date, via gh). An older one is
+   reported as stale, never counted. review-draft keeps its naokicodes-only rule; review.md keeps
+   "a human".
+5. architect-docs pickup (.claude/commands/run-step.md, section 1b): add `--limit 100` to the
+   `gh issue list`; and when verify is not green after branching, do what a failed check does -
+   comment the reason, relabel `architect-docs-failed`, return to main and delete the local
+   `docs/architect-docs-<n>` branch - then `RESULT: STOPPED architect-docs #<n>: verify not green`.
+
+Not here: broadening `Closes #<n>` (stays literal), the trust gate (stays --author naokicodes),
+the doorbell itself.
+
+Verification: there is no PowerShell harness - say so. Show with stand-ins: two runners against a
+deliberately stale lock -> exactly one proceeds; a STOPPED reason containing a path -> the
+dry-run (-LogIssue 0) body shows no path; a walk-through of review-draft on a red verify and on a
+click-through older than the last public/ commit; the run-step verify-fail path leaves no branch
+and a relabeled issue.
+
+Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md, .claude/commands/review.md,
+.claude/commands/run-step.md. No app code, no click-through, no migration. Blocks
+autopilot-doorbell.
+
+## Step ui-pass - restyle the existing pages to the mockup look (style.css only)
+
+Decided 2026-10-19 (completed UI shown Sunday 2026-10-25, Beta Monday 2026-10-26). Presentation
+only: no HTML, JS, route or engine change, no new dependency, no build step. The look is
+ui-conventions.md -> "Look" (tokens from the 2026-09-28 Dashboard + Landing mockup).
+
+- public/style.css only:
+  - :root carries the Look tokens (light values only, `color-scheme: light`).
+  - Font: an `@import` of Archivo (400, 500, 600, 700) from Google Fonts at the top of the file;
+    stack 'Archivo', system-ui, sans-serif, so with no internet the system font is used and
+    nothing breaks. body: paper background, ink text, 15px / 1.45, tabular figures.
+  - nav (the existing link bar in every page - markup unchanged): card background, bottom
+    hairline, links in ink2 at 500 weight, a tinted pill on hover. Keep the phone rule (one
+    non-wrapping row, overflow-x auto below 768px).
+  - Buttons: the default `button` becomes the quiet secondary look (card background, line2
+    border, ink text, 8px radius). Only `.save-bar button` and `.view-toggle button[aria-pressed="true"]`
+    get the accent fill (one accent action per view).
+  - Inputs, selects and textareas: card background, line2 border, 7px radius, tabular figures,
+    a 2px accent focus outline.
+  - Tables (global table / th / td): header row on paper at 12px 600 ink2 with a line2 bottom
+    border; body rows on a line hairline. Colors, borders, padding and font only - no alignment
+    changes. Wide tables keep their scroll container (ui-conventions "Tables").
+  - Cards (.audit-card, .box): card background, line border, 12px radius.
+  - Status: .status-message.success -> ok on ok-tint; .error -> danger on danger-tint;
+    .card-blocked -> warn on warn-tint; .variance-chip keeps which state gets which color, mapped
+    to the danger / ok / warn tokens, pill-shaped.
+- Page-level colors: every page except index.html has its own <style> block (and a few style=
+  attributes) with hard-coded colors. Leave them here - Step ui-pass-ii converts them, so this
+  step stays parallel-safe with count-drafts.
+- Not here: any markup (sidebar rail, grouped nav, aria-current, icons, brand mark - those need
+  every page's HTML and wait for a nav step after login and the new pages land); dark mode (a
+  later step, after the inline colors are checked); new pages.
+
+Click-through (390px AND desktop): all 11 pages open and read (no white-on-white, no lost
+borders); on daily-audit Review/Enter, ending-actual is still the only accented input and
+variance the only colored chip; the month-opening panel still works; wide tables scroll inside
+their container and the page body never scrolls sideways; with the network off, the fallback
+font loads and nothing breaks.
+
+Touches: public/style.css. No server change, no migration. PUBLIC -> click-through before merge.
+Overlaps loyverse-preview-ii (3s) on style.css -> sequence (3s is blocked anyway).
+
+## Step ui-pass-ii - page colors onto the Look tokens (the pages' own style blocks)
+
+Decided 2026-10-19, second half of the UI pass. Ten pages (all but index.html) carry their own
+<style> block and a few style= attributes with hard-coded colors (crimson, green, #fafafa,
+#f0f0f0, #999 ...), which ui-pass leaves alone. This step replaces those COLOR values with the
+Look tokens from style.css, by meaning: error/short -> var(--danger) / var(--danger-tint); ok ->
+var(--ok) / var(--ok-tint); warnings, blocked, estimates -> var(--warn) / var(--warn-tint); muted
+text -> var(--ink2) / var(--ink3); light panel and row backgrounds -> var(--paper) or
+var(--accent-tint) for a selected row; borders -> var(--line) / var(--line2).
+
+- Colors only: color, background(-color), border-color and the color part of a border. No
+  layout, sizing, spacing or font change; no markup outside the style block and style=
+  attributes; no JS change. terminal.html's panel included (colors only).
+- If a color has no clear meaning-match, keep it and list it in the PR.
+
+Click-through (390px AND desktop): the same list as ui-pass, page by page; plus every status
+color still means what it meant (an error still reads as an error, a selected row still stands
+out), and the terminal panel stays readable.
+
+Touches: public/allocations.html, public/commissary-shipments.html, public/commissary.html,
+public/daily-audit.html, public/dashboard.html, public/history.html, public/sales.html,
+public/settings.html, public/stock-receipts.html, public/terminal.html. PUBLIC -> click-through
+before merge. Blocked on ui-pass (needs the tokens) and count-drafts (shares daily-audit.html).

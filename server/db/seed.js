@@ -208,6 +208,35 @@ for (const cm of commissaryData.commissary_meats) {
 }
 console.log(`Commissary meats: ${commissaryMeatsInserted} inserted (of ${commissaryData.commissary_meats.length} in file - full real Meats sheet, M01-M15)`);
 
+// 6. Roles + the bootstrap super-admin user (step users-roles). Safe
+// defaults so the app runs pre-import; import-settings.js (later) is the
+// source of truth and may UPDATE these flags. INSERT OR IGNORE on the UNIQUE
+// name, so a re-run never overwrites an imported change.
+const roles = [
+  // name,        enter, finalize, admin, read_only
+  ['super-admin', 1, 1, 1, 0],
+  ['admin',       1, 1, 1, 0],
+  ['management',  0, 0, 0, 1],
+  ['head-chef',   1, 1, 0, 0],
+  ['checker',     1, 0, 0, 0],
+];
+const insertRole = db.prepare(
+  'INSERT OR IGNORE INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only, active) VALUES (?, ?, ?, ?, ?, 1)'
+);
+let rolesInserted = 0;
+for (const r of roles) {
+  if (insertRole.run(...r).changes > 0) rolesInserted++;
+}
+console.log(`Roles: ${rolesInserted} inserted (of ${roles.length})`);
+
+// "superadmin" is a break-glass/bootstrap login, not a real person's name -
+// real names enter only via the off-repo workbook at import (#19, #22).
+const superAdminRoleId = db.prepare(`SELECT id FROM roles WHERE name = 'super-admin'`).get().id;
+const userResult = db.prepare(
+  'INSERT OR IGNORE INTO users (name, default_role_id, active) VALUES (?, ?, 1)'
+).run('superadmin', superAdminRoleId);
+console.log(`Users: ${userResult.changes} inserted (bootstrap super-admin)`);
+
 // A reset must end on a consistent file: any dangling reference means the
 // clear or the reseed went wrong, so fail loudly rather than hand Beta a
 // broken database.

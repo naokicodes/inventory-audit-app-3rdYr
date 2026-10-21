@@ -42,6 +42,25 @@ acknowledgment, sides) are known. Add to it; don't wait for it to be complete.
 - **Desktop keeps its table.** Above the breakpoint there is no Review/Enter toggle;
   the phone views and the toggle exist below the breakpoint only.
 
+## Look (2026-10-19, from the 2026-09-28 Dashboard + Landing mockup)
+
+- **Character:** a precise digital ledger - ruled lines, tabular numerals, calm surfaces. Color
+  only points at what needs action.
+- **Light tokens:** --paper #FBFAF7 (page), --card #FFFFFF, --ink #232019, --ink2 #6B655B,
+  --ink3 #9A9488, --line #E9E5DC, --line2 #D8D3C7, --accent #1B5A72, --accent-ink #0E3D4E,
+  --accent-tint #E2EDF1, --danger #A8321E / --danger-tint #F6E4DF, --ok #2C6E49 /
+  --ok-tint #E2EFE7, --warn #B26B12 / --warn-tint #F6EAD6.
+- **Dark tokens (for the later dark-mode step):** --paper #17150F, --card #221F18,
+  --ink #F2EEE4, --ink2 #ADA595, --ink3 #726B5C, --line #322E25, --line2 #403A2E,
+  --accent #5AA7BC, --accent-ink #BFE0E8, --accent-tint #17323A, --danger #E08066 / #3A241E,
+  --ok #6FBF92 / #1E3327, --warn #DFA24F / #3A2E17.
+- **Type:** Archivo 400-700 (Google Fonts) with a system-ui fallback; tabular figures for every
+  number; no all-caps labels; no monospace as decoration.
+- **Shape:** cards 12px radius with a 1px --line border; inputs and buttons 7-8px; pills 20px.
+- **Color meaning:** red = short / variance / error; green = ok; amber = running low / blocked /
+  estimate. The accent is never a status color, and there is one accent action per view.
+- **Money:** peso sign with thousands separators, no decimals on dashboards.
+
 ## Tables
 
 - **Wide tables scroll, they don't reflow.** A table too wide for the phone (the yield log,
