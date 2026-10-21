@@ -212,7 +212,7 @@ async function computePreview({ date, nameMap = loadNameMap(), env = process.env
       const r = byKey[account.key];
       row[account.key] = r.status.ok ? (r.quantities.get(dish.dish_code) || 0) : null;
     }
-    row.total = dishTotal(row, nameMap.accounts);
+    row.total = dishTotal(row, dish, nameMap.accounts);
     return row;
   });
 
@@ -225,16 +225,24 @@ async function computePreview({ date, nameMap = loadNameMap(), env = process.env
   };
 }
 
-// UNDECIDED - see the needs-architect issue linked from this step's PR: the
-// spec settles a failed account's COLUMN (null, never 0) but not the TOTAL.
-// Placeholder until decided: null when any account failed.
-function dishTotal(row, accounts) {
+// A dish's total sums the accounts that succeeded AND sell the dish (the dish's
+// map column for that account is not ''). It is null only when EVERY account
+// that sells the dish failed - so a down account never reads as 0 - and a dish
+// the failed account doesn't sell still gets an exact total (#27 Reading B,
+// architecture review 2026-10-13). No per-row partial flag now; if one is ever
+// wanted it is added here, in the engine, never computed in a page.
+function dishTotal(row, dish, accounts) {
   let total = 0;
+  let sellers = 0;
+  let sellersOk = 0;
   for (const account of accounts) {
-    if (row[account.key] === null) return null;
+    if (!dish[account.key]) continue; // '' = this account doesn't sell the dish
+    sellers++;
+    if (row[account.key] === null) continue; // this seller's account failed
+    sellersOk++;
     total += row[account.key];
   }
-  return total;
+  return sellers > 0 && sellersOk === 0 ? null : total;
 }
 
 module.exports = {

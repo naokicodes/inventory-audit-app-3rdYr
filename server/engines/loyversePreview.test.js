@@ -253,6 +253,51 @@ test('a network error fails ONE account', async () => {
   assert.deepStrictEqual([r.accounts[1].ok, r.accounts[1].error], [false, 'getaddrinfo ENOTFOUND']);
 });
 
+// --- dish total when an account fails (#27 Reading B) ---
+
+test('total sums the accounts that succeeded and sell the dish; a down account is not 0', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: { TOK_S: 'secret-s' }, // Likod token missing
+    fetchImpl: stubFetch({ 'secret-s': [[receipt('2026-10-03T04:00:00Z', [['Meatball Pasta', 2]])]] }),
+  });
+  assert.strictEqual(r.accounts[1].ok, false);    // Likod failed
+  assert.strictEqual(row(r, 'D001').likod, null); // its column is null, never 0
+  assert.strictEqual(row(r, 'D001').total, 2);    // total = the surviving Silingan, not null, not 0
+});
+
+test("a dish the failed account doesn't sell gets an exact total (no '' special case)", async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: ENV,
+    fetchImpl: stubFetch({
+      'secret-l': { status: 500 }, // Likod down
+      'secret-s': [[receipt('2026-10-03T04:00:00Z', [['Pan Fry Pork Steak Special', 4]])]],
+    }),
+  });
+  assert.strictEqual(r.accounts[1].ok, false);    // Likod failed
+  assert.strictEqual(row(r, 'D003').likod, null); // Likod doesn't sell D003 ('') -> null column
+  assert.strictEqual(row(r, 'D003').total, 4);    // exact: only Silingan sells it, Silingan is up
+});
+
+test('total is null only when every account that sells the dish failed - both down', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: {}, // both tokens missing
+    fetchImpl: stubFetch({}),
+  });
+  assert.strictEqual(r.accounts[0].ok, false);
+  assert.strictEqual(r.accounts[1].ok, false);
+  assert.ok(r.dishes.every(d => d.total === null), 'every total is null when all sellers failed');
+});
+
+test('a one-account dish is null when that account is down; a two-account dish keeps the survivor', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: { TOK_L: 'secret-l' }, // Silingan token missing
+    fetchImpl: stubFetch({ 'secret-l': [[receipt('2026-10-03T04:00:00Z', [['Meatball  pasta', 5]])]] }),
+  });
+  assert.strictEqual(r.accounts[0].ok, false);  // Silingan failed
+  assert.strictEqual(row(r, 'D003').total, null); // D003 is Silingan-only -> its only seller failed
+  assert.strictEqual(row(r, 'D001').total, 5);    // D001 sold by both -> surviving Likod = 5
+});
+
 // --- diagnostics / id evidence ---
 
 test('REFUND receipts are counted (GAS behaviour) and reported in receiptTypes', async () => {
