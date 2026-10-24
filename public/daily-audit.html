@@ -71,6 +71,8 @@
     </div>
   </div>
 
+  <div id="draft-notice" class="status-message" hidden></div>
+
   <div id="grid-container">Loading...</div>
 
   <div class="save-bar">
@@ -78,6 +80,7 @@
     <span id="status" class="status-message"></span>
   </div>
 
+  <script src="draft-store.js"></script>
   <script src="month-opening.js"></script>
   <script>
     const restaurantSelect = document.getElementById('restaurant');
@@ -159,7 +162,7 @@
           <td class="calculated ending-calc">${fmt(r.endingCalculated)}</td>
           <td><input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0"${blocked ? ' disabled' : ''}></td>
           <td class="calculated over-short">${fmt(r.unexplainedVariance)}${overShortTags(r)}</td>
-          <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""></td>
+          <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""${blocked ? ' disabled' : ''}></td>
           <td class="row-status status-${r.status}">${statusText}</td>
         </tr>
       `;
@@ -230,7 +233,7 @@
             <span class="variance-chip status-${r.status}">${chip}</span>${overShortTags(r)}
           </div>
           <label class="card-field stacked">Remarks
-            <input type="text" class="remarks" value="${r.remarks || ''}" placeholder="">
+            <input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""${blocked ? ' disabled' : ''}>
           </label>
         </div>
       `;
@@ -437,6 +440,10 @@
       gridContainer.querySelectorAll(`${itemSelector} .${field}`).forEach(el => {
         if (el !== e.target) el.value = e.target.value;
       });
+      if (gridDraftKey) {
+        const id = isMeat ? holder.dataset.meatId : holder.dataset.dishId;
+        DraftStore.set(gridDraftKey, `${isMeat ? 'meat' : 'dish'}:${id}:${field}`, e.target.value);
+      }
       if (field === 'remarks') return;
       const tr = gridContainer.querySelector(`tr${itemSelector}`);
       if (!tr) return;
@@ -476,6 +483,7 @@
       if (!restaurantId || !date) return;
 
       gridContainer.innerHTML = 'Loading...';
+      draftNotice.hidden = true;
       const res = await fetch(`/api/daily-audit/mixed?restaurant_id=${restaurantId}&date=${date}`);
       const rows = await res.json();
 
@@ -500,7 +508,49 @@
           <tbody>${tableRows}</tbody>
         </table>
       `;
+      gridDraftKey = DraftStore.key('daily-audit', restaurantId, date);
+      restoreDraft();
     }
+
+    // Step count-drafts: unsaved entries (public/draft-store.js) for the grid
+    // on screen, per restaurant + date. Filled back in after every render,
+    // tagged, and cleared only once Save Day fully succeeds.
+    const draftNotice = document.getElementById('draft-notice');
+    let gridDraftKey = null;
+
+    function restoreDraft() {
+      draftNotice.hidden = true;
+      const draft = DraftStore.load(gridDraftKey);
+      if (!draft) return;
+      let restored = 0;
+      for (const [fieldKey, value] of Object.entries(draft.fields)) {
+        const [kind, id, field] = fieldKey.split(':');
+        if (!/^\d+$/.test(id) || !MIRRORED_FIELDS.includes(field) || (kind !== 'meat' && kind !== 'dish')) continue;
+        const itemSelector = `[data-${kind}-id="${id}"]`;
+        const inputs = Array.from(gridContainer.querySelectorAll(`${itemSelector} .${field}`));
+        // count-drafts (Decisions 2026-10-22, Q3 Reading B): skip the WHOLE
+        // blocked row, remarks included. Every input on a month-blocked row is
+        // disabled (ending always; remarks too since C4), so a disabled input
+        // on any view skips this field - ending and remarks alike.
+        if (inputs.length === 0 || inputs.some(el => el.disabled) || inputs[0].value === value) continue;
+        inputs.forEach(el => {
+          el.value = value;
+          el.insertAdjacentHTML('beforebegin', '<span class="carry-tag draft-tag">(unsaved)</span> ');
+        });
+        const tr = gridContainer.querySelector(`tr${itemSelector}`);
+        if (tr && field !== 'remarks') (kind === 'meat' ? recalcMeatRow : recalcDishRow)(tr);
+        restored++;
+      }
+      if (restored === 0) return;
+      draftNotice.innerHTML = `${DraftStore.restoredText(restored, draft.savedAt)} <button type="button" id="draft-discard">Discard</button>`;
+      draftNotice.hidden = false;
+    }
+
+    draftNotice.addEventListener('click', (e) => {
+      if (e.target.id !== 'draft-discard') return;
+      DraftStore.clear(gridDraftKey);
+      loadGrid(); // back to the server's values
+    });
 
     // Unchanged from before this step: only meat rows carry
     // data-meat-id, so this naturally skips dish rows - nothing to save
@@ -508,6 +558,7 @@
     async function save() {
       const restaurantId = Number(restaurantSelect.value);
       const date = dateInput.value;
+      const saveDraftKey = gridDraftKey;
       const trs = gridContainer.querySelectorAll('tr[data-meat-id]');
 
       const rows = Array.from(trs).map(tr => ({
@@ -552,10 +603,34 @@
 
         // Step 26a-ii: the server refuses an ending for a meat whose month
         // has no opening yet, and says which - named here so it's not lost.
-        const refusedNames = (result.refused || []).map(id => {
+        const refusedIds = (result.refused || []).map(String);
+        const refusedNames = refusedIds.map(id => {
           const tr = gridContainer.querySelector(`tr[data-meat-id="${id}"]`);
           return tr ? tr.cells[0].textContent.trim() : `meat ${id}`;
         });
+
+        // count-drafts (Decisions 2026-10-22, Q1 Reading C): both POSTs
+        // returned ok, but a refused count was never saved, so it must not be
+        // thrown away. Drop the drafted fields of every row that saved and
+        // keep only the refused meats'. A refused row is month-blocked, so its
+        // kept value stays hidden (blocked inputs are never filled) and comes
+        // back once that meat's month opening exists; the 3-day expiry cleans
+        // up the rest. No refusals -> the whole draft is safe to drop.
+        if (refusedIds.length === 0) {
+          DraftStore.clear(saveDraftKey);
+        } else {
+          const draft = DraftStore.load(saveDraftKey);
+          if (draft) {
+            const keep = new Set(refusedIds.map(id => `meat:${id}`));
+            DraftStore.removeFields(
+              saveDraftKey,
+              Object.keys(draft.fields).filter(fk => {
+                const [kind, id] = fk.split(':');
+                return !keep.has(`${kind}:${id}`);
+              })
+            );
+          }
+        }
 
         statusEl.textContent = `Saved. Reloading...`;
         statusEl.className = 'status-message success';
@@ -577,7 +652,8 @@
       ledger: 'restaurant',
       getOwnerId: () => restaurantSelect.value,
       getDate: () => dateInput.value,
-      onChange: loadGrid
+      onChange: loadGrid,
+      draftPage: 'daily-audit-month-opening'
     });
 
     function loadAll() {
