@@ -78,6 +78,7 @@ validate memberships. Depends on users-roles + user-sites. DECIDED 2026-09-28: r
 click-through. Full spec: session-status.md -> "Step import-identity".
 
 ### 3k. Step stub-login - pick-your-name login + currentUser middleware  [runnable]
+**CLOSED 2026-10-25, PR #33 (`ee0801f`).**
 Touches: public/login.html, server/routes/auth.js, server/index.js
 Phase-1 identity, no passwords: pick-your-name -> cookie -> req.user with capability flags. No
 enforcement yet. LEAN: plain cookie, no new dep (flag). Needs users present (import-identity or a

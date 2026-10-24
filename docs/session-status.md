@@ -1646,6 +1646,7 @@ entry from scripts/write-path-allowlist.json (added by user-sites). Touches gain
 scripts/write-path-allowlist.json. The write-path audit must stay clean without that entry.
 
 ## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
+**CLOSED 2026-10-25, PR #33 (`ee0801f`).**
 
 Multi-user slice 4a. Identity WITHOUT passwords (phase 1). No enforcement here - just "who am I."
 DEPENDS ON users-roles (tables) and users being present (import-identity, or a dev seed).
