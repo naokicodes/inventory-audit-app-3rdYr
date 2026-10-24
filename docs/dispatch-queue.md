@@ -123,6 +123,7 @@ users-roles, 24d-iii and autopilot 3n-3q. Full spec: session-status.md -> "Step 
 **2026-10-13:** #27 decided (Reading B - see the spec); PR #28 sent back (request changes) to implement it.
 
 ### 3s. Step loyverse-preview-ii - Kitchen Sales page (temporary)  [blocked: loyverse-preview-i]
+**CLOSED 2026-10-25, PR #37 (`54a28ec`).**
 Touches: public/kitchen-sales.html, public/index.html, public/style.css
 Dish | Likod | Silingan | Total, an unmatched list, Copy as text with a LAN-safe fallback; a
 failed account shows "-", never 0. Linked from Home only. Overlaps 24d-iii on style.css ->

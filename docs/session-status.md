@@ -2001,6 +2001,7 @@ server/routes/loyverse.js (new), server/routes/loyverse.test.js (new), server/in
 24d-iii and the autopilot steps 3n-3q.
 
 ## Step loyverse-preview-ii - the Kitchen Sales page (temporary)
+**CLOSED 2026-10-25, PR #37 (`54a28ec`).**
 
 The page for loyverse-preview-i. Depends on it. PUBLIC -> live click-through (390px) before merge.
 
