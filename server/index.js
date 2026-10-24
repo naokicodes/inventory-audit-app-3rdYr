@@ -25,12 +25,16 @@ const salesRoutes = require('./routes/sales.js');
 const allocationsRoutes = require('./routes/allocations.js');
 const dashboardRoutes = require('./routes/dashboard.js');
 const loyverseRoutes = require('./routes/loyverse.js');
+const authRoutes = require('./routes/auth.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
+// Step stub-login: every /api request gets req.user (null if not logged in).
+app.use('/api', authRoutes.currentUser);
+app.use('/api', authRoutes);
 app.use('/api', dailyAuditRoutes);
 app.use('/api', settingsRoutes);
 app.use('/api', stockReceiptsRoutes);
