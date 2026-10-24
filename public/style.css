@@ -381,6 +381,12 @@ nav a:hover {
   color: var(--ink3);
 }
 
+/* A "-" cell (failed account or null total) stays at normal ink even in a
+   muted zero row - a failure must never look greyed out like a zero. */
+.ks-zero td.ks-dash {
+  color: var(--ink);
+}
+
 th.num,
 td.num {
   text-align: right;

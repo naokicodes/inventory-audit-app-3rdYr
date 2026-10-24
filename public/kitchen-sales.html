@@ -97,6 +97,13 @@
       return v === null || v === undefined ? '-' : String(v);
     }
 
+    // A numeric table cell. A "-" (failed account or null total) keeps normal
+    // ink even inside a muted zero row - a failure must never read as a zero.
+    function numCell(v) {
+      const dash = v === null || v === undefined;
+      return `<td class="num${dash ? ' ks-dash' : ''}">${dash ? '-' : esc(String(v))}</td>`;
+    }
+
     function failedAccounts(data) {
       return data.accounts.filter(a => !a.ok);
     }
@@ -116,8 +123,8 @@
       document.querySelector('#sales-table tbody').innerHTML = data.dishes.map(d => {
         const zero = d.total === 0;
         return `<tr${zero ? ' class="ks-zero"' : ''}><td>${esc(d.name)}</td>` +
-          COLUMNS.map(c => `<td class="num">${show(d[c.key])}</td>`).join('') +
-          `<td class="num">${show(d.total)}</td></tr>`;
+          COLUMNS.map(c => numCell(d[c.key])).join('') +
+          numCell(d.total) + `</tr>`;
       }).join('');
 
       document.getElementById('account-status').innerHTML = data.accounts.map(a => {
@@ -166,7 +173,10 @@
       data.dishes.filter(d => d.total !== null && d.total > 0).forEach(d => {
         lines.push(`${d.name} - ${COLUMNS.map(c => `${c.label} ${show(d[c.key])}`).join(', ')}, Total ${d.total}`);
       });
-      if (data.unmatched.length > 0) lines.push(`Unmatched: ${data.unmatched.length} items (see app)`);
+      if (data.unmatched.length > 0) {
+        const n = data.unmatched.length;
+        lines.push(`Unmatched: ${n} item${n === 1 ? '' : 's'} (see app)`);
+      }
       failedAccounts(data).forEach(a => lines.push(failureLine(a)));
       return lines.join('\n');
     }
