@@ -30,9 +30,15 @@ const userId = (name, role, active = 1) => Number(db.prepare(
 
 const checker = roleId('checker', [1, 0, 0, 0]);
 const admin = roleId('admin', [1, 1, 1, 0]);
+// A role switched off: active = 0. Every flag is 1, so the test proves the
+// deactivation zeroes them rather than the flags being 0 to begin with.
+const retired = Number(db.prepare(
+  'INSERT INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only, active) VALUES (?, 1, 1, 1, 1, 0)'
+).run('retired').lastInsertRowid);
 const ana = userId('Ana', checker);
 const ben = userId('Ben', admin);
 const gone = userId('Gone', checker, 0);
+const cass = userId('Cass', retired);
 
 const app = express();
 app.use(express.json());
@@ -56,7 +62,7 @@ test('cookieUserId: picks user_id out of a header, ignores junk', () => {
 
 test('GET /auth/users lists active users only, by name', async () => {
   const body = await (await call('GET', '/api/auth/users')).json();
-  assert.deepStrictEqual(body, [{ id: ana, name: 'Ana' }, { id: ben, name: 'Ben' }]);
+  assert.deepStrictEqual(body, [{ id: ana, name: 'Ana' }, { id: ben, name: 'Ben' }, { id: cass, name: 'Cass' }]);
 });
 
 test('login sets the user_id cookie', async () => {
@@ -79,6 +85,16 @@ test('currentUser attaches the role capability flags', async () => {
   const b = (await (await call('GET', '/api/auth/me', { cookie: `user_id=${ben}` })).json()).user;
   assert.strictEqual(b.role, 'admin');
   assert.strictEqual(b.can_admin, 1);
+});
+
+test('currentUser: a deactivated role identifies the user but grants nothing', async () => {
+  // Q3 (2026-10-22): a role with active = 0 grants NOTHING. The user is still
+  // identified (id and name), but every capability flag reads 0.
+  const c = (await (await call('GET', '/api/auth/me', { cookie: `user_id=${cass}` })).json()).user;
+  assert.deepStrictEqual(c, {
+    id: cass, name: 'Cass', role: 'retired',
+    can_enter_counts: 0, can_finalize: 0, can_admin: 0, read_only: 0,
+  });
 });
 
 test('currentUser: no cookie, or an inactive user -> null', async () => {

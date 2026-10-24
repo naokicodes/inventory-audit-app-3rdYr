@@ -24,14 +24,27 @@ function cookieUserId(header) {
   return null;
 }
 
-// An active user with its role's capability flags, or null.
+// An active user with its role's capability flags, or null. A deactivated
+// role (active = 0) still identifies the user - id and name, so authorship
+// works - but grants nothing: every capability flag reads 0 (Q3, 2026-10-22).
 function loadUser(id) {
-  return db.prepare(`
-    SELECT u.id, u.name, r.name AS role,
+  const row = db.prepare(`
+    SELECT u.id, u.name, r.name AS role, r.active AS role_active,
            r.can_enter_counts, r.can_finalize, r.can_admin, r.read_only
       FROM users u JOIN roles r ON r.id = u.default_role_id
      WHERE u.id = ? AND u.active = 1
-  `).get(id) || null;
+  `).get(id);
+  if (!row) return null;
+  const live = row.role_active === 1;
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    can_enter_counts: live ? row.can_enter_counts : 0,
+    can_finalize: live ? row.can_finalize : 0,
+    can_admin: live ? row.can_admin : 0,
+    read_only: live ? row.read_only : 0,
+  };
 }
 
 // Middleware: attaches req.user. No cookie, or a stale/inactive id -> null.
