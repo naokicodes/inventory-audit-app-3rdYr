@@ -14,7 +14,8 @@
   posted as a comment, never an approval. It does not count toward -MaxSteps.
 
   Before any work: an open issue labelled autopilot-pause (by -Owner) makes the
-  run exit at once, and .run-queue-logs/run.lock stops two runs overlapping.
+  run exit at once, and a named OS mutex stops two runs overlapping
+  (.run-queue-logs/run.lock only records the holder's PID and start time).
   At the end, one comment summarising the run goes to issue -LogIssue.
 
   Nothing here can merge: gh pr merge / approve, pushes to main and force-pushes
@@ -89,6 +90,14 @@ function Invoke-Gh([string[]]$GhArgs) {
   }
 }
 
+# The public form of a RESULT: its kind plus at most one #<digits>, never the
+# model's free text (a STOPPED reason can carry a path). Log keeps the full line.
+function Get-PublicResult([string]$Kind, [string]$Rest) {
+  $line = "RESULT: $Kind"
+  if ($Rest -match '#\d+') { $line += " $($Matches[0])" }
+  return $line
+}
+
 # ---- Pause switch: an open autopilot-pause issue by the owner stops the run. ----
 # A missing label or a gh failure counts as NOT paused.
 $pause = Invoke-Gh @('issue', 'list', '--state', 'open', '--label', 'autopilot-pause', '--author', $Owner, '--json', 'number')
@@ -107,46 +116,24 @@ if ($pause.Code -ne 0) {
   }
 }
 
-# ---- Single-instance lock. ----
-function New-RunLock {
-  # CreateNew fails if the file exists - that is the lock.
-  $fs = [IO.File]::Open($lockPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-  try {
-    $bytes = $utf8.GetBytes("$PID`n$((Get-Date).ToString('o'))`n")
-    $fs.Write($bytes, 0, $bytes.Length)
-  } finally {
-    $fs.Close()
-  }
-}
-
+# ---- Single-instance lock: a named OS mutex, held for the whole run. ----
+# The OS frees it when the holder dies, so there is no stale state to judge and
+# two runners can never both win. run.lock is only an informational PID + time file.
+$runMutex = New-Object System.Threading.Mutex($false, 'Global\inventory-audit-run-queue')
+$haveMutex = $false
 try {
-  New-RunLock
-} catch {
-  if (-not (Test-Path $lockPath)) { throw }
-  $holderPid = 0
-  $lockedAt = $null
-  try {
-    $lines = [IO.File]::ReadAllText($lockPath) -split "`n"
-    if ($lines[0].Trim() -match '^\d+$') { $holderPid = [int]$lines[0].Trim() }
-    if ($lines.Count -gt 1 -and $lines[1].Trim()) { $lockedAt = [DateTime]::Parse($lines[1].Trim()) }
-  } catch {}
-  $alive = $false
-  if ($holderPid -gt 0) {
-    $p = Get-Process -Id $holderPid -ErrorAction SilentlyContinue
-    if ($p) {
-      $alive = $true
-      # A process that started after the lock was written is a reused PID, not the holder.
-      try { if ($lockedAt -and $p.StartTime -gt $lockedAt.AddSeconds(5)) { $alive = $false } } catch {}
-    }
-  }
-  if ($alive) {
-    Log "Another run is active (PID $holderPid) - exiting."
-    exit 0
-  }
-  Log "Stale lock (PID $holderPid not running, or the lock was unreadable) - replacing it."
-  Remove-Item $lockPath -Force
-  New-RunLock
+  $haveMutex = $runMutex.WaitOne(0)
+} catch [System.Threading.AbandonedMutexException] {
+  # The last holder died without releasing it; we own it now.
+  $haveMutex = $true
+  Log 'The previous run ended without releasing the lock - taking it over.'
 }
+if (-not $haveMutex) {
+  Log 'Another run is active - exiting.'
+  $runMutex.Dispose()
+  exit 0
+}
+[IO.File]::WriteAllText($lockPath, "$PID`n$((Get-Date).ToString('o'))`n", $utf8)
 
 # ---- Everything after the lock: the finally block always releases it. ----
 $startedAt = Get-Date
@@ -223,7 +210,7 @@ try {
     $kind = $r.Kind
     $resultLine = "RESULT: $kind $($r.Rest)".Trim() + $r.Cost
     Log "[$i] $resultLine"
-    $runLines.Add("Step $i - $resultLine")
+    $runLines.Add("Step $i - $(Get-PublicResult $kind $r.Rest)")
 
     if ($kind -eq 'NOTHING' -or $kind -eq 'STOPPED') { break }
     if (@('BUILT', 'FIXED', 'ISSUE') -notcontains $kind) {
@@ -258,7 +245,7 @@ try {
       } else {
         $reviewLine = "RESULT: $($rv.Kind) $($rv.Rest)".Trim() + $rv.Cost
         Log "[$i] review draft $reviewLine"
-        $runLines.Add("Review draft #$prNumber - $reviewLine")
+        $runLines.Add("Review draft #$prNumber - $(Get-PublicResult $rv.Kind $rv.Rest)")
       }
     }
   }
@@ -307,6 +294,8 @@ try {
     Log "Could not write the run log: $($_.Exception.Message)"
   } finally {
     Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
+    $runMutex.ReleaseMutex()
+    $runMutex.Dispose()
   }
 }
 
