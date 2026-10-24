@@ -8,6 +8,7 @@
     "reseed": "node server/db/seed.js --reset",
     "test":"node scripts/run-tests.js",
     "audit:write-paths": "node scripts/audit-write-paths.js",
+    "loyverse:matches": "node scripts/loyverse-matches.js",
     "verify": "node scripts/run-tests.js && node scripts/audit-write-paths.js"
   },
   "engines": {
