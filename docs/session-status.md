@@ -2040,6 +2040,7 @@ style.css -> sequence. PUBLIC -> click-through before merge.
   "1 item" / "2 items", "1 receipt" / "2 receipts", "1 refund" / "0 refunds".
 
 ## Step loyverse-preview-iii - wildcard-match report (terminal, you-only)
+**CLOSED 2026-10-24, PR #39 (`2820773`).**
 
 The debug tool `loyverse-sync.md` asks for ("dry-run sync" / "search items across a date"), kept
 out of the daily UI on purpose. Decided 2026-10-03. Depends on loyverse-preview-i. Its job: show
@@ -2178,6 +2179,7 @@ current queue (no Touches overlap).
   restored.
 
 ## Step autopilot-hardening - close the runner review findings before the doorbell
+**CLOSED 2026-10-24, PR #40 (`86ba732`).**
 
 Decided 2026-10-13 (architect review of PRs #25 and #26, cubic findings). AUTOPILOT family; inert
 until install like the rest of it. Windows PowerShell 5.1, no modules, no npm dependency. Five
