@@ -162,7 +162,7 @@
           <td class="calculated ending-calc">${fmt(r.endingCalculated)}</td>
           <td><input type="number" step="0.01" class="ending_actual" value="${r.actual ?? ''}" placeholder="0"${blocked ? ' disabled' : ''}></td>
           <td class="calculated over-short">${fmt(r.unexplainedVariance)}${overShortTags(r)}</td>
-          <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""></td>
+          <td><input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""${blocked ? ' disabled' : ''}></td>
           <td class="row-status status-${r.status}">${statusText}</td>
         </tr>
       `;
@@ -233,7 +233,7 @@
             <span class="variance-chip status-${r.status}">${chip}</span>${overShortTags(r)}
           </div>
           <label class="card-field stacked">Remarks
-            <input type="text" class="remarks" value="${r.remarks || ''}" placeholder="">
+            <input type="text" class="remarks" value="${r.remarks || ''}" placeholder=""${blocked ? ' disabled' : ''}>
           </label>
         </div>
       `;
@@ -528,7 +528,10 @@
         if (!/^\d+$/.test(id) || !MIRRORED_FIELDS.includes(field) || (kind !== 'meat' && kind !== 'dish')) continue;
         const itemSelector = `[data-${kind}-id="${id}"]`;
         const inputs = Array.from(gridContainer.querySelectorAll(`${itemSelector} .${field}`));
-        // A month-blocked row's input is disabled - never filled.
+        // count-drafts (Decisions 2026-10-22, Q3 Reading B): skip the WHOLE
+        // blocked row, remarks included. Every input on a month-blocked row is
+        // disabled (ending always; remarks too since C4), so a disabled input
+        // on any view skips this field - ending and remarks alike.
         if (inputs.length === 0 || inputs.some(el => el.disabled) || inputs[0].value === value) continue;
         inputs.forEach(el => {
           el.value = value;
@@ -598,16 +601,36 @@
           portionsSaved = portionsResult.saved;
         }
 
-        // Both POSTs ok - only now is the draft safe to drop. Any failure
-        // above throws first and keeps it.
-        DraftStore.clear(saveDraftKey);
-
         // Step 26a-ii: the server refuses an ending for a meat whose month
         // has no opening yet, and says which - named here so it's not lost.
-        const refusedNames = (result.refused || []).map(id => {
+        const refusedIds = (result.refused || []).map(String);
+        const refusedNames = refusedIds.map(id => {
           const tr = gridContainer.querySelector(`tr[data-meat-id="${id}"]`);
           return tr ? tr.cells[0].textContent.trim() : `meat ${id}`;
         });
+
+        // count-drafts (Decisions 2026-10-22, Q1 Reading C): both POSTs
+        // returned ok, but a refused count was never saved, so it must not be
+        // thrown away. Drop the drafted fields of every row that saved and
+        // keep only the refused meats'. A refused row is month-blocked, so its
+        // kept value stays hidden (blocked inputs are never filled) and comes
+        // back once that meat's month opening exists; the 3-day expiry cleans
+        // up the rest. No refusals -> the whole draft is safe to drop.
+        if (refusedIds.length === 0) {
+          DraftStore.clear(saveDraftKey);
+        } else {
+          const draft = DraftStore.load(saveDraftKey);
+          if (draft) {
+            const keep = new Set(refusedIds.map(id => `meat:${id}`));
+            DraftStore.removeFields(
+              saveDraftKey,
+              Object.keys(draft.fields).filter(fk => {
+                const [kind, id] = fk.split(':');
+                return !keep.has(`${kind}:${id}`);
+              })
+            );
+          }
+        }
 
         statusEl.textContent = `Saved. Reloading...`;
         statusEl.className = 'status-message success';
