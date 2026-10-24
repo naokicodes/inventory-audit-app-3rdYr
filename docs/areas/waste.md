@@ -8,9 +8,12 @@ Status: IRL Told - FLOW None - APP Decided (separate entries)
 - Sources: chat 2026-10-25. The waste paper has not been seen yet.
 
 ## APP
-- Decided (handoff 38): waste is its own entry (what, how much, why, who); the
-  sheets show WASTE (and COOKED / INHOUSE) computed from their own entries.
-- Not specced.
+- Meat: Built. Waste is already an adjustment in the daily audit, with the
+  seeded types Wastage, Spoilage and Damaged (admin can add more).
+- Side items: Decided (handoff 38) - the same adjustment idea extended to side
+  items; the sheets show WASTE (and COOKED / INHOUSE) from those entries.
+  Not specced.
+- During testing Naoki enters most waste himself.
 
 ## Open questions
 - Who writes waste today, when, and where the paper goes.

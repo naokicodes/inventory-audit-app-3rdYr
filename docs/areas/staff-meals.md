@@ -31,11 +31,12 @@ Status: IRL Confirmed - FLOW Drafted - APP Decided
 - Decided: ADR-003 (quantities, never prices; pesos computed); inhouse column
   on the side sheet unused (13); in-house summary (18); budget from official
   head count, OJT separate, meat in grams (32); budget figure kept as the
-  maximum reference until the rule is confirmed (40).
+  maximum reference until the rule is confirmed (40); cooking gas stays out of
+  staff-meal cost - it is an operating expense (52).
 - Not specced. Queue item A10.
 
 ## Open questions
 - Budget rule: keep the paper's figure as the maximum reference for now (see
   private notes). It may be a whole-day budget; Naoki is asking.
-- Is cooking gas part of the meal cost in the app?
-- How a staff order is recognised in Loyverse.
+- Which Loyverse field carries the staff member's name on a staff order
+  (customer or note)? Staff orders are recognised by the staff name (53).

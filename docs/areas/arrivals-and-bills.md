@@ -28,5 +28,5 @@ Status: IRL Written - FLOW Drafted - APP Decided
   (9); unplanned buys (28); receivers assigned via roster (29).
 - Not specced. Queue item A9.
 
-## Open questions
-- Buyer-run receipts (many shops per day): one bill per receipt, or per run?
+- Decided (handoff 57): one bill per receipt; a buyer's receipts for the day
+  are grouped under that day's run.

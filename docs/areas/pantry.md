@@ -13,6 +13,8 @@ Sheet "Inventory Pantry" (Silingan) / "Inventory Form Kitchen - PANTRY" (FC)
 - Units: gal, pack, pcs, tube, bottle, can, container, box, kg, tie; fractions
   down to eighths ("1 1/8 pack", "3/4 container"); "OS" = out of stock.
 - PO remarks carry urgency and brand ("ASAP, add tomorrow").
+- Likod: same as veggies - a copy of Silingan's list, closed until its kitchen
+  opens.
 - Counted exactly (unlike veggies). Podium keeps a logbook for pantry arrivals.
 - Pizza stations keep small working stocks of some pantry items (pizza.md).
 

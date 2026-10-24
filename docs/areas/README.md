@@ -23,7 +23,7 @@ money details live in the private notes (Claude project files), never here.
 3. A paper-sheet photo is sent once; its structure is copied into the IRL
    section, which then stands in for the photo.
 
-## Map (2026-10-25)
+## Map (2026-10-25, round 2)
 
 | # | Area | IRL | FLOW | APP |
 |---|---|---|---|---|
@@ -31,7 +31,7 @@ money details live in the private notes (Claude project files), never here.
 | 2 | [Meat landing (Silingan, FC)](meat-landing.md) | Confirmed | Drafted | Built; endings-only + blind count Decided |
 | 3 | [Kitchen veggies](veggies.md) | Confirmed (Silingan, FC) | Drafted | Decided |
 | 4 | [Pantry](pantry.md) | Confirmed (Silingan, FC) | Drafted | Decided |
-| 5 | [Bar](bar.md) | Confirmed (all three) | None | Decided; sales check Decided |
+| 5 | [Bar](bar.md) | Confirmed (all three) | None | Decided; exact sales check for bottles, cans, desserts |
 | 6 | [Roster](roster.md) | Written | Drafted | Decided |
 | 7 | [Supplier orders and buying](supplier-orders.md) | Written | Drafted | Decided |
 | 8 | [Arrivals and bills](arrivals-and-bills.md) | Written | Drafted | Decided |
@@ -45,7 +45,7 @@ money details live in the private notes (Claude project files), never here.
 | 16 | [Sales (Loyverse)](sales.md) | Confirmed | None | Built (Kitchen Sales preview) |
 | 17 | [Management view](management-view.md) | Written | Drafted | Partly built |
 | 18 | [Money and operating expenses](money.md) | Unknown | None | None |
-| 19 | [Waste](waste.md) | Told | None | Decided (separate entries) |
+| 19 | [Waste](waste.md) | Told | None | Meat: Built (adjustment types); sides: Decided |
 
 Gaps to read off the map: IRL Confirmed + APP None is safe backlog (pizza,
 Likod grill). APP ahead of IRL is a warning. IRL Told is knowledge that lives

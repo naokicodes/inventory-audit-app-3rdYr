@@ -33,5 +33,6 @@ Status: IRL Written - FLOW Drafted - APP Decided
   (23); a specific supervisor can be blocked from editing (23).
 - Not specced. Queue item A6.
 
-## Open questions
-- Does a lent person (Silingan to Likod for a day) appear on both rosters?
+- Decided (handoff 55): a person lent to another restaurant for the day (any of
+  the three, FC included) appears on both rosters - "lent out" at home,
+  "working" where they go - and counts in the head count only where they work.

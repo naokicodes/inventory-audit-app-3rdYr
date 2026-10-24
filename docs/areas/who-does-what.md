@@ -34,6 +34,10 @@ Status: IRL Written - FLOW Drafted - APP Decided (pick-your-name login Built, PR
 - Not specced: staff table, tonight's assignments (sheet owner, sheets tier 2),
   supervisor role, login list from roster. Queue item A6.
 
+- Decided (handoff 45, 54): an admin can close a sheet ("under maintenance"):
+  it cannot be assigned, nobody counts it, it never shows as missing, and its
+  history stays. If an assigned counter is absent, the landing person or a
+  supervisor reassigns, any time before the count closes.
+
 ## Open questions
-- If an assigned counter is absent, who reassigns, and how late may it happen?
 - PINs for staff before Live (decide later).

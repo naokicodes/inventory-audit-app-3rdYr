@@ -21,6 +21,8 @@ Sheet "Inventory Form Kitchen - VEG/SPICES" at Silingan and FC (source: photos
 - Units are mixed, even within one row: kg, g, pcs, half pieces, tray, stalk,
   pack, tie, tub, sipi (a hand of bananas), and peso value at Silingan for some
   herbs (tanglad; FC counts it in grams). "OS" or "-" = out of stock.
+- Likod has no veggie sheet yet; its kitchen opens roughly before the new year.
+  Its sheet starts as a copy of Silingan's list and stays closed until then.
 - Veggies are eyeballed at count time. On arrival the kitchen only confirms
   the veggies are there; the buyer already weighed them.
 

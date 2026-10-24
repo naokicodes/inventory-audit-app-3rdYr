@@ -32,12 +32,11 @@ empty.
 - The roster's bar person counts; with two, either one.
 
 ## APP
-- Decided (handoff 36): drinks sold as-is and dessert slices get a sales check
-  like meat (expected from Loyverse sales vs counted), so staff do less by
-  hand. Raw bar items stay side-sheet style.
+- Decided (handoff 36, 42): bottles, cans and desserts get an exact sales check
+  (expected from Loyverse sales vs counted). Bar is NOT blind: the bar counter
+  sees expected and variance. Raw bar items stay side-sheet style for now.
 - Desserts need a conversion (slices per whole).
 - Not specced. Queue item A8.
 
 ## Open questions
-- Bar items now have a variance: should bar counters be blind too, like meat?
-- What Likod's OUT column records (transfers to Silingan?).
+- What Likod's OUT column records (unclear even to Naoki; low priority).

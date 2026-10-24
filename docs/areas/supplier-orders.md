@@ -35,5 +35,5 @@ Status: IRL Written - FLOW Drafted - APP Decided
   against items (28); internal commi requests are not supplier orders (30).
 - Not specced. Queue item A9.
 
-## Open questions
-- Who maintains the item-to-supplier / item-to-buyer tags?
+- Decided (handoff 56): an admin sets each item's "how it is bought" tag in
+  Settings; the landing person can suggest a change.

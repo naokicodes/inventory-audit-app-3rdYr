@@ -30,19 +30,25 @@ Both:
   paper.
 - Flour used vs dough made gives a natural standard (about 220-250 g of flour
   per ball on the two Silingan days).
-- Pizza sells on Loyverse as separate dishes; at the shared station both
-  restaurants' sales take from the same dough and mozzarella.
+- Pizza is rung on both restaurants' Loyverse accounts (like the Silingan
+  kitchen for now); at the shared station both take from the same dough and
+  mozzarella. Dough is what matters most.
+- Two bases: mozzarella and cream cheese. Each pizza type uses one; the
+  mozzarella standard per pizza differs between the shared station and FC.
 
 ## APP
-- Decided (handoff 37): dough is counted in balls; new dough is entered in
-  containers of 12.
-- Proposed (chat 2026-10-24): an item may be counted on more than one sheet
-  (pantry + pizza) and the ending is the sum; dough and mozzarella get a set
-  amount per pizza and a variance, like meat. Queue item A11.
+- Decided (handoff 37, 51):
+  - Dough is counted in balls; making dough is logged as containers of 12,
+    with a set amount of flour per container (gives the flour check).
+  - Dough and mozzarella get a set amount per pizza and a variance, like meat;
+    mozzarella standard per pizza type, per station.
+  - Old dough (French loaf, pita) and boxes to FC are adjustments
+    (conversion, transfer), like meat.
+  - Items shared with the pantry are counted on both sheets and summed.
+  - Pizza is the last side sheet to build. First, a skeleton: the pizzaman
+    sees pizzas sold (from Loyverse) on their sheet during testing.
+- Queue item A11.
 
 ## Open questions
-- Which restaurant owns the shared station's stock? Is pizza sold on both
-  accounts?
-- Mozzarella per pizza type.
-- How dough making is recorded (flour in, containers of dough out).
-- Old dough conversions (French loaf, pita) and boxes to FC: allocations?
+- Whose stock is the shared station's (Silingan's, like the kitchen, with
+  Likod's pizza sales counted against it)? Which pantry does it draw from?
