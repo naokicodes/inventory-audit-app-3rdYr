@@ -2125,6 +2125,7 @@ server/engines/sheetDefinitions.test.js (new). Server-only, no click-through, no
 Shares schema.sql + seed.js with users-roles and user-sites -> sequenced after them.
 
 ## Step count-drafts - keep unsaved count entries on the phone
+**CLOSED 2026-10-24, PR #31 (`7617088`).**
 
 Decided 2026-10-05 (inventory online-only, but a refresh must not lose a count pass). Browser
 only: the server is untouched and stays the record. A draft is never submitted by itself.

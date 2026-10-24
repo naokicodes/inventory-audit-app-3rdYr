@@ -145,6 +145,7 @@ click-through, no migration. Shares schema.sql + seed.js with 3h/3i -> sequenced
 Full spec: session-status.md -> "Step sheets-tier1".
 
 ### 3v. Step count-drafts - keep unsaved count entries on the phone  [runnable]
+**CLOSED 2026-10-24, PR #31 (`7617088`).**
 Touches: public/draft-store.js, public/daily-audit.html, public/month-opening.js
 Unsaved count entries on the daily audit (and the month-opening panel) are kept in localStorage
 per page + site + date, restored with an "unsaved" tag and a Discard button after a refresh,
