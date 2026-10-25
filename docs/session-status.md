@@ -1581,6 +1581,14 @@ Touches: server/db/schema.sql, server/db/siteAccess.js (+ test). Server-only, no
 no migration. Depends on users-roles; overlaps schema.sql with 24d-i + users-roles -> sequence,
 not concurrent.
 
+**Decisions 2026-10-22 (issue #36, Naoki).** These override any reading of the text above.
+- No writer in this step (Reading A). Add user_sites to scripts/write-path-allowlist.json with
+  the reason "import-identity writes memberships. DELETE THIS ENTRY when import-identity lands."
+  (same pattern as the existing commissary_stock_receipts entry). The step stays read-only as
+  specified; import-identity is the first writer, with its own warn-and-skip rule for unknown
+  site codes.
+- Touches gains: scripts/write-path-allowlist.json.
+
 ## Step import-identity - import-settings.js, identity slice (Roles, Users, memberships)
 
 Third slice of the multi-user surface (architect 2026-09-28). Decision A: a standalone
@@ -1633,7 +1641,12 @@ Touches: scripts/import-settings.js (new), server/db/seed.js (the bootstrap guar
 (an import:settings script), + a test. Shares seed.js with sheets-tier1 -> sequence. Depends on users-roles + user-sites. Server/scripts only,
 no click-through, no migration.
 
+**Added 2026-10-22 (issue #36).** This step writes user_sites, so it also DELETES the user_sites
+entry from scripts/write-path-allowlist.json (added by user-sites). Touches gains:
+scripts/write-path-allowlist.json. The write-path audit must stay clean without that entry.
+
 ## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
+**CLOSED 2026-10-25, PR #33 (`ee0801f`).**
 
 Multi-user slice 4a. Identity WITHOUT passwords (phase 1). No enforcement here - just "who am I."
 DEPENDS ON users-roles (tables) and users being present (import-identity, or a dev seed).
@@ -1654,6 +1667,23 @@ Tests: login sets the cookie; currentUser attaches the right capabilities; logou
 Touches: public/login.html (new), the shared nav, server/routes/auth.js (new) + the currentUser
 middleware, server/index.js (wire it) (+ tests). PUBLIC -> click-through before merge. Depends on
 users-roles.
+
+**Decisions 2026-10-22 (issue #34, Naoki).** These override any reading of the text above.
+- Who is listed (Q1, Reading A): every active user, all sites. Later (a future step, after the
+  roster exists): the list becomes tonight's rostered people, and someone with nothing assigned
+  sees "No work for you tonight". Not in this step.
+- Which role (Q2, Reading A): the user's default role. Per-site / per-shift roles are not
+  modelled.
+- An inactive role (Q3, Reading B): a role with active = 0 grants NOTHING. The user is still
+  identified (id and name, so authorship works), but every capability flag reads 0. Switching
+  something off must take power away. Add a test for it.
+- A user deactivated while logged in (Q4, Reading A): reads as logged out (null) on the next
+  request.
+- Where login lands (Q5, Reading A): Home, for now. If a "return to where you were" is ever
+  added, it may only send to a path on this same site (no open redirect).
+- Dashboard (Q6, Reading A): no indicator on the Dashboard in this step, and "Log in" shows
+  when logged out. The indicator comes with the grouped-navigation step, which touches every
+  page anyway.
 
 ## Step user-id-authorship - new writes carry user_id (slice 4b)
 
@@ -1971,6 +2001,7 @@ server/routes/loyverse.js (new), server/routes/loyverse.test.js (new), server/in
 24d-iii and the autopilot steps 3n-3q.
 
 ## Step loyverse-preview-ii - the Kitchen Sales page (temporary)
+**CLOSED 2026-10-25, PR #37 (`54a28ec`).**
 
 The page for loyverse-preview-i. Depends on it. PUBLIC -> live click-through (390px) before merge.
 
@@ -1996,7 +2027,22 @@ The page for loyverse-preview-i. Depends on it. PUBLIC -> live click-through (39
 Touches: public/kitchen-sales.html (new), public/index.html, public/style.css. Overlaps 24d-iii on
 style.css -> sequence. PUBLIC -> click-through before merge.
 
+**Decisions 2026-10-22 (issue #38, Naoki).** These override any reading of the text above.
+- "N receipts" (Q1, Reading A): receiptsKept - the chosen day's non-cancelled receipts.
+- Dish total while one account is down (Q2, Reading A): show it plainly. The line already shows
+  "-" for the failed account, and the failed-account warning ends the copied text. No new
+  page-side partial rule (#27 Reading B stands: any partial flag belongs in the engine).
+- "Unmatched: N items" (Q3, Reading A): N = distinct (account, item name) rows, the same rows
+  the unmatched list shows.
+- Muted zero rows (Q4, Reading B): in a muted zero row, a "-" cell stays un-muted (normal ink).
+  A failure must never look greyed out like a zero.
+- Failed-account status line (Q5, Reading A): "<Account>: could not be fetched". The banner
+  carries the error.
+- Wording (Q6): keep the Copy header "Kitchen Sales (Loyverse) - <date>". Pluralise correctly:
+  "1 item" / "2 items", "1 receipt" / "2 receipts", "1 refund" / "0 refunds".
+
 ## Step loyverse-preview-iii - wildcard-match report (terminal, you-only)
+**CLOSED 2026-10-24, PR #39 (`2820773`).**
 
 The debug tool `loyverse-sync.md` asks for ("dry-run sync" / "search items across a date"), kept
 out of the daily UI on purpose. Decided 2026-10-03. Depends on loyverse-preview-i. Its job: show
@@ -2081,6 +2127,7 @@ server/engines/sheetDefinitions.test.js (new). Server-only, no click-through, no
 Shares schema.sql + seed.js with users-roles and user-sites -> sequenced after them.
 
 ## Step count-drafts - keep unsaved count entries on the phone
+**CLOSED 2026-10-24, PR #31 (`7617088`).**
 
 Decided 2026-10-05 (inventory online-only, but a refresh must not lose a count pass). Browser
 only: the server is untouched and stays the record. A draft is never submitted by itself.
@@ -2113,7 +2160,29 @@ Touches: public/draft-store.js (new), public/daily-audit.html, public/month-open
 server change, no migration. PUBLIC -> click-through before merge. Parallel-safe with the
 current queue (no Touches overlap).
 
+**Decisions 2026-10-22 (issue #32, Naoki).** These override any reading of the text above.
+- Partial refusal on Save Day (Q1, Reading C): when both POSTs return ok but the meat POST lists
+  `refused` meats, clear the drafted fields of every row that saved and KEEP only the refused
+  meats' drafted fields. A refused count was never saved, so it must not be thrown away. Because
+  a refused row is month-blocked, its kept value stays hidden (blocked inputs are never filled)
+  and comes back once that meat's month opening exists. The 3-day expiry cleans up the rest.
+- Newer server value from another device (Q2, Reading A): the draft wins and shows tagged
+  "unsaved" until Discard or Save Day. No timestamp compare now; revisit when login adds the user
+  to the draft key.
+- Month-blocked rows (Q3, Reading B): skip the WHOLE blocked row when restoring, remarks
+  included. The server saves a remark only together with an ending (dailyAudit.js), and a
+  blocked row cannot have an ending, so a restored remark would promise something Save Day
+  cannot keep.
+- Also in this step (C4): disable the remarks input on a month-blocked row, like its ending
+  input. Today a remark typed there is silently lost.
+- Tests (C5): this is browser-only code and the test runner scans server/ only, so the phone
+  click-through is the test. The review's "no automated test" check is not a blocker here.
+- Click-through additions: Save Day with one meat refused keeps only that meat's draft; a remark
+  cannot be typed on a blocked row; a drafted remark on a row that became blocked is not
+  restored.
+
 ## Step autopilot-hardening - close the runner review findings before the doorbell
+**CLOSED 2026-10-24, PR #40 (`86ba732`).**
 
 Decided 2026-10-13 (architect review of PRs #25 and #26, cubic findings). AUTOPILOT family; inert
 until install like the rest of it. Windows PowerShell 5.1, no modules, no npm dependency. Five

@@ -78,6 +78,7 @@ validate memberships. Depends on users-roles + user-sites. DECIDED 2026-09-28: r
 click-through. Full spec: session-status.md -> "Step import-identity".
 
 ### 3k. Step stub-login - pick-your-name login + currentUser middleware  [runnable]
+**CLOSED 2026-10-25, PR #33 (`ee0801f`).**
 Touches: public/login.html, server/routes/auth.js, server/index.js
 Phase-1 identity, no passwords: pick-your-name -> cookie -> req.user with capability flags. No
 enforcement yet. LEAN: plain cookie, no new dep (flag). Needs users present (import-identity or a
@@ -122,6 +123,7 @@ users-roles, 24d-iii and autopilot 3n-3q. Full spec: session-status.md -> "Step 
 **2026-10-13:** #27 decided (Reading B - see the spec); PR #28 sent back (request changes) to implement it.
 
 ### 3s. Step loyverse-preview-ii - Kitchen Sales page (temporary)  [blocked: loyverse-preview-i]
+**CLOSED 2026-10-25, PR #37 (`54a28ec`).**
 Touches: public/kitchen-sales.html, public/index.html, public/style.css
 Dish | Likod | Silingan | Total, an unmatched list, Copy as text with a LAN-safe fallback; a
 failed account shows "-", never 0. Linked from Home only. Overlaps 24d-iii on style.css ->
@@ -129,6 +131,7 @@ sequence. PUBLIC -> click-through before merge. Full spec: session-status.md -> 
 loyverse-preview-ii".
 
 ### 3t. Step loyverse-preview-iii - wildcard-match report (terminal, you-only)  [blocked: loyverse-preview-i]
+**CLOSED 2026-10-24, PR #39 (`2820773`).**
 Touches: server/engines/loyverseReport.js, server/engines/loyverseReport.test.js, scripts/loyverse-matches.js, package.json
 `npm run loyverse:matches -- --date YYYY-MM-DD`: lists every wildcard pattern's catches (raw
 Loyverse names + quantities), unmatched items and account status, by calling the SAME engine as
@@ -144,6 +147,7 @@ click-through, no migration. Shares schema.sql + seed.js with 3h/3i -> sequenced
 Full spec: session-status.md -> "Step sheets-tier1".
 
 ### 3v. Step count-drafts - keep unsaved count entries on the phone  [runnable]
+**CLOSED 2026-10-24, PR #31 (`7617088`).**
 Touches: public/draft-store.js, public/daily-audit.html, public/month-opening.js
 Unsaved count entries on the daily audit (and the month-opening panel) are kept in localStorage
 per page + site + date, restored with an "unsaved" tag and a Discard button after a refresh,
@@ -151,6 +155,7 @@ and cleared only after Save succeeds. Never auto-submits; server untouched. PUBL
 click-through before merge. Full spec: session-status.md -> "Step count-drafts".
 
 ### 3w. Step autopilot-hardening - lock, public log lines, review gates, docs-pickup cleanup  [runnable]
+**CLOSED 2026-10-24, PR #40 (`86ba732`).**
 Touches: scripts/run-queue.ps1, .claude/commands/review-draft.md, .claude/commands/review.md, .claude/commands/run-step.md
 Decided 2026-10-13 (review of #25/#26): a lock two runners can never both win, public run-log
 lines without model free text, no merge recommendation on red verify, a click-through must

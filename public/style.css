@@ -370,6 +370,28 @@ nav a:hover {
   font-size: 1rem;
 }
 
+/* Kitchen Sales (Loyverse) preview page. Zero rows are muted so the dishes
+   that sold stand out. */
+.ks-note {
+  color: var(--ink2);
+  font-size: 0.85rem;
+}
+
+.ks-zero td {
+  color: var(--ink3);
+}
+
+/* A "-" cell (failed account or null total) stays at normal ink even in a
+   muted zero row - a failure must never look greyed out like a zero. */
+.ks-zero td.ks-dash {
+  color: var(--ink);
+}
+
+th.num,
+td.num {
+  text-align: right;
+}
+
 /* Phone vs desktop cutover - docs/ui-conventions.md -> Breakpoints (768px,
    one number across pages). Below it: phone views + toggle; at/above it:
    the desktop layout, no toggle. */

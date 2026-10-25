@@ -14,7 +14,9 @@
 //   ledger,           // 'restaurant' | 'commissary'
 //   getOwnerId,       // () => selected restaurant id / commissary id
 //   getDate,          // () => the page's selected date (YYYY-MM-DD)
-//   onChange          // () => called after any write, to reload the grid
+//   onChange,         // () => called after any write, to reload the grid
+//   draftPage         // optional: keep unsaved recount/correct entries
+//                     // (public/draft-store.js) under this page name
 // }) -> { load }
 (function () {
   const LEDGERS = {
@@ -63,10 +65,39 @@
     return result;
   }
 
-  window.createMonthOpeningPanel = function ({ container, ledger, getOwnerId, getDate, onChange }) {
+  window.createMonthOpeningPanel = function ({ container, ledger, getOwnerId, getDate, onChange, draftPage }) {
     const L = LEDGERS[ledger];
     let editing = false;
     let message = '';
+
+    // Step count-drafts: opt-in per page - Landing passes draftPage,
+    // Commissary does not yet. A field leaves the draft when its own row saves.
+    const drafts = draftPage && window.DraftStore ? window.DraftStore : null;
+    const DRAFT_FIELDS = ['mo-recount', 'mo-edit'];
+    const draftKey = () => drafts.key(draftPage, getOwnerId(), getDate());
+
+    function dropRowDrafts(meatIds) {
+      if (drafts) drafts.removeFields(draftKey(), meatIds.flatMap(id => DRAFT_FIELDS.map(f => `meat:${id}:${f}`)));
+    }
+
+    function restoreDraft() {
+      const panel = container.querySelector('.month-opening');
+      const draft = drafts && panel ? drafts.load(draftKey()) : null;
+      if (!draft) return;
+      let restored = 0;
+      for (const [fieldKey, value] of Object.entries(draft.fields)) {
+        const [, id, field] = fieldKey.split(':');
+        if (!/^\d+$/.test(id) || !DRAFT_FIELDS.includes(field)) continue;
+        const input = container.querySelector(`tr[data-mo-meat-id="${id}"] .${field}`);
+        if (!input || input.disabled || input.value === value) continue;
+        input.value = value;
+        input.insertAdjacentHTML('beforebegin', '<span class="mo-tag">unsaved</span> ');
+        restored++;
+      }
+      if (restored) {
+        panel.insertAdjacentHTML('beforeend', `<div class="mo-message">${esc(drafts.restoredText(restored, draft.savedAt))} <button type="button" class="mo-discard-draft">Discard</button></div>`);
+      }
+    }
 
     function unopenedRowHtml(r) {
       const detail = r.must_count
@@ -150,7 +181,14 @@
       const res = await fetch(L.statusUrl(ownerId, date));
       if (!res.ok) { container.innerHTML = ''; return; }
       render(await res.json());
+      restoreDraft();
     }
+
+    container.addEventListener('input', (e) => {
+      const field = drafts && DRAFT_FIELDS.find(f => e.target.classList.contains(f));
+      const tr = e.target.closest('tr[data-mo-meat-id]');
+      if (field && tr) drafts.set(draftKey(), `meat:${tr.dataset.moMeatId}:${field}`, e.target.value);
+    });
 
     async function afterWrite(text) {
       message = text;
@@ -174,18 +212,25 @@
           const value = tr.querySelector('.mo-recount').value;
           if (value === '') { message = 'Enter the counted quantity first.'; await load(); return; }
           await send(L.recountUrl, 'POST', { ...L.meatBody(ownerId, meatId), business_date: date, quantity: Number(value) });
+          dropRowDrafts([meatId]);
           await afterWrite('Recount saved.');
         } else if (e.target.matches('.mo-copy-all')) {
           const result = await send(L.copyAllUrl, 'POST', { ...L.ownerBody(ownerId), business_date: date });
+          dropRowDrafts(result.copied);
           await afterWrite(`Copied ${result.copied.length} meat(s) from last month's ending.`);
         } else if (e.target.matches('.mo-save-edit')) {
           const value = tr.querySelector('.mo-edit').value;
           if (value === '') { message = 'Use Clear to remove an opening.'; await load(); return; }
           await send(L.patchUrl, 'PATCH', { ...L.meatBody(ownerId, meatId), business_date: tr.dataset.moDate, quantity: Number(value) });
+          dropRowDrafts([meatId]);
           await afterWrite('Opening updated.');
         } else if (e.target.matches('.mo-clear')) {
           await send(L.patchUrl, 'PATCH', { ...L.meatBody(ownerId, meatId), business_date: tr.dataset.moDate, quantity: null });
+          dropRowDrafts([meatId]);
           await afterWrite('Opening cleared.');
+        } else if (e.target.matches('.mo-discard-draft')) {
+          drafts.clear(draftKey());
+          await load(); // back to the server's values
         }
       } catch (err) {
         message = 'Error: ' + err.message;
