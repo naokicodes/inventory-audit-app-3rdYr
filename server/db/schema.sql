@@ -548,6 +548,17 @@ CREATE TABLE IF NOT EXISTS users (
   FOREIGN KEY (default_role_id) REFERENCES roles(id)
 );
 
+-- 13. user_sites (step user-sites - membership model B)
+-- site_code is a restaurants.code OR a commissaries.code. No FK on site_code
+-- (model B's tradeoff): server/db/siteAccess.js resolves and validates it.
+-- Data layer only - nothing enforces memberships yet.
+CREATE TABLE IF NOT EXISTS user_sites (
+  user_id INTEGER NOT NULL,
+  site_code TEXT NOT NULL,
+  PRIMARY KEY (user_id, site_code),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 -- Seed a reasonable starting set of adjustment types (admin can add more
 -- via the UI later - this is just a sensible default, not a fixed list).
 INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requires_conversion_target) VALUES
