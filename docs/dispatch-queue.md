@@ -64,6 +64,7 @@ is. Read the step's own section in `session-status.md` before starting.
 ### 3h. Step users-roles — CLOSED 2026-10-13, PR #24 (`74ea2ba`).
 
 ### 3i. Step user-sites - membership table + site resolver  [runnable]
+**CLOSED 2026-10-26, PR #35 (`9a88add`).**
 Touches: server/db/schema.sql, server/db/siteAccess.js
 Membership model B (site_code text) + a resolver (getUserSiteCodes / userHasSite /
 resolveSiteCode). Data layer only, NO enforcement yet. Depends on users-roles (users table);

@@ -1547,6 +1547,7 @@ migration. NOTE: touches schema.sql, which Step 24d-i also touches -> not both i
 sequence them.
 
 ## Step user-sites - membership table + site resolver (model B)
+**CLOSED 2026-10-26, PR #35 (`9a88add`).**
 
 Second slice of the multi-user surface (architect 2026-09-28). Membership model B (site_code
 text) - proceeding on the lean; flipping to C (polymorphic) is a small doc change. Data layer
