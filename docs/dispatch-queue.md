@@ -173,6 +173,7 @@ No HTML/JS change, no dependency, light only. PUBLIC -> click-through at 390px a
 Sequence with 3s (style.css). Full spec: session-status.md -> "Step ui-pass".
 
 ### 3y. Step ui-pass-ii - page colors onto the Look tokens  [blocked: ui-pass, count-drafts]
+**CLOSED 2026-10-26, PR #43 (`1d1b39e`).**
 Touches: public/allocations.html, public/commissary-shipments.html, public/commissary.html, public/daily-audit.html, public/dashboard.html, public/history.html, public/sales.html, public/settings.html, public/stock-receipts.html, public/terminal.html
 Colors only: each page's own <style> block and style= attributes move from hard-coded colors to
 the Look tokens, by meaning. No layout, markup or JS change. PUBLIC -> click-through. Full spec:

@@ -2296,6 +2296,7 @@ Touches: public/style.css. No server change, no migration. PUBLIC -> click-throu
 Overlaps loyverse-preview-ii (3s) on style.css -> sequence (3s is blocked anyway).
 
 ## Step ui-pass-ii - page colors onto the Look tokens (the pages' own style blocks)
+**CLOSED 2026-10-26, PR #43 (`1d1b39e`).**
 
 Decided 2026-10-19, second half of the UI pass. Ten pages (all but index.html) carry their own
 <style> block and a few style= attributes with hard-coded colors (crimson, green, #fafafa,
