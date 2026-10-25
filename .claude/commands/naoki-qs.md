@@ -1,5 +1,5 @@
 ---
-description: Team quick start — take ONE piece of queue work as far as the runner may (build or finish a PR, independent check, gates; Naoki's runs also merge and close). Run it again after /clear for the next one.
+description: Team quick start — take ONE piece of queue work as far as the runner may (build or finish a PR, independent check, gates; Naoki's runs also merge and close). Optional target - /naoki-qs 35 (a PR or issue number) or /naoki-qs warn-ink (a step id). Run it again after /clear for the next one.
 ---
 
 Take one piece of queue work as far as you are allowed, then stop. One piece per
@@ -30,9 +30,47 @@ never force-push, and never resolving a conflict in `server/db/migrate.js` or
 Follow `start.md` sections 1 and 2 (current `main`, baseline). If `npm run
 verify` is not green on `main`, stop: nothing gets built on a broken `main`.
 
-## 3. Pick the work, in this order
+## 3. Pick the work
 
-Draft PRs are claims. Never pick up, review or merge someone else's draft.
+Draft PRs are claims. Never pick up, review or merge someone else's draft
+(the one exception is a takeover Naoki asks for, in 3T).
+
+### 3T. A target the person named (`$ARGUMENTS` is not empty)
+
+The person chose the work, so skip the automatic order below (and any "Order
+this week" note). Read the first word of `$ARGUMENTS`:
+
+- **A number:** try `gh pr view <n>`; if there is no such PR, try
+  `gh issue view <n>`.
+  - **A PR.** Merged or closed: stop and say so. Its step has an open
+    `needs-architect` issue: stop and name the issue ("waiting on a decision").
+    Someone else's **draft**: stop and say whose claim it is, unless the second
+    word is `takeover` (below). Otherwise treat it exactly as the automatic
+    order would: your own draft -> 3.0; sent back -> 3b; waiting or "Ready to
+    merge" -> 3a.
+  - **An issue.** An open `needs-architect` issue: stop ("this is a decision for
+    an architect chat"). A closed `needs-architect` issue: work on the PR it
+    links, as above. An issue naming a step ("Step <id>"): treat it as that step
+    id. Anything else: stop ("not queue work").
+- **A step id** (`warn-ink`, or its queue number like `3z`): if an open PR's
+  title has `(<step-id>)`, work on that PR as above. Otherwise check it with
+  `start.md` section 3: runnable -> claim and build it as in 3c; blocked or not
+  specced -> stop and say what it waits for. Never build a step that is not
+  runnable just because it was named.
+
+**Takeover** (`/naoki-qs <PR> takeover`, Naoki's runs only): for a teammate's
+draft or parked PR when they are away. Stop instead if the login is not
+`naokicodes`, or if the branch's newest commit is less than 2 hours old (they
+may still be working). Otherwise comment on the PR
+`Taken over by naokicodes on <yyyy-mm-dd> (owner away).`, check out its branch,
+and continue from section 4 or 5 on that same branch. Never force-push; if a
+push is rejected, someone else pushed: stop.
+
+### The automatic order (no target)
+
+Before choosing, list every candidate you looked at with a one-line reason for
+skipping it ("#35 - someone else's draft", "#43 - waiting on issue #44"). The
+report repeats this list, so a skipped claim is always visible.
 
 0. **Your own unfinished claim**: `gh pr list --author @me --draft`. A run of
    yours stopped part-way. Resume it on its branch from section 4 (or section 5
@@ -55,7 +93,8 @@ c. **The next runnable step**, chosen exactly by `start.md` section 3. One
 d. **Nothing left.** Stop and report in plain words (section 8): what is still
    in the queue, and what each one is waiting for.
 
-Announce what you picked in one line, then keep going without a checkpoint.
+Announce what you picked in one line (and, for the automatic order, the
+skipped list), then keep going without a checkpoint.
 
 ## 4. Build (for 3c, or a resumed 3.0)
 
@@ -123,12 +162,14 @@ first.
 
 ## 8. Report in plain words
 
-At most six short lines, no jargon, no file names unless someone must act on one:
+At most eight short lines, no jargon, no file names unless someone must act on one:
 - **Merged** / **Ready for Naoki** / **Stopped:** what this does, in words a
   restaurant person would understand (PR #n), or why it stopped, in one sentence.
 - **See it:** where to look in the app, or "nothing to see, it works behind the
   scenes".
 - **You need to:** the one thing a person must do, if anything.
-- **Next:** "`/clear`, then `/naoki-qs`."
+- **Skipped:** for the automatic order, each candidate passed over and why
+  (one line each, at most three; "and N more" after that).
+- **Next:** "`/clear`, then `/naoki-qs`" (or `/naoki-qs <n>` for a specific PR).
 
 Verify, don't assert: every gate above cites real command output, never a belief.
