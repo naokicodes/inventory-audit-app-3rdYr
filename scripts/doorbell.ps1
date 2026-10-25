@@ -39,9 +39,16 @@ $logFile = Join-Path $logDir 'doorbell.log'
 $seenFile = Join-Path $logDir 'doorbell-seen.txt'
 $lockPath = Join-Path $logDir 'run.lock'
 
-function Log($text) {
-  New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-  Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $text" -Encoding UTF8
+# Notes are collected and written by Finish as ONE log line per invocation.
+$script:notes = New-Object System.Collections.Generic.List[string]
+function Log($text) { $script:notes.Add($text) }
+
+function Finish {
+  if ($script:notes.Count -gt 0) {
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    Add-Content -Path $logFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $($script:notes -join ' | ')" -Encoding UTF8
+  }
+  exit 0
 }
 
 # Runs gh and returns its exit code and stdout lines. stderr is dropped: in
@@ -64,7 +71,7 @@ function Get-GhLines([string]$What, [string[]]$GhArgs) {
   $r = Invoke-Gh $GhArgs
   if ($r.Code -ne 0) {
     Log "$What failed (gh exit $($r.Code)) - nothing done."
-    exit 0
+    Finish
   }
   return $r.Lines
 }
@@ -72,28 +79,28 @@ function Get-GhLines([string]$What, [string[]]$GhArgs) {
 function Start-Run([string]$Why) {
   Log "Fired: $Why - starting a 1-step run."
   try {
-    & .\scripts\run-queue.ps1 -MaxSteps 1 -Trigger doorbell -Owner $Owner
-    Log "Run finished (exit $LASTEXITCODE)."
+    & .\scripts\run-queue.ps1 -MaxSteps 1 -Trigger doorbell
+    Log "Run finished."
   } catch {
     Log "Run failed: $($_.Exception.Message)"
   }
-  exit 0
+  Finish
 }
 
 try {
   $ghCmd = Get-Command gh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-  if (-not $ghCmd) { Log 'gh not found on PATH - nothing done.'; exit 0 }
+  if (-not $ghCmd) { Log 'gh not found on PATH - nothing done.'; Finish }
   $script:gh = $ghCmd.Source
 
   # ---- 1. Pause. ----
   $paused = @(Get-GhLines 'Pause check' @('issue', 'list', '--repo', $Repo, '--state', 'open', '--label', 'autopilot-pause', '--author', $Owner, '--json', 'number', '--jq', '.[].number'))
-  if ($paused.Count -gt 0) { exit 0 }
+  if ($paused.Count -gt 0) { Finish }
 
   # ---- 2. Busy: run.lock's first line is the holder's PID. ----
   if (Test-Path $lockPath) {
     $lockPid = 0
     $first = Get-Content $lockPath -TotalCount 1 -ErrorAction SilentlyContinue
-    if ([int]::TryParse("$first".Trim(), [ref]$lockPid) -and (Get-Process -Id $lockPid -ErrorAction SilentlyContinue)) { exit 0 }
+    if ([int]::TryParse("$first".Trim(), [ref]$lockPid) -and (Get-Process -Id $lockPid -ErrorAction SilentlyContinue)) { Finish }
   }
 
   # ---- 3. run-now on an open issue or PR. ----
@@ -102,11 +109,15 @@ try {
   $targets = @($runNowIssues | ForEach-Object { @{ N = $_; Kind = 'issue' } }) + @($runNowPrs | ForEach-Object { @{ N = $_; Kind = 'pr' } })
 
   $counted = $null
+  # Read every target's labeller before removing any label, so an events
+  # failure part-way leaves all labels in place for the next tick.
   foreach ($t in $targets) {
     # Every labeled event for run-now, oldest first; the newest decides.
     $actors = @(Get-GhLines "Events for #$($t.N)" @('api', '--paginate', "repos/$Repo/issues/$($t.N)/events", '--jq', '.[] | select(.event == "labeled" and .label.name == "run-now") | .actor.login'))
-    $actor = if ($actors.Count -gt 0) { $actors[-1] } else { '' }
-
+    $t.Actor = if ($actors.Count -gt 0) { $actors[-1] } else { '' }
+  }
+  foreach ($t in $targets) {
+    $actor = $t.Actor
     $removed = Invoke-Gh @($t.Kind, 'edit', $t.N, '--repo', $Repo, '--remove-label', 'run-now')
     if ($removed.Code -ne 0) { Log "Could not remove run-now from #$($t.N) (gh exit $($removed.Code))." }
 
@@ -135,8 +146,8 @@ try {
   }
 
   # ---- 5. Nothing to do. ----
-  exit 0
+  Finish
 } catch {
   Log "Doorbell error: $($_.Exception.Message)"
-  exit 0
+  Finish
 }
