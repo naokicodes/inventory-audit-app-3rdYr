@@ -57,8 +57,10 @@ acknowledgment, sides) are known. Add to it; don't wait for it to be complete.
 - **Type:** Archivo 400-700 (Google Fonts) with a system-ui fallback; tabular figures for every
   number; no all-caps labels; no monospace as decoration.
 - **Shape:** cards 12px radius with a 1px --line border; inputs and buttons 7-8px; pills 20px.
-- **Color meaning:** red = short / variance / error; green = ok; amber = running low / blocked /
-  estimate. The accent is never a status color, and there is one accent action per view.
+- **Color meaning:** red = short / error; amber = surplus (over) / running low / blocked /
+  estimate / needs review; green = ok. Actions that already happened (history pills) are neutral
+  ink, not a status. Computed cells look different from input cells. The accent is never a
+  status color, and there is one accent action per view. (Decided 2026-10-25, issue #44.)
 - **Money:** peso sign with thousands separators, no decimals on dashboards.
 
 ## Tables

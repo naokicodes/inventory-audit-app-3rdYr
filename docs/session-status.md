@@ -1589,6 +1589,13 @@ not concurrent.
   site codes.
 - Touches gains: scripts/write-path-allowlist.json.
 
+**Decisions 2026-10-25 (issue #42, Naoki).** These override any reading of the text above.
+- A code in both tables (Q1, Reading A): resolveSiteCode THROWS. A collision is a data error;
+  never guess which site was meant, because counts would land on the wrong site.
+- Cross-table uniqueness (Q2): accepted as a fact about the data for this step; nothing more
+  here (today's codes RA, FC and COM-A do not collide). The guard belongs where site codes are
+  written: see the 2026-10-25 line under "Step import-identity".
+
 ## Step import-identity - import-settings.js, identity slice (Roles, Users, memberships)
 
 Third slice of the multi-user surface (architect 2026-09-28). Decision A: a standalone
@@ -1644,6 +1651,12 @@ no click-through, no migration.
 **Added 2026-10-22 (issue #36).** This step writes user_sites, so it also DELETES the user_sites
 entry from scripts/write-path-allowlist.json (added by user-sites). Touches gains:
 scripts/write-path-allowlist.json. The write-path audit must stay clean without that entry.
+
+**Added 2026-10-25 (issue #42).** Whatever writes a site code - a Sites-tab import in this step
+or a later slice, and any future "add site" screen - first checks the code against BOTH
+restaurants and commissaries and refuses (warn and skip) a code the other table already uses,
+so resolveSiteCode never meets a collision. Likod becomes a site soon and more branches may
+follow, so the check lives at creation time.
 
 ## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
 **CLOSED 2026-10-25, PR #33 (`ee0801f`).**
@@ -1891,6 +1904,20 @@ Verification (no PowerShell harness - say so): show in the PR an invocation with
 `npm run verify` stays green.
 
 Touches: scripts/doorbell.ps1 (new). No app code, no click-through.
+
+**Decisions 2026-10-25 (issue #46, Naoki).** These override any reading of the text above.
+- (1) Removing the `run-now` label fails (Reading B): skip the run and write a log line. The ring
+  waits until removal works; a stuck label must never start a run every tick.
+- (2) Several owner rings in one tick (Reading B): comment on every counted item, start ONE run.
+- (3) First install (Reading B, as a switch): `doorbell.ps1 -Init` writes doorbell-seen.txt with
+  the issues already open and exits without ringing. The setup guide runs it once (the guide
+  line is an architect docs follow-up, not part of this step).
+- (4) Busy check (option C): in addition to the run.lock live-PID check, probe the named mutex
+  `Global\inventory-audit-run-queue` that run-queue.ps1 holds (WaitOne(0); if acquired, release
+  it at once). Either one busy = do not start a run.
+- Hand-run cases to record in the PR body: removal failure skips; two rings get two comments
+  and one run; -Init then a tick starts nothing; a ring while the runner holds the mutex
+  starts nothing.
 
 ## Step autopilot-preview - serve a PR on port 3100 for phone click-throughs
 
@@ -2290,3 +2317,37 @@ Touches: public/allocations.html, public/commissary-shipments.html, public/commi
 public/daily-audit.html, public/dashboard.html, public/history.html, public/sales.html,
 public/settings.html, public/stock-receipts.html, public/terminal.html. PUBLIC -> click-through
 before merge. Blocked on ui-pass (needs the tokens) and count-drafts (shares daily-audit.html).
+
+**Decisions 2026-10-25 (issue #44, Naoki).** These override any reading of the text above.
+- Color by meaning (Reading B), with one refinement for surplus:
+  - short -> var(--danger) / var(--danger-tint);
+  - surplus / over -> var(--warn) / var(--warn-tint) (a "check this", not a loss; the landing
+    person reading variance sees which way it went);
+  - Review -> warn; the stock-receipts mapping-warning `.warn` line -> warn;
+  - history action pills (update, delete, ...) -> neutral ink (var(--ink2)): an action that
+    already happened is not a status;
+  - the source label -> ink;
+  - computed cells keep a background distinct from input cells (a neutral token such as
+    var(--paper)), so staff can tell typed numbers from worked-out ones.
+- Contrast: warn text on the warn tint (3.53:1) is accepted in this step; the follow-up step
+  warn-ink (3z) fixes it in style.css. Do not touch style.css here.
+- Click-through additions: on the daily audit, short reads red and surplus reads amber;
+  computed cells visibly differ from input cells; history pills are neutral.
+
+## Step warn-ink - darker warn text on the warn tint
+
+Decided 2026-10-25 (issue #44). Small warn badges (`.card-blocked` and other text in var(--warn)
+on var(--warn-tint)) read at 3.53:1, below the 4.5:1 that small text needs (WCAG AA).
+
+- Add a light-mode token `--warn-ink: #94570A` next to --warn in style.css (4.87:1 on
+  --warn-tint, 5.79:1 on white).
+- Wherever style.css sets text to var(--warn) on a var(--warn-tint) background, use
+  var(--warn-ink) for the text instead. Keep --warn for borders, icons and large text.
+- Dark mode: leave it alone if style.css has one (its warn pair already reads at 5.95:1).
+- Colors only, style.css only: no layout, markup or JS change.
+
+Edge states: none beyond the click-through (no data, no state).
+Click-through (390px AND desktop): every warn badge and the blocked card read clearly; nothing
+else changed color.
+
+Touches: public/style.css. PUBLIC -> click-through before merge.

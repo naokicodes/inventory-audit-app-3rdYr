@@ -177,6 +177,11 @@ Colors only: each page's own <style> block and style= attributes move from hard-
 the Look tokens, by meaning. No layout, markup or JS change. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step ui-pass-ii".
 
+### 3z. Step warn-ink - darker warn text on the warn tint  [runnable]
+Touches: public/style.css
+Adds --warn-ink (#94570A) for text on --warn-tint so small warn badges reach 4.5:1. Colors only,
+style.css only. PUBLIC -> click-through. Full spec: session-status.md -> "Step warn-ink".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 **2026-10-19:** the rewrite folds into the supply family (see Planned below): an arrival links to a supplier-order line.
