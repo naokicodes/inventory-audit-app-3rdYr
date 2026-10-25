@@ -11,18 +11,18 @@
     body { max-width: 1200px; }
     .grid-scroll { overflow-x: auto; }
     table { border-collapse: collapse; font-size: 0.85rem; }
-    th, td { border: 1px solid #ddd; padding: 0.3rem; text-align: center; }
-    th { background: #f0f0f0; }
-    td.dish-name, th.dish-name { text-align: left; position: sticky; left: 0; background: #fff; min-width: 10rem; }
-    th.dish-name { background: #f0f0f0; }
-    input[type="number"] { width: 3.5rem; padding: 0.2rem; text-align: right; border: 1px solid #ccc; }
-    input.manual-source { background: #fff; }
-    input.loyverse-source { background: #f5faff; } /* not reachable yet - Loyverse sync isn't built (rule 14) - styled defensively for when it is */
-    .type-badge { font-size: 0.7em; color: #999; }
+    th, td { border: 1px solid var(--line); padding: 0.3rem; text-align: center; }
+    th { background: var(--paper); }
+    td.dish-name, th.dish-name { text-align: left; position: sticky; left: 0; background: var(--card); min-width: 10rem; }
+    th.dish-name { background: var(--paper); }
+    input[type="number"] { width: 3.5rem; padding: 0.2rem; text-align: right; border: 1px solid var(--line2); }
+    input.manual-source { background: var(--card); }
+    input.loyverse-source { background: var(--accent-tint); } /* not reachable yet - Loyverse sync isn't built (rule 14) - styled defensively for when it is */
+    .type-badge { font-size: 0.7em; color: var(--ink3); }
     .cell-saving { opacity: 0.5; }
-    .cell-error { background: #fee !important; }
-    .status-message.error { color: crimson; }
-    .status-message.ok { color: green; }
+    .cell-error { background: var(--danger-tint) !important; }
+    .status-message.error { color: var(--danger); }
+    .status-message.ok { color: var(--ok); }
   </style>
 </head>
 <body>
@@ -41,7 +41,7 @@
   </nav>
 
   <h1>Sales</h1>
-  <p style="color:#666; font-size: 0.85rem;">
+  <p style="color:var(--ink2); font-size: 0.85rem;">
     Manual sales entry, one cell per dish per day. This is the interim
     path while the Loyverse sync (a later phase) isn't built yet - see
     <code>docs/data-model.md</code>. Overwriting an already-filled cell
