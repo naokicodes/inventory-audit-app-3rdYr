@@ -1870,6 +1870,7 @@ Touches: .claude/commands/run-step.md. No app code, no click-through. Independen
 autopilot-runner (no shared file); the runner already handles BUILT and STOPPED.
 
 ## Step autopilot-doorbell - start a run from the phone
+**CLOSED 2026-10-26, PR #45 (`2c241b1`).**
 
 AUTOPILOT family, slice 3 of 4. Waits for autopilot-hardening (2026-10-13).
 Depends on autopilot-runner (the lock, -Trigger, -Owner, the

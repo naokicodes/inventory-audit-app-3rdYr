@@ -103,6 +103,7 @@ ambiguous ones. Full spec: session-status.md -> "Step site-filter".
 ### 3o. Step architect-docs-pickup — CLOSED 2026-10-13, PR #26 (`eac8789`).
 
 ### 3p. Step autopilot-doorbell - start a run from the phone  [blocked: autopilot-hardening]
+**CLOSED 2026-10-26, PR #45 (`2c241b1`).**
 Touches: scripts/doorbell.ps1 (new)
 A 15-minute poll: a `run-now` label or a new `architect-docs` issue (naokicodes only) starts a
 1-step run. Calls no Claude itself. Needs 3n's lock, -Trigger and pause switch. Full spec:
