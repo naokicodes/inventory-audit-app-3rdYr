@@ -9,12 +9,19 @@
 
   In order, stopping at the first that fires:
     1. An open autopilot-pause issue by -Owner -> exit.
-    2. .run-queue-logs/run.lock names a live PID (a run is active) -> exit.
+    2. .run-queue-logs/run.lock names a live PID, OR the run-queue mutex is held
+       (a run is active) -> exit.
     3. run-now label on an open issue or PR. Counts only if the newest
-       'labeled' event for it was by -Owner. The label is removed either way.
+       'labeled' event for it was by -Owner AND the label removal succeeded: a
+       removal that fails never starts a run, so a stuck label cannot ring every
+       tick (it waits for a tick where removal works). Every owner-labelled
+       target in the tick is commented on; one run starts for all of them.
     4. An open architect-docs issue by -Owner not yet in
        .run-queue-logs/doorbell-seen.txt. Each one rings at most once: a failed
        run is retried by the scheduled runs, never by the doorbell.
+
+  -Init seeds doorbell-seen.txt with the architect-docs issues already open and
+  exits without ringing (run once at install, per docs/autopilot-guide.md).
 
   Quiet invocations print and log nothing. Anything that did something (fired,
   removed a stranger's label, or failed) adds one line to
@@ -24,10 +31,14 @@
 
 .EXAMPLE
   .\scripts\doorbell.ps1
+
+.EXAMPLE
+  .\scripts\doorbell.ps1 -Init   # install only: seed the seen-file, ring nothing
 #>
 param(
   [string]$Owner = 'naokicodes',
-  [string]$Repo = 'naokicodes/inventory-audit-app-3rdYr'
+  [string]$Repo = 'naokicodes/inventory-audit-app-3rdYr',
+  [switch]$Init
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,6 +87,25 @@ function Get-GhLines([string]$What, [string[]]$GhArgs) {
   return $r.Lines
 }
 
+# True unless run-queue.ps1 currently holds its named mutex. Probing it catches
+# an active run even when run.lock is stale or missing. An abandoned mutex (the
+# holder died) acquires, so it reads as free. If the probe itself errors we do
+# not block the doorbell on it.
+function Test-RunQueueFree {
+  $m = $null
+  try {
+    $m = New-Object System.Threading.Mutex($false, 'Global\inventory-audit-run-queue')
+    $got = $false
+    try { $got = $m.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $got = $true }
+    if ($got) { $m.ReleaseMutex(); return $true }
+    return $false
+  } catch {
+    return $true
+  } finally {
+    if ($m) { $m.Dispose() }
+  }
+}
+
 function Start-Run([string]$Why) {
   Log "Fired: $Why - starting a 1-step run."
   try {
@@ -92,23 +122,34 @@ try {
   if (-not $ghCmd) { Log 'gh not found on PATH - nothing done.'; Finish }
   $script:gh = $ghCmd.Source
 
+  # ---- Install only: seed the seen-file with open architect-docs issues, ring nothing. ----
+  if ($Init) {
+    $docs = @(Get-GhLines 'architect-docs list (init)' @('issue', 'list', '--repo', $Repo, '--state', 'open', '--label', 'architect-docs', '--author', $Owner, '--json', 'number', '--jq', '.[].number'))
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    $content = if ($docs.Count -gt 0) { (($docs -join "`r`n") + "`r`n") } else { '' }
+    [IO.File]::WriteAllText($seenFile, $content, $utf8)
+    Write-Host "doorbell -Init: seeded $($docs.Count) open architect-docs issue(s) into $seenFile; no run started."
+    exit 0
+  }
+
   # ---- 1. Pause. ----
   $paused = @(Get-GhLines 'Pause check' @('issue', 'list', '--repo', $Repo, '--state', 'open', '--label', 'autopilot-pause', '--author', $Owner, '--json', 'number', '--jq', '.[].number'))
   if ($paused.Count -gt 0) { Finish }
 
-  # ---- 2. Busy: run.lock's first line is the holder's PID. ----
+  # ---- 2. Busy: run.lock's first line is the holder's PID, or the mutex is held. ----
   if (Test-Path $lockPath) {
     $lockPid = 0
     $first = Get-Content $lockPath -TotalCount 1 -ErrorAction SilentlyContinue
     if ([int]::TryParse("$first".Trim(), [ref]$lockPid) -and (Get-Process -Id $lockPid -ErrorAction SilentlyContinue)) { Finish }
   }
+  if (-not (Test-RunQueueFree)) { Finish }
 
   # ---- 3. run-now on an open issue or PR. ----
   $runNowIssues = @(Get-GhLines 'run-now issue list' @('issue', 'list', '--repo', $Repo, '--state', 'open', '--label', 'run-now', '--json', 'number', '--jq', '.[].number'))
   $runNowPrs = @(Get-GhLines 'run-now PR list' @('pr', 'list', '--repo', $Repo, '--state', 'open', '--label', 'run-now', '--json', 'number', '--jq', '.[].number'))
   $targets = @($runNowIssues | ForEach-Object { @{ N = $_; Kind = 'issue' } }) + @($runNowPrs | ForEach-Object { @{ N = $_; Kind = 'pr' } })
 
-  $counted = $null
+  $counted = New-Object System.Collections.Generic.List[object]
   # Read every target's labeller before removing any label, so an events
   # failure part-way leaves all labels in place for the next tick.
   foreach ($t in $targets) {
@@ -119,18 +160,25 @@ try {
   foreach ($t in $targets) {
     $actor = $t.Actor
     $removed = Invoke-Gh @($t.Kind, 'edit', $t.N, '--repo', $Repo, '--remove-label', 'run-now')
-    if ($removed.Code -ne 0) { Log "Could not remove run-now from #$($t.N) (gh exit $($removed.Code))." }
-
+    if ($removed.Code -ne 0) {
+      # Decision #46 (1): a failed removal must never start a run, or a stuck
+      # label would ring every tick. Leave it; a later tick retries removal.
+      Log "Could not remove run-now from #$($t.N) (gh exit $($removed.Code)) - leaving it for the next tick."
+      continue
+    }
     if ($actor -eq $Owner) {
-      if (-not $counted) { $counted = $t }
+      $counted.Add($t)
     } else {
       Log "Removed run-now from #$($t.N): labelled by '$actor', not $Owner."
     }
   }
-  if ($counted) {
-    $c = Invoke-Gh @($counted.Kind, 'comment', $counted.N, '--repo', $Repo, '--body', 'Doorbell: starting a 1-step run.')
-    if ($c.Code -ne 0) { Log "Could not comment on #$($counted.N) (gh exit $($c.Code)) - running anyway." }
-    Start-Run "run-now on #$($counted.N)"
+  if ($counted.Count -gt 0) {
+    # Decision #46 (2): comment on every counted item, then start ONE run.
+    foreach ($c in $counted) {
+      $r = Invoke-Gh @($c.Kind, 'comment', $c.N, '--repo', $Repo, '--body', 'Doorbell: starting a 1-step run.')
+      if ($r.Code -ne 0) { Log "Could not comment on #$($c.N) (gh exit $($r.Code)) - running anyway." }
+    }
+    Start-Run ('run-now on ' + (($counted | ForEach-Object { "#$($_.N)" }) -join ', '))
   }
 
   # ---- 4. New architect-docs issues. ----
