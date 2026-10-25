@@ -11,7 +11,8 @@
   "tables": {
     "commissary_meat_map": "Open architectural question - possibly vestigial. Listed in session-status.md's open questions. Do not build a writer to satisfy this audit; the question is whether the table should exist at all.",
     "commissary_stock_receipts": "Step 25a builds the supplier intake write path. DELETE THIS ENTRY when 25a lands.",
-    "loyverse_name_map": "Rule 14 - the Loyverse sync is a later phase and deliberately unbuilt."
+    "loyverse_name_map": "Rule 14 - the Loyverse sync is a later phase and deliberately unbuilt.",
+    "user_sites": "import-identity writes memberships. DELETE THIS ENTRY when import-identity lands."
   },
 
   "columns": {
