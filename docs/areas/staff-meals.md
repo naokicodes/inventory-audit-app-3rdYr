@@ -3,8 +3,16 @@
 Status: IRL Confirmed - FLOW Drafted - APP Decided
 
 ## IRL - how it works today
-- Silingan eats twice a day (afternoon, evening) because of the shifts.
-  Silingan sometimes cooks for Likod and notes it on the paper.
+- Meals per day differ by restaurant: Silingan 2 (afternoon and evening,
+  because of the shifts), Likod 2, FC 3. Silingan sometimes cooks for Likod
+  and notes it on the paper; normally Likod cooks its own on a portable stove
+  in the space being readied for its kitchen.
+- Each month the head chef picks four cooks; each plans one week of staff
+  meals ahead (a dish per meal with an estimated cost). Events such as
+  birthdays can replace the plan. The cook for each meal is still chosen on
+  the day.
+- OJT eat twice (breakfast at home); their food is cooked separately and paid
+  from their own money.
 - One cook per meal cooks and writes what was used, right after cooking: meat
   counted properly, sides and seasonings guessed.
 - The paper log (source: photo) has three columns: lunch, OJT meal, dinner.
@@ -33,10 +41,24 @@ Status: IRL Confirmed - FLOW Drafted - APP Decided
   head count, OJT separate, meat in grams (32); budget figure kept as the
   maximum reference until the rule is confirmed (40); cooking gas stays out of
   staff-meal cost - it is an operating expense (52).
+- Decided 2026-10-28: meal slots per restaurant are settings; each slot has a
+  budget mode - a fixed amount, head count x a per-head rate, or no budget -
+  with every value editable (values in the private notes). Budgets are per
+  meal: the fixed amount is the budget, head count x rate the maximum. Head
+  count is typed per meal until the roster exists, then comes from it. OJT
+  uses "no budget": recorded and monitored, no limit; each slot can carry an
+  optional OJT part with its own head count. Gas stays out (operating
+  expenses). A logged meal stands alone (date, site, slot, cook, lines); the
+  meal planner is a later, separate feature where a plan can be voided with a
+  reason and stays in history.
 - Not specced. Queue item A10.
 
 ## Open questions
-- Budget rule: keep the paper's figure as the maximum reference for now (see
-  private notes). It may be a whole-day budget; Naoki is asking.
+- Does the meal budget also pay for rice (a pantry item)? Naoki asks the head
+  chef. If yes, rice becomes the one pantry item logged in staff meals.
+- Likod's non-meat ingredients: proposed as name + estimate lines until Likod's
+  Veggies and Pantry sheets open (meat comes from the grill's raw stock).
+- Miscuts used for staff meals (grill, and kitchen commi work): proposed flow
+  in the 2026-10-28 handoff; cost rule to confirm.
 - Which Loyverse field carries the staff member's name on a staff order
   (customer or note)? Staff orders are recognised by the staff name (53).

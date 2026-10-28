@@ -11,6 +11,10 @@ See `docs/engineer-role.md`.
 `/start` and the queue runner can skip it while an open PR touches the same
 files. The architect adds the line when a step becomes runnable.
 
+**Edge states line (2026-10-22).** Every step spec in `session-status.md` ends with an "Edge
+states:" line covering failure, partial, empty, stale, blocked, inactive and two devices
+(whichever apply; "none" is an answer). A spec without one is not runnable.
+
 `docs/session-status.md` remains the authoritative description of each
 step. This file says *what order* and *which lane* — not what the work
 is. Read the step's own section in `session-status.md` before starting.
@@ -34,6 +38,12 @@ is. Read the step's own section in `session-status.md` before starting.
 > Wi-Fi; the completed UI is shown Sunday 2026-10-25. Order this week: **3x ui-pass and 3v
 > count-drafts (parallel), then 3y ui-pass-ii, then 3k stub-login (optional)**. Everything else
 > at normal pace. See session-status "Beta date + UI pass".
+
+> **2026-10-28 - order for the 11-01 inventory demo.** **3za blind-count first** (it and 3m / 3l
+> all touch dailyAudit.js; 3m and 3l wait for it). Any time, in parallel: 3z warn-ink, 3q
+> autopilot-preview, 3zb self-host-font, and 3u sheets-tier1 then 3j import-identity (they share
+> seed.js). After 3za: 3m site-filter, then 3l user-id-authorship, then 3zc allocation-requests.
+> 3zd sheet-close after 3u. 3ze is Naoki's own PR.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -71,7 +81,7 @@ resolveSiteCode). Data layer only, NO enforcement yet. Depends on users-roles (u
 overlaps schema.sql with 24d-i + users-roles -> sequence. Server-only, no click-through. Full
 spec: session-status.md -> "Step user-sites".
 
-### 3j. Step import-identity - import-settings.js identity slice (Roles/Users/memberships)  [blocked: user-sites]
+### 3j. Step import-identity - import-settings.js identity slice (Roles/Users/memberships)  [runnable: after 3u, shares seed.js]
 Touches: scripts/import-settings.js, server/db/seed.js, package.json
 **2026-10-13:** + the seed.js bootstrap guard (one super-admin). Shares seed.js with 3u -> sequence.
 Standalone importer (decision A), identity tabs only, UPSERT/idempotent, uses siteAccess.js to
@@ -85,14 +95,14 @@ Phase-1 identity, no passwords: pick-your-name -> cookie -> req.user with capabi
 enforcement yet. LEAN: plain cookie, no new dep (flag). Needs users present (import-identity or a
 dev seed). PUBLIC -> click-through. Full spec: session-status.md -> "Step stub-login".
 
-### 3l. Step user-id-authorship - new writes carry user_id  [blocked: stub-login]
+### 3l. Step user-id-authorship - new writes carry user_id  [blocked: blind-count, then site-filter]
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, write routes
 Add created_by_user_id (FK users) to the ~10 created_by tables; stamp it from req.user on new
 writes; legacy created_by retired at wipe, no backfill. Invasive (many routes), one pass. Big
 migration -> sequences with other schema/migration steps. Full spec: session-status.md ->
 "Step user-id-authorship".
 
-### 3m. Step site-filter - query-layer site scoping enforcement  [blocked: stub-login, user-sites]
+### 3m. Step site-filter - query-layer site scoping enforcement  [blocked: blind-count]
 Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/index.js
 requireSiteAccess middleware: checker scoped to memberships (siteAccess.js), management/admin/
 super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped routes; park
@@ -109,7 +119,7 @@ A 15-minute poll: a `run-now` label or a new `architect-docs` issue (naokicodes 
 1-step run. Calls no Claude itself. Needs 3n's lock, -Trigger and pause switch. Full spec:
 session-status.md -> "Step autopilot-doorbell".
 
-### 3q. Step autopilot-preview - serve a PR on port 3100 for phone click-throughs  [blocked: autopilot-doorbell]
+### 3q. Step autopilot-preview - serve a PR on port 3100 for phone click-throughs  [runnable]
 Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1
 A `preview` label on a PR serves that PR's code from a separate worktree on port 3100 with a
 reseeded throwaway DB, reachable over Tailscale. Never port 3000, never the live DB. Full
@@ -140,7 +150,7 @@ Loyverse names + quantities), unmatched items and account status, by calling the
 the route. Writes nothing. Not in the UI. Parallel-safe with loyverse-preview-ii. Full spec:
 session-status.md -> "Step loyverse-preview-iii".
 
-### 3u. Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)  [blocked: user-sites]
+### 3u. Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)  [runnable]
 Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js
 First Sheets slice: the sheet_definitions table (site_code, category, engine_type MEAT|SIDE,
 active) + a validating module + a seed of one Landing per restaurant and one Commi per
@@ -184,6 +194,30 @@ session-status.md -> "Step ui-pass-ii".
 Touches: public/style.css
 Adds --warn-ink (#94570A) for text on --warn-tint so small warn badges reach 4.5:1. Colors only,
 style.css only. PUBLIC -> click-through. Full spec: session-status.md -> "Step warn-ink".
+
+### 3za. Step blind-count - meat counters count blind; quiet recount  [runnable]
+Touches: server/db/schema.sql, server/engines/blindCount.js, server/engines/blindCount.test.js, server/routes/dailyAudit.js, public/daily-audit.html
+The 11-01 demo item. Counters see endings + remarks only (server strips the numbers); head chef
+orders recounts; every save kept in count_entries. PUBLIC -> click-through. Full spec:
+session-status.md -> "Step blind-count".
+
+### 3zb. Step self-host-font - serve Archivo from the app  [runnable]
+Touches: public/style.css, public/fonts/
+Pages stop waiting on Google Fonts over the restaurant Wi-Fi. PUBLIC -> click-through. Full spec:
+session-status.md -> "Step self-host-font".
+
+### 3zc. Step allocation-requests - counters ask, the head chef confirms  [blocked: user-id-authorship]
+Touches: server/db/schema.sql, server/engines/allocationRequests.js, server/engines/allocationRequests.test.js, server/routes/allocations.js, public/daily-audit.html
+PUBLIC -> click-through. Full spec: session-status.md -> "Step allocation-requests".
+
+### 3zd. Step sheet-close - admins close a sheet  [blocked: sheets-tier1]
+Touches: server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js, server/routes/settings.js, public/settings.html
+PUBLIC -> click-through. Full spec: session-status.md -> "Step sheet-close".
+
+### 3ze. Step restaurant-pc - the restaurant PC script, with an update mode  [Naoki's own PR]
+Touches: scripts/restaurant-pc.bat, .gitattributes
+Not for /naoki-qs: Naoki opens it with the architect-provided file. Full spec: session-status.md
+-> "Step restaurant-pc".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
@@ -302,6 +336,17 @@ conversion model". Family:
   commissary_conversion_standards (multiple standards per conversion + costing-default + per-log
   override). Optional - most goods received proper; conversion is the on-the-spot exception.
 Commi yield (Stage 1) is built (24d-i). Leans on commissary_meat_map + allocation machinery already in schema.
+
+## Planned — queued by the architect 2026-10-28 (NOT yet specified)
+
+- **table-scroll** (issue #30): wide tables scroll inside their own box on a phone. After 3y,
+  before grouped navigation. Needs a spec.
+- **grouped navigation**: the prototype's Tonight / Supply / Staff / Management groups. Touches
+  every page, so after table-scroll. Needs a spec.
+- **spos-import**: SPOS moves into `spos/` by `git subtree add` with full history, after Beta, in
+  one attended PR (spos/CLAUDE.md, mail secrets to .env, a guard-db rule for SPOS's schema.sql
+  DROPs, graphify kept out of spos/, backend/uploads/ untracked, a test forbidding requires
+  across spos/). The mail password is already rotated. Autopilot never touches spos/.
 
 ## Planned — supply, cost and SPOS sales (architect-defined 2026-10-19, NOT yet sliced)
 

@@ -13,3 +13,6 @@ Status: IRL Written - FLOW None - APP Decided
   seeded from the private workbook through import-settings (1); valuation uses
   the same number; prices never in the repo (31).
 - Not specced (import-settings price slice). Queue item A9.
+- Counted-meat costing (valuation): batch cost = input quantity x unit cost;
+  shrinkage pesos = batch x (raw - backed) / raw; backed cost per kg = batch /
+  backed kg. No schema change.

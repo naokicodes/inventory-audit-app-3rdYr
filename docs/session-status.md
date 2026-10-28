@@ -136,6 +136,34 @@ decision records; ADR-002 definition of done (Beta and Final); ADR-003 staff
 meals as quantities; ADR-004 SPOS ownership. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
 
+### 2026-10-28 architect (A7, A3, A4) - decided (ADRs follow in A1)
+
+- **Blind counting is derived from role flags** until the supervisor role adds an explicit flag:
+  checker is blind; head-chef, admin, super-admin and management see expected and variance. No
+  user = blind. The server strips the numbers, never only the page. The commissary is **never**
+  blind; the Likod grill landing is **not** blind until it has a head.
+- **Counters see endings + remarks only**: no beginning, new stock, sales, in-house, allocations,
+  expected or variance.
+- **Recount:** the landing person / head chef picks items and a person (told in person; no
+  notifications); only those items are recounted; the recount is blind too and becomes the
+  count; the first count stays in history. The first counter may be picked, with a warning
+  (sharpens 10-22 item 2: "by someone else" is a warning, not a block). Orders only before the
+  day is finalized. Two devices: last save wins, both kept, "changed by".
+- **One unit per meat on the landing** (closes "pieces AND weight" for the landing). A kg figure
+  at a landing means commi work, which is done on the commissary page by whoever has a commi
+  membership (the griller; the kitchen cook who backs up shortplate). All raw meat lands on commi
+  stock first. One commi, more people allowed - never a sub-commi.
+- **Allocation requests:** counters propose (type, amount, note); the head chef accepts, edits or
+  rejects. Its own step, after the identity chain.
+- **Roles across sites** use memberships, never a bypass: the buyer and some supervisors hold
+  several; one cashier per restaurant. import-identity and site-filter run as specced.
+- **Beta:** the restaurant PC is the Beta server, pinned to tags (scripts/restaurant-pc.bat);
+  the laptop is for dev and weekday testing on main. Paper stays the record of truth.
+- **Staff meals** (A10, not specced): meal slots per restaurant are settings; each slot has a
+  budget mode (fixed amount / head count x per-head rate / none), all editable; budgets are per
+  meal; OJT uses "none" (own money); gas stays out of meal cost (an operating expense); the meal
+  planner is a later, separate feature (a plan can be voided with a reason, kept in history).
+
 ### 2026-09-15 multi-user scoping — decided (direction; build is gated/Planned)
 
 The app is pivoting from single-user local to multi-user with roles. These are
@@ -2354,3 +2382,182 @@ Click-through (390px AND desktop): every warn badge and the blocked card read cl
 else changed color.
 
 Touches: public/style.css. PUBLIC -> click-through before merge.
+
+## Step blind-count - meat counters count blind; quiet recount (A7)
+
+Decided 2026-10-22 and 2026-10-28 (see "Things NOT to re-litigate" -> 2026-10-28). The 11-01 demo
+item. DEPENDS ON stub-login (req.user), closed. Runs BEFORE site-filter and user-id-authorship: all
+three touch server/routes/dailyAudit.js; those two adapt to this one.
+
+**Who is blind.** One helper, isBlind(user), in a new module server/engines/blindCount.js; nothing
+else decides it. Blind = the user's role has can_enter_counts = 1 AND can_finalize = 0 AND
+can_admin = 0 AND read_only = 0 (today: checker). No user (not logged in) = blind. Everyone else
+sees everything. An explicit role flag replaces this derivation when the supervisor role arrives
+(roster family); this helper is the only place to change.
+
+**Where.** The restaurant meat landing only: the daily-audit routes for meat AND portion rows.
+Not the commissary (never blind) and not side sheets (no expected value).
+
+**Server strips, not the page.** For a blind user, the daily-audit GET routes return per row only:
+ids, name, unit, the current count, its remark, and an open-recount flag, plus blind: true. Never
+beginning, new stock, sales, in-house, allocations, ending_calculated, variance,
+unexplained_variance, or any portion expected / variance. One stripping function in the module,
+called by the routes.
+
+**Counter view (public/daily-audit.html).** When blind: true, a count list only - item, END
+input, remark. No review cards, allocations or variance chips. count-drafts keeps working. Remarks
+for portion rows are new (stored below).
+
+**Count history** - new table, CREATE TABLE IF NOT EXISTS (no migrate helper, so it never
+collides with user-id-authorship's migration):
+- count_entries: id, restaurant_id, business_date, kind ('MEAT' or 'PORTION', module-validated),
+  item_id (meat_id or dish_id), quantity REAL NOT NULL, remark TEXT, entry_type ('COUNT',
+  'RECOUNT', 'EDIT', module-validated), user_id INTEGER (nullable), user_name TEXT (snapshot),
+  created_at.
+- Every saved ending (meat or portion) appends one row in the SAME transaction as the existing
+  upsert. ending_actual / portion_ending_actual keep holding the current value, so auditEngine is
+  untouched. ending_actual.notes keeps getting the meat remark as today.
+- entry_type: the first save of the day for that item = COUNT; a save that answers an open recount
+  order = RECOUNT; any other later save = EDIT.
+
+**Recount orders** - new table recount_orders: id, restaurant_id, business_date, kind, item_id,
+ordered_by_user_id, assigned_user_id, status ('OPEN', 'DONE', 'CANCELLED'), created_at, done_at.
+- Who may order or cancel: not blind AND (can_finalize OR can_admin) - head-chef, admin,
+  super-admin. Management sees, never orders (403).
+- An order = items ticked on the review page + one person: an active user with a membership at
+  that site (user_sites) whose role can enter counts. If that person made the item's COUNT entry,
+  the response carries a warning ("did the first count") and the order is still created.
+- After picking their name, the assigned person sees "Recount: <items>" at the top of the count
+  page. Their save of that item is a RECOUNT, closes the order and becomes the current value. The
+  first count stays in count_entries.
+- Finalization is not built yet; when it lands it blocks new orders. isBlocked() refuses recount
+  saves exactly as it refuses any save today.
+
+**Landing person's view.** The review page as today, plus per item with history: who counted,
+who recounted and the first value; "changed by <name>" when an EDIT replaced a count.
+
+Edge states: failure - a failed save writes no history row (one transaction). Partial - unsaved
+rows stay as drafts; saved rows are counts. Empty - the counter sees the item list with empty
+inputs; the landing person sees "not counted". Stale - an open order belongs to its date only and
+is never carried to today. Blocked - isBlocked items refuse as today; no order can be created on a
+blocked item. Inactive - an inactive user cannot be picked; an order whose person went inactive
+stays OPEN and can be cancelled and re-ordered. Two devices - last save wins, both rows kept,
+"changed by" shown.
+
+Tests: a blind response (checker, and no user) has none of the forbidden keys, for meat and
+portion rows; a head-chef response is unchanged from today; a save writes the current value and
+one count_entries row together; COUNT / EDIT / RECOUNT typing; a recount closes its order and
+becomes the count while the first stays in history; checker and management get 403 on ordering;
+picking the first counter returns the warning and succeeds; a portion remark round-trips.
+
+Click-through (390px): as a checker - a count list only, and no numbers in View Source or the
+network response; as head chef - order a recount, switch to the picked person, recount, then see
+the history on the review page.
+
+Not in scope: allocation requests (step allocation-requests); PO quantities on the counter's page
+(supply family); notifications; the explicit role flag (roster family).
+
+Touches: server/db/schema.sql, server/engines/blindCount.js (new) + its test,
+server/routes/dailyAudit.js, public/daily-audit.html. PUBLIC -> click-through before merge.
+
+## Step allocation-requests - counters ask, the head chef confirms (A7b)
+
+Decided 2026-10-28. Today counters tell the head chef by word of mouth ("dropped 2 portions",
+"sent 1 to Likod"); about half are forgotten, and the head chef only needs to confirm the value.
+DEPENDS ON blind-count (shares its pages) and user-id-authorship (requests carry user ids).
+
+- New table allocation_requests (CREATE TABLE IF NOT EXISTS): id, restaurant_id, business_date,
+  kind ('MEAT' or 'PORTION'), item_id, request_type (module-validated: the adjustment / allocation
+  types the head chef can already enter on that item, plus OTHER), quantity REAL NOT NULL, note,
+  requested_by_user_id, status ('PENDING', 'ACCEPTED', 'EDITED', 'REJECTED'),
+  decided_by_user_id, decided_at, created_ref (id of what accepting created), created_at.
+- Anyone who can enter counts at that site adds a request from the count page: item, type,
+  amount, note. Blind users see only their own requests and their status.
+- Head-chef / admin / super-admin see PENDING requests on the review page next to the item.
+  Accept = create the entry through the EXISTING write path for that type (same validation, same
+  activity_log), status ACCEPTED. Edit = change amount or type, then accept (EDITED; the request
+  row keeps what was asked). Reject = REJECTED with an optional note. Nothing changes stock until
+  accepted.
+- Staff meals are not a request type (own page, staff-meals family).
+
+Edge states: failure - accept is one transaction (entry + status) or nothing. Partial - n/a.
+Empty - "No requests". Stale - a PENDING request stays on its own date's review with its date
+shown; never carried forward. Blocked - if the write path refuses, the request stays PENDING with
+the reason. Inactive - a request from a user who went inactive stays valid. Two devices - a second
+accept or reject of the same request gets "already decided" and changes nothing.
+
+Tests: a counter can create, a counter cannot accept (403); accept creates exactly one entry via
+the existing path; edit keeps the original amount on the request; reject creates nothing; double
+accept is refused; blind users never receive another user's requests.
+
+Touches: server/db/schema.sql, server/engines/allocationRequests.js (new) + its test,
+server/routes/allocations.js, public/daily-audit.html. PUBLIC -> click-through before merge.
+
+## Step self-host-font - serve Archivo from the app, not from Google (A4)
+
+Decided 2026-10-25 (handoff 58). On the restaurant Wi-Fi every page waits on
+fonts.googleapis.com because style.css @imports it. Archivo is OFL-licensed.
+
+- Add Archivo woff2 files, Latin subset, weights 400 / 500 / 600 / 700, under public/fonts/, with
+  the OFL license text next to them (public/fonts/OFL.txt). Take them from the @fontsource/archivo
+  package or the official download; commit the files; add NO runtime dependency.
+- style.css: replace the @import line with @font-face rules (font-display: swap). Keep the
+  existing font-family stack (system-ui fallback).
+- No other file references Google Fonts today (checked 2026-10-28); keep it that way.
+
+Edge states: offline is the point - every page renders with no internet; if a font file fails,
+the system-ui fallback shows and nothing breaks.
+
+Tests: no file under public/ references fonts.googleapis.com or fonts.gstatic.com.
+Click-through (390px AND desktop): pages look the same as before; with internet blocked, pages load
+at once.
+
+Touches: public/style.css, public/fonts/ (new), one test file. PUBLIC -> click-through before
+merge.
+
+## Step sheet-close - admins close a sheet ("under maintenance") (A4)
+
+Decided 2026-10-25 (handoff 45). DEPENDS ON sheets-tier1. Narrow slice: the switch only.
+
+- Closed = sheet_definitions.active = 0 (tier 1's column; no schema change). Shown as
+  "Under maintenance".
+- Module (sheetDefinitions.js): setSheetActive({ id, active, user }): only can_admin roles
+  (super-admin, admin); writes an activity_log row (before / after) in the same transaction.
+- Routes: GET /api/settings/sheets (all definitions, every site, with status); POST
+  /api/settings/sheets/:id/close and /open (403 for anyone without can_admin).
+- Settings page: a Sheets list per site with Close / Reopen.
+- Rules for later slices, recorded here so they honor it: a closed sheet cannot be assigned, is
+  not counted, never shows as missing, and keeps its history. Likod's Veggies and Pantry
+  definitions start closed when the sides slice seeds them.
+
+Edge states: failure - nothing half-written (one transaction). Empty - "No sheets yet". Stale -
+the list reloads after each action. Blocked - non-admins see the list without buttons. Inactive -
+a closed sheet stays listed. Two devices - closing an already closed sheet is a no-op that
+returns the current state.
+
+Tests: admin closes and reopens; checker / head-chef / management get 403; activity_log row
+written; listSheetDefinitions({ activeOnly: true }) excludes a closed sheet.
+
+Touches: server/engines/sheetDefinitions.js + test, server/routes/settings.js,
+public/settings.html. PUBLIC -> click-through before merge.
+
+## Step restaurant-pc - the restaurant PC script in the repo, with an update mode (A3)
+
+Decided 2026-10-28. The restaurant PC is the Beta server. Its setup script
+(restaurant-pc.bat, written 2026-10-28) installs a separate clone in
+%USERPROFILE%\InventoryApp, pinned to a tag, with server/db/beta.db through .env and the Loyverse
+tokens in that .env only. It is never pulled or reseeded.
+
+This step is **Naoki's own PR** with the architect-provided file (no secrets inside): add
+scripts/restaurant-pc.bat and a .gitattributes line `*.bat text eol=crlf`. Modes:
+- no argument: setup (idempotent); `start`: back up beta.db, show the phone link, run the app
+  (the desktop shortcut calls this);
+- `update <tag>`: refuses while the app is running (port 3000 in use) or if tracked files were
+  edited; backs up beta.db; fetches tags; checks out the tag; npm ci; npm run verify; on a failed
+  verify, goes back to the previous version and says so. .env and beta.db are untracked, so an
+  update never touches them; migrations run on the next start.
+
+Edge states: no internet (fetch fails - nothing changes); unknown tag (refused, tags listed); app
+running (refused); verify fails (rolled back).
+
+Touches: scripts/restaurant-pc.bat (new), .gitattributes. Not public/.

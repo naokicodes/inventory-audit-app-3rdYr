@@ -39,5 +39,9 @@ Status: IRL Written - FLOW Drafted - APP Decided (pick-your-name login Built, PR
   history stays. If an assigned counter is absent, the landing person or a
   supervisor reassigns, any time before the count closes.
 
+- Decided 2026-10-28: people who work across restaurants hold several site
+  memberships (the buyer; some supervisors); one cashier per restaurant. No
+  role bypasses site scoping except the existing admin / management ones.
+
 ## Open questions
 - PINs for staff before Live (decide later).

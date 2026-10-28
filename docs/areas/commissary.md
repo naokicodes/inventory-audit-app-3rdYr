@@ -25,9 +25,13 @@ Sheet "Commissary Inventory" (source: photos 2026-10-23 and 2026-10-24).
   requests (requested -> fulfilled -> acknowledged).
 - Missing: Likod as a third destination (8). Queue item A12.
 - The app's acknowledge step replaces the empty signature columns.
+- Decided 2026-10-28: one commi, more people. Whoever does commi work at a
+  station gets a commi membership: the griller, and the kitchen cook who backs
+  up shortplate into braised beef / nilaga. All raw meat lands on commi stock
+  first; the cook asks for it, then records the yield and the shipment on the
+  commissary page. Commi counts are never blind.
 
 ## Open questions
-- Who works the commi screens: the person who takes meat out of the commi for
-  their station (for example the griller) could be given commi access to yield
-  and ship to their own site, instead of a second "sub-commi". Proposed:
-  one commi, more people allowed, each shipping only to their own site.
+- Miscuts as stock: the yield already records miscut kg (analytics only).
+  Proposed 2026-10-28: miscut becomes a counted item that staff meals draw
+  from and that closes out as waste (bones). Cost rule to confirm.

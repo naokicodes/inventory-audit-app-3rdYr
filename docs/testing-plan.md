@@ -68,6 +68,31 @@ path so Beta runs on a disposable `beta.db`, separate from the live
 
 ---
 
+## Beta setup (2026-10-28)
+
+Replaces the 2026-10-24 laptop plan.
+
+- **Server: the restaurant PC.** Installed by `scripts/restaurant-pc.bat` into
+  `%USERPROFILE%\InventoryApp`: its own clone, never pulled, pinned to a tag; data in
+  `server/db/beta.db` through `.env`, never reseeded there; the Loyverse tokens live only in that
+  `.env`. Daily: the desktop "Start Inventory App" backs up `beta.db` to a dated copy, shows the
+  phone link and runs the app.
+- **Dev and weekday testing: Naoki's laptop**, on `main`, with its own `beta.db`.
+- **Tags.** `beta-1`, `beta-2`, ... Each tag is a `main` Naoki already phone-checked, set before a
+  session at the restaurant. Move the PC with `restaurant-pc.bat update <tag>` while the app is
+  closed.
+- **Sessions.** Night counts (Silingan 9:30-10:30pm) and, as those pages land, day sessions
+  (arrivals) and PO time with the team. Naoki picks the testers he works with that day. **Paper
+  stays the record of truth**; the app runs alongside and staff input is UX feedback.
+- **Scripts per role, only for what the tag has.** Counter (checker): pick your name, count
+  tonight's items, add a remark, compare with the paper. Head chef: review the variance, order a
+  recount (once blind-count is tagged). Commi: a yield, then a shipment.
+- **Bugs:** one Messenger group, fixed shape - page, what I did, what I expected, what happened,
+  screenshot, time. Naoki turns them into `beta` issues and triages them at the end of each week.
+- **Backups:** after each session, also copy the newest dated `beta.db` to a private folder (for
+  example Drive). Never in the repo: it holds real counts and names.
+- **Network:** Wi-Fi only; a DHCP reservation on the router keeps the phone link fixed.
+
 ## Target
 
 Testing plan finalized and Beta-ready within ~1 week (≈ **2026-10-02**).

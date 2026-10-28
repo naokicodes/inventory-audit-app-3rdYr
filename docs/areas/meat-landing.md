@@ -1,6 +1,6 @@
 # Meat landing (Silingan, FC)
 
-Status: IRL Confirmed - FLOW Drafted - APP Built (endings-only + blind count Decided)
+Status: IRL Confirmed - FLOW Drafted - APP Built (blind count + recount Specced)
 
 ## IRL - how it works today
 
@@ -12,8 +12,9 @@ Status: IRL Confirmed - FLOW Drafted - APP Built (endings-only + blind count Dec
      salmon, shrimp, golabki.
    - COOKED: sisig, jowl, pata, slab inihaw, braised beef, nilaga, pasta, whole
      chicken; croquettes and mozzarella added by hand.
-   - Only END is filled. The counter never sees an expected number: blind
-     counting already happens on paper.
+   - The counter fills END; QTY is their first PO quantity for the item,
+     which the head chef reviews. The counter never sees an expected
+     number: blind counting already happens on paper.
    - Endings like "12+6" are later additions: paper cannot be erased, so staff
      add with "+". In the app this is simply an edit.
    - Remarks carry the OJT meals (dish and grams of jowl).
@@ -50,8 +51,19 @@ ITEM NAME, BEG, NEW S., POS, INHOUSE, OVR/SHRT, END, RAW, REMARKS.
 ## APP
 - Built: daily audit (meat + portion counts, allocations, month opening and
   recount, dashboard), count drafts kept on the phone (PR #31).
-- Decided, not specced: blind count + quiet recount (handoff 2), counters enter
-  endings + remarks only (3). Queue item A7.
+- Specced 2026-10-28: step blind-count (queue 3za). Blind = the checker role
+  (derived from role flags until the supervisor role adds a flag); the server
+  never sends beginning, new stock, sales, in-house, expected or variance to a
+  counter. Recounts are picked by the landing person / head chef, told in
+  person, recount only the ticked items, and become the count; the first count
+  stays in history. The first counter may be picked, with a warning.
+- Specced 2026-10-28: step allocation-requests (3zc). Counters propose an
+  allocation (type, amount, note); the head chef accepts, edits or rejects.
+- One unit per meat on the landing. A kg figure at a landing is commi work,
+  done on the commissary page (see commissary.md).
+- Not blind: the commissary (never) and the Likod grill landing (until it has
+  a head).
+- QTY (the counter's PO line) belongs to the supply family (A9).
 
 ## Open questions
-- Counting one meat by pieces AND weight: allowed? (handoff open question 4)
+- None open. (Pieces AND weight: closed 2026-10-28 - one unit per meat.)
