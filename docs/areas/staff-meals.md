@@ -45,7 +45,8 @@ Status: IRL Confirmed - FLOW Drafted - APP Decided
   budget mode - a fixed amount, head count x a per-head rate, or no budget -
   with every value editable (values in the private notes). Budgets are per
   meal: the fixed amount is the budget, head count x rate the maximum. Head
-  count is typed per meal until the roster exists, then comes from it. OJT
+  count: one field per meal, prefilled from the people on duty at that
+  restaurant, editable by the cook (ADR-027). OJT
   uses "no budget": recorded and monitored, no limit; each slot can carry an
   optional OJT part with its own head count. Gas stays out (operating
   expenses). A logged meal stands alone (date, site, slot, cook, lines); the
@@ -58,7 +59,5 @@ Status: IRL Confirmed - FLOW Drafted - APP Decided
   chef. If yes, rice becomes the one pantry item logged in staff meals.
 - Likod's non-meat ingredients: proposed as name + estimate lines until Likod's
   Veggies and Pantry sheets open (meat comes from the grill's raw stock).
-- Miscuts used for staff meals (grill, and kitchen commi work): proposed flow
-  in the 2026-10-28 handoff; cost rule to confirm.
 - Which Loyverse field carries the staff member's name on a staff order
   (customer or note)? Staff orders are recognised by the staff name (53).

@@ -1,6 +1,6 @@
 # ADR-004 SPOS ownership while Prince is busy
 
-- Status: Accepted 2026-10-20 (one open question, below)
+- Status: Accepted 2026-10-20 (the open question was answered 2026-10-21: see ADR-005)
 - Decided by: Naoki, with Prince
 - Supersedes: none (amends who owns SPOS work, not the boundary)
 

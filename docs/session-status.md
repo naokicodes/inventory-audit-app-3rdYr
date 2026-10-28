@@ -132,11 +132,11 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-decision records; ADR-002 definition of done (Beta and Final); ADR-003 staff
-meals as quantities; ADR-004 SPOS ownership. If an entry here and an ADR
+to ADR-032; the index, and a map from handoff item numbers to records, is in
+`docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
 
-### 2026-10-28 architect (A7, A3, A4) - decided (ADRs follow in A1)
+### 2026-10-28 architect (A7, A3, A4) - decided (recorded: ADR-007, ADR-010 to ADR-019, ADR-027)
 
 - **Blind counting is derived from role flags** until the supervisor role adds an explicit flag:
   checker is blind; head-chef, admin, super-admin and management see expected and variance. No
@@ -150,8 +150,8 @@ disagree, that is a bug: ask Naoki and fix both the same day.
   (sharpens 10-22 item 2: "by someone else" is a warning, not a block). Orders only before the
   day is finalized. Two devices: last save wins, both kept, "changed by".
 - **One unit per meat on the landing** (closes "pieces AND weight" for the landing). A kg figure
-  at a landing means commi work, which is done on the commissary page by whoever has a commi
-  membership (the griller; the kitchen cook who backs up shortplate). All raw meat lands on commi
+  at a landing means commi work, which is done on the commissary page by whoever has commi
+  access (ADR-017: rostered on Commissary, a head-chef pick, or a Likod griller). All raw meat lands on commi
   stock first. One commi, more people allowed - never a sub-commi.
 - **Allocation requests:** counters propose (type, amount, note); the head chef accepts, edits or
   rejects. Its own step, after the identity chain.
