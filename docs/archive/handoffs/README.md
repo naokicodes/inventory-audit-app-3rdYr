@@ -24,13 +24,13 @@ listing what changed after it.
 | `ARCHITECTURE-HANDOFF-2026-09-26` | `85ac0e8` | 402 | Closed the draft's open questions; the Beta lane; the richer yield model (reversed two days later). |
 | `ARCHITECTURE-HANDOFF-2026-09-28` | `7d7e14e` | 443 | Path 1 yield, three-stage staging, the identity chain, the slicing order. |
 | `ARCHITECTURE-HANDOFF-2026-10-05` | `1f62de5` | 443 | Core-app line, hybrid A, the autopilot plan, the Loyverse preview. |
+| `ARCHITECTURE-HANDOFF-2026-10-20` | `213b9a1` | - | Transitional: introduced `docs/decisions/` (ADR-001 to ADR-004) and this archive; planned the harvest. |
 | `ARCHITECTURE-HANDOFF-2026-10-21` | `144c33d` | 483 | SPOS into the repo, the `/naoki-qs` merge policy, Beta on the restaurant PC, roster storage. |
 | `ARCHITECTURE-HANDOFF-2026-10-22` | `1517380` | 483 | Decisions 1-15: prices, blind counting, roles, stations, Likod, POs, roster. |
 | `ARCHITECTURE-HANDOFF-2026-10-25` | `40e982d` | 499 | Decisions 16-59: area docs, side units, buying, staff meals, bar, waste, pizza; the architect queue. |
 
 Not here: the 2026-09-15 handoff and the dispatcher handoff (never committed),
-the 2026-10-20 handoff (no copy was in the project files when A1 ran), and
-`architect-notes-PRIVATE.md` (stays private). Decisions 1-94 from the 10-22 to
+and `architect-notes-PRIVATE.md` (stays private). Decisions 1-94 from the 10-22 to
 10-28 handoffs are recorded as ADR-005 to ADR-032.
 
 ## How the decisions changed
