@@ -2216,6 +2216,7 @@ Touches: server/index.js, server/lanAddress.js (new), server/lanAddress.test.js 
 only, no migration, no click-through. Parallel-safe with 3zf.
 
 ## Step name-map-refresh - the app's Loyverse name map catches up with the Sheet
+**CLOSED 2026-10-30, PR #50 (`60bdc8b`).**
 Architect 2026-10-30. Why: on 10-30 the Kitchen Sales page left real kitchen sales unmatched
 (Likod Pork Slab Bagnet 7, Whole Chicken 3, Mozzarella stick 2, Chopsuey, Bah-Mi Pork, Stir-Fry,
 Beef Nilaga; Silingan Beef Nilaga 7). server/db/loyverse-name-map.json is the 10-03 copy of the

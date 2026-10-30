@@ -236,6 +236,7 @@ npm run dev prints the phone address (http://<PC IP>:3000) next to localhost. Se
 click-through. Full spec: session-status.md -> "Step lan-address".
 
 ### 3zh. Step name-map-refresh - the Loyverse name map catches up with the Sheet  [runnable]
+**CLOSED 2026-10-30, PR #50 (`60bdc8b`).**
 Touches: server/db/loyverse-name-map.json, docs/loyverse-name-map-2026-10-30.json, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, public/kitchen-sales.html
 Copies the Sheet's 43-dish map into the app, lets one cell hold "old | new" names, and collapses
 the Unmatched list. PUBLIC -> click-through. Full spec: session-status.md -> "Step
