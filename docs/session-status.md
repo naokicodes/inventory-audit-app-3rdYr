@@ -2128,6 +2128,7 @@ scripts/loyverse-matches.js (new), package.json. Server/scripts only, no click-t
 migration. Parallel-safe with loyverse-preview-ii.
 
 ## Step loyverse-preview-iv - Kitchen Sales: 8am business day, last kitchen receipt, date bar
+**CLOSED 2026-10-30, PR #48 (`5852d65`).**
 Architect 2026-10-30, loyverse-preview-iv (rev 2). Builds on loyverse-preview-i/ii (closed). Why:
 the kitchen reads its sales from this page instead of Naoki sending them from the Google Sheet each
 night. Not perfect, just usable; it runs until the landing work replaces it. Still read-only,

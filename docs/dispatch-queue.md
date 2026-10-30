@@ -222,6 +222,7 @@ Not for /naoki-qs: Naoki opens it with the architect-provided file. Full spec: s
 -> "Step restaurant-pc".
 
 ### 3zf. Step loyverse-preview-iv - Kitchen Sales: 8am day, last kitchen receipt, date bar  [runnable]
+**CLOSED 2026-10-30, PR #48 (`5852d65`).**
 Touches: server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, scripts/loyverse-matches.js, public/kitchen-sales.html
 The kitchen reads its own sales: the sales day turns at 8am (ADR-033), a "Last kitchen receipt"
 time per account, a Loyverse-style date bar (< date >, tap for a picker) and a Sync button.
