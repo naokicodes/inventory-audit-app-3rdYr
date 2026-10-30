@@ -574,7 +574,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
 - **Separate apps - settled 2026-10-19 (D3).** Staff use this app; cashiers use the SPOS POS; management uses both - SPOS's back office for money in (sales, revenue, receipts) and this app's read-only management dashboard for stock and losses in pesos. SPOS holds none of our data (finance may read our API later - the 10-03 lean stands). A plain link each way. This app keeps its own look and stack (plain CSS, no build step).
 - **Management dashboard + the 10pm sneak peek - settled 2026-10-19.** Silingan sells until 9pm, Likod until 12am; management wants the day's picture around 9-10pm.
   - Everything staff enter (arrivals, yields, allocations, bills, counts) is read straight from our DB: live with no sync.
-  - Sales are the only outside stream: pulled when the dashboard opens, held about 5 minutes, stored nowhere, tagged "as of HH:MM - partial" (+ "Likod open until 12am"). Same engine module as the Loyverse preview (3r): Loyverse now, SPOS's MySQL later. The official numbers come from the nightly sync (the real port) after the business day; a sale after midnight belongs to the previous business date.
+  - Sales are the only outside stream: pulled when the dashboard opens, held about 5 minutes, stored nowhere, tagged "as of HH:MM - partial" (+ "Likod open until 12am"). Same engine module as the Loyverse preview (3r): Loyverse now, SPOS's MySQL later. The official numbers come from the nightly sync (the real port) after the business day; a sale after midnight belongs to the previous business date (the sales day turns at 8am, ADR-033).
   - It shows: sales so far per site; meat used by recipe (sales x recipe_bom) and "should be left" (beginning + arrivals - usage); arrivals with cost ("Est." at the settings cost until billed); losses in pesos; stock value from the last count. Over/short appears only after the ending counts are saved. Revenue never appears - a link goes to SPOS's back office (Loyverse until then).
   - The usage, should-be-left and peso math live in an engine module (recyclable-logic rule), never in the page.
 - **Beta date + UI pass - settled 2026-10-19.**
@@ -2126,6 +2126,65 @@ when non-empty; `all` adds exact matches; a failed account prints its error line
 Touches: server/engines/loyverseReport.js (new), server/engines/loyverseReport.test.js (new),
 scripts/loyverse-matches.js (new), package.json. Server/scripts only, no click-through, no
 migration. Parallel-safe with loyverse-preview-ii.
+
+## Step loyverse-preview-iv - Kitchen Sales: 8am business day, last kitchen receipt, date bar
+Architect 2026-10-30, loyverse-preview-iv (rev 2). Builds on loyverse-preview-i/ii (closed). Why:
+the kitchen reads its sales from this page instead of Naoki sending them from the Google Sheet each
+night. Not perfect, just usable; it runs until the landing work replaces it. Still read-only,
+no money, writes nothing. Decision: ADR-033 (the sales day turns at 8am). PUBLIC -> live
+click-through (390px) before merge.
+
+Engine - server/engines/loyversePreview.js:
+- Business date (ADR-033): a receipt belongs to the Manila calendar date of (receipt_date minus
+  8 hours), both accounts. One constant, BUSINESS_DAY_START_HOUR = 8. 07:59:59 belongs to the
+  previous day; 08:00:00 to the new one.
+- Window: created_at from <date>T08:00:00+08:00 to +LOOKBACK_DAYS (late syncs still caught).
+- New helper businessDate(now): today's business date (before 8am Manila = yesterday). The route's
+  default date and the loyverse:matches CLI default use it instead of manilaDate(now).
+- Each account status gains `lastReceiptAt`: the receipt_date (ISO, as Loyverse sends it) of the
+  LATEST kept receipt that has at least one line resolved to a dish in the name map (a kitchen
+  item). Drinks-only or unmatched-only receipts don't count; a REFUND with a kitchen line does.
+  null when the account fetched fine but has no such receipt; null on a failed account.
+- receiptsKept, dishes, unmatched: unchanged except for the business date.
+
+Route - server/routes/loyverse.js: default date = businessDate(now). Nothing else.
+CLI - scripts/loyverse-matches.js: default date = businessDate(now). Nothing else.
+
+Page - public/kitchen-sales.html (layout like the Loyverse dashboard):
+- Top bar: "<" button, the date as a tappable label ("Fri, Oct 30"), ">" button. Tapping the
+  date opens the phone's date picker (a native input type=date; showPicker() where supported,
+  else the input sits invisibly over the label). Each arrow moves one day and loads; picking a
+  date loads. ">" is disabled on the current business date. Default: the current business date.
+- A "Sync with Loyverse" button fetches again (the page also loads on open and on every date
+  change). Nothing is saved - a sync is a fresh read.
+- Under the bar: "Last kitchen receipt: Silingan 9:12 PM - Likod 12:48 AM" (Manila, 12-hour;
+  "none yet" for an ok account with null; "-" for a failed account, its banner says why), then
+  "Synced 10:55 PM", plus " - this day stays open until 8:00 AM" on the current business date.
+- Table, banners, unmatched, account lines: as now. Copy as text stays, with the Last kitchen
+  receipt line after the header.
+- Styles in a page <style> block (11 pages already do this). No style.css change, so this stays
+  parallel-safe with warn-ink and self-host-font. Phone first: the bar fits at 390px.
+
+Tests (engine + route, pure, injected fetch / now): the 8am boundary both ways; the window starts
+at 08:00+08:00; businessDate at 07:59 is yesterday and at 08:00 is today; lastReceiptAt is the max
+among kitchen receipts given out of order; a later drinks-only receipt, a later cancelled one and
+one of another business date are ignored; none -> null; "token not set" -> null; the route with no
+date uses businessDate.
+
+Click-through: (1) the date bar shows today; "<" goes back a day, ">" comes back, ">" is greyed on
+today; (2) tapping the date opens a date picker and choosing a day loads it; (3) "Last kitchen
+receipt" and "Synced" show, and Sync with Loyverse updates the Synced time; (4) Copy as text has
+the Last kitchen receipt line; (5) at 390px nothing scrolls sideways. The laptop needs both
+tokens in .env for the live path; without them both accounts show "-" with "token not set".
+
+Edge states: failure - a failed account shows "-" and its banner, the other still shows its time;
+partial - same; empty - "none yet"; stale - the Synced time is the signal, no auto-refresh;
+00:00-07:59 - those receipts show on the previous day; future date - ">" disabled, a picked future
+date shows zeros and "none yet"; two devices, blocked, inactive - none (read-only page).
+
+Touches: server/engines/loyversePreview.js, server/engines/loyversePreview.test.js,
+server/routes/loyverse.js, server/routes/loyverse.test.js, scripts/loyverse-matches.js,
+public/kitchen-sales.html. PUBLIC -> click-through before merge.
 
 ## Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)
 

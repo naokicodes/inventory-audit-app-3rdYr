@@ -75,6 +75,7 @@ flight. (ADR-001 explains the split.)
 | ADR-030 | Likod is its own site | Accepted 2026-10-25 |
 | ADR-031 | Pizza: dough first (partly decided) | Accepted 2026-10-25 |
 | ADR-032 | Grouped navigation, after table-scroll | Accepted 2026-10-21 |
+| ADR-033 | The sales day turns at 8am | Accepted 2026-10-30 |
 
 ## Handoff item map
 

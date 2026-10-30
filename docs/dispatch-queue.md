@@ -44,6 +44,8 @@ is. Read the step's own section in `session-status.md` before starting.
 > autopilot-preview, 3zb self-host-font, and 3u sheets-tier1 then 3j import-identity (they share
 > seed.js). After 3za: 3m site-filter, then 3l user-id-authorship, then 3zc allocation-requests.
 > 3zd sheet-close after 3u. 3ze is Naoki's own PR.
+> **2026-10-30:** 3zf loyverse-preview-iv any time, ahead of the rest (it shares no file with
+> another runnable step).
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -218,6 +220,13 @@ PUBLIC -> click-through. Full spec: session-status.md -> "Step sheet-close".
 Touches: scripts/restaurant-pc.bat, .gitattributes
 Not for /naoki-qs: Naoki opens it with the architect-provided file. Full spec: session-status.md
 -> "Step restaurant-pc".
+
+### 3zf. Step loyverse-preview-iv - Kitchen Sales: 8am day, last kitchen receipt, date bar  [runnable]
+Touches: server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, scripts/loyverse-matches.js, public/kitchen-sales.html
+The kitchen reads its own sales: the sales day turns at 8am (ADR-033), a "Last kitchen receipt"
+time per account, a Loyverse-style date bar (< date >, tap for a picker) and a Sync button.
+Read-only, no money. PUBLIC -> click-through. Full spec: session-status.md -> "Step
+loyverse-preview-iv".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
