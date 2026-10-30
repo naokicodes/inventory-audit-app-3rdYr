@@ -230,6 +230,7 @@ Read-only, no money. PUBLIC -> click-through. Full spec: session-status.md -> "S
 loyverse-preview-iv".
 
 ### 3zg. Step lan-address - the server prints the address phones use  [runnable]
+**CLOSED 2026-10-30, PR #49 (`b5a8f5d`).**
 Touches: server/index.js, server/lanAddress.js, server/lanAddress.test.js
 npm run dev prints the phone address (http://<PC IP>:3000) next to localhost. Server only, no
 click-through. Full spec: session-status.md -> "Step lan-address".

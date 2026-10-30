@@ -2188,6 +2188,7 @@ server/routes/loyverse.js, server/routes/loyverse.test.js, scripts/loyverse-matc
 public/kitchen-sales.html. PUBLIC -> click-through before merge.
 
 ## Step lan-address - the server prints the address phones use
+**CLOSED 2026-10-30, PR #49 (`b5a8f5d`).**
 Architect 2026-10-30. Why: on start the server prints only http://localhost:3000, so anyone
 connecting a phone has to find the PC's IP with ipconfig. Server only, no click-through.
 
