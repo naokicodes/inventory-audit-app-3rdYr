@@ -86,12 +86,20 @@ function buildResolver(dishes, accountKey) {
   const exact = new Map();
   const wildcards = [];
   for (const dish of dishes) {
-    const pattern = dish[accountKey];
-    if (!pattern) continue; // '' = this account doesn't sell the dish
-    const norm = normalize(pattern);
-    if (!exact.has(norm)) exact.set(norm, { dish_code: dish.dish_code, pattern });
-    if (norm.includes('*')) {
-      wildcards.push({ dish_code: dish.dish_code, pattern, re: wildcardRegex(norm) });
+    const cell = dish[accountKey];
+    if (!cell) continue; // '' = this account doesn't sell the dish
+    // A cell may list several names separated by '|' (the GAS behaviour) - a
+    // dish renamed keeps its old name beside the new one. Split, trim, drop
+    // empties; each name is exact or wildcard on its own. The reported pattern
+    // is the single name that matched, not the whole cell.
+    for (const name of String(cell).split('|')) {
+      const pattern = name.trim();
+      if (!pattern) continue; // an empty '|' part is ignored
+      const norm = normalize(pattern);
+      if (!exact.has(norm)) exact.set(norm, { dish_code: dish.dish_code, pattern });
+      if (norm.includes('*')) {
+        wildcards.push({ dish_code: dish.dish_code, pattern, re: wildcardRegex(norm) });
+      }
     }
   }
   return function resolve(itemName) {

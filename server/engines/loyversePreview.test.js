@@ -226,6 +226,46 @@ test("an account that doesn't sell a dish ('') never matches it", () => {
   assert.strictEqual(l(''), null);
 });
 
+// --- multi-name cells ("old | new"): name-map-refresh ---
+
+test('"A | B" matches both names to the same dish; the matched name is the pattern', () => {
+  const dishes = [{ dish_code: 'D001', silingan: 'Alpha | Beta', likod: '' }];
+  const s = buildResolver(dishes, 'silingan');
+  assert.strictEqual(s('Alpha').dish_code, 'D001');
+  assert.strictEqual(s('Beta').dish_code, 'D001');
+  assert.strictEqual(s('Alpha').pattern, 'Alpha');
+  assert.strictEqual(s('Beta').pattern, 'Beta'); // the single name, not the whole cell
+});
+
+test('extra spaces around "|" are ignored and an empty part is dropped', () => {
+  const dishes = [{ dish_code: 'D001', silingan: '  Alpha   |   Beta  |  ', likod: '' }];
+  const s = buildResolver(dishes, 'silingan');
+  assert.strictEqual(s('Alpha').dish_code, 'D001');
+  assert.strictEqual(s('Beta').dish_code, 'D001');
+  assert.strictEqual(s(''), null); // the empty '|' part never matches ''
+});
+
+test('a wildcard after "|" works', () => {
+  const dishes = [{ dish_code: 'D014', silingan: '', likod: 'French Cut Pork Chop | Grilled French Chop*' }];
+  const l = buildResolver(dishes, 'likod');
+  assert.strictEqual(l('French Cut Pork Chop').matchedBy, 'exact');
+  const w = l('Grilled French Chop Large');
+  assert.strictEqual(w.dish_code, 'D014');
+  assert.strictEqual(w.matchedBy, 'wildcard');
+  assert.strictEqual(w.pattern, 'Grilled French Chop*'); // the single name, not the whole cell
+});
+
+test('an exact name in a later row beats a wildcard in an earlier row', () => {
+  const dishes = [
+    { dish_code: 'D001', silingan: 'Special*', likod: '' },
+    { dish_code: 'D002', silingan: 'Pork Special | Special Combo', likod: '' },
+  ];
+  const s = buildResolver(dishes, 'silingan');
+  assert.strictEqual(s('Special Combo').matchedBy, 'exact'); // D002's exact beats D001's wildcard
+  assert.strictEqual(s('Special Combo').dish_code, 'D002');
+  assert.strictEqual(s('Special Anything').dish_code, 'D001'); // only the wildcard matches
+});
+
 // --- account failures ---
 
 test('a missing token fails ONE account with a null column; the other computes', async () => {
@@ -443,15 +483,22 @@ test('every map row present in map order, zeros included; no price/total-money k
   assert.ok(!JSON.stringify(r).includes('999'), 'a price value leaked');
 });
 
-test('the committed name map loads and every row has a code and both account columns', () => {
+test('the committed name map loads with 43 dishes and resolves the October renames', () => {
   const map = loadNameMap();
   assert.deepStrictEqual(map.accounts.map(a => a.tokenEnv), ['LOYVERSE_SILINGAN_TOKEN', 'LOYVERSE_LIKOD_TOKEN']);
-  assert.ok(map.dishes.length > 0);
+  assert.strictEqual(map.dishes.length, 43);
   for (const d of map.dishes) {
     assert.ok(d.dish_code && typeof d.silingan === 'string' && typeof d.likod === 'string', d.dish_code);
   }
   const l = buildResolver(map.dishes, 'likod');
   assert.strictEqual(l('Pompano (Large)').matchedBy, 'wildcard');
+  assert.strictEqual(l('Pork Slab Bagnet').dish_code, 'D016');
+  assert.strictEqual(l('Whole Chicken').dish_code, 'D022');
+  assert.strictEqual(l('Mozzarella stick').dish_code, 'D001');
+  assert.strictEqual(l('Beef Nilaga').dish_code, 'D037');
+  const s = buildResolver(map.dishes, 'silingan');
+  assert.strictEqual(s('Beef Nilaga').dish_code, 'D037');
+  assert.strictEqual(s('Braised Beef Trays'), null);
 });
 
 test('malformed date is rejected', async () => {

@@ -81,15 +81,15 @@
 
     <div id="account-status"></div>
 
-    <div id="unmatched" hidden>
-      <h2>Unmatched</h2>
+    <details id="unmatched" hidden>
+      <summary></summary>
       <div class="table-scroll">
         <table>
           <thead><tr><th>Account</th><th>Item name</th><th class="num">Qty</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
-    </div>
+    </details>
 
     <div class="save-bar">
       <button id="copy-btn">Copy as text</button>
@@ -222,6 +222,12 @@
 
       const unmatchedEl = document.getElementById('unmatched');
       unmatchedEl.hidden = data.unmatched.length === 0;
+      // Starts collapsed on every render: most unmatched rows are drinks, rice,
+      // bread and pizza, which are not kitchen dishes and are expected.
+      unmatchedEl.open = false;
+      const un = data.unmatched.length;
+      unmatchedEl.querySelector('summary').textContent =
+        `Unmatched: ${un} item${un === 1 ? '' : 's'} (show)`;
       unmatchedEl.querySelector('tbody').innerHTML = data.unmatched.map(u =>
         `<tr><td>${esc(u.account)}</td><td>${esc(u.item_name)}</td><td class="num">${esc(u.quantity)}</td></tr>`
       ).join('');
