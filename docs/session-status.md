@@ -2215,6 +2215,44 @@ partial, stale, two devices, blocked, inactive - none.
 Touches: server/index.js, server/lanAddress.js (new), server/lanAddress.test.js (new). Server
 only, no migration, no click-through. Parallel-safe with 3zf.
 
+## Step name-map-refresh - the app's Loyverse name map catches up with the Sheet
+Architect 2026-10-30. Why: on 10-30 the Kitchen Sales page left real kitchen sales unmatched
+(Likod Pork Slab Bagnet 7, Whole Chicken 3, Mozzarella stick 2, Chopsuey, Bah-Mi Pork, Stir-Fry,
+Beef Nilaga; Silingan Beef Nilaga 7). server/db/loyverse-name-map.json is the 10-03 copy of the
+Apps Script map; the Sheet's Name_Map has since gained the October renames ("old | new" in one
+cell), D040-D043 and fixed patterns. The Sheet is being retired, so the app's file becomes the map.
+
+- server/db/loyverse-name-map.json: replace it byte for byte with
+  docs/loyverse-name-map-2026-10-30.json (43 dishes, copied from the Sheet on 10-30 by the
+  architect), then delete the docs copy in the same PR. Do not edit any row.
+- server/engines/loyversePreview.js, buildResolver: a map cell may list several names separated
+  by "|" (the GAS behaviour). Split, trim, drop empties; each name is exact or wildcard on its
+  own. Exact matches across all rows first, then wildcards in map order (unchanged). The
+  reported `pattern` is the single name that matched, not the whole cell.
+- public/kitchen-sales.html: the Unmatched section starts collapsed: "Unmatched: N items (show)"
+  as a <details> element (N = the rows it lists). Most rows are drinks, rice, bread and pizza,
+  which are not kitchen dishes and are expected. Nothing else changes.
+
+Tests (pure): "A | B" matches both A and B to the same dish; extra spaces around "|" ignored; a
+wildcard after "|" works ("French Cut Pork Chop | Grilled French Chop*"); an exact name in a later
+row beats a wildcard in an earlier row; the committed map loads with 43 dishes and resolves, for
+Likod, "Pork Slab Bagnet" -> D016, "Whole Chicken" -> D022, "Mozzarella stick" -> D001, "Beef
+Nilaga" -> D037, and for Silingan "Beef Nilaga" -> D037, "Braised Beef Trays" -> no match.
+Update the existing committed-map test if its Pompano example no longer fits.
+
+Click-through: (1) Kitchen Sales for 2026-10-30 now shows Likod numbers for Pork Bagnet, Whole
+Chicken and Mozarella Sticks; (2) Unmatched starts closed and opens on tap; (3) 390px, nothing
+scrolls sideways.
+
+Edge states: a name in two rows - exact beats wildcard, then map order (unchanged); an empty
+"|" part - ignored; a failed account - unchanged ("-"); empty, stale, two devices, blocked,
+inactive - none (read-only).
+
+Touches: server/db/loyverse-name-map.json, docs/loyverse-name-map-2026-10-30.json (deleted),
+server/engines/loyversePreview.js, server/engines/loyversePreview.test.js,
+public/kitchen-sales.html. PUBLIC -> click-through before merge. Map edits from now on: in this
+file, by the architect (the Sheet no longer leads).
+
 ## Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)
 
 First slice of the Sheets family (architect 2026-10-05). Decisions: "Sheets are a first-class

@@ -44,7 +44,7 @@ is. Read the step's own section in `session-status.md` before starting.
 > autopilot-preview, 3zb self-host-font, and 3u sheets-tier1 then 3j import-identity (they share
 > seed.js). After 3za: 3m site-filter, then 3l user-id-authorship, then 3zc allocation-requests.
 > 3zd sheet-close after 3u. 3ze is Naoki's own PR.
-> **2026-10-30:** 3zf loyverse-preview-iv any time, ahead of the rest (it shares no file with
+> **2026-10-30:** 3zh name-map-refresh first (Likod sales are undercounted until it lands). 3zf loyverse-preview-iv any time, ahead of the rest (it shares no file with
 > another runnable step). 3zg lan-address any time too (server only, no shared file).
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
@@ -234,6 +234,12 @@ loyverse-preview-iv".
 Touches: server/index.js, server/lanAddress.js, server/lanAddress.test.js
 npm run dev prints the phone address (http://<PC IP>:3000) next to localhost. Server only, no
 click-through. Full spec: session-status.md -> "Step lan-address".
+
+### 3zh. Step name-map-refresh - the Loyverse name map catches up with the Sheet  [runnable]
+Touches: server/db/loyverse-name-map.json, docs/loyverse-name-map-2026-10-30.json, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, public/kitchen-sales.html
+Copies the Sheet's 43-dish map into the app, lets one cell hold "old | new" names, and collapses
+the Unmatched list. PUBLIC -> click-through. Full spec: session-status.md -> "Step
+name-map-refresh".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
