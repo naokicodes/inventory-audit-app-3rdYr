@@ -19,6 +19,11 @@ const RECEIPTS_URL = 'https://api.loyverse.com/v1.0/receipts';
 const LOOKBACK_DAYS = 7;
 const TIMEZONE = 'Asia/Manila';
 const PAGE_LIMIT = 250;
+// The sales day turns at 8am (ADR-033): a receipt belongs to the Manila
+// calendar date of (receipt_date minus 8 hours). 07:59:59 is the previous
+// day; 08:00:00 is the new one. Sales only - nothing is sold before 8am, so
+// 8am never splits a night.
+const BUSINESS_DAY_START_HOUR = 8;
 
 function loadNameMap() {
   return JSON.parse(fs.readFileSync(NAME_MAP_PATH, 'utf8'));
@@ -42,10 +47,21 @@ function manilaDate(instant) {
   return manilaDateFormat.format(d);
 }
 
-// created_at window: <date>T00:00:00+08:00 to +LOOKBACK_DAYS. A late-synced
-// receipt's created_at is AFTER its receipt_date, never before.
+// Business date (ADR-033) of an instant: the Manila date of (instant minus 8
+// hours). Classifies a receipt (receipt_date) and gives "today's business
+// date" for a `now` (before 8am Manila -> yesterday).
+function businessDate(instant) {
+  const d = instant instanceof Date ? instant : new Date(instant);
+  if (Number.isNaN(d.getTime())) return null;
+  return manilaDate(d.getTime() - BUSINESS_DAY_START_HOUR * 60 * 60 * 1000);
+}
+
+// created_at window: <date>T08:00:00+08:00 (the business day's start) to
+// +LOOKBACK_DAYS. A late-synced receipt's created_at is AFTER its
+// receipt_date, never before, so it is still caught.
 function receiptWindow(date) {
-  const start = new Date(`${date}T00:00:00+08:00`);
+  const hh = String(BUSINESS_DAY_START_HOUR).padStart(2, '0');
+  const start = new Date(`${date}T${hh}:00:00+08:00`);
   const end = new Date(start.getTime() + LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
   return { min: start.toISOString(), max: end.toISOString() };
 }
@@ -125,7 +141,7 @@ function num(q) {
 // One account: fetch, keep, resolve. Never throws - a failure comes back as
 // { ok:false, error }.
 async function previewAccount({ account, date, dishes, env, fetchImpl }) {
-  const status = { label: account.label, ok: false, receiptsScanned: 0, receiptsKept: 0, receiptTypes: {} };
+  const status = { label: account.label, ok: false, receiptsScanned: 0, receiptsKept: 0, receiptTypes: {}, lastReceiptAt: null };
   const token = env[account.tokenEnv];
   if (!token) {
     status.error = 'token not set';
@@ -144,17 +160,21 @@ async function previewAccount({ account, date, dishes, env, fetchImpl }) {
   const quantities = new Map(); // dish_code -> qty
   const unmatched = new Map();  // raw item_name -> qty
   const candidates = new Map(); // dish|item_id|variant_id -> candidate
+  // The latest kept receipt that has at least one kitchen (name-mapped) line.
+  // Compared by time, since Loyverse may return receipts out of order.
+  let lastReceiptAtMs = -Infinity;
 
   status.receiptsScanned = receipts.length;
   for (const receipt of receipts) {
     if (receipt.cancelled_at) continue;
-    if (manilaDate(receipt.receipt_date) !== date) continue;
+    if (businessDate(receipt.receipt_date) !== date) continue;
     status.receiptsKept++;
     // Diagnostic only: REFUND receipts are still counted like sales (GAS
     // behaviour); the real port decides how refunds subtract.
     if (receipt.receipt_type) {
       status.receiptTypes[receipt.receipt_type] = (status.receiptTypes[receipt.receipt_type] || 0) + 1;
     }
+    let hasKitchenLine = false;
     for (const line of receipt.line_items || []) {
       const { item_name, quantity, item_id, variant_id, variant_name } = line;
       const qty = num(quantity);
@@ -163,6 +183,7 @@ async function previewAccount({ account, date, dishes, env, fetchImpl }) {
         unmatched.set(item_name, (unmatched.get(item_name) || 0) + qty);
         continue;
       }
+      hasKitchenLine = true;
       quantities.set(match.dish_code, (quantities.get(match.dish_code) || 0) + qty);
       const key = `${match.dish_code}|${item_id}|${variant_id}`;
       let c = candidates.get(key);
@@ -181,6 +202,15 @@ async function previewAccount({ account, date, dishes, env, fetchImpl }) {
         candidates.set(key, c);
       }
       c.quantity += qty;
+    }
+    // Drinks-only or unmatched-only receipts don't set the time; a REFUND
+    // with a kitchen line does. receipt_date is kept as Loyverse sent it.
+    if (hasKitchenLine) {
+      const t = new Date(receipt.receipt_date).getTime();
+      if (Number.isFinite(t) && t > lastReceiptAtMs) {
+        lastReceiptAtMs = t;
+        status.lastReceiptAt = receipt.receipt_date;
+      }
     }
   }
 
@@ -250,9 +280,11 @@ module.exports = {
   loadNameMap,
   isValidDate,
   manilaDate,
+  businessDate,
   receiptWindow,
   normalize,
   wildcardRegex,
   buildResolver,
   LOOKBACK_DAYS,
+  BUSINESS_DAY_START_HOUR,
 };

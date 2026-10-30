@@ -5,6 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kitchen Sales (Loyverse) - Inventory Audit App</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Step loyverse-preview-iv: a Loyverse-style date bar + sync. Page-local
+       so style.css is untouched (parallel-safe with warn-ink, self-host-font).
+       Phone first: the bar fits at 390px. */
+    .ks-bar {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.5rem; margin: 0.75rem 0 0.5rem;
+    }
+    .ks-arrow {
+      min-width: 2.75rem; min-height: 2.75rem;
+      font-size: 1.25rem; line-height: 1; padding: 0.25rem 0.5rem;
+    }
+    .ks-arrow:disabled { opacity: 0.4; cursor: default; }
+    .ks-date-wrap { position: relative; display: inline-flex; }
+    .ks-date-label {
+      display: inline-block; min-width: 9rem; text-align: center;
+      font-size: 1.1rem; font-weight: 600; padding: 0.5rem 0.75rem;
+      cursor: pointer; white-space: nowrap;
+    }
+    /* The native picker sits invisibly over the label: tapping it opens the
+       phone's date picker even where showPicker() is unavailable. */
+    .ks-date-input {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      opacity: 0; border: 0; padding: 0; margin: 0; cursor: pointer;
+    }
+    .ks-sync { text-align: center; margin: 0 0 0.75rem; }
+    #last-receipt, #synced { margin: 0.2rem 0; }
+  </style>
 </head>
 <body>
   <nav>
@@ -24,22 +52,28 @@
   <h1>Kitchen Sales (Loyverse)</h1>
   <p class="ks-note">Preview - read-only, nothing is saved</p>
 
-  <div class="controls">
-    <label>
-      Date
-      <input type="date" id="date-input">
-    </label>
-    <button id="load-btn">Load</button>
+  <div class="ks-bar">
+    <button type="button" id="prev-btn" class="ks-arrow" aria-label="Previous day">&lsaquo;</button>
+    <span class="ks-date-wrap">
+      <span id="date-label" class="ks-date-label"></span>
+      <input type="date" id="date-input" class="ks-date-input" aria-label="Choose a date">
+    </span>
+    <button type="button" id="next-btn" class="ks-arrow" aria-label="Next day">&rsaquo;</button>
+  </div>
+  <div class="ks-sync">
+    <button type="button" id="sync-btn">Sync with Loyverse</button>
   </div>
 
   <div id="banners"></div>
   <p id="loading" class="ks-note" hidden>Loading...</p>
+  <p id="last-receipt" class="ks-note"></p>
+  <p id="synced" class="ks-note"></p>
 
   <div id="result" hidden>
     <div class="table-scroll">
       <table id="sales-table">
         <thead>
-          <tr><th>Dish</th><th class="num">Likod</th><th class="num">Silingan</th><th class="num">Total</th></tr>
+          <tr><th>Dish</th><th class="num">Silingan</th><th class="num">Likod</th><th class="num">Total</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -65,28 +99,61 @@
   </div>
 
   <script>
-    // Step loyverse-preview-ii: the page for GET /api/loyverse/preview.
-    // Temporary - linked from Home only, not from the shared nav.
+    // Step loyverse-preview-iv: the Kitchen Sales page for
+    // GET /api/loyverse/preview. The sales day turns at 8am (ADR-033), so the
+    // default date is today's business date (before 8am Manila = yesterday).
+    // Temporary - linked from Home only. Still read-only, nothing is saved.
     const COLUMNS = [
-      { key: 'likod', label: 'Likod' },
       { key: 'silingan', label: 'Silingan' },
+      { key: 'likod', label: 'Likod' },
     ];
+    const TZ = 'Asia/Manila';
+    const BUSINESS_DAY_START_MS = 8 * 60 * 60 * 1000;
 
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const dateLabel = document.getElementById('date-label');
     const dateInput = document.getElementById('date-input');
-    const loadBtn = document.getElementById('load-btn');
+    const syncBtn = document.getElementById('sync-btn');
     const bannersEl = document.getElementById('banners');
     const loadingEl = document.getElementById('loading');
+    const lastReceiptEl = document.getElementById('last-receipt');
+    const syncedEl = document.getElementById('synced');
     const resultEl = document.getElementById('result');
     const copyBtn = document.getElementById('copy-btn');
     const copyStatus = document.getElementById('copy-status');
     const copyText = document.getElementById('copy-text');
 
     let current = null;
+    let selected = null;
 
-    // Today in Manila, not the phone's UTC date.
-    dateInput.value = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date());
+    // --- business-date helpers (mirror the engine's 8am rule) ---
+    function manilaDateOf(ms) {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date(ms));
+    }
+    function currentBusinessDate() {
+      return manilaDateOf(Date.now() - BUSINESS_DAY_START_MS);
+    }
+    function addDaysStr(dateStr, n) {
+      const d = new Date(dateStr + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    }
+    // "Fri, Oct 30" - parsed at UTC noon so the calendar date never rolls over.
+    function labelFor(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00Z');
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric',
+      }).format(d);
+    }
+    // Manila wall-clock, 12-hour: "9:12 PM", "12:48 AM".
+    function timeFor(instant) {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true,
+      }).format(new Date(instant));
+    }
 
     function esc(s) {
       return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -116,9 +183,29 @@
       bannersEl.insertAdjacentHTML('beforeend', `<p class="status-message error">${esc(text)}</p>`);
     }
 
+    // "Last kitchen receipt: Silingan 9:12 PM - Likod 12:48 AM". An ok account
+    // with no kitchen receipt reads "none yet"; a failed account reads "-"
+    // (its banner says why).
+    function lastReceiptText(data) {
+      const parts = data.accounts.map(a => {
+        if (!a.ok) return `${a.label} -`;
+        return `${a.label} ${a.lastReceiptAt ? timeFor(a.lastReceiptAt) : 'none yet'}`;
+      });
+      return `Last kitchen receipt: ${parts.join(' - ')}`;
+    }
+
+    function syncedText(data) {
+      let s = `Synced ${timeFor(Date.now())}`;
+      if (data.date === currentBusinessDate()) s += ' - this day stays open until 8:00 AM';
+      return s;
+    }
+
     function render(data) {
       bannersEl.innerHTML = '';
       failedAccounts(data).forEach(a => banner(failureLine(a)));
+
+      lastReceiptEl.textContent = lastReceiptText(data);
+      syncedEl.textContent = syncedText(data);
 
       document.querySelector('#sales-table tbody').innerHTML = data.dishes.map(d => {
         const zero = d.total === 0;
@@ -146,12 +233,14 @@
     }
 
     async function load() {
-      loadBtn.disabled = true;
+      syncBtn.disabled = true;
+      prevBtn.disabled = true;
+      nextBtn.disabled = true;
       loadingEl.hidden = false;
       resultEl.hidden = true;
       bannersEl.innerHTML = '';
       try {
-        const res = await fetch(`/api/loyverse/preview?date=${encodeURIComponent(dateInput.value)}`);
+        const res = await fetch(`/api/loyverse/preview?date=${encodeURIComponent(selected)}`);
         // A proxy or crash page may not be JSON: report the HTTP status, not a parse error.
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -159,17 +248,32 @@
         render(body);
       } catch (err) {
         current = null;
+        lastReceiptEl.textContent = '';
+        syncedEl.textContent = '';
         banner(`Could not load sales: ${err.message}`);
       } finally {
-        loadBtn.disabled = false;
+        syncBtn.disabled = false;
+        prevBtn.disabled = false;
+        // ">" stays disabled on the current business date.
+        nextBtn.disabled = selected >= currentBusinessDate();
         loadingEl.hidden = true;
       }
     }
 
-    // Messenger text: non-zero dishes only; a null-total dish is left out
-    // because the failed-account warning covers it (#27).
+    // Move to a date: update the bar, then load it.
+    function setSelected(dateStr) {
+      selected = dateStr;
+      dateLabel.textContent = labelFor(selected);
+      dateInput.value = selected;
+      nextBtn.disabled = selected >= currentBusinessDate();
+      load();
+    }
+
+    // Messenger text: the Last kitchen receipt line after the header, then
+    // non-zero dishes only; a null-total dish is left out because the
+    // failed-account warning covers it (#27).
     function asText(data) {
-      const lines = [`Kitchen Sales (Loyverse) - ${data.date}`];
+      const lines = [`Kitchen Sales (Loyverse) - ${data.date}`, lastReceiptText(data)];
       data.dishes.filter(d => d.total !== null && d.total > 0).forEach(d => {
         lines.push(`${d.name} - ${COLUMNS.map(c => `${c.label} ${show(d[c.key])}`).join(', ')}, Total ${d.total}`);
       });
@@ -205,9 +309,21 @@
       copyStatus.textContent = ok ? 'Copied' : 'Copy failed - select the text below and copy it';
     }
 
-    loadBtn.addEventListener('click', load);
+    prevBtn.addEventListener('click', () => setSelected(addDaysStr(selected, -1)));
+    nextBtn.addEventListener('click', () => { if (!nextBtn.disabled) setSelected(addDaysStr(selected, 1)); });
+    dateInput.addEventListener('change', () => { if (dateInput.value) setSelected(dateInput.value); });
+    // Desktop: open the picker from the label. Mobile: the invisible input over
+    // the label already opens it on tap.
+    dateInput.addEventListener('click', () => {
+      if (typeof dateInput.showPicker === 'function') {
+        try { dateInput.showPicker(); } catch (e) { /* already open / unsupported */ }
+      }
+    });
+    syncBtn.addEventListener('click', load);
     copyBtn.addEventListener('click', copy);
-    load();
+
+    // Default: the current business date, loaded on open.
+    setSelected(currentBusinessDate());
   </script>
 </body>
 </html>
