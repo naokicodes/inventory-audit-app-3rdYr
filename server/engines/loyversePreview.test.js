@@ -5,7 +5,7 @@
 
 const assert = require('assert');
 const {
-  computePreview, loadNameMap, isValidDate, manilaDate, receiptWindow, normalize, buildResolver,
+  computePreview, loadNameMap, isValidDate, manilaDate, businessDate, receiptWindow, normalize, buildResolver,
 } = require('./loyversePreview.js');
 
 let passed = 0, failed = 0;
@@ -72,16 +72,26 @@ test('isValidDate accepts real dates and rejects malformed / impossible ones', (
   }
 });
 
-test('window is <date>T00:00+08:00 through +7 days', () => {
+test('window starts at <date>T08:00+08:00 (the business day) and runs +7 days', () => {
   assert.deepStrictEqual(receiptWindow('2026-10-03'), {
-    min: '2026-10-02T16:00:00.000Z',
-    max: '2026-10-09T16:00:00.000Z',
+    min: '2026-10-03T00:00:00.000Z',
+    max: '2026-10-10T00:00:00.000Z',
   });
 });
 
 test('UTC -> Manila boundary: 2026-10-02T17:30:00Z is 2026-10-03', () => {
   assert.strictEqual(manilaDate('2026-10-02T17:30:00Z'), '2026-10-03');
   assert.strictEqual(manilaDate('2026-10-02T15:59:59Z'), '2026-10-02');
+});
+
+// ADR-033: the sales day turns at 8am Manila.
+test('businessDate: 07:59 Manila is the previous day, 08:00 is the new one', () => {
+  // 2026-10-30T07:59:59 Manila = 2026-10-29T23:59:59Z -> business date 10-29.
+  assert.strictEqual(businessDate('2026-10-29T23:59:59Z'), '2026-10-29');
+  // 2026-10-30T08:00:00 Manila = 2026-10-30T00:00:00Z -> business date 10-30.
+  assert.strictEqual(businessDate('2026-10-30T00:00:00Z'), '2026-10-30');
+  // A past-midnight sale (Manila 01:30) still belongs to the day before.
+  assert.strictEqual(businessDate('2026-10-02T17:30:00Z'), '2026-10-02');
 });
 
 test('normalize trims, lowercases and collapses whitespace', () => {
@@ -96,8 +106,8 @@ test('sends bearer token and the created_at window with limit=250', async () => 
   assert.strictEqual(calls.length, 2);
   const u = calls[0].url;
   assert.strictEqual(u.origin + u.pathname, 'https://api.loyverse.com/v1.0/receipts');
-  assert.strictEqual(u.searchParams.get('created_at_min'), '2026-10-02T16:00:00.000Z');
-  assert.strictEqual(u.searchParams.get('created_at_max'), '2026-10-09T16:00:00.000Z');
+  assert.strictEqual(u.searchParams.get('created_at_min'), '2026-10-03T00:00:00.000Z');
+  assert.strictEqual(u.searchParams.get('created_at_max'), '2026-10-10T00:00:00.000Z');
   assert.strictEqual(u.searchParams.get('limit'), '250');
 });
 
@@ -107,17 +117,19 @@ test('a late-synced receipt (created days later) is counted', async () => {
   assert.strictEqual(row(r, 'D001').silingan, 2);
 });
 
-test('receipt at 2026-10-02T17:30:00Z counts for 10-03; one from another Manila day does not', async () => {
+test('8am boundary: Manila 08:00 up to next-day 07:59 is kept, either side is not', async () => {
   const r = await computePreview({
     date: '2026-10-03', nameMap: MAP, env: ENV,
     fetchImpl: stubFetch({ 'secret-s': [[
-      receipt('2026-10-02T17:30:00Z', [['Meatball Pasta', 1]]),
-      receipt('2026-10-03T16:30:00Z', [['Meatball Pasta', 5]]), // 10-04 in Manila
+      receipt('2026-10-02T23:59:59Z', [['Meatball Pasta', 1]]), // Manila 10-03 07:59:59 -> biz 10-02, out
+      receipt('2026-10-03T00:00:00Z', [['Meatball Pasta', 2]]), // Manila 10-03 08:00:00 -> biz 10-03, in
+      receipt('2026-10-03T23:59:59Z', [['Meatball Pasta', 4]]), // Manila 10-04 07:59:59 -> biz 10-03, in
+      receipt('2026-10-04T00:00:00Z', [['Meatball Pasta', 8]]), // Manila 10-04 08:00:00 -> biz 10-04, out
     ]] }),
   });
-  assert.strictEqual(row(r, 'D001').silingan, 1);
-  assert.strictEqual(r.accounts[0].receiptsScanned, 2);
-  assert.strictEqual(r.accounts[0].receiptsKept, 1);
+  assert.strictEqual(row(r, 'D001').silingan, 6); // 2 + 4
+  assert.strictEqual(r.accounts[0].receiptsScanned, 4);
+  assert.strictEqual(r.accounts[0].receiptsKept, 2);
 });
 
 test('cancelled receipts are skipped', async () => {
@@ -221,7 +233,7 @@ test('a missing token fails ONE account with a null column; the other computes',
     date: '2026-10-03', nameMap: MAP, env: { TOK_S: 'secret-s' },
     fetchImpl: stubFetch({ 'secret-s': [[receipt('2026-10-03T04:00:00Z', [['Meatball Pasta', 2]])]] }),
   });
-  assert.deepStrictEqual(r.accounts[1], { label: 'Likod', ok: false, receiptsScanned: 0, receiptsKept: 0, receiptTypes: {}, error: 'token not set' });
+  assert.deepStrictEqual(r.accounts[1], { label: 'Likod', ok: false, receiptsScanned: 0, receiptsKept: 0, receiptTypes: {}, lastReceiptAt: null, error: 'token not set' });
   assert.strictEqual(r.accounts[0].ok, true);
   assert.strictEqual(row(r, 'D001').silingan, 2);
   assert.strictEqual(row(r, 'D001').likod, null);
@@ -296,6 +308,87 @@ test('a one-account dish is null when that account is down; a two-account dish k
   assert.strictEqual(r.accounts[0].ok, false);  // Silingan failed
   assert.strictEqual(row(r, 'D003').total, null); // D003 is Silingan-only -> its only seller failed
   assert.strictEqual(row(r, 'D001').total, 5);    // D001 sold by both -> surviving Likod = 5
+});
+
+// --- lastReceiptAt (loyverse-preview-iv) ---
+
+test('lastReceiptAt is the latest kitchen receipt, even when receipts arrive out of order', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: ENV,
+    fetchImpl: stubFetch({ 'secret-s': [[
+      receipt('2026-10-03T06:00:00Z', [['Meatball Pasta', 1]]),
+      receipt('2026-10-03T10:00:00Z', [['Meatball Pasta', 1]]), // the latest
+      receipt('2026-10-03T08:00:00Z', [['Meatball Pasta', 1]]),
+    ]] }),
+  });
+  assert.strictEqual(r.accounts[0].lastReceiptAt, '2026-10-03T10:00:00Z');
+});
+
+test('a later drinks-only (all-unmatched) receipt does not advance lastReceiptAt', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: ENV,
+    fetchImpl: stubFetch({ 'secret-s': [[
+      receipt('2026-10-03T06:00:00Z', [['Meatball Pasta', 1]]),
+      receipt('2026-10-03T09:00:00Z', [['Soda', 3]]),
+    ]] }),
+  });
+  assert.strictEqual(r.accounts[0].lastReceiptAt, '2026-10-03T06:00:00Z');
+  assert.strictEqual(r.accounts[0].receiptsKept, 2); // still kept, just not a kitchen receipt
+});
+
+test('a later cancelled receipt does not advance lastReceiptAt', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: ENV,
+    fetchImpl: stubFetch({ 'secret-s': [[
+      receipt('2026-10-03T06:00:00Z', [['Meatball Pasta', 1]]),
+      receipt('2026-10-03T09:00:00Z', [['Meatball Pasta', 1]], { cancelled_at: '2026-10-03T09:05:00Z' }),
+    ]] }),
+  });
+  assert.strictEqual(r.accounts[0].lastReceiptAt, '2026-10-03T06:00:00Z');
+});
+
+test('a kitchen receipt from another business date does not set lastReceiptAt', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: ENV,
+    fetchImpl: stubFetch({ 'secret-s': [[
+      receipt('2026-10-03T06:00:00Z', [['Meatball Pasta', 1]]),
+      receipt('2026-10-04T00:00:00Z', [['Meatball Pasta', 1]]), // Manila 10-04 08:00 -> biz 10-04
+    ]] }),
+  });
+  assert.strictEqual(r.accounts[0].lastReceiptAt, '2026-10-03T06:00:00Z');
+});
+
+test('a REFUND with a kitchen line still sets lastReceiptAt', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: ENV,
+    fetchImpl: stubFetch({ 'secret-s': [[
+      receipt('2026-10-03T06:00:00Z', [['Meatball Pasta', 1]]),
+      receipt('2026-10-03T09:00:00Z', [['Meatball Pasta', 1]], { receipt_type: 'REFUND' }),
+    ]] }),
+  });
+  assert.strictEqual(r.accounts[0].lastReceiptAt, '2026-10-03T09:00:00Z');
+});
+
+test('an ok account with no kitchen receipt has lastReceiptAt null', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: ENV,
+    fetchImpl: stubFetch({ 'secret-s': [[receipt('2026-10-03T06:00:00Z', [['Soda', 2]])]] }),
+  });
+  assert.strictEqual(r.accounts[0].ok, true);
+  assert.strictEqual(r.accounts[0].lastReceiptAt, null);
+});
+
+test('a failed account (non-200) has lastReceiptAt null; a healthy one still reports its time', async () => {
+  const r = await computePreview({
+    date: '2026-10-03', nameMap: MAP, env: ENV,
+    fetchImpl: stubFetch({
+      'secret-s': { status: 500 },
+      'secret-l': [[receipt('2026-10-03T06:00:00Z', [['Meatball  pasta', 1]])]],
+    }),
+  });
+  assert.strictEqual(r.accounts[0].ok, false);
+  assert.strictEqual(r.accounts[0].lastReceiptAt, null);
+  assert.strictEqual(r.accounts[1].lastReceiptAt, '2026-10-03T06:00:00Z');
 });
 
 // --- diagnostics / id evidence ---
