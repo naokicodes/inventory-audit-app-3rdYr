@@ -2186,6 +2186,33 @@ Touches: server/engines/loyversePreview.js, server/engines/loyversePreview.test.
 server/routes/loyverse.js, server/routes/loyverse.test.js, scripts/loyverse-matches.js,
 public/kitchen-sales.html. PUBLIC -> click-through before merge.
 
+## Step lan-address - the server prints the address phones use
+Architect 2026-10-30. Why: on start the server prints only http://localhost:3000, so anyone
+connecting a phone has to find the PC's IP with ipconfig. Server only, no click-through.
+
+- server/lanAddress.js (new): a PURE function lanUrls(interfaces, port) taking the shape of
+  os.networkInterfaces(). Returns one { name, url } per non-internal IPv4 address, in the order
+  given (no deps).
+- server/index.js: on listen, print
+    Inventory Audit App running at:
+      This PC:  http://localhost:3000
+      Phones on the same Wi-Fi:
+        http://192.168.1.23:3000   (Wi-Fi)
+  one line per lanUrls entry, with the adapter name in brackets, so a Tailscale or virtual
+  adapter is easy to tell apart. None found -> "Phones: no network address found (check Wi-Fi)".
+  Everything else in index.js unchanged; the server still listens on all addresses.
+- Prints addresses only - never a token or anything from .env.
+
+Tests (pure, canned interfaces): IPv6 and internal (127.0.0.1) entries skipped; two adapters ->
+two urls in order with their names; the port is used; empty input -> [].
+
+Edge states: no network - the "no network address found" line, the server still starts; several
+adapters - all listed with names; IP changes later (DHCP) - shown on the next start only; failure,
+partial, stale, two devices, blocked, inactive - none.
+
+Touches: server/index.js, server/lanAddress.js (new), server/lanAddress.test.js (new). Server
+only, no migration, no click-through. Parallel-safe with 3zf.
+
 ## Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)
 
 First slice of the Sheets family (architect 2026-10-05). Decisions: "Sheets are a first-class

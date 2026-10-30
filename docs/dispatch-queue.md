@@ -45,7 +45,7 @@ is. Read the step's own section in `session-status.md` before starting.
 > seed.js). After 3za: 3m site-filter, then 3l user-id-authorship, then 3zc allocation-requests.
 > 3zd sheet-close after 3u. 3ze is Naoki's own PR.
 > **2026-10-30:** 3zf loyverse-preview-iv any time, ahead of the rest (it shares no file with
-> another runnable step).
+> another runnable step). 3zg lan-address any time too (server only, no shared file).
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -227,6 +227,11 @@ The kitchen reads its own sales: the sales day turns at 8am (ADR-033), a "Last k
 time per account, a Loyverse-style date bar (< date >, tap for a picker) and a Sync button.
 Read-only, no money. PUBLIC -> click-through. Full spec: session-status.md -> "Step
 loyverse-preview-iv".
+
+### 3zg. Step lan-address - the server prints the address phones use  [runnable]
+Touches: server/index.js, server/lanAddress.js, server/lanAddress.test.js
+npm run dev prints the phone address (http://<PC IP>:3000) next to localhost. Server only, no
+click-through. Full spec: session-status.md -> "Step lan-address".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
