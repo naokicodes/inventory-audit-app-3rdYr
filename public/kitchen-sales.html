@@ -73,7 +73,7 @@
     <div class="table-scroll">
       <table id="sales-table">
         <thead>
-          <tr><th>Dish</th><th class="num">Likod</th><th class="num">Silingan</th><th class="num">Total</th></tr>
+          <tr><th>Dish</th><th class="num">Silingan</th><th class="num">Likod</th><th class="num">Total</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -104,8 +104,8 @@
     // default date is today's business date (before 8am Manila = yesterday).
     // Temporary - linked from Home only. Still read-only, nothing is saved.
     const COLUMNS = [
-      { key: 'likod', label: 'Likod' },
       { key: 'silingan', label: 'Silingan' },
+      { key: 'likod', label: 'Likod' },
     ];
     const TZ = 'Asia/Manila';
     const BUSINESS_DAY_START_MS = 8 * 60 * 60 * 1000;
