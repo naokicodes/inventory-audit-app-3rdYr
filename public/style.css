@@ -5,10 +5,14 @@
    no new dependency, light mode only. Each page still carries its own inline
    colours in its <style> block; Step ui-pass-ii moves those onto the tokens. */
 
-/* Archivo from Google Fonts. @import must stay at the very top (after nothing
-   but a @charset). display=swap + the system-ui fallback below mean that with
-   no internet the system font is used and nothing breaks. */
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap');
+/* Archivo served from public/fonts/ (Step self-host-font): pages never wait on
+   the internet for it. Latin subset from @fontsource/archivo 5.3.0, OFL - see
+   fonts/OFL.txt. If a file fails, font-display: swap + the system-ui fallback
+   below show the system font and nothing breaks. */
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 400; font-display: swap; src: url('fonts/archivo-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 500; font-display: swap; src: url('fonts/archivo-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 600; font-display: swap; src: url('fonts/archivo-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 700; font-display: swap; src: url('fonts/archivo-latin-700-normal.woff2') format('woff2'); }
 
 :root {
   color-scheme: light;
