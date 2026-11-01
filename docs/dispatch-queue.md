@@ -204,6 +204,7 @@ Adds --warn-ink (#94570A) for text on --warn-tint so small warn badges reach 4.5
 style.css only. PUBLIC -> click-through. Full spec: session-status.md -> "Step warn-ink".
 
 ### 3za. Step blind-count - meat counters count blind; quiet recount  [runnable]
+**CLOSED 2026-11-01, PR #51 (`d4d4245`).**
 Touches: server/db/schema.sql, server/engines/blindCount.js, server/engines/blindCount.test.js, server/routes/dailyAudit.js, public/daily-audit.html
 The 11-01 demo item. Counters see endings + remarks only (server strips the numbers); head chef
 orders recounts; every save kept in count_entries. PUBLIC -> click-through. Full spec:

@@ -2544,6 +2544,7 @@ else changed color.
 Touches: public/style.css. PUBLIC -> click-through before merge.
 
 ## Step blind-count - meat counters count blind; quiet recount (A7)
+**CLOSED 2026-11-01, PR #51 (`d4d4245`).**
 
 Decided 2026-10-22 and 2026-10-28 (see "Things NOT to re-litigate" -> 2026-10-28). The 11-01 demo
 item. DEPENDS ON stub-login (req.user), closed. Runs BEFORE site-filter and user-id-authorship: all
