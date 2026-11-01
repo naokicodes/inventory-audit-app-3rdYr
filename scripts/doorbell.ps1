@@ -16,7 +16,10 @@
        removal that fails never starts a run, so a stuck label cannot ring every
        tick (it waits for a tick where removal works). Every owner-labelled
        target in the tick is commented on; one run starts for all of them.
-    4. An open architect-docs issue by -Owner not yet in
+    4. preview label on an open PR, same -Owner and removal rules as run-now.
+       The first owner-labelled PR is served by scripts/preview.ps1 (no run,
+       no Claude); any other keeps its label for the next tick.
+    5. An open architect-docs issue by -Owner not yet in
        .run-queue-logs/doorbell-seen.txt. Each one rings at most once: a failed
        run is retried by the scheduled runs, never by the doorbell.
 
@@ -181,7 +184,32 @@ try {
     Start-Run ('run-now on ' + (($counted | ForEach-Object { "#$($_.N)" }) -join ', '))
   }
 
-  # ---- 4. New architect-docs issues. ----
+  # ---- 4. preview label on an open PR: serve it, no run lock (calls no Claude). ----
+  $previewPrs = @(Get-GhLines 'preview PR list' @('pr', 'list', '--repo', $Repo, '--state', 'open', '--label', 'preview', '--json', 'number', '--jq', '.[].number'))
+  foreach ($n in $previewPrs) {
+    $actors = @(Get-GhLines "Events for #$n" @('api', '--paginate', "repos/$Repo/issues/$n/events", '--jq', '.[] | select(.event == "labeled" and .label.name == "preview") | .actor.login'))
+    $actor = if ($actors.Count -gt 0) { $actors[-1] } else { '' }
+    $removed = Invoke-Gh @('pr', 'edit', $n, '--repo', $Repo, '--remove-label', 'preview')
+    if ($removed.Code -ne 0) {
+      Log "Could not remove preview from #$n (gh exit $($removed.Code)) - leaving it for the next tick."
+      continue
+    }
+    if ($actor -ne $Owner) {
+      Log "Removed preview from #${n}: labelled by '$actor', not $Owner."
+      continue
+    }
+    # One preview at a time: any other labelled PR keeps its label for the next tick.
+    Log "Fired: preview on #$n."
+    try {
+      & .\scripts\preview.ps1 -Pr $n
+      Log "Preview script exited $LASTEXITCODE."
+    } catch {
+      Log "Preview failed: $($_.Exception.Message)"
+    }
+    Finish
+  }
+
+  # ---- 5. New architect-docs issues. ----
   $docs = @(Get-GhLines 'architect-docs list' @('issue', 'list', '--repo', $Repo, '--state', 'open', '--label', 'architect-docs', '--author', $Owner, '--json', 'number', '--jq', '.[].number'))
   $seen = @()
   if (Test-Path $seenFile) { $seen = @(Get-Content $seenFile | ForEach-Object { "$_".Trim() }) }
@@ -193,7 +221,7 @@ try {
     Start-Run "architect-docs $(($new | ForEach-Object { "#$_" }) -join ', ')"
   }
 
-  # ---- 5. Nothing to do. ----
+  # ---- 6. Nothing to do. ----
   Finish
 } catch {
   Log "Doorbell error: $($_.Exception.Message)"
