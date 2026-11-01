@@ -87,6 +87,8 @@ Replaces the 2026-10-24 laptop plan.
 - **Scripts per role, only for what the tag has.** Counter (checker): pick your name, count
   tonight's items, add a remark, compare with the paper. Head chef: review the variance, order a
   recount (once blind-count is tagged). Commi: a yield, then a shipment.
+- **Before each tag:** Claude in Chrome runs the Beta smoke list (`docs/click-through.md`) on a
+  throwaway database with the fake test accounts (ADR-039). The test accounts never go on beta.db.
 - **Bugs:** one Messenger group, fixed shape - page, what I did, what I expected, what happened,
   screenshot, time. Naoki turns them into `beta` issues and triages them at the end of each week.
 - **Backups:** after each session, also copy the newest dated `beta.db` to a private folder (for

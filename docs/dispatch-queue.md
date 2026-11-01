@@ -51,6 +51,10 @@ is. Read the step's own section in `session-status.md` before starting.
 > a time) -> 3zk roles-page; 3u and 3j before 3zl. Then in order (shared files): 3zl roster-stations
 > -> 3zm roster-staff -> 3zn roster-week -> 3zo roster-day-status -> 3zp tonight-picks -> 3zq
 > login-tonight -> 3zr write-permission.
+> **2026-11-02 (A0):** issues #53, #54 and #57 answered (see their steps). PR #52 (3u) and PR #56
+> (3q) stand as built. 3m site-filter is next in the identity chain. Any time: 3zb self-host-font;
+> 3zu settings-guard (one at a time with 3zd, and with 3l if 3l touches settings.js). After 3q:
+> 3zt test-accounts. After 3l: 3zs site-filter-ii (one at a time with 3zc: allocations.js).
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -199,6 +203,7 @@ the Look tokens, by meaning. No layout, markup or JS change. PUBLIC -> click-thr
 session-status.md -> "Step ui-pass-ii".
 
 ### 3z. Step warn-ink - darker warn text on the warn tint  [runnable]
+**CLOSED 2026-11-02, PR #58 (`d9fc0fc`).**
 Touches: public/style.css
 Adds --warn-ink (#94570A) for text on --warn-tint so small warn badges reach 4.5:1. Colors only,
 style.css only. PUBLIC -> click-through. Full spec: session-status.md -> "Step warn-ink".
@@ -221,7 +226,7 @@ Touches: server/db/schema.sql, server/engines/allocationRequests.js, server/engi
 PUBLIC -> click-through. Full spec: session-status.md -> "Step allocation-requests".
 
 ### 3zd. Step sheet-close - admins close a sheet  [blocked: sheets-tier1]
-Touches: server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js, server/routes/settings.js, public/settings.html
+Touches: server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js, server/routes/settings.js, public/settings.html, server/index.js
 PUBLIC -> click-through. Full spec: session-status.md -> "Step sheet-close".
 
 ### 3ze. Step restaurant-pc - the restaurant PC script, with an update mode  [Naoki's own PR]
@@ -251,13 +256,14 @@ the Unmatched list. PUBLIC -> click-through. Full spec: session-status.md -> "St
 name-map-refresh".
 
 ### 3zi. Step business-day - one 8am business date for the whole app  [runnable]
+**CLOSED 2026-11-02, PR #55 (`cd50d51`).**
 Touches: server/businessDay.js, server/businessDay.test.js, server/engines/loyversePreview.js
 Moves the 8am businessDate (ADR-036) out of the Loyverse engine into a shared module, plus
 mondayOf(). No behaviour change. Server-only, no click-through. Full spec: session-status.md ->
 "Step business-day".
 
 ### 3zj. Step role-assignments - roles per site, role switches, the supervisor role  [blocked: blind-count, site-filter, user-id-authorship]
-Touches: server/db/schema.sql, server/db/permissions.js, server/db/permissions.test.js, server/db/siteAccess.js, server/engines/blindCount.js, server/routes/auth.js, server/db/seed.js
+Touches: server/db/schema.sql, server/db/permissions.js, server/db/permissions.test.js, server/db/siteAccess.js, server/engines/blindCount.js, server/routes/auth.js, server/db/seed.js, server/db/testAccounts.js
 ADR-034 / ADR-038: a base role plus role assignments at a site (or all), switches as rows, one
 can(); blind = no "sees expected" switch at that site; the supervisor role. Login unchanged.
 Server-only, no click-through. Full spec: session-status.md -> "Step role-assignments".
@@ -295,9 +301,26 @@ Touches: server/engines/tonightWork.js, server/engines/tonightWork.test.js, serv
 PUBLIC -> click-through. Full spec: session-status.md -> "Step login-tonight".
 
 ### 3zr. Step write-permission - only tonight's people write  [blocked: login-tonight, site-filter]
-Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/tonightWork.test.js, server/middleware/requireSiteAccess.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js
+Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/tonightWork.test.js, server/middleware/requireSiteAccess.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, the site-scoped route tests
 ADR-011 enforced on the meat landing counts and the commissary writes; canUseSite widened. Click-
 through of the refusal message. Full spec: session-status.md -> "Step write-permission".
+
+### 3zs. Step site-filter-ii - two-site requests and lists across sites  [blocked: site-filter, user-id-authorship]
+Touches: server/middleware/requireSiteAccess.js, server/db/siteAccess.js, server/routes/commissary.js, server/routes/allocations.js, server/routes/dailyAudit.js, server/routes/dashboard.js, server/routes/commands.js, server/routes/commissary.test.js, server/routes/allocations.test.js, server/routes/dailyAudit.test.js, server/routes/dashboard.test.js, server/routes/commands.test.js
+ADR-041: each two-site request checks its owner site only; the picker and the rollup trim to the
+user's sites; admin commands need a bypass role. Server-only, no click-through. Full spec:
+session-status.md -> "Step site-filter-ii".
+
+### 3zt. Step test-accounts - fake tester accounts for previews and dev databases  [blocked: autopilot-preview]
+Touches: server/db/testAccounts.js, server/db/testAccounts.test.js, scripts/seed-test-accounts.js, package.json, scripts/preview.ps1
+ADR-039: `npm run seed:test` makes the "Test ..." accounts; refuses inventory.db and beta.db;
+previews run it after the reseed. Server and scripts only, no click-through. Full spec:
+session-status.md -> "Step test-accounts".
+
+### 3zu. Step settings-guard - Settings changes need an admin  [runnable]
+Touches: server/middleware/requireAdmin.js, server/routes/settings.js, server/routes/settings.test.js
+ADR-042: every Settings change needs a logged-in admin; reads stay open. Server-only. Full spec:
+session-status.md -> "Step settings-guard".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**

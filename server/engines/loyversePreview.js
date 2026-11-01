@@ -13,17 +13,14 @@
 
 const fs = require('fs');
 const path = require('path');
+// The sales day turns at 8am: a receipt belongs to the business date of its
+// receipt_date. The rule lives in ../businessDay.js (ADR-036) for the whole app.
+const { manilaDate, businessDate, BUSINESS_DAY_START_HOUR } = require('../businessDay.js');
 
 const NAME_MAP_PATH = path.join(__dirname, '..', 'db', 'loyverse-name-map.json');
 const RECEIPTS_URL = 'https://api.loyverse.com/v1.0/receipts';
 const LOOKBACK_DAYS = 7;
-const TIMEZONE = 'Asia/Manila';
 const PAGE_LIMIT = 250;
-// The sales day turns at 8am (ADR-033): a receipt belongs to the Manila
-// calendar date of (receipt_date minus 8 hours). 07:59:59 is the previous
-// day; 08:00:00 is the new one. Sales only - nothing is sold before 8am, so
-// 8am never splits a night.
-const BUSINESS_DAY_START_HOUR = 8;
 
 function loadNameMap() {
   return JSON.parse(fs.readFileSync(NAME_MAP_PATH, 'utf8'));
@@ -34,26 +31,6 @@ function isValidDate(s) {
   if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-}
-
-const manilaDateFormat = new Intl.DateTimeFormat('en-CA', {
-  timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
-});
-
-// Calendar date (YYYY-MM-DD) of an instant, in Asia/Manila.
-function manilaDate(instant) {
-  const d = instant instanceof Date ? instant : new Date(instant);
-  if (Number.isNaN(d.getTime())) return null;
-  return manilaDateFormat.format(d);
-}
-
-// Business date (ADR-033) of an instant: the Manila date of (instant minus 8
-// hours). Classifies a receipt (receipt_date) and gives "today's business
-// date" for a `now` (before 8am Manila -> yesterday).
-function businessDate(instant) {
-  const d = instant instanceof Date ? instant : new Date(instant);
-  if (Number.isNaN(d.getTime())) return null;
-  return manilaDate(d.getTime() - BUSINESS_DAY_START_HOUR * 60 * 60 * 1000);
 }
 
 // created_at window: <date>T08:00:00+08:00 (the business day's start) to
