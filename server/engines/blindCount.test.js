@@ -180,6 +180,13 @@ test('a portion remark round-trips; a save without a remark keeps it', async () 
   assert.deepStrictEqual([(await getJson(MIXED, cara)).rows[2].count, (await getJson(MIXED, cara)).rows[2].remark], [11, 'two burnt']);
 });
 
+test('month opening: 403 for a blind user (beginning numbers); the head chef still gets it', async () => {
+  const url = `/api/daily-audit/month-opening?restaurant_id=1&date=${DATE}`;
+  assert.strictEqual((await call('GET', url, { user: cara })).status, 403);
+  assert.strictEqual((await call('GET', url)).status, 403);
+  assert.strictEqual((await call('GET', url, { user: hugo })).status, 200);
+});
+
 test('count history: 403 for a blind user; the head chef sees entries, orders and who can be picked', async () => {
   const url = `/api/daily-audit/count-history?restaurant_id=1&date=${DATE}`;
   assert.strictEqual((await call('GET', url, { user: cara })).status, 403);

@@ -206,6 +206,8 @@ router.get('/daily-audit/month-opening', (req, res) => {
   if (!restaurantId || !isIsoDate(date)) {
     return res.status(400).json({ error: 'restaurant_id and date (YYYY-MM-DD) are required' });
   }
+  // Step blind-count: openings and copy quantities are beginning numbers.
+  if (isBlind(req.user, siteCodeOf(restaurantId))) return res.status(403).json({ error: 'Counters do not see month openings.' });
   res.json(getMonthOpeningStatus(db, 'restaurant', restaurantId, date));
 });
 
