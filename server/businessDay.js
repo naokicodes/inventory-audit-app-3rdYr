@@ -39,4 +39,4 @@ function mondayOf(dateString) {
   return new Date(d.getTime() - daysSinceMonday * DAY_MS).toISOString().slice(0, 10);
 }
 
-module.exports = { manilaDate, businessDate, mondayOf, BUSINESS_DAY_START_HOUR, TIMEZONE };
+module.exports = { manilaDate, businessDate, mondayOf, BUSINESS_DAY_START_HOUR };
