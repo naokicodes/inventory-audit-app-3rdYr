@@ -29,6 +29,13 @@
     .type-badge { font-size: 0.7em; color: var(--ink3); margin-left: 0.3em; }
     .carry-tag { font-size: 0.8em; color: var(--ink2); font-weight: normal; }
     tr.dish-row td:first-child { border-left: 3px solid var(--line2); }
+    /* Step blind-count: the counter's list and the landing person's history. */
+    .blind-list .enter-row input[type="text"] { width: 8rem; padding: 0.5rem; font-size: 1rem; }
+    .count-history { border: 1px solid var(--line); background: var(--paper); padding: 0.6rem 0.8rem; margin: 0.8rem 0; }
+    .count-history h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+    .count-history .ch-row { padding: 0.35rem 0; border-bottom: 1px solid var(--line); }
+    .count-history .ch-text { display: block; color: var(--ink2); font-size: 0.85em; }
+    .count-history .ch-order { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.6rem; }
   </style>
 </head>
 <body style="max-width: 1200px;">
@@ -73,8 +80,10 @@
   </div>
 
   <div id="draft-notice" class="status-message" hidden></div>
+  <div id="recount-banner" class="status-message" hidden></div>
 
   <div id="grid-container">Loading...</div>
+  <div id="count-history"></div>
 
   <div class="save-bar">
     <button id="save-btn">Save Day</button>
@@ -290,6 +299,23 @@
       `;
     }
 
+    // Step blind-count: a counter (blind: true from the server) gets a count
+    // list only - item, END input, remark - at every width. The server sent
+    // nothing else to show. Inputs carry the same classes as the table's, so
+    // drafts and save() work unchanged.
+    function blindRowHtml(r) {
+      const kind = r.type === 'DISH' ? 'dish' : 'meat';
+      return `
+        <div class="enter-row" data-${kind}-id="${r.item_id}">
+          <span class="enter-name">${r.name} <span class="type-badge">(${r.unit})</span>${r.recount_open ? ' <span class="carry-tag">(recount)</span>' : ''}</span>
+          <span class="enter-inputs">
+            <label>END<input type="number" step="0.01" class="${kind === 'dish' ? 'portion_actual' : 'ending_actual'}" value="${r.count ?? ''}" placeholder="0"></label>
+            <label>Remark<input type="text" class="remarks" value="${r.remark || ''}"></label>
+          </span>
+        </div>
+      `;
+    }
+
     // Step 13: live recalculation of Ending(calc)/Over-Short/Status as a
     // meat row's editable inputs change, without a save+reload round trip.
     // Mirrors server/engines/auditEngine.js's computeMeatAudit exactly -
@@ -441,8 +467,9 @@
       gridContainer.querySelectorAll(`${itemSelector} .${field}`).forEach(el => {
         if (el !== e.target) el.value = e.target.value;
       });
+      const id = isMeat ? holder.dataset.meatId : holder.dataset.dishId;
+      touched.add(`${isMeat ? 'meat' : 'dish'}:${id}`);
       if (gridDraftKey) {
-        const id = isMeat ? holder.dataset.meatId : holder.dataset.dishId;
         DraftStore.set(gridDraftKey, `${isMeat ? 'meat' : 'dish'}:${id}:${field}`, e.target.value);
       }
       if (field === 'remarks') return;
@@ -485,8 +512,25 @@
 
       gridContainer.innerHTML = 'Loading...';
       draftNotice.hidden = true;
+      touched.clear();
       const res = await fetch(`/api/daily-audit/mixed?restaurant_id=${restaurantId}&date=${date}`);
-      const rows = await res.json();
+      const data = await res.json();
+
+      // Step blind-count: a counter gets { blind: true, rows } - the count
+      // list only, no month opening panel, no history, no view toggle.
+      isBlindView = !Array.isArray(data) && data.blind === true;
+      document.getElementById('sheet-header').hidden = isBlindView;
+      document.getElementById('month-opening').hidden = isBlindView;
+      if (isBlindView) {
+        showRecountBanner(data.rows.filter(r => r.recount_open).map(r => r.name));
+        historyEl.innerHTML = '';
+        gridContainer.innerHTML = `<div class="blind-list">${data.rows.map(blindRowHtml).join('')}</div>`;
+        gridDraftKey = DraftStore.key('daily-audit', restaurantId, date);
+        restoreDraft();
+        return;
+      }
+      const rows = data;
+      gridRows = rows;
 
       const tableRows = rows.map(r => r.type === 'MEAT' ? meatRowHtml(r) : dishRowHtml(r)).join('');
       const reviewCards = rows.map(r => r.type === 'MEAT' ? meatCardHtml(r) : dishCardHtml(r)).join('');
@@ -511,7 +555,94 @@
       `;
       gridDraftKey = DraftStore.key('daily-audit', restaurantId, date);
       restoreDraft();
+      await loadHistory();
     }
+
+    // Step blind-count state: whether the server sent the counter's view,
+    // which items the user typed in (sent as `touched`, so a repost of an
+    // untouched row is not a new count), and the landing rows for history.
+    let isBlindView = false;
+    const touched = new Set();
+    let gridRows = [];
+    const historyEl = document.getElementById('count-history');
+    const recountBanner = document.getElementById('recount-banner');
+
+    function showRecountBanner(names) {
+      recountBanner.textContent = names.length ? `Recount: ${names.join(', ')}` : '';
+      recountBanner.hidden = names.length === 0;
+    }
+
+    // The landing person's view: per item who counted (and the first value),
+    // who recounted, "changed by" for edits, and open recount orders. Head
+    // chef / admin also tick items and pick one person to order a recount.
+    function historyText(list) {
+      if (list.length === 0) return 'not counted';
+      const who = e => e.user_name || 'not logged in';
+      const first = list.find(e => e.entry_type === 'COUNT') || list[0];
+      const parts = [`counted by ${who(first)} (first ${fmt(first.quantity)})`];
+      list.filter(e => e.entry_type === 'RECOUNT').forEach(e => parts.push(`recounted by ${who(e)} (${fmt(e.quantity)})`));
+      const editors = [...new Set(list.filter(e => e.entry_type === 'EDIT').map(who))];
+      if (editors.length) parts.push(`changed by ${editors.join(', ')}`);
+      return parts.join(' · ');
+    }
+
+    async function loadHistory() {
+      const res = await fetch(`/api/daily-audit/count-history?restaurant_id=${restaurantSelect.value}&date=${dateInput.value}`);
+      if (!res.ok) { historyEl.innerHTML = ''; showRecountBanner([]); return; }
+      const h = await res.json();
+      const kindOf = r => (r.type === 'DISH' ? 'PORTION' : 'MEAT');
+      const same = r => x => x.kind === kindOf(r) && x.item_id === r.item_id;
+      const open = h.orders.filter(o => o.status === 'OPEN');
+      showRecountBanner(gridRows.filter(r => open.some(o => same(r)(o) && o.assigned_user_id === h.user_id)).map(r => r.name));
+      const rowsHtml = gridRows.map(r => {
+        const blocked = r.status === 'MISSING_PERIOD_OPENING';
+        const pick = h.can_order
+          ? `<input type="checkbox" class="ch-pick" data-kind="${kindOf(r)}" data-item-id="${r.item_id}"${blocked ? ' disabled' : ''}> `
+          : '';
+        const orders = open.filter(same(r)).map(o =>
+          ` · recount ordered: ${o.assigned_name}${h.can_order ? ` <button type="button" data-cancel="${o.id}">Cancel</button>` : ''}`).join('');
+        return `<div class="ch-row"><label>${pick}${r.name}</label><span class="ch-text">${historyText(h.entries.filter(same(r)))}${orders}</span></div>`;
+      }).join('');
+      const orderHtml = h.can_order ? `
+        <div class="ch-order">
+          <label>Recount by <select id="ch-person">${h.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select></label>
+          <button type="button" id="ch-order">Order recount</button>
+        </div>` : '';
+      historyEl.innerHTML = `<div class="count-history"><h2>Counts and recounts</h2>${rowsHtml}${orderHtml}<div id="ch-message" class="status-message"></div></div>`;
+    }
+
+    historyEl.addEventListener('click', async (e) => {
+      const restaurantId = Number(restaurantSelect.value);
+      let res, message = '';
+      if (e.target.id === 'ch-order') {
+        const items = Array.from(historyEl.querySelectorAll('.ch-pick:checked'))
+          .map(el => ({ kind: el.dataset.kind, item_id: Number(el.dataset.itemId) }));
+        const person = historyEl.querySelector('#ch-person');
+        res = await fetch('/api/daily-audit/recount-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurant_id: restaurantId, business_date: dateInput.value, assigned_user_id: Number(person.value), items })
+        });
+        const body = await res.json();
+        const nameOf = w => (gridRows.find(r => r.item_id === w.item_id && (r.type === 'DISH' ? 'PORTION' : 'MEAT') === w.kind) || {}).name;
+        message = res.ok
+          ? `Recount ordered.${body.warnings.length ? ` Note: ${person.selectedOptions[0].textContent} did the first count of ${body.warnings.map(nameOf).join(', ')}.` : ''}`
+          : body.error;
+      } else if (e.target.dataset.cancel) {
+        res = await fetch(`/api/daily-audit/recount-orders/${e.target.dataset.cancel}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurant_id: restaurantId })
+        });
+        message = res.ok ? 'Recount cancelled.' : (await res.json()).error;
+      } else {
+        return;
+      }
+      await loadHistory();
+      const msg = historyEl.querySelector('#ch-message');
+      msg.textContent = message;
+      msg.className = `status-message ${res.ok ? 'success' : 'error'}`;
+    });
 
     // Step count-drafts: unsaved entries (public/draft-store.js) for the grid
     // on screen, per restaurant + date. Filled back in after every render,
@@ -538,6 +669,7 @@
           el.value = value;
           el.insertAdjacentHTML('beforebegin', '<span class="carry-tag draft-tag">(unsaved)</span> ');
         });
+        touched.add(`${kind}:${id}`);
         const tr = gridContainer.querySelector(`tr${itemSelector}`);
         if (tr && field !== 'remarks') (kind === 'meat' ? recalcMeatRow : recalcDishRow)(tr);
         restored++;
@@ -560,12 +692,15 @@
       const restaurantId = Number(restaurantSelect.value);
       const date = dateInput.value;
       const saveDraftKey = gridDraftKey;
-      const trs = gridContainer.querySelectorAll('tr[data-meat-id]');
+      // Step blind-count: the counter's list rows instead of the table's.
+      const holders = kind => gridContainer.querySelectorAll(isBlindView ? `.blind-list [data-${kind}-id]` : `tr[data-${kind}-id]`);
+      const trs = holders('meat');
 
       const rows = Array.from(trs).map(tr => ({
         meat_id: Number(tr.dataset.meatId),
         ending_actual: tr.querySelector('.ending_actual').value,
-        remarks: tr.querySelector('.remarks').value
+        remarks: tr.querySelector('.remarks').value,
+        touched: touched.has(`meat:${tr.dataset.meatId}`)
       }));
 
       statusEl.textContent = 'Saving...';
@@ -584,13 +719,17 @@
         // table shape, different endpoint (POST /api/daily-audit/portions),
         // same save button/status flow. Only sent if this restaurant/date
         // actually has any BATCH_PREPPED dish rows loaded.
-        const dishTrs = gridContainer.querySelectorAll('tr[data-dish-id]');
+        const dishTrs = holders('dish');
         let portionsSaved = 0;
         if (dishTrs.length > 0) {
+          // The counter's list has no Prepped and the table has no dish
+          // remark: a missing input is left out, so the server keeps it.
           const portionRows = Array.from(dishTrs).map(tr => ({
             dish_id: Number(tr.dataset.dishId),
-            prepped: tr.querySelector('.prepped').value,
-            portion_actual: tr.querySelector('.portion_actual').value
+            prepped: tr.querySelector('.prepped')?.value,
+            portion_actual: tr.querySelector('.portion_actual').value,
+            remark: tr.querySelector('.remarks')?.value,
+            touched: touched.has(`dish:${tr.dataset.dishId}`)
           }));
           const portionsRes = await fetch('/api/daily-audit/portions', {
             method: 'POST',
@@ -606,8 +745,8 @@
         // has no opening yet, and says which - named here so it's not lost.
         const refusedIds = (result.refused || []).map(String);
         const refusedNames = refusedIds.map(id => {
-          const tr = gridContainer.querySelector(`tr[data-meat-id="${id}"]`);
-          return tr ? tr.cells[0].textContent.trim() : `meat ${id}`;
+          const tr = Array.from(trs).find(el => el.dataset.meatId === id);
+          return tr ? tr.firstElementChild.textContent.trim() : `meat ${id}`;
         });
 
         // count-drafts (Decisions 2026-10-22, Q1 Reading C): both POSTs
@@ -657,8 +796,11 @@
       draftPage: 'daily-audit-month-opening'
     });
 
-    function loadAll() {
-      return Promise.all([monthOpening.load(), loadGrid()]);
+    // Step blind-count: the grid first - a counter never loads the Month
+    // opening panel (its numbers would reach the counter's phone).
+    async function loadAll() {
+      await loadGrid();
+      if (!isBlindView) await monthOpening.load();
     }
 
     restaurantSelect.addEventListener('change', loadAll);
