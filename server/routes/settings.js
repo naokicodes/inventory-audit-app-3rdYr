@@ -5,8 +5,15 @@
 
 const express = require('express');
 const db = require('../db/connection.js');
+const requireAdmin = require('../middleware/requireAdmin.js');
 
 const router = express.Router();
+
+// Step settings-guard (ADR-042): every Settings write needs an admin; reads
+// stay open (other pages fill dropdowns from them). Scoped to /settings, never
+// a bare router.use: this router is mounted at /api ahead of the others.
+const WRITES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+router.use('/settings', (req, res, next) => (WRITES.has(req.method) ? requireAdmin(req, res, next) : next()));
 
 // Step 26a-ii: a 0/1 flag from a checkbox-style body value, or null when the
 // field was not sent at all (the meat UPDATEs COALESCE null away).
