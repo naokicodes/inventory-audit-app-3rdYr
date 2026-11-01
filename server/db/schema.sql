@@ -559,6 +559,43 @@ CREATE TABLE IF NOT EXISTS user_sites (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- 14. count_entries (step blind-count) - every saved restaurant ending
+-- (meat or portion), appended in the same transaction as the ending_actual /
+-- portion_ending_actual upsert, which keeps holding the current value.
+-- kind and entry_type are validated in server/engines/blindCount.js.
+CREATE TABLE IF NOT EXISTS count_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  restaurant_id INTEGER NOT NULL,
+  business_date TEXT NOT NULL,
+  kind TEXT NOT NULL,             -- 'MEAT' (item_id = meat_id) or 'PORTION' (item_id = dish_id)
+  item_id INTEGER NOT NULL,
+  quantity REAL NOT NULL,
+  remark TEXT,
+  entry_type TEXT NOT NULL,       -- 'COUNT', 'RECOUNT' or 'EDIT'
+  user_id INTEGER,                -- null = not logged in
+  user_name TEXT,                 -- snapshot at save time
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
+);
+
+-- 15. recount_orders (step blind-count) - a head chef / admin asks one
+-- person to recount one item on one date. Belongs to its date only.
+CREATE TABLE IF NOT EXISTS recount_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  restaurant_id INTEGER NOT NULL,
+  business_date TEXT NOT NULL,
+  kind TEXT NOT NULL,             -- 'MEAT' or 'PORTION', as count_entries
+  item_id INTEGER NOT NULL,
+  ordered_by_user_id INTEGER NOT NULL,
+  assigned_user_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'OPEN',  -- 'OPEN', 'DONE' or 'CANCELLED'
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  done_at TEXT,                   -- set when DONE or CANCELLED
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
+  FOREIGN KEY (ordered_by_user_id) REFERENCES users(id),
+  FOREIGN KEY (assigned_user_id) REFERENCES users(id)
+);
+
 -- Seed a reasonable starting set of adjustment types (admin can add more
 -- via the UI later - this is just a sensible default, not a fixed list).
 INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requires_conversion_target) VALUES

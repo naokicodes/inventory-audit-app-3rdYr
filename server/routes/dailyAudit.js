@@ -7,8 +7,15 @@ const db = require('../db/connection.js');
 const { computeMeatAudit, computeMixedDailyAudit } = require('../engines/auditEngine.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
 const { isIsoDate, isBlocked, getMonthOpeningStatus, recordRecount, copyAll } = require('../engines/monthOpening.js');
+const { isBlind, canOrderRecount, blindView, saveCount, createRecountOrders, cancelRecountOrder, countHistory } = require('../engines/blindCount.js');
 
 const router = express.Router();
+
+// Step blind-count: the restaurant's code, the siteCode isBlind takes.
+function siteCodeOf(restaurantId) {
+  const row = db.prepare(`SELECT code FROM restaurants WHERE id = ?`).get(restaurantId);
+  return row ? row.code : null;
+}
 
 router.get('/restaurants', (req, res) => {
   const restaurants = db.prepare(`SELECT id, name, code FROM restaurants WHERE active = 1 ORDER BY name`).all();
@@ -94,6 +101,8 @@ router.get('/daily-audit', (req, res) => {
     };
   });
 
+  // Step blind-count: a blind counter gets the stripped rows only.
+  if (isBlind(req.user, siteCodeOf(restaurantId))) return res.json(blindView(db, restaurantId, date, req.user, rows));
   res.json(rows);
 });
 
@@ -126,11 +135,14 @@ router.get('/daily-audit/mixed', (req, res) => {
     return { ...row, ...decorate(row.item_id) };
   });
 
+  // Step blind-count: a blind counter gets the stripped rows only.
+  if (isBlind(req.user, siteCodeOf(restaurantId))) return res.json(blindView(db, restaurantId, date, req.user, rows));
   res.json(rows);
 });
 
 // POST /api/daily-audit
-// Body: { restaurant_id, business_date, rows: [{ meat_id, ending_actual, remarks }] }
+// Body: { restaurant_id, business_date, rows: [{ meat_id, ending_actual, remarks, touched }] }
+// touched (step blind-count): the user typed in this row - see saveCount.
 // Routes each field to its correct table. Only writes fields that were
 // actually provided (not null/empty) - leaves everything else untouched.
 // Note: new_stock is no longer accepted here - it's entered on the Stock
@@ -169,7 +181,12 @@ router.post('/daily-audit', (req, res) => {
         refused.push(row.meat_id);
         continue;
       }
-      upsertEndingActual.run(restaurant_id, row.meat_id, business_date, Number(row.ending_actual), row.remarks || null);
+      // Step blind-count: the upsert and its count_entries row together.
+      const quantity = Number(row.ending_actual);
+      saveCount(db, {
+        restaurantId: Number(restaurant_id), date: business_date, kind: 'MEAT', itemId: Number(row.meat_id),
+        quantity, remark: row.remarks || null, touched: row.touched === true, user: req.user
+      }, remark => upsertEndingActual.run(restaurant_id, row.meat_id, business_date, quantity, remark));
     }
     saved++;
   }
@@ -226,7 +243,7 @@ router.post('/daily-audit/month-opening/copy-all', (req, res) => {
 });
 
 // POST /api/daily-audit/portions
-// Body: { restaurant_id, business_date, rows: [{ dish_id, prepped, portion_actual }] }
+// Body: { restaurant_id, business_date, rows: [{ dish_id, prepped, portion_actual, remark, touched }] }
 //
 // The write path for BATCH_PREPPED dish rows that's been missing since
 // step 11 (session-status.md) - dish rows on Landing have been
@@ -308,7 +325,14 @@ router.post('/daily-audit/portions', (req, res) => {
     }
 
     if (row.portion_actual !== null && row.portion_actual !== undefined && row.portion_actual !== '') {
-      upsertPortionActual.run(restaurant_id, row.dish_id, business_date, Number(row.portion_actual));
+      // Step blind-count: the upsert and its count_entries row together.
+      // remark is new for portions and lives in count_entries only;
+      // omitted = keep the current one.
+      const quantity = Number(row.portion_actual);
+      saveCount(db, {
+        restaurantId: Number(restaurant_id), date: business_date, kind: 'PORTION', itemId: Number(row.dish_id),
+        quantity, remark: row.remark, touched: row.touched === true, user: req.user
+      }, () => upsertPortionActual.run(restaurant_id, row.dish_id, business_date, quantity));
       wrote = true;
     }
 
@@ -316,6 +340,51 @@ router.post('/daily-audit/portions', (req, res) => {
   }
 
   res.json({ ok: true, saved });
+});
+
+// GET /api/daily-audit/count-history?restaurant_id=1&date=2026-11-01
+// Step blind-count: the landing person's view - who counted, who recounted
+// and the first value, recount orders, and who can be picked. Blind users
+// never see it (it holds other people's counts).
+router.get('/daily-audit/count-history', (req, res) => {
+  const restaurantId = Number(req.query.restaurant_id);
+  const date = req.query.date;
+  if (!restaurantId || !isIsoDate(date)) {
+    return res.status(400).json({ error: 'restaurant_id and date (YYYY-MM-DD) are required' });
+  }
+  const siteCode = siteCodeOf(restaurantId);
+  if (isBlind(req.user, siteCode)) return res.status(403).json({ error: 'Counters do not see count history.' });
+  res.json(countHistory(db, restaurantId, siteCode, date, req.user));
+});
+
+// POST /api/daily-audit/recount-orders
+// Body: { restaurant_id, business_date, assigned_user_id, items: [{ kind, item_id }] }
+// Step blind-count: head chef / admin only (403 otherwise). warnings lists
+// items the picked person counted first - the order is still created.
+router.post('/daily-audit/recount-orders', (req, res) => {
+  const { restaurant_id, business_date, assigned_user_id, items } = req.body || {};
+  if (!restaurant_id || !isIsoDate(business_date)) {
+    return res.status(400).json({ error: 'restaurant_id and business_date (YYYY-MM-DD) are required' });
+  }
+  const restaurantId = Number(restaurant_id);
+  const siteCode = siteCodeOf(restaurantId);
+  if (!canOrderRecount(req.user, siteCode)) return res.status(403).json({ error: 'Only a head chef or admin can order a recount.' });
+  const result = createRecountOrders(db, {
+    restaurantId, siteCode, date: business_date, items, assignedUserId: assigned_user_id, user: req.user
+  });
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.json(result);
+});
+
+// POST /api/daily-audit/recount-orders/:id/cancel
+// Body: { restaurant_id }. Same 403 rule as ordering.
+router.post('/daily-audit/recount-orders/:id/cancel', (req, res) => {
+  const restaurantId = Number(req.body && req.body.restaurant_id);
+  if (!restaurantId) return res.status(400).json({ error: 'restaurant_id is required' });
+  if (!canOrderRecount(req.user, siteCodeOf(restaurantId))) return res.status(403).json({ error: 'Only a head chef or admin can cancel a recount.' });
+  const result = cancelRecountOrder(db, restaurantId, Number(req.params.id));
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.json(result);
 });
 
 // PATCH /api/daily-audit/opening-stock
