@@ -132,9 +132,34 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-032; the index, and a map from handoff item numbers to records, is in
+to ADR-038; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-01 architect (A6) - decided (recorded: ADR-034 to ADR-038)
+
+- **Roles per site, switches as rows (ADR-034).** Login is unchanged: the account says who you
+  are. A person has a base role plus any number of role assignments, each at one site or all, with
+  an optional end date; what they may do at a site = everything their live roles there allow.
+  Switches are rows (a new one needs no migration); admin implies all; an inactive role grants
+  nothing. Supervisor is a sixth role (never counts; sees expected; edits the whole roster; picks
+  tonight's people; manages staff); all supervisors have the same access, and blocking one = a role
+  without the roster switch. Per-person overrides come later on the same shape. Supersedes
+  stub-login's "per-site roles are not modelled" (issue #34, Q2).
+- **The landing is the head-chef role at that site (ADR-035).** Appointing = giving head-chef at
+  that site (a supervisor, Naoki, very rarely a cook), optionally until a date. No nightly landing
+  pick; ADR-014's "anyone, a supervisor as fallback" is gone.
+- **One business day for everything, 8am Manila (ADR-036):** sales, roster, login list, picks,
+  write permission.
+- **Roster (ADR-037):** stations are data per site; a station opens sheets, possibly at another
+  site (Silingan's Commissary station opens the commissary's Commi sheet; the commi stock stays its
+  own site). Kitchen-flagged stations are pick-only, one live pick per night. One placement per
+  person per day. Sub-stations are hints; standing access grants a station's sheets on days on duty
+  at that site, never kitchen. Copy last week reverts one-offs. The head chef edits her kitchen
+  people's days, supervisors everything. Login list: tonight first, then always-listed, then
+  everyone else. OJT are never on the roster; head count = on duty + floater at the site.
+- **Blind follows the site's roles; Likod counts blind (ADR-038).** Blind = no "sees expected"
+  switch at that site. Likod's grillers count blind; its appointed head chef sees.
 
 ### 2026-10-28 architect (A7, A3, A4) - decided (recorded: ADR-007, ADR-010 to ADR-019, ADR-027)
 
@@ -142,6 +167,8 @@ disagree, that is a bug: ask Naoki and fix both the same day.
   checker is blind; head-chef, admin, super-admin and management see expected and variance. No
   user = blind. The server strips the numbers, never only the page. The commissary is **never**
   blind; the Likod grill landing is **not** blind until it has a head.
+  **Superseded 2026-11-01 by ADR-038:** blind = no "sees expected" switch at that site (roles per
+  site, ADR-034); Likod's grillers count blind.
 - **Counters see endings + remarks only**: no beginning, new stock, sales, in-house, allocations,
   expected or variance.
 - **Recount:** the landing person / head chef picks items and a person (told in person; no
@@ -1782,6 +1809,12 @@ for a floater.
 Touches: server/middleware/requireSiteAccess.js (new), the site-scoped routes, server/index.js
 (+ tests). Server-only (a click-through only if UI changes). Depends on stub-login + user-sites.
 
+**Added 2026-11-01 (A6).** The membership check goes through ONE helper, canUseSite(db, user,
+siteCode, date), in server/db/siteAccess.js. In this step it means userHasSite (bypass roles as
+above); date is accepted and unused. role-assignments (3zj) and write-permission (3zr) widen this
+helper - a role at the site, a roster placement or pick that day - without touching the routes
+again. Touches gains: server/db/siteAccess.js.
+
 ## Step autopilot-runner - runner lock, run log, pause switch, review drafts
 **CLOSED 2026-10-13, PR #25 (`1cf1c2a`).**
 
@@ -2587,6 +2620,11 @@ Not in scope: allocation requests (step allocation-requests); PO quantities on t
 Touches: server/db/schema.sql, server/engines/blindCount.js (new) + its test,
 server/routes/dailyAudit.js, public/daily-audit.html. PUBLIC -> click-through before merge.
 
+**Added 2026-11-01 (A6, ADR-038).** isBlind takes (user, siteCode); the routes pass the
+restaurant's code. siteCode is unused until role-assignments (3zj), which makes blindness follow the
+site's roles (no "sees expected" switch there = blind). Put the ordering check in one helper too,
+canOrderRecount(user, siteCode), so 3zj changes only blindCount.js.
+
 ## Step allocation-requests - counters ask, the head chef confirms (A7b)
 
 Decided 2026-10-28. Today counters tell the head chef by word of mouth ("dropped 2 portions",
@@ -2688,3 +2726,479 @@ Edge states: no internet (fetch fails - nothing changes); unknown tag (refused, 
 running (refused); verify fails (rolled back).
 
 Touches: scripts/restaurant-pc.bat (new), .gitattributes. Not public/.
+
+## Step business-day - one 8am business date for the whole app (A6)
+
+Decided 2026-11-01 (ADR-036, widens ADR-033). Why: the roster, the login list and tonight's picks
+need "tonight", and FC and Likod count until about 1am. Sales already turn at 8am; everything now
+uses the same rule. Server-only, pure functions.
+
+- New module server/businessDay.js: BUSINESS_DAY_START_HOUR = 8 (moved from loyversePreview.js),
+  manilaDate(instant), businessDate(instant) -> 'YYYY-MM-DD' (the Manila date of instant minus 8
+  hours), and mondayOf(dateString) -> the Monday of that date's week (weeks run Monday to Sunday,
+  ADR-013). No DB, no dependency.
+- server/engines/loyversePreview.js imports these instead of defining them and keeps exporting
+  manilaDate and businessDate (re-exported), so its callers and tests stay unchanged. No behaviour
+  change.
+- Nothing else uses it yet; the roster steps do.
+
+Edge states: 07:59:59 belongs to the previous day, 08:00:00 to the new one; month and year ends
+roll correctly; mondayOf on a Monday returns itself, on a Sunday the Monday six days before;
+failure, partial, empty, stale, blocked, inactive, two devices - none (pure functions).
+
+Tests (server/businessDay.test.js, injected instants): the 8am boundary both ways; 2026-12-31 23:00
+and 2027-01-01 07:59 Manila both give 2026-12-31; mondayOf for every weekday of one week;
+loyversePreview.test.js stays green unchanged.
+
+Touches: server/businessDay.js (new), server/businessDay.test.js (new),
+server/engines/loyversePreview.js. Server-only, no migration, no click-through. Shares no file with
+another queued step.
+
+## Step role-assignments - roles per site, role switches, the supervisor role (A6)
+
+Decided 2026-11-01 (ADR-034, ADR-038). DEPENDS ON blind-count (3za: blindCount.js), site-filter (3m:
+canUseSite) and user-id-authorship (3l; one schema step at a time - sequence with
+allocation-requests too). Server-only; the page is the next step (roles-page).
+
+Why: one default role at every site cannot express an appointed head chef at FC or Likod, a cashier
+who also has podium access, or supervisors who work every site from Silingan. **Login does not
+change**: the account says who you are; this step changes what you may do where.
+
+Schema (schema.sql, new CREATE TABLE IF NOT EXISTS - no migrate helper):
+- role_capabilities: role_id (FK roles), capability TEXT NOT NULL, PRIMARY KEY (role_id,
+  capability). Names are validated by the module, not a CHECK, so a new switch never needs a table
+  rebuild.
+- user_roles: id, user_id (FK users), role_id (FK roles), site_code TEXT (NULL = at every site the
+  person can use), until_date TEXT (NULL = no end; a business date, inclusive), created_by_user_id,
+  created_at. No FK on site_code (model B): the module validates it with resolveSiteCode. A
+  duplicate (user, role, site) is refused by the module (SQLite UNIQUE lets two NULL sites through).
+
+Module server/db/permissions.js - the ONE place that answers "may this person do X here":
+- CAPABILITIES: the four legacy flags, read from the roles columns (enter_counts, finalize, admin,
+  read_only), plus switch rows: sees_expected, roster_kitchen, roster_all, pick_tonight,
+  manage_staff. An unknown name throws.
+- liveRoles(db, user, siteCode, date): the base role (users.default_role_id, at every site the
+  person can use) plus every user_roles row whose site_code is siteCode or NULL and whose
+  until_date is NULL or >= date. date defaults to businessDate(now) (business-day). An inactive role
+  contributes nothing (stub-login Q3 stands).
+- can(db, user, capability, siteCode, date): true if any live role grants it. A role with admin
+  grants every capability. No user -> false.
+- capabilitiesBySite(db, user, date) -> { siteCode: [capabilities] } for every site the user can
+  use (for /api/auth/me).
+- assignRole / removeAssignment ({ userId, roleId, siteCode, untilDate }, actor): admin only;
+  validates an active role, a resolving site, a valid untilDate not in the past; writes activity_log
+  (MANUAL) in the same transaction. The super-admin role is never assigned or removed here (one
+  seeded, unlockable account).
+- setRoleCapability({ roleId, capability, on }, actor): admin only; never on super-admin (it has
+  admin, so it has everything); activity_log row.
+
+Site access: canUseSite(db, user, siteCode, date) in siteAccess.js (added by 3m) also returns true
+for a live user_roles row at that site. Routes are not touched.
+
+Blind (ADR-038): isBlind(user, siteCode) in blindCount.js becomes "not can(sees_expected) at that
+site". The derived rule is deleted. canOrderRecount(user, siteCode) becomes: not blind AND (finalize
+OR admin) at that site. No user = blind, as before.
+
+Seed (seed.js, idempotent):
+- A sixth role, supervisor: enter_counts 0, finalize 0, admin 0, read_only 0 (ADR-010: never
+  counts). INSERT OR IGNORE.
+- Switch rows, written only for a role that has NO switch rows yet (so an admin's later removal is
+  never undone by a reseed): supervisor -> sees_expected, roster_all, pick_tonight, manage_staff;
+  head-chef -> sees_expected, roster_kitchen, pick_tonight; management -> sees_expected; checker,
+  admin, super-admin -> none (admin implies all).
+- /api/auth/me returns the user plus capabilities_by_site. Pages may use it to show or hide
+  buttons; the server always re-checks.
+
+Not in scope: the Roles page (next step); per-person switch overrides (later, same shape -
+ADR-034); import-settings tabs for switches and assignments (later); cashier and buyer roles
+(supply family).
+
+Edge states: failure - an assignment and its activity_log row are one transaction. Partial - n/a.
+Empty - a user with no assignments acts on their base role exactly as today. Stale - an assignment
+past its until_date grants nothing from the next business day (8am), with no cleanup job. Blocked -
+non-admins get 403 on every write here. Inactive - an inactive role or user grants nothing;
+assignments stay listed. Two devices - assigning the same role twice returns "already assigned" and
+changes nothing.
+
+Tests: base role only behaves exactly as before for the five existing roles (3za's blind and 403
+tests still pass); head-chef assigned at FC sees expected at FC and is blind at RA; a NULL-site
+assignment applies at every site the person can use; until_date yesterday grants nothing, today
+grants; admin implies every capability; inactive role grants nothing; unknown capability throws;
+duplicate assignment refused; checker and head-chef get 403 on assign; super-admin cannot be
+assigned or edited; the seed is idempotent and does not re-add a removed switch; canUseSite is true
+at an assignment's site.
+
+Touches: server/db/schema.sql, server/db/permissions.js (new), server/db/permissions.test.js (new),
+server/db/siteAccess.js, server/engines/blindCount.js, server/routes/auth.js, server/db/seed.js.
+Server-only, no migration, no click-through.
+
+## Step roles-page - the Roles page: switches per role, roles per person (A6)
+
+Decided 2026-11-01 (ADR-034). DEPENDS ON role-assignments. The first cut of the Discord-style
+screen.
+
+- New page public/roles.html, linked from Home. Anyone signed in may open it; only admins see
+  buttons; the server enforces.
+- **Roles**: one card per role - name, active, and its switches as toggles (the four legacy flags
+  and the five switch rows), each with a one-line meaning ("Sees expected and variance", "Edits the
+  whole roster", "Edits kitchen staff's days", "Picks tonight's people", "Adds and edits stations
+  and staff", ...). super-admin shows "Has everything", no toggles. "Add role": a name, starting as
+  a copy of another role's switches (example: "supervisor (no roster)" to block one supervisor,
+  ADR-034). Rename, deactivate.
+- **People**: each active user with their base role (changeable: users.default_role_id) and their
+  assignments ("head-chef at FC until Nov 5"); add (role, site or "all their sites", optional end
+  date) and remove.
+- Routes, new server/routes/roles.js (wired in server/index.js): GET /api/roles; POST /api/roles
+  (name, copy_from); PUT /api/roles/:id (name, active); PUT /api/roles/:id/capabilities
+  (capability, on - legacy flags update the roles columns); PUT /api/users/:id/base-role; GET / POST
+  / DELETE /api/users/:id/roles. All writes go through permissions.js.
+
+Edge states: failure - one transaction per action. Empty - "No extra roles" per person. Stale - the
+page reloads after each action. Blocked - non-admins see no buttons and get 403. Inactive - an
+inactive role is listed greyed and cannot be assigned. Two devices - toggling to the current state
+is a no-op that returns the current state.
+
+Tests (routes): admin creates a role by copy, toggles a switch, assigns and removes; non-admin gets
+403 on each; super-admin is untouchable; a toggle writes activity_log; the base role change
+applies on the next request.
+
+Click-through (390px): as admin, create "supervisor (no roster)" by copying supervisor and turning
+roster_all off, assign it to a user at all sites, and check /api/auth/me has no roster_all; as a
+checker, the page shows no buttons.
+
+Touches: public/roles.html (new), public/index.html, server/routes/roles.js (new),
+server/routes/roles.test.js (new), server/index.js, server/db/permissions.js. PUBLIC ->
+click-through before merge.
+
+## Step roster-stations - stations as roster rows, and which sheets each opens (A6)
+
+Decided ADR-012 and ADR-037. DEPENDS ON sheets-tier1 (3u: sheet_definitions), import-identity (3j:
+import-settings.js) and role-assignments (3zj: can()).
+
+Stations are data per site - the paper roster's rows. They differ per site and change over time
+(Silingan's September and October sheets differ), so nothing is seeded in the repo: they come from
+the workbook import or the Staff page.
+
+Schema (CREATE TABLE IF NOT EXISTS):
+- stations: id, site_code TEXT NOT NULL, name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
+  kitchen INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at. No FK on
+  site_code; the module validates it (resolveSiteCode).
+- station_sheets: station_id (FK stations), sheet_definition_id (FK sheet_definitions), PRIMARY KEY
+  (both). The sheets a station opens. A sheet may be at another site: Silingan's Commissary station
+  opens COM-A's Commi sheet (the commi stock stays its own site; the station only says who works
+  there today).
+
+Module server/engines/stations.js: createStation, updateStation (name, sort_order, kitchen,
+active), listStations({ siteCode, activeOnly }), linkSheet / unlinkSheet, sheetsForStation(id),
+stationsForSheet(sheetDefinitionId).
+- Validation: name trimmed and non-empty; no case-insensitive duplicate on the same site (LOWER()
+  in the module); the site resolves. A closed sheet (sheet-close) may stay linked; it is just not
+  counted.
+- kitchen = 1 marks the head chef's rows (ADR-037): she edits her kitchen people's days, and the
+  sheets a kitchen station opens are pick-only, one pick per night.
+- Permission: can(user, 'manage_staff', siteCode). Every write logs activity_log in the same
+  transaction.
+
+Import: scripts/import-settings.js gains a Stations tab - site_code, name, sort_order, kitchen (Y or
+blank), sheets (comma-separated categories at the station's site, or site:category for another
+site, e.g. "COM-A:Commi"). Upsert by (site_code, name), case-insensitive. An unknown sheet is warned
+and its link skipped, not the station. A second run is a no-op.
+
+Routes, new server/routes/staff.js (wired in server/index.js): GET /api/stations?site, POST
+/api/stations, PUT /api/stations/:id, POST /api/stations/:id/sheets, DELETE
+/api/stations/:id/sheets/:sheetId.
+
+Page, new public/staff.html, section Stations (Home links "Staff"): a site picker; the stations in
+order with a kitchen tag and the sheets each opens; add, rename, move up / down, kitchen on / off,
+deactivate, link and unlink sheets.
+
+Not in scope: staff (next step), the roster grid.
+
+Edge states: failure - one transaction per action. Empty - "No stations yet - import the workbook
+or add one". Stale - reload after each action. Blocked - without manage_staff at that site: the
+list without buttons, 403 on writes. Inactive - a deactivated station keeps its history and links,
+is hidden from pickers, and people whose main station it is get a warning on the Staff page. Two
+devices - a duplicate name from a second device gets the duplicate error.
+
+Tests: create and list per site; a case-insensitive duplicate refused, the same name on two sites
+allowed; an unknown site refused; link a sheet at another site (Commissary -> COM-A Commi);
+stationsForSheet; 403 without manage_staff; activity_log written; the importer upserts, links,
+warns on an unknown sheet and is idempotent.
+
+Click-through (390px): import a sample Stations CSV, then add, reorder, flag kitchen and link a
+sheet on the page.
+
+Touches: server/db/schema.sql, server/engines/stations.js (new), server/engines/stations.test.js
+(new), server/routes/staff.js (new), server/routes/staff.test.js (new), server/index.js,
+scripts/import-settings.js, public/staff.html (new), public/index.html. PUBLIC -> click-through
+before merge.
+
+## Step roster-staff - the staff list: main station, sub-stations, standing access, login link (A6)
+
+Decided ADR-013 (a staff table separate from users) and ADR-037. DEPENDS ON roster-stations.
+
+Schema (CREATE TABLE IF NOT EXISTS):
+- staff: id, name TEXT NOT NULL UNIQUE, main_station_id INTEGER NOT NULL (FK stations), user_id
+  INTEGER UNIQUE (FK users; NULL for people who never sign in), active, created_at. Home site = the
+  main station's site.
+- staff_stations: staff_id, station_id, kind ('SUB' or 'ACCESS', module-validated), PRIMARY KEY
+  (staff_id, station_id, kind).
+  - SUB = usually covers this station: a hint for pickers and copying; it grants nothing.
+  - ACCESS = standing access: may write the sheets this station opens on any day the person is on
+    duty at that station's site (Likod grillers -> Commissary, ADR-017; Likod's cashier -> Podium).
+    Refused on a kitchen station: kitchen sheets are pick-only (ADR-011).
+
+Module server/engines/staff.js: createStaff, updateStaff, setStations(staffId, { subs, access }),
+linkUser / unlinkUser, listStaff({ siteCode, activeOnly }), staffForUser(userId).
+- Validation: name trimmed, unique case-insensitively; the main station is active; a login is
+  linked to at most one person; no ACCESS on a kitchen station.
+- Permission: manage_staff at the person's home site (and at the new home site when moving).
+  activity_log on every write.
+- Real names never enter the repo: the workbook is off-repo; tests use made-up names.
+
+Import: a Staff tab - name, main_station (site:name), sub_stations and access_stations
+(comma-separated site:name), user_name, active. Upsert by name. An unknown station or user is
+warned and that field skipped.
+
+Page public/staff.html, section Staff: grouped by home site and main station; add (name, main
+station), edit, sub-stations, standing access, link a login (users with no staff link), deactivate.
+A deactivated person stays in past rosters and leaves future copies (roster-week).
+
+Edge states: failure - one transaction per action. Empty - "No staff yet". Stale - reload after
+each action. Blocked - without manage_staff: the list without buttons, 403. Inactive - a
+deactivated person is never copied into a new week or offered in pickers; their linked login stays
+an account (what it may do comes from roles). Two devices - a duplicate name gets the duplicate
+error.
+
+Tests: create with a main station; unique name; ACCESS on a kitchen station refused; a login linked
+twice refused; staffForUser; moving the home site needs manage_staff at both sites; the importer
+warns and is idempotent; activity_log written.
+
+Click-through (390px): add a person, give a sub-station and standing access, link a login,
+deactivate.
+
+Touches: server/db/schema.sql, server/engines/staff.js (new), server/engines/staff.test.js (new),
+server/routes/staff.js, server/routes/staff.test.js, scripts/import-settings.js, public/staff.html.
+PUBLIC -> click-through before merge.
+
+## Step roster-week - the weekly roster: placements, rest days, copy last week (A6)
+
+Decided ADR-013 and ADR-037. DEPENDS ON roster-staff and business-day.
+
+Schema (CREATE TABLE IF NOT EXISTS):
+- roster_entries: id, business_date TEXT NOT NULL, staff_id (FK staff), site_code TEXT NOT NULL
+  (where the person is that day), station_id (FK stations, nullable), status TEXT NOT NULL, reason
+  TEXT, covering_staff_id (FK staff, nullable), updated_by_user_id, updated_at, created_at. UNIQUE
+  (business_date, staff_id): one placement per person per day.
+- status (module-validated; all six from day one so roster-day-status needs no migration): ON_DUTY,
+  REST_DAY, LEAVE, SICK_LEAVE, ABSENT, FLOATER. This step's page sets ON_DUTY and REST_DAY.
+
+Rules (new module server/engines/roster.js):
+- ON_DUTY needs an active station; site_code = that station's site (another restaurant's station =
+  working there that day, ADR-013). FLOATER has no station. REST_DAY, LEAVE, SICK_LEAVE, ABSENT
+  have no station. Without a station, site_code = the home site.
+- Who may edit an entry: roster_all at the person's home site; or roster_kitchen at the home site
+  when the person's main station is a kitchen station AND any station being set is a kitchen
+  station. Everyone else reads.
+- Every change writes activity_log (before / after) in the same transaction: daily changes keep
+  their history.
+- getWeek(siteCode, monday): every active person whose home site is siteCode, plus anyone placed at
+  siteCode that week; grouped by main station in station order (a temporary placement shows in the
+  person's usual slot, naming the station, and the site when it is elsewhere); a visitor from
+  another site shows under the station they work, marked with their home site. A missing cell is
+  "not set".
+- copyWeek(siteCode, monday, actor), needs roster_all: from the previous week, for each active
+  person of the site, REST_DAY stays REST_DAY and ON_DUTY at a home-site station stays; every
+  one-off (LEAVE, SICK_LEAVE, ABSENT, FLOATER, a covering placement, a day at another site) becomes
+  ON_DUTY at the main station. Anyone with no entry last week gets ON_DUTY at the main station every
+  day (so an empty last week builds the week from main stations). Refused if anyone of the site
+  already has an entry that week ("This week already has entries").
+
+Routes, new server/routes/roster.js (wired in server/index.js): GET /api/roster/week?site&date
+(any date in the week), PUT /api/roster/entry (staff_id, date, status, station_id), POST
+/api/roster/copy-week (site, monday).
+
+Page, new public/roster.html (Home links "Roster"): a site picker; a week bar "< Nov 2 - 8 >"
+(Monday to Sunday, default the week of businessDate); day tabs Mon to Sun (one day at a time, phone
+first); per day, stations in order with their people; tap a person -> On duty at <station: their
+sub-stations first, then the home site's stations, then other sites'> or Rest day. "Copy last week"
+shows when the week is empty. Read-only without edit rights.
+
+Not in scope: leave, sick, absent, floater, covering and totals (next step); picks; the login list.
+
+Edge states: failure - one transaction per change. Partial - a half-built week is fine; empty cells
+show "not set". Empty - an empty week offers "Copy last week". Stale - the day reloads after each
+save and shows "changed by <name>". Blocked - without edit rights cells are not tappable; 403 on
+writes. Inactive - an inactive station cannot be chosen, existing entries on it stay and show it
+greyed; an inactive person stays in past weeks only. Two devices - last save wins; both changes are
+in activity_log.
+
+Tests: one entry per person per day; ON_DUTY needs a station, a rest day refuses one; a placement at
+another site sets site_code there and the person shows in both weeks (home slot "at FC"); a head
+chef can set a kitchen person's rest day but cannot move them to Bar or edit a Bar person; a
+supervisor edits everything; copyWeek reverts each one-off, keeps rest days, fills new people,
+refuses a non-empty week; activity_log rows.
+
+Click-through (390px): copy last week, set a rest day, place someone at another restaurant and see
+both weeks; as head chef, a non-kitchen person cannot be edited.
+
+Touches: server/db/schema.sql, server/engines/roster.js (new), server/engines/roster.test.js (new),
+server/routes/roster.js (new), server/routes/roster.test.js (new), server/index.js,
+public/roster.html (new), public/index.html. PUBLIC -> click-through before merge.
+
+## Step roster-day-status - leave, sick, absent, floater, covering; the day's totals and head count (A6)
+
+Decided ADR-013, ADR-027 and ADR-037. DEPENDS ON roster-week.
+
+- The person sheet on roster.html gains the other statuses: Leave (reason, free text, required),
+  Sick leave, Absent (the supervisor's arrival check), Floater; and "Covering <person>": ON_DUTY at
+  the covered person's station with covering_staff_id set. Choosing "covering" lists people of that
+  site who are not on duty that day.
+- Covering rules: covering_staff_id is another person; only with ON_DUTY; the covered person's own
+  entry is not changed (a warning shows if they are on duty that day).
+- Totals under each day, like the paper's bottom rows: Present (ON_DUTY + FLOATER at this site,
+  visitors from other sites included), Rest day, Leave, Sick leave, Absent, Floater.
+- headCount(siteCode, date) in roster.js -> { present, rest_day, leave, sick_leave, absent, floater
+  }; GET /api/roster/head-count?site&date. present is the staff-meal prefill (ADR-027; the meal page
+  itself is A10). OJT are never on the roster (ADR-037).
+
+Edge states: failure - one transaction. Partial - n/a. Empty - a day with no entries shows all
+totals 0 and "Roster not set for this day" (A10's head count then starts empty). Stale - totals
+recompute on each load. Blocked - as roster-week. Inactive - an inactive person counts on past days
+only. Two devices - last save wins; history in activity_log.
+
+Tests: leave needs a reason; covering only with ON_DUTY and another person; present counts ON_DUTY
++ FLOATER at the site, includes a visitor, excludes absent; the home site does not count a person
+working elsewhere; the head-count route.
+
+Click-through (390px): mark absent, sick and leave with a reason; set a cover; the totals change.
+
+Touches: server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js,
+server/routes/roster.test.js, public/roster.html. PUBLIC -> click-through before merge.
+
+## Step tonight-picks - tonight's kitchen counter and other picks, with reassignment (A6)
+
+Decided ADR-014, ADR-017 and ADR-037. DEPENDS ON roster-day-status.
+
+Schema (CREATE TABLE IF NOT EXISTS): night_picks: id, business_date TEXT NOT NULL, station_id (FK
+stations), staff_id (FK staff), picked_by_user_id, created_at, ended_at (NULL = live),
+ended_by_user_id.
+
+Rules (new module server/engines/tonightPicks.js):
+- A pick = "this person works <station>'s sheets on <date>". Only stations that open at least one
+  sheet can be picked for.
+- Kitchen station (kitchen = 1): at most one live pick per station per date - the Kitchen Window
+  dispatcher (ADR-014); one pick covers every sheet that station opens (meat now, veggies and pantry
+  later). Picking someone else ends the current pick: access for that night only, and saves already
+  made keep their author.
+- Other stations (e.g. Commissary): any number of live picks (the head chef's commi pick,
+  ADR-017); removing one ends it.
+- Who picks: can(user, 'pick_tonight', the station's site). Candidates: active people with a
+  linked login who are ON_DUTY or FLOATER at that site on that date. Not on a kitchen station that
+  day -> warning "not on a kitchen station today", still allowed. No login -> refused "no login
+  yet".
+- Dates: today's business date or later (picks in advance, e.g. at closing the night before). A
+  past date is refused. No automatic default (ADR-014).
+
+Routes in server/routes/roster.js: GET /api/tonight?site&date (the stations that open sheets, live
+picks, candidates), POST /api/tonight/picks, POST /api/tonight/picks/:id/end.
+
+Page roster.html: a "Tonight" panel at the top of the day view, for today and future days: per
+station with sheets, "Kitchen counter: <name> [Change]" or "Commissary today: <names> [Add] [x]";
+ended picks listed small underneath with who picked them and when.
+
+Edge states: failure - replacing a pick (end the old, add the new) is one transaction. Partial -
+n/a. Empty - "Not picked yet". Stale - reload after each action. Blocked - without pick_tonight the
+panel is read-only; 403. Inactive - a deactivated person's live pick stays visible with a warning
+and can be changed. Two devices - two people picking the kitchen counter at once: the second ends
+the first (last pick wins, both in history).
+
+Tests: one live kitchen pick per station and date, replacing ends the old; several commi picks; the
+candidate must be on duty at the site; no login refused; past date refused; the warning for a
+non-kitchen person; 403 without pick_tonight; ended picks stay in history.
+
+Click-through (390px): as head chef, pick tonight's kitchen counter, change it, add a commi pick; as
+a checker, the panel is read-only.
+
+Touches: server/db/schema.sql, server/engines/tonightPicks.js (new),
+server/engines/tonightPicks.test.js (new), server/routes/roster.js, server/routes/roster.test.js,
+public/roster.html. PUBLIC -> click-through before merge.
+
+## Step login-tonight - the login list from tonight's roster; "your work tonight" (A6)
+
+Decided ADR-011 and ADR-037. DEPENDS ON tonight-picks.
+
+- tonightWork(db, user, date) in new server/engines/tonightWork.js -> the sheets this person may
+  write on that business date, each with its reason ("picked: Kitchen", "on duty: Bar", "standing
+  access: Podium"), from: live picks; an ON_DUTY entry at a NON-kitchen station that opens sheets;
+  standing access (ACCESS) to a station at a site where the person is on duty that day. Kitchen
+  stations count only through a pick. Admin -> every sheet ("admin"). Read-only here;
+  write-permission enforces it.
+- GET /api/auth/login-list for businessDate(now) -> { tonight, always, everyone_else }: tonight =
+  active users linked to people ON_DUTY or FLOATER anywhere today or with a live pick; always =
+  active users with admin, read_only (management) or roster_all anywhere, not already in tonight;
+  everyone_else = every other active user. /api/auth/users is unchanged.
+- login.html: tonight first (grouped by site), then always, then a collapsed "Everyone else" (a
+  rest-day person who came in anyway).
+- GET /api/tonight/mine -> tonightWork for req.user today. index.html: a "Tonight" card at the top
+  with a link per sheet ("Landing count - Silingan"), or "No work for you tonight" (every page can
+  still be read). People who can finalize at a site also see "Landing review - <site>".
+
+Edge states: failure - if login-list fails, the login page falls back to /api/auth/users (everyone).
+Partial - n/a. Empty - no roster anywhere today: tonight is empty and Everyone else starts open.
+Stale - computed per request; at 8am the list becomes the new day. Blocked - none (read-only).
+Inactive - inactive users are never listed. Two devices - n/a.
+
+Tests: tonightWork from a kitchen pick, from ON_DUTY at a non-kitchen station with a sheet, from
+standing access only when on duty at that site, never from a SUB; ON_DUTY at a kitchen station
+without a pick gives nothing; the three login-list buckets; at 07:59 yesterday's roster is used.
+
+Click-through (390px): a rostered person is under Tonight; a rest-day person is under Everyone else;
+after login, Home shows their sheets or "No work for you tonight".
+
+Touches: server/engines/tonightWork.js (new), server/engines/tonightWork.test.js (new),
+server/routes/auth.js, server/routes/auth.test.js, server/routes/roster.js, public/login.html,
+public/index.html. PUBLIC -> click-through before merge.
+
+## Step write-permission - only tonight's people write (ADR-011 enforced) (A6)
+
+Decided ADR-011, ADR-013, ADR-015 and ADR-037. DEPENDS ON login-tonight and site-filter.
+
+- canUseSite(db, user, siteCode, date) in siteAccess.js widens to: a membership, OR a live role
+  assignment at the site (3zj), OR ON_DUTY / FLOATER at the site that date, OR a live pick on a
+  station whose sheets are at the site (Silingan's commi pick -> COM-A). Routes are not changed;
+  requireSiteAccess passes the request's business date (its date parameter, else businessDate(now)).
+- mayWriteSheet(db, user, sheetDefinitionId, date) in tonightWork.js: admin -> yes; the sheet is in
+  tonightWork(user, date) -> yes; an OPEN recount order assigned to the user (3za) -> yes for that
+  item only; otherwise no. Fallback (ADR-015): when the sheet's site has no roster entries at all on
+  that date, anyone with enter_counts at the site may write, so Beta keeps working until rosters are
+  entered.
+- Enforced on: the restaurant meat landing's count saves (meat and portion endings) in dailyAudit.js
+  against that restaurant's Landing sheet; and the commissary writes in commissary.js (endings,
+  yields, shipments, adjustments) against that commissary's Commi sheet. Review-page actions
+  (allocations, recount orders, finalize) stay role-based and are not changed here.
+- A save for a date other than today's business date (a correction): only finalize or admin at the
+  site.
+- Refusal: 403 { error: "Not your sheet tonight - ask the head chef to pick you." }. The pages
+  already show save errors; no page change.
+
+Edge states: failure - a refused save writes nothing (no count_entries row). Partial - unsaved
+entries stay as drafts on the phone (count-drafts). Empty - no roster that date at that site -> the
+old rule. Stale - access follows the latest pick at the time of each save: a replaced counter's next
+save is refused; their earlier saves keep their name. Blocked - isBlocked and finalization refuse
+first, as today. Inactive - a deactivated user reads as logged out (stub-login Q4). Two devices - the
+same person on two phones: both allowed, last save wins (3za).
+
+Tests: the picked counter saves, another cook on the Kitchen station is refused; after a
+reassignment the first is refused and their count_entries keep their name; a recount assignee
+saves that item only; a Commissary placement, a commi pick and standing access can write the commi,
+standing access on a rest day cannot; a person placed at FC for the day passes canUseSite at FC; no
+roster that date -> the old rule; an old date needs finalize or admin; admin always.
+
+Click-through (390px): as a cook who was not picked, a save shows the refusal; as the picked counter
+it saves.
+
+Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/tonightWork.test.js,
+server/middleware/requireSiteAccess.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js,
+server/routes/commissary.js, server/routes/commissary.test.js. Server-side; click-through of the
+refusal message only.

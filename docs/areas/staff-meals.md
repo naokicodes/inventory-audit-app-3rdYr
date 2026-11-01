@@ -52,7 +52,11 @@ Status: IRL Confirmed - FLOW Drafted - APP Decided
   expenses). A logged meal stands alone (date, site, slot, cook, lines); the
   meal planner is a later, separate feature where a plan can be voided with a
   reason and stays in history.
-- Not specced. Queue item A10.
+- Specced 2026-11-01 (A6, roster-day-status 3zo): the head-count prefill is the
+  roster's Present for that site and date (on duty + floater, visitors included,
+  absent excluded). OJT are never on the roster; the cook types the OJT count
+  (ADR-037).
+- Not specced (the meal page). Queue item A10.
 
 ## Open questions
 - Does the meal budget also pay for rice (a pantry item)? Naoki asks the head

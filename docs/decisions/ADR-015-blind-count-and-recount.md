@@ -3,6 +3,7 @@
 - Status: Accepted 2026-10-28
 - Decided by: Naoki
 - Supersedes: none
+- Superseded by: ADR-038 (the derivation line and the Likod line only)
 
 ## Context
 

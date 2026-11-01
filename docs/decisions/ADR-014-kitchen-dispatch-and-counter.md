@@ -3,6 +3,7 @@
 - Status: Accepted 2026-10-28
 - Decided by: Naoki, from the head chef
 - Supersedes: none (corrects the 10-28 item 76 "each cook's PO")
+- Superseded by: ADR-035 (the line "the landing can be assigned to anyone, a supervisor as fallback" only)
 
 ## Context
 

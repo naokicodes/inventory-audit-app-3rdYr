@@ -33,6 +33,9 @@ Sheet "Commissary Inventory" (source: photos 2026-10-23 and 2026-10-24).
   are never blind.
 - Decided 2026-10-28 (ADR-018): miscut becomes a counted kg item, carried over
   until announced as waste; portions and miscut share one cost per kg.
+- Specced 2026-11-01 (A6, ADR-037): commi write access = a placement on the
+  Commissary station, the head chef's commi pick for the day, or standing access
+  (Likod grillers); enforced by write-permission (3zr). Never blind.
 
 ## Open questions
 - None open.

@@ -56,8 +56,8 @@ flight. (ADR-001 explains the split.)
 | ADR-011 | Write permission is enforced; process is not | Accepted 2026-10-22 |
 | ADR-012 | Stations and sheets | Accepted 2026-10-22 |
 | ADR-013 | The roster | Accepted 2026-10-28 |
-| ADR-014 | Kitchen dispatch and tonight's kitchen counter | Accepted 2026-10-28 |
-| ADR-015 | Blind counting and the quiet recount | Accepted 2026-10-28 |
+| ADR-014 | Kitchen dispatch and tonight's kitchen counter | Accepted 2026-10-28; landing line superseded by ADR-035 |
+| ADR-015 | Blind counting and the quiet recount | Accepted 2026-10-28; derivation and Likod lines superseded by ADR-038 |
 | ADR-016 | One unit per meat on the landing | Accepted 2026-10-28 |
 | ADR-017 | Commi access, not a sub-commi | Accepted 2026-10-28 |
 | ADR-018 | Counted-meat costing and miscut as stock | Accepted 2026-10-28 |
@@ -75,7 +75,12 @@ flight. (ADR-001 explains the split.)
 | ADR-030 | Likod is its own site | Accepted 2026-10-25 |
 | ADR-031 | Pizza: dough first (partly decided) | Accepted 2026-10-25 |
 | ADR-032 | Grouped navigation, after table-scroll | Accepted 2026-10-21 |
-| ADR-033 | The sales day turns at 8am | Accepted 2026-10-30 |
+| ADR-033 | The sales day turns at 8am | Accepted 2026-10-30; scope widened by ADR-036 |
+| ADR-034 | Roles per site and role switches | Accepted 2026-11-01 |
+| ADR-035 | The landing belongs to the head-chef role at that site | Accepted 2026-11-01 |
+| ADR-036 | The business day turns at 8am everywhere | Accepted 2026-11-01 |
+| ADR-037 | Roster placements, copying, picks and access | Accepted 2026-11-01 |
+| ADR-038 | Blind counting follows the site's roles; Likod counts blind | Accepted 2026-11-01 |
 
 ## Handoff item map
 

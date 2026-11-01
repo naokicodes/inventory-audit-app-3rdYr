@@ -28,6 +28,7 @@ listing what changed after it.
 | `ARCHITECTURE-HANDOFF-2026-10-21` | `144c33d` | 483 | SPOS into the repo, the `/naoki-qs` merge policy, Beta on the restaurant PC, roster storage. |
 | `ARCHITECTURE-HANDOFF-2026-10-22` | `1517380` | 483 | Decisions 1-15: prices, blind counting, roles, stations, Likod, POs, roster. |
 | `ARCHITECTURE-HANDOFF-2026-10-25` | `40e982d` | 499 | Decisions 16-59: area docs, side units, buying, staff meals, bar, waste, pizza; the architect queue. |
+| `ARCHITECTURE-HANDOFF-2026-10-28` | `2308d0a` | 505 | Consolidated after A1: blind count and recount (A7), Beta on the restaurant PC, the roster round (ADR-013, ADR-014), the architect queue A0-A14. |
 
 Not here: the 2026-09-15 handoff and the dispatcher handoff (never committed),
 and `architect-notes-PRIVATE.md` (stays private). Decisions 1-94 from the 10-22 to

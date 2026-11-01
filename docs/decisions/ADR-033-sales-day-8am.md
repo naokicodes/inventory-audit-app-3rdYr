@@ -3,6 +3,7 @@
 - Status: Accepted 2026-10-30
 - Decided by: Naoki
 - Supersedes: none
+- Superseded by: ADR-036 (scope only; the 8am rule is unchanged)
 
 ## Context
 
