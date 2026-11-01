@@ -46,7 +46,10 @@ function Invoke-Native([string]$What, [scriptblock]$Cmd) {
 }
 
 function Send-PrComment([string]$Body) {
-  & gh pr comment $Pr --repo $Repo --body $Body
+  # Via a file: PowerShell 5.1 splits an argument at its embedded double quotes.
+  $bodyFile = Join-Path $logDir 'preview-comment.txt'
+  [IO.File]::WriteAllText($bodyFile, $Body, (New-Object System.Text.UTF8Encoding $false))
+  & gh pr comment $Pr --repo $Repo --body-file $bodyFile
   if ($LASTEXITCODE -ne 0) { Write-Warning "Could not comment on PR #$Pr (gh exit $LASTEXITCODE)." }
 }
 
