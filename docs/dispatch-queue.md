@@ -199,6 +199,7 @@ the Look tokens, by meaning. No layout, markup or JS change. PUBLIC -> click-thr
 session-status.md -> "Step ui-pass-ii".
 
 ### 3z. Step warn-ink - darker warn text on the warn tint  [runnable]
+**CLOSED 2026-11-02, PR #58 (`d9fc0fc`).**
 Touches: public/style.css
 Adds --warn-ink (#94570A) for text on --warn-tint so small warn badges reach 4.5:1. Colors only,
 style.css only. PUBLIC -> click-through. Full spec: session-status.md -> "Step warn-ink".
@@ -251,6 +252,7 @@ the Unmatched list. PUBLIC -> click-through. Full spec: session-status.md -> "St
 name-map-refresh".
 
 ### 3zi. Step business-day - one 8am business date for the whole app  [runnable]
+**CLOSED 2026-11-02, PR #55 (`cd50d51`).**
 Touches: server/businessDay.js, server/businessDay.test.js, server/engines/loyversePreview.js
 Moves the 8am businessDate (ADR-036) out of the Loyverse engine into a shared module, plus
 mondayOf(). No behaviour change. Server-only, no click-through. Full spec: session-status.md ->

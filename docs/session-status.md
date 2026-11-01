@@ -2526,6 +2526,7 @@ before merge. Blocked on ui-pass (needs the tokens) and count-drafts (shares dai
   computed cells visibly differ from input cells; history pills are neutral.
 
 ## Step warn-ink - darker warn text on the warn tint
+**CLOSED 2026-11-02, PR #58 (`d9fc0fc`).**
 
 Decided 2026-10-25 (issue #44). Small warn badges (`.card-blocked` and other text in var(--warn)
 on var(--warn-tint)) read at 3.53:1, below the 4.5:1 that small text needs (WCAG AA).
@@ -2729,6 +2730,7 @@ running (refused); verify fails (rolled back).
 Touches: scripts/restaurant-pc.bat (new), .gitattributes. Not public/.
 
 ## Step business-day - one 8am business date for the whole app (A6)
+**CLOSED 2026-11-02, PR #55 (`cd50d51`).**
 
 Decided 2026-11-01 (ADR-036, widens ADR-033). Why: the roster, the login list and tonight's picks
 need "tonight", and FC and Likod count until about 1am. Sales already turn at 8am; everything now
