@@ -68,6 +68,10 @@ try {
     }
     Remove-Item $pidFile -Force
   }
+  # Something else still on the port would answer the readiness check below for the wrong code.
+  $busy = $true
+  try { Invoke-WebRequest -Uri "http://localhost:$Port/" -UseBasicParsing -TimeoutSec 3 | Out-Null } catch { $busy = $false }
+  if ($busy) { throw "port $Port is already in use by a process this script did not start" }
 
   # ---- Check out the PR into the worktree. ----
   Invoke-Native 'git fetch' { git fetch origin "+pull/$Pr/head:preview-$Pr" }
@@ -110,11 +114,12 @@ try {
       Start-Sleep -Seconds 2
     }
   }
-  if (-not $up) { throw "the server did not answer on port $Port within 60 s (see .run-queue-logs/preview.log)" }
+  if (-not $up) { throw "the server did not answer on port $Port within 60 s (see .run-queue-logs/preview.log and preview.err.log)" }
 
   $where = if ($env:AUTOPILOT_PREVIEW_URL) { "up at $($env:AUTOPILOT_PREVIEW_URL)" } else { "up on port $Port" }
   Send-PrComment "Preview of PR #$Pr is $where (reseeded sample data). After clicking through, comment `"Click-through: <what you saw>`"."
   Write-Host "Preview of PR #$Pr is $where (PID $($proc.Id))."
+  exit 0
 } catch {
   Send-PrComment "Preview of PR #$Pr failed: $($_.Exception.Message)"
   Write-Error "Preview of PR #$Pr failed: $($_.Exception.Message)" -ErrorAction Continue
