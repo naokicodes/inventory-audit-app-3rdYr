@@ -132,9 +132,27 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-038; the index, and a map from handoff item numbers to records, is in
+to ADR-042; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-02 architect (A0) - decided (recorded: ADR-039 to ADR-042)
+
+- **Testing (ADR-039).** Click-throughs split: Claude in Chrome checks the logic on the PR's
+  preview, a person checks the looks on a phone. Fake accounts named "Test ..." come from
+  `npm run seed:test` (step test-accounts), never from the normal seed and never on `beta.db`.
+  A step that adds a role, switch or access rule adds its test account. Claude in Chrome runs the
+  Beta smoke list before each tag. Guide: `docs/click-through.md`.
+- **Logged out (ADR-040).** Until write-permission (3zr), a request with no logged-in user passes
+  the site checks and stays blind; from 3zr it gets 401. Admin-only actions need a logged-in admin
+  from the step that adds them.
+- **Owner site (ADR-041).** site-filter scopes the routes that name one site or reach it through a
+  row. site-filter-ii: a two-site request checks its owner site only; the picker and the rollup
+  trim to the user's sites; admin commands need a bypass role; history and Kitchen Sales stay open.
+- **Settings (ADR-042).** Every Settings change needs a logged-in admin; reads stay open.
+- **Issues answered in their steps:** #53 (sheets-tier1), #54 (site-filter), #57
+  (autopilot-preview). New steps: site-filter-ii (3zs), test-accounts (3zt), settings-guard
+  (3zu). The people workbook's format is pinned in import-identity.
 
 ### 2026-11-01 architect (A6) - decided (recorded: ADR-034 to ADR-038)
 
@@ -1714,6 +1732,18 @@ restaurants and commissaries and refuses (warn and skip) a code the other table 
 so resolveSiteCode never meets a collision. Likod becomes a site soon and more branches may
 follow, so the check lives at creation time.
 
+**Added 2026-11-02 (A0): the people workbook.** Naoki keeps one off-repo workbook for people;
+real names never enter the repo. One CSV per tab (option B), the file named after the tab, the
+first row holding these headers:
+- Roles: name, can_enter_counts, can_finalize, can_admin, read_only (0 or 1). Optional: the
+  seeded roles exist already; a row changes that role's flags.
+- Users: name, default_role, active (1 or 0), site_memberships (comma-separated site codes, as
+  Settings shows them). site_memberships is a column on Users, not a separate tab.
+- Stations: the columns roster-stations (3zl) defines. This step skips it.
+- Staff: the columns roster-staff (3zm) defines. This step skips it.
+The importer reads the tabs it knows and lists the ones it skipped. Fake test accounts are not
+here: they come from test-accounts (3zt) and never reach beta.db (ADR-039).
+
 ## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
 **CLOSED 2026-10-25, PR #33 (`ee0801f`).**
 
@@ -1814,6 +1844,29 @@ siteCode, date), in server/db/siteAccess.js. In this step it means userHasSite (
 above); date is accepted and unused. role-assignments (3zj) and write-permission (3zr) widen this
 helper - a role at the site, a roster placement or pick that day - without touching the routes
 again. Touches gains: server/db/siteAccess.js.
+
+**Decisions 2026-11-02 (issue #54, Naoki; ADR-040, ADR-041).** These override any reading of the
+text above.
+- (1) No logged-in user (Reading B): requireSiteAccess calls next() when req.user is null. Scoping
+  applies to logged-in users whose role does not bypass (admin, super-admin, management). Existing
+  route tests stay logged out. This pass ends with write-permission (3zr).
+- (2) Which routes: the issue's groups (a) and (b), nothing else.
+  - (a) The site is named in the request: /daily-audit* (restaurant_id); /stock-receipts GET and
+    POST and /stock-receipts/meats; /sales GET and PATCH; /commissary/daily-audit,
+    /commissary/month-opening*, /commissary/meats, /commissary/yield-log GET,
+    /commissary/adjustments GET (commissary_id).
+  - (b) The site is found through a row: PATCH and DELETE /stock-receipts/:id; POST, PATCH and
+    DELETE /commissary/yield-log*; POST, PATCH and DELETE /commissary/adjustments*; PATCH
+    /commissary/opening-stock (commissary_meat_id); POST /daily-audit/recount-orders/:id/cancel.
+    One helper in siteAccess.js maps each kind of id to its site code. A row that does not exist
+    passes through, so the route answers 404 as it does today.
+  - Ids become codes through restaurants.code and commissaries.code, never by matching strings.
+  - Refusal: 403 { error: "No access to site <code>" }.
+  - Groups (c) and (d) go to site-filter-ii (3zs); group (e), Settings, to settings-guard (3zu).
+  - A route that names a site and is in neither list: park it as needs-architect, as before.
+- Tests: logged out passes; a logged-in checker without the site gets 403 on one route of each
+  group; a floater with both sites passes at both; each bypass role passes; a missing row id still
+  gets 404.
 
 ## Step autopilot-runner - runner lock, run log, pause switch, review drafts
 **CLOSED 2026-10-13, PR #25 (`1cf1c2a`).**
@@ -2018,6 +2071,19 @@ the live inventory.db untouched; show the guards refusing -Port 3000 and an inve
 
 Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1. No app code; the preview runs the
 PR's code as-is. No click-through for this step itself.
+
+**Decisions 2026-11-02 (issue #57, Naoki).** These override any reading of the text above.
+- (1) Two log files (Reading A, as built): node's output goes to `.run-queue-logs/preview.log` and
+  its errors to `.run-queue-logs/preview.err.log`; the failure comment names both. "output to
+  .run-queue-logs/preview.log" above means these two files.
+- (2) Several labelled PRs in one tick (Reading A, as built): the first owner-labelled PR is served
+  and its label removed; the others keep their label and are served on later ticks, each
+  replacing the previous preview.
+- cubic's two notes on 686d160 need no change. `exit 0` ends only preview.ps1: doorbell.ps1 calls
+  it with `&` and logs the exit code afterwards. The port probe misses a program that answers
+  with an error status; node then fails to start, the 60-second readiness check fails, and the
+  comment points to the logs.
+- test-accounts (3zt) later adds one line after the reseed: `npm run seed:test` on the preview DB.
 
 ## Step loyverse-preview-i - Loyverse sales preview: engine + route (writes nothing)
 **CLOSED 2026-10-21, PR #28 (`4592207`).**
@@ -2342,6 +2408,16 @@ inactive restaurant gets none. reseed.test.js stays green.
 Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js (new),
 server/engines/sheetDefinitions.test.js (new). Server-only, no click-through, no migration.
 Shares schema.sql + seed.js with users-roles and user-sites -> sequenced after them.
+
+**Decisions 2026-11-02 (issue #53, Naoki).** These override any reading of the text above.
+- (1) A switched-off site (Reading A): any existing site code is valid, active or not, exactly as
+  resolveSiteCode() decides. Sheet setup is admin-only (ADR-042): whichever step first lets a
+  person create a definition requires can_admin there, switched-off sites included. This step has
+  no route, so PR #52 needs no change.
+- (2) A site added at runtime (Reading A): defaults come from the seed only; settings.js is not
+  touched here. sheet-close (3zd), the first step that reads definitions, calls
+  ensureDefaultSheets() at server start and when Settings adds a restaurant or commissary, because
+  the restaurant PC's beta.db is never reseeded.
 
 ## Step count-drafts - keep unsaved count entries on the phone
 **CLOSED 2026-10-24, PR #31 (`7617088`).**
@@ -2708,6 +2784,13 @@ written; listSheetDefinitions({ activeOnly: true }) excludes a closed sheet.
 Touches: server/engines/sheetDefinitions.js + test, server/routes/settings.js,
 public/settings.html. PUBLIC -> click-through before merge.
 
+**Added 2026-11-02 (A0, issue #53).** This is the first step that reads sheet_definitions, and the
+restaurant PC's beta.db is never reseeded. So server/index.js calls ensureDefaultSheets() once at
+start (idempotent), and creating a restaurant or commissary in Settings calls it in the same
+request. Test: a site created through Settings has its Landing or Commi definition at once.
+settings-guard (3zu) already refuses Settings changes from non-admins; setSheetActive keeps its own
+check. Touches gains: server/index.js. One at a time with settings-guard (both touch settings.js).
+
 ## Step restaurant-pc - the restaurant PC script in the repo, with an update mode (A3)
 
 Decided 2026-10-28. The restaurant PC is the Beta server. Its setup script
@@ -2834,6 +2917,9 @@ at an assignment's site.
 Touches: server/db/schema.sql, server/db/permissions.js (new), server/db/permissions.test.js (new),
 server/db/siteAccess.js, server/engines/blindCount.js, server/routes/auth.js, server/db/seed.js.
 Server-only, no migration, no click-through.
+
+**Added 2026-11-02 (A0, ADR-039).** The test accounts gain "Test Supervisor RA" (base role
+supervisor, member of RA) in server/db/testAccounts.js. Touches gains: server/db/testAccounts.js.
 
 ## Step roles-page - the Roles page: switches per role, roles per person (A6)
 
@@ -3205,3 +3291,121 @@ Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/
 server/middleware/requireSiteAccess.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js,
 server/routes/commissary.js, server/routes/commissary.test.js. Server-side; click-through of the
 refusal message only.
+
+**Added 2026-11-02 (A0, ADR-040).** This step ends the logged-out pass. requireSiteAccess answers a
+request with no logged-in user with 401 { error: "Log in first" } on every site-scoped route
+(site-filter and site-filter-ii), reads included; canUseSite with no user is false. Route tests
+that call those routes logged out now log in (made-up users, as today). Click-through, Claude
+checks: logged out, a counting page shows "Log in first". Touches gains: the site-scoped route
+tests.
+
+## Step site-filter-ii - two-site requests and lists across sites (A0)
+
+Decided 2026-11-02 (ADR-041, ADR-040). DEPENDS ON site-filter (3m: requireSiteAccess, canUseSite)
+and user-id-authorship (3l changes the same route files). One at a time with allocation-requests
+(3zc: allocations.js).
+
+Two sites in one request: each route has ONE owner site, the site of the people who do the work,
+and only that site is checked. Never both.
+- POST /commissary/shipments; /commissary/shipment-presets (GET, POST, PUT);
+  GET /commissary/adjustments/destinations -> the commissary (through the commissary meat).
+- /commissary/conversion-standards (GET, POST, PUT) -> the restaurant (restaurant_id; ratio
+  conversion is the restaurant's).
+- /allocations (GET, POST) and POST /allocations/conversion -> the entry's restaurant
+  (restaurant_id).
+
+Lists and reads across sites:
+- GET /restaurants (the site picker, dailyAudit.js): a scoped user gets only their sites; bypass
+  roles get all.
+- GET /dashboard/stock-rollup: restaurant_ids the user may not use are dropped; none left -> an
+  empty result, not an error.
+- GET /commands/oversold-check and POST /commands/sync-batch-stock: bypass roles only (admin,
+  super-admin, management for the read; admin, super-admin for the write). Logged out -> 401,
+  others -> 403 (ADR-040: no logged-out pass for admin actions).
+- /history and /history/filters: unchanged (activity_log has no site column). Check whether a
+  blind user can read, through history, the numbers the landing hides (beginning, new stock,
+  sales, expected, variance). If so, open a needs-architect issue; do not guess a fix.
+- GET /loyverse/preview: unchanged.
+
+Logged out: passes the site checks until write-permission (ADR-040).
+
+Edge states: Blocked - 403 { error: "No access to site <code>" }; Empty - a rollup with no usable
+site returns an empty result. No new writes, so failure, partial and two devices are unchanged.
+
+Tests: a commi-only user ships to RA; a restaurant-only user cannot ship; conversion standards
+follow the restaurant; allocations follow restaurant_id; the picker returns only the user's sites,
+and every site for management; the rollup drops other sites; a checker gets 403 on both commands
+and management gets 403 on sync-batch-stock; logged out passes the site checks and gets 401 on the
+commands.
+
+Touches: server/middleware/requireSiteAccess.js, server/db/siteAccess.js,
+server/routes/commissary.js, server/routes/allocations.js, server/routes/dailyAudit.js,
+server/routes/dashboard.js, server/routes/commands.js, and their tests. Server-only, no
+click-through.
+
+## Step test-accounts - fake tester accounts for previews and dev databases (A0)
+
+Decided 2026-11-02 (ADR-039). DEPENDS ON autopilot-preview (3q: preview.ps1). The users and
+user_sites tables exist already (users-roles, user-sites).
+
+Module server/db/testAccounts.js:
+- TEST_ACCOUNTS: the list below (name, role, site codes).
+- testAccountsRefusal(envDbPath) -> a message or null. Refuses when DB_PATH is unset, when it
+  resolves to the live inventory.db (dbPath.js), or when its file name is beta.db in any folder
+  (case-insensitive). Side-effect free, like reseedRefusal.
+- ensureTestAccounts(db) -> { users, memberships, skipped }: upsert each account by name (default
+  role, active 1) and add missing memberships. A site code that does not resolve (resolveSiteCode)
+  is warned about and skipped. Never touches super-admin or any user whose name does not start
+  with "Test ". Idempotent.
+
+Script scripts/seed-test-accounts.js: checks the refusal BEFORE requiring connection.js (as seed.js
+does), then calls ensureTestAccounts and prints the counts. package.json gains
+`"seed:test": "node scripts/seed-test-accounts.js"`. scripts/preview.ps1 runs it right after the
+reseed, with the same DB_PATH; a failure fails the preview the way a failed reseed does.
+
+Accounts (the seed's sites are RA, FC and COM-A):
+- Test Admin: admin, no memberships (bypass).
+- Test Management: management, no memberships (bypass).
+- Test Head Chef RA: head-chef, RA. Test Head Chef FC: head-chef, FC.
+- Test Counter RA: checker, RA. Test Counter FC: checker, FC.
+- Test Commi: checker, COM-A.
+- Test Floater: checker, RA and FC.
+- Test No Sites: checker, no memberships.
+Later steps add theirs (role-assignments: Test Supervisor RA).
+
+Tests (server/db/testAccounts.test.js): the refusal for unset, inventory.db, and beta.db in any
+folder and letter case; allowed for preview.db and dev.db; every account created with its role and
+sites; a second run adds nothing; an unknown site code is skipped with a warning; a user whose
+name does not start with "Test " is never changed; super-admin is untouched.
+
+Edge states: no page. Failure - a refusal writes nothing.
+
+Touches: server/db/testAccounts.js (new), server/db/testAccounts.test.js (new),
+scripts/seed-test-accounts.js (new), package.json, scripts/preview.ps1. Server and scripts only,
+no click-through, no migration.
+
+## Step settings-guard - Settings changes need an admin (A0)
+
+Decided 2026-11-02 (ADR-042, ADR-040). DEPENDS ON stub-login (req.user; closed). Runnable now.
+
+- New middleware server/middleware/requireAdmin.js: no logged-in user -> 401 { error: "Log in
+  first" }; a user without can_admin -> 403 { error: "Only an admin can change settings" };
+  otherwise next().
+- server/routes/settings.js: every POST, PUT, PATCH and DELETE goes through it, through ONE
+  router-level check scoped to the Settings paths (`router.use('/settings', ...)` for non-GET
+  methods), so a new Settings route cannot forget it. Never a bare `router.use`: this router is
+  mounted at /api before the other routers, so a bare one would catch their requests too.
+- GET routes stay open: other pages fill their dropdowns from them.
+- No page change: settings.html already shows the server's error text (alert / status line).
+
+Edge states: Blocked - the refusal messages above. Everything else unchanged.
+
+Tests: logged out -> 401 on one write of each Settings resource; checker, head-chef and management
+-> 403; admin and super-admin pass; every GET still answers logged out; a POST to a non-Settings
+route (for example /stock-receipts) is not affected. Existing Settings tests log in as an admin
+first.
+
+Touches: server/middleware/requireAdmin.js (new), server/routes/settings.js,
+server/routes/settings.test.js. Server-only. One at a time with sheet-close (3zd) and, if its write
+routes include settings.js, with user-id-authorship (3l). Claude checks (optional, on a preview):
+as Test Counter RA, saving a setting shows "Only an admin can change settings".

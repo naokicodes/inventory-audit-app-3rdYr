@@ -81,6 +81,10 @@ flight. (ADR-001 explains the split.)
 | ADR-036 | The business day turns at 8am everywhere | Accepted 2026-11-01 |
 | ADR-037 | Roster placements, copying, picks and access | Accepted 2026-11-01 |
 | ADR-038 | Blind counting follows the site's roles; Likod counts blind | Accepted 2026-11-01 |
+| ADR-039 | Testing: Claude checks the logic, people check the looks; fake test accounts | Accepted 2026-11-02 |
+| ADR-040 | Logged-out visitors keep working until write-permission | Accepted 2026-11-02 |
+| ADR-041 | Site scoping: one owner site per request | Accepted 2026-11-02 |
+| ADR-042 | Settings changes need an admin | Accepted 2026-11-02 |
 
 ## Handoff item map
 
