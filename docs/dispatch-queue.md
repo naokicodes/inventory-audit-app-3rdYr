@@ -132,6 +132,7 @@ A 15-minute poll: a `run-now` label or a new `architect-docs` issue (naokicodes 
 session-status.md -> "Step autopilot-doorbell".
 
 ### 3q. Step autopilot-preview - serve a PR on port 3100 for phone click-throughs  [runnable]
+**CLOSED 2026-11-11, PR #56 (`fd061a1`).**
 Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1
 A `preview` label on a PR serves that PR's code from a separate worktree on port 3100 with a
 reseeded throwaway DB, reachable over Tailscale. Never port 3000, never the live DB. Full
@@ -163,6 +164,7 @@ the route. Writes nothing. Not in the UI. Parallel-safe with loyverse-preview-ii
 session-status.md -> "Step loyverse-preview-iii".
 
 ### 3u. Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)  [runnable]
+**CLOSED 2026-11-11, PR #52 (`52e9290`).**
 Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js
 First Sheets slice: the sheet_definitions table (site_code, category, engine_type MEAT|SIDE,
 active) + a validating module + a seed of one Landing per restaurant and one Commi per

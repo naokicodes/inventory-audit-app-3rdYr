@@ -2036,6 +2036,7 @@ Touches: scripts/doorbell.ps1 (new). No app code, no click-through.
   starts nothing.
 
 ## Step autopilot-preview - serve a PR on port 3100 for phone click-throughs
+**CLOSED 2026-11-11, PR #56 (`fd061a1`).**
 
 AUTOPILOT family, slice 4 of 4. Depends on autopilot-doorbell. Inert until install. The
 architect clicks through public/ PRs on a phone over Tailscale, against that PR's own code on
@@ -2354,6 +2355,7 @@ public/kitchen-sales.html. PUBLIC -> click-through before merge. Map edits from 
 file, by the architect (the Sheet no longer leads).
 
 ## Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)
+**CLOSED 2026-11-11, PR #52 (`52e9290`).**
 
 First slice of the Sheets family (architect 2026-10-05). Decisions: "Sheets are a first-class
 two-tier entity, overlay-not-churn" (2026-09-26); Q2 (tier-1 first); round-2 S (site keying =
