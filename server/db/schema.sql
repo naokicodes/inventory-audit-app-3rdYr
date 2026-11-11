@@ -596,6 +596,21 @@ CREATE TABLE IF NOT EXISTS recount_orders (
   FOREIGN KEY (assigned_user_id) REFERENCES users(id)
 );
 
+-- 16. sheet_definitions (step sheets-tier1) - which sheets each site has
+-- and which engine each uses. Config only (tier 1): no dated instances.
+-- site_code is a restaurants.code OR commissaries.code with no FK (model B);
+-- engine_type ('MEAT' or 'SIDE') has no CHECK - sheetDefinitions.js
+-- validates both, so the engine set can grow without a table rebuild.
+CREATE TABLE IF NOT EXISTS sheet_definitions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_code TEXT NOT NULL,
+  category TEXT NOT NULL,         -- free text, admin-fed per site
+  engine_type TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (site_code, category)
+);
+
 -- Seed a reasonable starting set of adjustment types (admin can add more
 -- via the UI later - this is just a sensible default, not a fixed list).
 INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requires_conversion_target) VALUES
