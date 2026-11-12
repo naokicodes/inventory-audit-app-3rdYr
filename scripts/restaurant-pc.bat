@@ -21,8 +21,9 @@ REM ===================================================================
 set "APPDIR=%USERPROFILE%\InventoryApp"
 set "REPO=%APPDIR%\inventory-audit-app-3rdYr"
 set "REPO_URL=https://github.com/naokicodes/inventory-audit-app-3rdYr.git"
-set "TAG=beta-1"
+set "TAG="
 set "APP_PORT=3000"
+set "KEEP_BACKUPS=14"
 set "WARN="
 
 if /i "%~1"=="start" goto :start
@@ -100,7 +101,7 @@ goto :graphify_done
 echo        OK
 :graphify_done
 
-REM --- 5. The app itself, pinned ----------------------------------------
+REM --- 5. The app itself, pinned to the newest beta tag -----------------
 echo.
 echo  [5/9] The app
 if exist "%REPO%\.git" goto :clone_have
@@ -108,14 +109,16 @@ if not exist "%APPDIR%" mkdir "%APPDIR%"
 git clone "%REPO_URL%" "%REPO%"
 if errorlevel 1 goto :fail_clone
 cd /d "%REPO%"
-git rev-parse -q --verify "refs/tags/%TAG%" >nul 2>&1
-if errorlevel 1 goto :no_tag
+REM Never a fixed tag name: take the newest beta-* tag.
+for /f "delims=" %%T in ('git tag -l "beta-*" --sort^=-creatordate') do if not defined TAG set "TAG=%%T"
+if not defined TAG goto :no_tag
 git -c advice.detachedHead=false checkout -q "%TAG%"
-echo        Pinned to tag %TAG%.
+if errorlevel 1 goto :fail_pin
+echo        Pinned to tag %TAG%, the newest.
 goto :clone_done
 :no_tag
-echo        [!] There is no %TAG% tag yet, so this is main as of today.
-echo            Later: restaurant-pc.bat update %TAG%
+echo        [!] There is no beta tag yet, so this is main as of today.
+echo            Later: restaurant-pc.bat update beta-N
 set "WARN=1"
 goto :clone_done
 :clone_have
@@ -154,7 +157,9 @@ set "TOK="
 echo        Written.
 goto :env_done
 :env_have
-echo        Already there - kept as is.
+call :checkenv
+if errorlevel 1 goto :fail
+echo        Already there - kept as is. DB_PATH=%ENVDB%
 :env_done
 
 REM --- 8. Beta database, created once -----------------------------------
@@ -194,11 +199,16 @@ echo            Run this file again and click Yes.
 set "WARN=1"
 goto :admin_done
 :admin_ok
-echo        Firewall open for phones on the Private network, sleep off.
+echo        Port %APP_PORT% open to phones on this network only, sleep off.
 :admin_done
 
 REM --- Desktop launcher -------------------------------------------------
-if /i not "%~f0"=="%APPDIR%\restaurant-pc.bat" copy /y "%~f0" "%APPDIR%\restaurant-pc.bat" >nul 2>&1
+if /i "%~f0"=="%APPDIR%\restaurant-pc.bat" goto :launcher_copied
+copy /y "%~f0" "%APPDIR%\restaurant-pc.bat" >nul 2>&1
+if not errorlevel 1 goto :launcher_copied
+echo  [!] Could not copy this file into InventoryApp, so the desktop file may run an old copy.
+set "WARN=1"
+:launcher_copied
 set "DESKTOP="
 for /f "usebackq delims=" %%D in (`powershell -NoProfile -Command "[Environment]::GetFolderPath('Desktop')"`) do set "DESKTOP=%%D"
 if not defined DESKTOP set "DESKTOP=%USERPROFILE%\Desktop"
@@ -231,7 +241,15 @@ call :refreshpath
 if not exist "%REPO%\package.json" goto :fail_norepo
 cd /d "%REPO%"
 title Inventory Audit App - keep this window open
+REM The port first: never copy beta.db while the app is using it.
+call :portbusy
+if errorlevel 1 goto :fail_already
+call :checkenv
+if errorlevel 1 goto :fail
 call :backup
+if not errorlevel 1 goto :start_backed_up
+echo  [!] The backup failed - see above. The app starts anyway; tell Naoki today.
+:start_backed_up
 echo.
 for /f "delims=" %%H in ('git describe --tags --always') do echo  Version: %%H
 echo  Phones on the restaurant network open:
@@ -257,8 +275,10 @@ title Inventory Audit App - update
 echo.
 echo  Inventory Audit App - update
 echo  ============================
-powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort %APP_PORT% -State Listen -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+call :portbusy
 if errorlevel 1 goto :fail_running
+call :checkenv
+if errorlevel 1 goto :fail
 set "DIRTY="
 for /f "delims=" %%L in ('git status --porcelain --untracked-files^=no') do set "DIRTY=1"
 if defined DIRTY goto :fail_dirty
@@ -272,10 +292,15 @@ set /p "NEWTAG=  Which tag (for example beta-2): "
 if "%NEWTAG%"=="" goto :fail_notag
 git rev-parse -q --verify "refs/tags/%NEWTAG%" >nul 2>&1
 if errorlevel 1 goto :fail_badtag
+REM PREV is the exact commit, so going back never depends on a tag name.
 set "PREV="
-for /f "delims=" %%H in ('git describe --tags --always') do set "PREV=%%H"
-echo  Now: %PREV%    Moving to: %NEWTAG%
+for /f "delims=" %%H in ('git rev-parse HEAD') do set "PREV=%%H"
+if not defined PREV goto :fail_prev
+set "PREVNAME="
+for /f "delims=" %%H in ('git describe --tags --always') do set "PREVNAME=%%H"
+echo  Now: %PREVNAME%    Moving to: %NEWTAG%
 call :backup
+if errorlevel 1 goto :fail_nobackup
 git -c advice.detachedHead=false checkout -q "%NEWTAG%"
 if errorlevel 1 goto :fail_checkout
 echo  Installing dependencies...
@@ -292,11 +317,16 @@ pause
 exit /b 0
 :rollback
 echo.
-echo  [!] %NEWTAG% failed its check - going back to %PREV%.
+echo  [!] %NEWTAG% failed its check - going back to %PREVNAME%.
 echo      The log is %APPDIR%\last-verify.log - send it to Naoki.
 git -c advice.detachedHead=false checkout -q "%PREV%"
+if errorlevel 1 goto :fail_rollback
+set "NOWAT="
+for /f "delims=" %%H in ('git rev-parse HEAD') do set "NOWAT=%%H"
+if /i not "%NOWAT%"=="%PREV%" goto :fail_rollback
 call npm.cmd ci --no-audit --no-fund
-echo  Back on %PREV%. Nothing in the data was changed.
+if errorlevel 1 goto :fail_rollback_deps
+echo  Back on %PREVNAME%. Nothing in the data was changed.
 goto :fail
 
 REM ===================================================================
@@ -343,6 +373,28 @@ goto :fail
 :fail_checkout
 echo  [X] Could not switch to %NEWTAG%. Nothing was changed.
 goto :fail
+:fail_pin
+echo  [X] Could not switch to tag %TAG%. Run this file again; if it fails again, tell Naoki.
+goto :fail
+:fail_already
+echo  [X] The app is already running - port %APP_PORT% is in use.
+echo      Use the app window that is already open. Nothing was changed.
+goto :fail
+:fail_prev
+echo  [X] Could not read the current version. Nothing was changed. Tell Naoki.
+goto :fail
+:fail_nobackup
+echo  [X] The backup failed, so the update stopped. Nothing was changed.
+echo      Check the disk space, then tell Naoki.
+goto :fail
+:fail_rollback
+echo  [X] Could not go back to %PREVNAME% by itself. Do NOT start the app.
+echo      Send a photo of this window to Naoki.
+goto :fail
+:fail_rollback_deps
+echo  [X] Back on %PREVNAME%, but reinstalling its parts failed. Do NOT start the app.
+echo      Check the internet, then send a photo of this window to Naoki.
+goto :fail
 :fail
 echo.
 pause
@@ -360,14 +412,48 @@ if defined NEWPATH set "PATH=%NEWPATH%;%USERPROFILE%\.local\bin;%APPDATA%\npm"
 goto :eof
 
 :backup
-if not exist "%REPO%\server\db\beta.db" goto :eof
+REM Returns errorlevel 1 if any copy failed.
+if not exist "%REPO%\server\db\beta.db" exit /b 0
 set "STAMP="
 for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HHmm"`) do set "STAMP=%%T"
+if not defined STAMP goto :backup_bad
 if not exist "%APPDIR%\backups" mkdir "%APPDIR%\backups"
 copy /y "%REPO%\server\db\beta.db" "%APPDIR%\backups\beta_%STAMP%.db" >nul
-if exist "%REPO%\server\db\beta.db-wal" copy /y "%REPO%\server\db\beta.db-wal" "%APPDIR%\backups\beta_%STAMP%.db-wal" >nul
+if errorlevel 1 goto :backup_bad
+if not exist "%REPO%\server\db\beta.db-wal" goto :backup_ok
+copy /y "%REPO%\server\db\beta.db-wal" "%APPDIR%\backups\beta_%STAMP%.db-wal" >nul
+if errorlevel 1 goto :backup_bad
+:backup_ok
 echo  Data backed up to InventoryApp\backups\beta_%STAMP%.db
-goto :eof
+REM Keep the newest %KEEP_BACKUPS% backups; delete older ones (and their -wal files).
+powershell -NoProfile -Command "Get-ChildItem -LiteralPath '%APPDIR%\backups' -Filter 'beta_*.db' | Where-Object { $_.Extension -eq '.db' } | Sort-Object Name -Descending | Select-Object -Skip %KEEP_BACKUPS% | ForEach-Object { Remove-Item -LiteralPath $_.FullName; Remove-Item -LiteralPath ($_.FullName + '-wal') -ErrorAction SilentlyContinue }"
+exit /b 0
+:backup_bad
+echo  [X] Backing up the data failed. Is the disk full?
+exit /b 1
+
+:portbusy
+REM errorlevel 1 when something already listens on the app's port.
+powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort %APP_PORT% -State Listen -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+exit /b %errorlevel%
+
+:checkenv
+REM An existing .env must point at beta.db. Never rewritten here: stop and say what it found.
+set "ENVDB="
+if not exist "%REPO%\.env" goto :checkenv_none
+for /f "usebackq tokens=1,* delims==" %%A in ("%REPO%\.env") do if /i "%%A"=="DB_PATH" set "ENVDB=%%B"
+if not defined ENVDB goto :checkenv_bad
+if /i not "%ENVDB:~-7%"=="beta.db" goto :checkenv_bad
+exit /b 0
+:checkenv_none
+echo  [X] The settings file .env is missing. Run restaurant-pc.bat once with no word after it.
+exit /b 1
+:checkenv_bad
+echo  [X] .env does not point at the Beta database, so nothing was started or changed.
+if defined ENVDB echo      It says: DB_PATH=%ENVDB%
+if not defined ENVDB echo      It has no DB_PATH line.
+echo      It must say: DB_PATH=server/db/beta.db  - fix .env by hand, or ask Naoki.
+exit /b 1
 
 REM ===================================================================
 REM  Runs elevated - one UAC prompt from the main setup
@@ -380,10 +466,13 @@ REM Clear old rules, including any block rule Windows made if its own
 REM "allow node?" prompt was ever cancelled - a block rule beats an allow.
 netsh advfirewall firewall delete rule name="Inventory Audit App" >nul 2>&1
 netsh advfirewall firewall delete rule name="Node.js JavaScript Runtime" >nul 2>&1
-netsh advfirewall firewall add rule name="Inventory Audit App" dir=in action=allow protocol=TCP localport=%APP_PORT% profile=private >nul
-if defined NODEEXE netsh advfirewall firewall add rule name="Inventory Audit App" dir=in action=allow program="%NODEEXE%" profile=private >nul
-REM The restaurant network counts as Private, so the rules above apply.
-powershell -NoProfile -Command "Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private"
+REM ONE rule: node, on the app's port only, from this network only, on Private only.
+REM Naming node stops Windows' own "Allow Node.js?" pop-up, whose Allow would open
+REM every node port (3100 too) and whose Cancel would add a block rule.
+if defined NODEEXE netsh advfirewall firewall add rule name="Inventory Audit App" dir=in action=allow program="%NODEEXE%" protocol=TCP localport=%APP_PORT% remoteip=localsubnet profile=private >nul
+if not defined NODEEXE netsh advfirewall firewall add rule name="Inventory Audit App" dir=in action=allow protocol=TCP localport=%APP_PORT% remoteip=localsubnet profile=private >nul
+REM Only the network this PC is connected through becomes Private, never every network.
+powershell -NoProfile -Command "$r = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -First 1; if ($r) { Set-NetConnectionProfile -InterfaceIndex $r.InterfaceIndex -NetworkCategory Private }"
 REM Never sleep or hibernate while plugged in.
 powercfg /change standby-timeout-ac 0
 powercfg /change hibernate-timeout-ac 0
