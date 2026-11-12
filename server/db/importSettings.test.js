@@ -10,7 +10,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
-const { parseCsv, loadTab, importIdentity, formatReport, exportIdentity } = require('./importSettings.js');
+const { parseCsv, loadTab, importIdentity, formatReport, exportIdentity } = require('../../scripts/import-settings.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
