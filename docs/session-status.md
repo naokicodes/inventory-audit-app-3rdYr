@@ -3346,6 +3346,7 @@ server/routes/dashboard.js, server/routes/commands.js, and their tests. Server-o
 click-through.
 
 ## Step test-accounts - fake tester accounts for previews and dev databases (A0)
+**CLOSED 2026-11-12, PR #64 (`5e50ddd`).**
 
 Decided 2026-11-02 (ADR-039). DEPENDS ON autopilot-preview (3q: preview.ps1). The users and
 user_sites tables exist already (users-roles, user-sites).

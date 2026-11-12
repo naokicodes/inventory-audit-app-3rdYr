@@ -314,6 +314,7 @@ user's sites; admin commands need a bypass role. Server-only, no click-through. 
 session-status.md -> "Step site-filter-ii".
 
 ### 3zt. Step test-accounts - fake tester accounts for previews and dev databases  [blocked: autopilot-preview]
+**CLOSED 2026-11-12, PR #64 (`5e50ddd`).**
 Touches: server/db/testAccounts.js, server/db/testAccounts.test.js, scripts/seed-test-accounts.js, package.json, scripts/preview.ps1
 ADR-039: `npm run seed:test` makes the "Test ..." accounts; refuses inventory.db and beta.db;
 previews run it after the reseed. Server and scripts only, no click-through. Full spec:
