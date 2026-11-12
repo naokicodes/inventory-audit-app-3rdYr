@@ -3,6 +3,7 @@
 - Status: Accepted 2026-10-28
 - Decided by: Naoki, with the head chef
 - Supersedes: the 10-25 item 40 (keep the paper's figure as the maximum reference)
+- Superseded by: ADR-045 (the "one cook per meal logs" line only). Rice answered by ADR-044.
 
 ## Context
 

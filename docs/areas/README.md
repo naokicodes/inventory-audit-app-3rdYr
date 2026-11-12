@@ -35,7 +35,7 @@ money details live in the private notes (Claude project files), never here.
 | 6 | [Roster](roster.md) | Confirmed (Silingan); Written (Likod, FC) | Drafted | Specced |
 | 7 | [Supplier orders and buying](supplier-orders.md) | Written | Drafted | Decided |
 | 8 | [Arrivals and bills](arrivals-and-bills.md) | Written | Drafted | Decided |
-| 9 | [Staff meals and in-house](staff-meals.md) | Confirmed | Drafted | Decided (slots, budget modes) |
+| 9 | [Staff meals and in-house](staff-meals.md) | Confirmed | Drafted | Specced (3zw-3zz) |
 | 10 | [Prices](prices.md) | Written | None | Decided |
 | 11 | [Podium (receiving, misc)](podium.md) | Told | None | Decided |
 | 12 | [Pizza stations](pizza.md) | Confirmed | None | Partly decided (dough in 12s) |

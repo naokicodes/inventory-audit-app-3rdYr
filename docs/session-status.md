@@ -132,9 +132,32 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-042; the index, and a map from handoff item numbers to records, is in
+to ADR-046; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-12 architect (A10 + triage) - decided (recorded: ADR-043 to ADR-046)
+
+- **Catalog reads stay open (ADR-043).** A list of what exists (id, code, name, unit; no stock, no
+  money) needs no site access. /stock-receipts/meats leaves site-filter's guard for good;
+  /commissary/meats keeps its check when a commissary is named and is never narrowed without one.
+- **Issues answered in their steps:** #60 (site-filter: meat ids and body rows are checked; lists
+  with no site id narrow in site-filter-ii), #62 (settings-guard: PR #61 complete as built; saving
+  shipment presets and conversion standards needs an admin, in site-filter-ii). cubic's P1 on #61
+  (the unsigned cookie): no change, stub-login is identity, not security; new step
+  sign-the-cookie (3zv) after write-permission.
+- table-scroll (issue #30) specced; PR #47's review fixes are in restaurant-pc; `/review` reads
+  only the step's own section and keeps verify's summary lines.
+- **beta.db is never reseeded:** role-assignments gains ensureRoleDefaults() at server start, so
+  the supervisor role and the default switches reach the restaurant PC (see its added note).
+- **Staff meals (A10; ADR-044 to ADR-046, amending ADR-027 and ADR-003).** Rice is never in the
+  budget: a daily "Staff rice (estimated)" line from dated settings, never a stock deduction. One
+  meal per site, business day and slot. Any cook logs (the "log staff meals" switch; grillers are
+  cooks) and the meal counts at once; the head chef checks or fixes, never approves. Extra meals
+  (named, no budget), copy a past meal (scaled), late logs up to 3 days back by the head chef.
+  Until the item lists exist (A8), non-meat lines are a typed name and an estimated peso amount at
+  every site. Steps: staff-meal-settings (3zw), staff-meal-log (3zx), staff-meal-check (3zy),
+  staff-meal-view (3zz).
 
 ### 2026-11-02 architect (A0) - decided (recorded: ADR-039 to ADR-042)
 
@@ -1868,6 +1891,20 @@ text above.
   group; a floater with both sites passes at both; each bypass role passes; a missing row id still
   gets 404.
 
+**Decisions 2026-11-11 (issue #60, Naoki; ADR-043).** These override any reading of the text above.
+- Q1 (Reading A): a `commissary_meat_id` on the group (a) GETs (/commissary/daily-audit,
+  /commissary/yield-log, /commissary/adjustments) is mapped to its commissary with the group (b)
+  helper and checked like commissary_id. Both given: both are checked.
+- Q2 (Reading A): POST /commissary/daily-audit also checks the site of every
+  rows[].commissary_meat_id. One row from a commissary the user may not use refuses the whole save
+  with 403; nothing is saved.
+- Q3 (Reading B): lists with no site id are not this step's; site-filter-ii (3zs) narrows them.
+- Q4 (Reading B, for good): /stock-receipts/meats leaves this step's guard. It is a catalog read
+  (ADR-043): the destination dropdowns and the terminal's `ship` command need another site's meats.
+- Tests gain: a meat id from another commissary gets 403 on each of the three GETs; a body row from
+  another commissary refuses the save and writes nothing; /stock-receipts/meats answers a logged-in
+  checker for any restaurant. PR #59 changes to match.
+
 ## Step autopilot-runner - runner lock, run log, pause switch, review drafts
 **CLOSED 2026-10-13, PR #25 (`1cf1c2a`).**
 
@@ -2814,6 +2851,21 @@ running (refused); verify fails (rolled back).
 
 Touches: scripts/restaurant-pc.bat (new), .gitattributes. Not public/.
 
+**Added 2026-11-11 (PR #47 review; Naoki accepted every recommendation).** PR #47 changes to:
+- An existing .env: check that DB_PATH names a beta.db. Anything else: stop with a message naming
+  the database it found. Never rewrite .env.
+- start: check port 3000 BEFORE the backup. In use: "The app is already running" and stop.
+- Check errorlevel after every copy (backups, .env). update refuses to go on without a backup.
+- update: PREV = `git rev-parse HEAD` before the checkout. A failed verify checks PREV out again
+  and checks that this checkout worked, saying so plainly if it did not.
+- Network: set Private only on the connected network profile, never on every network.
+- Firewall: drop the program-wide node rule. Keep one inbound TCP rule with
+  localport=%APP_PORT% and remoteip=localsubnet (the second rule had lost localport and would have
+  opened 3100 too).
+- No hard-coded tag: setup and update take the tag as an argument; never a fixed name like beta-1.
+- Keep the newest 14 beta.db backups; delete older ones only after a new backup succeeded.
+- Fill the PR template.
+
 ## Step business-day - one 8am business date for the whole app (A6)
 **CLOSED 2026-11-02, PR #55 (`cd50d51`).**
 
@@ -2922,6 +2974,20 @@ Server-only, no migration, no click-through.
 
 **Added 2026-11-02 (A0, ADR-039).** The test accounts gain "Test Supervisor RA" (base role
 supervisor, member of RA) in server/db/testAccounts.js. Touches gains: server/db/testAccounts.js.
+
+**Added 2026-11-12 (A10 review): beta.db is never reseeded.** The supervisor role and the switch
+rows above are written by seed.js only, so the restaurant PC would get neither: its head chefs and
+management would turn blind (no sees_expected) the day this step lands. So:
+- ensureRoleDefaults(db) in permissions.js, called once at server start (as sheet-close calls
+  ensureDefaultSheets) and by seed.js: adds the supervisor role if missing and applies each named
+  set of default switch rows once per database.
+- New table defaults_applied (name TEXT PRIMARY KEY, applied_at TEXT): a set is applied only when
+  its name is absent, then recorded. This replaces "only for a role that has NO switch rows yet":
+  an admin's later removal is never undone, and a later step adds its own set by name
+  (staff-meal-log adds 'staff-meal-switches').
+- Tests gain: a database seeded before this step (roles, no switch rows) gets the supervisor role
+  and the default switches on its first start; a second start changes nothing; a switch an admin
+  removed stays removed after a restart. Touches gains: server/index.js.
 
 ## Step roles-page - the Roles page: switches per role, roles per person (A6)
 
@@ -3167,6 +3233,10 @@ Click-through (390px): mark absent, sick and leave with a reason; set a cover; t
 Touches: server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js,
 server/routes/roster.test.js, public/roster.html. PUBLIC -> click-through before merge.
 
+**Added 2026-11-12 (A10).** The staff-meal page (staff-meal-log, 3zx) types its head count until
+headCount() exists. Whichever of this step and 3zx lands second prefills the meal's head count from
+present (editable, ADR-027); "Roster not set for this day" leaves it empty.
+
 ## Step tonight-picks - tonight's kitchen counter and other picks, with reassignment (A6)
 
 Decided ADR-014, ADR-017 and ADR-037. DEPENDS ON roster-day-status.
@@ -3345,6 +3415,23 @@ server/routes/commissary.js, server/routes/allocations.js, server/routes/dailyAu
 server/routes/dashboard.js, server/routes/commands.js, and their tests. Server-only, no
 click-through.
 
+**Added 2026-11-11 (issues #60 Q3 and #62).** DEPENDS ON settings-guard too (requireAdmin).
+- Lists with no site id: for a logged-in user whose role does not bypass, GET /stock-receipts (no
+  restaurant_id) and GET /commissary/daily-audit, /commissary/yield-log and
+  /commissary/adjustments (no commissary_id) return only the rows of the user's sites
+  (getUserSiteCodes). Bypass roles, and logged-out requests until write-permission (ADR-040), get
+  every row. GET /commissary/meats is never narrowed: stock-receipts.html, terminal.html and
+  settings.html list every commissary's meats (ADR-043).
+- Saving presets and standards: POST and PUT /commissary/shipment-presets and
+  /commissary/conversion-standards also go through requireAdmin (settings-guard): logged out ->
+  401, not an admin -> 403 "Only an admin can change settings". Their GETs keep the owner-site rule
+  above. The shipment and conversion forms still take any numbers on the day: a preset or a
+  standard is a default.
+- Tests gain: a checker's unfiltered lists hold only their sites' rows, management's every site;
+  /commissary/meats lists every commissary for a checker; a checker gets 403 saving a preset and a
+  standard, an admin passes, and the checker still loads both.
+- Touches gains: server/routes/stockReceipts.js, server/routes/stockReceipts.test.js.
+
 ## Step test-accounts - fake tester accounts for previews and dev databases (A0)
 **CLOSED 2026-11-12, PR #64 (`5e50ddd`).**
 
@@ -3412,3 +3499,297 @@ Touches: server/middleware/requireAdmin.js (new), server/routes/settings.js,
 server/routes/settings.test.js. Server-only. One at a time with sheet-close (3zd) and, if its write
 routes include settings.js, with user-id-authorship (3l). Claude checks (optional, on a preview):
 as Test Counter RA, saving a setting shows "Only an admin can change settings".
+
+**Decisions 2026-11-11 (issue #62, Naoki).** These override any reading of the text above.
+- Reading B: "Settings" here means the /api/settings routes. PR #61 is complete as built.
+- Shipment presets and conversion standards are saved from the Settings page through
+  commissary.js. Saving them (POST, PUT) needs an admin, in site-filter-ii (3zs). Loading them and
+  changing the numbers on the day stay open: a preset or a standard is a default.
+- cubic's P1 (the user_id cookie is unsigned): no change here. stub-login is identity, not
+  security; sign-the-cookie (3zv) signs it after write-permission.
+
+## Step table-scroll - wide tables scroll inside their own box on a phone (issue #30)
+
+Decided 2026-11-11 (issue #30; ui-conventions.md -> Tables). Runnable now. Markup only: the
+`.table-scroll` class already exists in style.css.
+
+- Wrap every `<table>` in public/*.html that is not already inside a `.table-scroll` box in
+  `<div class="table-scroll">...</div>`, as kitchen-sales.html and commissary.html's yield table
+  do, including tables a page's script writes into a template string. On `2812ffc` that is 20
+  tables on 8 pages: settings.html 12, commissary.html 2, and one each on allocations.html,
+  commissary-shipments.html, dashboard.html, history.html, sales.html and stock-receipts.html.
+  Count again on the build's main and wrap whatever is there.
+- daily-audit.html is excluded: its sheet is cards on a phone.
+- Nothing else changes: no class, id, column, script or style. Before wrapping, check each page's
+  script for code that reaches a table through its parent (parentNode, closest, children) and keep
+  it working.
+
+Edge states: no data, so failure, partial, stale, inactive and two devices do not apply. Empty - an
+empty table still sits in its box.
+
+Tests: none new (markup only); verify stays green.
+
+Click-through (390px): Claude checks that on each of the 8 pages a wide table swipes sideways
+inside its box and the page itself never scrolls sideways; You check the looks.
+
+Touches: public/allocations.html, public/commissary-shipments.html, public/commissary.html,
+public/dashboard.html, public/history.html, public/sales.html, public/settings.html,
+public/stock-receipts.html. PUBLIC -> click-through before merge. One at a time with any open PR
+on these pages (settings.html: sheet-close 3zd, staff-meal-settings 3zw).
+
+## Step sign-the-cookie - the login cookie carries a signature (A0 follow-up)
+
+Decided 2026-11-11 (cubic's P1 on PR #61). DEPENDS ON write-permission (3zr): until then nothing
+depends on who you are, so a forged cookie gains nothing a logged-out visitor lacks (ADR-040).
+
+Why: the user_id cookie is a plain number, so anyone can type another person's id. stub-login is
+identity, not security, but once write-permission decides who may write, the cookie must not be
+forgeable.
+- The cookie value becomes `<user_id>.<signature>`: an HMAC-SHA256 of the user id keyed with
+  COOKIE_SECRET, base64url, from node:crypto (no dependency). Compared with crypto.timingSafeEqual
+  (check the lengths first).
+- COOKIE_SECRET comes from .env; .env.example gains the line. Missing: the server makes a random
+  secret at start and prints one warning ("COOKIE_SECRET is not set: everyone is logged out after
+  each restart. Add it to .env."). The restaurant PC gets the line by hand at the next update.
+- No signature, a wrong signature, or an unknown or inactive user -> req.user is null (logged
+  out). Old plain cookies log everyone out once.
+- cookieUserId(header) checks the signature; login sets the signed value.
+
+Edge states: Stale - an old unsigned cookie = logged out. Blocked - a forged id = logged out (401
+on writes from write-permission). Failure, partial, empty, inactive (an inactive user = logged
+out, as today) and two devices (one cookie each) are unchanged.
+
+Tests: a signed cookie gives req.user; a changed id or signature gives null; an old unsigned
+cookie gives null; with no COOKIE_SECRET the server still starts and signs with its random secret;
+a signature of the wrong length does not throw.
+
+Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example. Server-only, no
+click-through.
+
+## Step staff-meal-settings - meal slots, budgets and the rice rates in Settings (A10)
+
+Decided 2026-10-28 and 2026-11-11 (ADR-027, ADR-044). DEPENDS ON settings-guard (3zu: requireAdmin
+on /api/settings). Schema step: one at a time with the other schema.sql steps.
+
+Schema (schema.sql, new CREATE TABLE IF NOT EXISTS, no migrate helper):
+- staff_meal_slots: id, site_code TEXT NOT NULL (a restaurant's code, model B), name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0, fixed_budget REAL (NULL = none), per_head_rate REAL (NULL
+  = none), active INTEGER NOT NULL DEFAULT 1, created_at. UNIQUE (site_code, name).
+- staff_rice_rates: id, effective_from TEXT NOT NULL (a business date), cups_per_head REAL NOT
+  NULL, grams_per_cup REAL NOT NULL, price_per_kg REAL NOT NULL, created_by_user_id, created_at. One
+  group-wide set of rates.
+
+Module server/engines/staffMealSettings.js:
+- listSlots(db, siteCode, { activeOnly }), createSlot(db, fields, actor), updateSlot(db, id,
+  fields, actor): name required and unique per site; amounts NULL or >= 0; the site resolves
+  (resolveSiteCode) and is a restaurant, never a commissary.
+- budgetFor({ fixed_budget, per_head_rate }, headCount) -> { budget, maximum }: budget =
+  fixed_budget; maximum = headCount x per_head_rate. Only a rate: the maximum is also the budget.
+  Neither: no budget. (ADR-027: the fixed amount is the budget, head count x rate the maximum.)
+- riceRateOn(db, date) -> the row with the latest effective_from not after date (the newest row
+  wins a tie), or null ("not set").
+- addRiceRate(db, fields, actor): every value > 0; effective_from defaults to today's business
+  date (ADR-036) and may not be in the past, so a change never rewrites a past day.
+- Every write writes activity_log (MANUAL) in the same transaction.
+
+Routes (server/routes/settings.js, under /api/settings, so requireAdmin guards every write): GET
+and POST /settings/staff-meal-slots, PUT /settings/staff-meal-slots/:id, GET and POST
+/settings/staff-rice-rates. GETs stay open (ADR-042).
+
+Page (settings.html): a "Staff meals" section. Pick a restaurant; its slots in order (name, fixed
+budget, per-head rate, active) with add and edit; a blank amount means none. Below, the rice rates
+(cups per head, grams per cup, price per kg, from which day) with their history.
+
+Seed (dev and previews only; beta.db is never reseeded): a restaurant with no slots gets names
+only - RA "Afternoon", "Evening"; FC "Meal 1", "Meal 2", "Meal 3". No amounts and no rice rate:
+every value is entered in Settings (ADR-027; the values are off-repo).
+
+Edge states: Failure - a write and its activity_log row are one transaction. Empty - "No meal
+slots yet"; "Rice rate not set". Inactive - an inactive slot keeps its past meals and is hidden
+from new logs. Blocked - logged out 401, not an admin 403 (requireAdmin). Stale - a new rate
+applies from its day on; earlier days keep theirs. Two devices - last save wins; activity_log keeps
+both.
+
+Tests: a slot name is unique per site; a commissary site is refused; a negative amount is refused;
+budgetFor with fixed only, rate only, both and neither; riceRateOn picks the latest rate not after
+the date and returns null before the first; a past effective_from is refused; a checker gets 403 on
+each write and an admin passes; the GETs answer logged out.
+
+Click-through (390px): Claude checks, as Test Admin, adding two slots (with and without amounts)
+and a rice rate, and as Test Counter RA, that saving is refused; You check the looks.
+
+Touches: server/db/schema.sql, server/db/seed.js, server/engines/staffMealSettings.js (new),
+server/engines/staffMealSettings.test.js (new), server/routes/settings.js,
+server/routes/settings.test.js, public/settings.html. PUBLIC -> click-through before merge.
+
+## Step staff-meal-log - the Staff meals page: log today's meals (A10)
+
+Decided (ADR-027, ADR-045, ADR-046, ADR-003). DEPENDS ON staff-meal-settings (3zw) and
+role-assignments (3zj: can(), switches as rows, ensureRoleDefaults). Schema step: one at a time.
+
+What the cook sees: Staff meals (linked from index.html, as Kitchen Sales is) opens on today's
+business date at the cook's site (a site picker for people with several sites). One card per
+active slot: "Afternoon: not logged yet" or "Afternoon: Adobo, logged by <name>, 21 people".
+Tapping a logged card opens that log to add to it - never a second meal for the slot.
+
+The meal form:
+- Dish name (short, required).
+- Head count (staff), typed (roster-day-status prefills it later; see its added note). OJT head
+  count, optional (the OJT part, ADR-027). Cooking for another site: the cook types the combined
+  head count (ADR-045).
+- Lines in two parts, Staff and OJT:
+  - Meat: a meat of this restaurant (GET /stock-receipts/meats, ADR-043) and an amount - grams for
+    a kg meat (stored in kg), units for a unit meat.
+  - Other: a typed name and an estimated peso amount (ADR-046), shown as "estimated".
+- Running cost: meat pesos (amount x the meat's cost_per_unit, the settings cost - ADR-020's
+  fallback until bills exist, A9) plus the estimates; beside it the slot's budget and maximum for
+  the staff part (budgetFor with this head count). A meat with no cost shows "not priced" and stays
+  out of the sum. The OJT part shows its cost and no budget.
+- Save. The meal counts at once.
+
+Schema (schema.sql, new tables):
+- staff_meals: id, site_code, business_date, slot_id (FK staff_meal_slots; NULL for an extra meal,
+  3zy), extra_name (NULL for a slot meal), dish_name NOT NULL, head_count INTEGER NOT NULL,
+  ojt_head_count INTEGER NOT NULL DEFAULT 0, budget_fixed REAL, budget_per_head REAL (copied from
+  the slot at the first save, so a later Settings change never rewrites a past meal),
+  logged_by_user_id, logged_at, updated_by_user_id, updated_at, checked_by_user_id, checked_at,
+  logged_late INTEGER NOT NULL DEFAULT 0, copied_from_meal_id. UNIQUE (site_code, business_date,
+  slot_id).
+- staff_meal_lines: id, meal_id (FK), part TEXT NOT NULL ('STAFF' or 'OJT'), meat_id (FK meats;
+  NULL on an other line), quantity REAL, item_name TEXT, estimate_pesos REAL. The module checks: a
+  meat line has meat_id and quantity > 0; an other line has item_name and estimate_pesos >= 0.
+- staff_meal_postings: meal_id (FK), adjustment_id (FK adjustments), meat_id: the allocation rows
+  written for the meal.
+
+Module server/engines/staffMeals.js:
+- saveMeal(db, { siteCode, businessDate, slotId, dishName, headCount, ojtHeadCount, lines },
+  actor): creates or updates the one record for (site, date, slot), all in one transaction: the
+  meal row, its lines replaced, an activity_log row, and the meat postings. For each meat, the
+  meal's new total is compared with the sum already posted for this meal; a difference writes ONE
+  adjustments row of type 'Staff Meal / In-House' at the meal's restaurant and business date
+  (positive or negative), linked in staff_meal_postings. Old rows are never edited (allocations are
+  append-only); the authorship columns are stamped as user-id-authorship does. This step saves the
+  current business date only.
+- mealCost(db, meal) -> { staff: { meat, estimates, unpriced }, ojt: { ... }, budget, maximum }.
+- slotCards(db, siteCode, date) -> the cards.
+
+Switches: log_staff_meals and check_staff_meals join CAPABILITIES in permissions.js. Their defaults
+are the named set 'staff-meal-switches' applied by ensureRoleDefaults (role-assignments' added
+note): checker -> log_staff_meals; head-chef -> log_staff_meals and check_staff_meals. Cooks and
+grillers are checkers; stations grant nothing (ADR-037). The existing test accounts cover both
+switches (Test Counter RA logs, Test Head Chef RA checks), so none is added.
+
+Routes (server/routes/staffMeals.js, new, mounted at /api): GET /staff-meals?site&date (cards and
+meals; open to anyone who may use the site), GET /staff-meals/:id, POST /staff-meals (save). Saving
+needs a logged-in user (401 "Log in first") with log_staff_meals at the site (403 "You can't log
+staff meals here"); a slot from another site is refused (400).
+
+Edge states: Failure - one transaction; nothing is half-saved. Partial - n/a. Empty - "No meal
+slots yet - an admin adds them in Settings"; a slot with no log shows "not logged yet". Stale - a
+second cook opening a logged slot sees the saved log. Blocked - the messages above. Inactive -
+inactive slots show no card. Two devices - last save wins; the postings follow the last save;
+activity_log keeps both.
+
+Tests: one record per site, date and slot (a second save updates it); meat postings: a first save
+posts, a lower amount posts a negative difference, an unchanged amount posts nothing, and the
+landing's adjustments sum matches the meal; an other line needs a name and an estimate; mealCost
+with a priced meat, an unpriced meat, estimates and the OJT part outside the budget; the budget is
+copied at the first save and kept after a slot change; a checker logs, a user without the switch
+gets 403, logged out gets 401; a slot of another site is refused; ensureRoleDefaults applies
+'staff-meal-switches' once.
+
+Click-through (390px): Claude checks, as Test Counter RA, logging the afternoon meal with a meat
+line and two other lines, then reopening it as a second cook; You check the looks.
+
+Touches: server/db/schema.sql, server/db/permissions.js, server/db/permissions.test.js,
+server/engines/staffMeals.js (new), server/engines/staffMeals.test.js (new),
+server/routes/staffMeals.js (new), server/routes/staffMeals.test.js (new), server/index.js,
+public/staff-meals.html (new), public/index.html. PUBLIC -> click-through before merge.
+
+## Step staff-meal-check - the head chef checks; extra meals, late logs, copy a past meal (A10)
+
+Decided (ADR-045). DEPENDS ON staff-meal-log (3zx); same files, so after it.
+
+What the head chef sees (check_staff_meals at the site):
+- "To check" on the Staff meals page: the site's unchecked meals of the last 7 business days,
+  newest first. "Checked" marks one (checked_by_user_id, checked_at). Editing and saving fixes it
+  and checks it. A save by anyone holding the check switch is checked automatically. A change by
+  someone without it after the check sends the meal back to "to check".
+- "Add extra meal": a name ("Birthday, Kim") for today or up to 3 business days back. No slot and
+  no budget; any number per day; anyone who logs fills in its lines like a slot meal.
+- Late logs and fixes: for the check switch only, the date bar goes back 3 business days. A meal
+  saved for an earlier business date is marked "logged late" (a tag on its card). Without the check
+  switch, an earlier date is refused: 403 "Only the head chef can log an earlier day". Further back:
+  400 "Only the last 3 days".
+- Meat postings for an earlier date are dated to the meal's business date, so that day's landing
+  changes: a late staff meal explains part of that day's variance. The count stays as counted.
+
+Copy a past meal (anyone who logs): "Start from a past meal" lists the site's meals of the last 30
+days by dish name and date. Picking one fills the lines, each amount scaled by this meal's head
+count / that meal's (the OJT part by the OJT counts; a 0 count copies the amount as it was),
+rounded to whole grams, one decimal for units and whole pesos. The cook edits and saves; the meal
+keeps copied_from_meal_id ("copied from Adobo, 11-02").
+
+Module (server/engines/staffMeals.js): checkMeal(db, mealId, actor); addExtraMeal(db, { siteCode,
+businessDate, name }, actor); copyLines(db, fromMealId, headCount, ojtHeadCount) -> lines (writes
+nothing); saveMeal gains the date rule, logged_late and the automatic check. Routes: POST
+/staff-meals/:id/check, POST /staff-meals/extra, GET /staff-meals/:id/copy?head_count&ojt_head_count,
+GET /staff-meals/to-check?site.
+
+Edge states: Failure - one transaction. Stale - a meal changed after its check shows "changed after
+check" in "to check". Blocked - the messages above; checking without the switch -> 403. Empty -
+"Nothing to check". Two devices - last save wins; activity_log keeps both. Inactive - an inactive
+slot's past meals still open.
+
+Tests: a checker cannot check (403); the head chef checks; the head chef's own save is checked; a
+checker's change after the check returns the meal to "to check"; a checker saving yesterday gets
+403; the head chef saves 3 days back (marked logged late) and is refused 4 days back; extra meals:
+several in a day, no budget in mealCost, a checker fills one in; copying scales by the head counts,
+handles a 0 count and keeps copied_from_meal_id; a late meat posting lands on the meal's date.
+
+Click-through (390px): Claude checks as Test Counter RA (logs, cannot check, cannot go back a day)
+and as Test Head Chef RA (checks, fixes, adds an extra meal, logs 3 days back); You check the looks.
+
+Touches: server/engines/staffMeals.js, server/engines/staffMeals.test.js,
+server/routes/staffMeals.js, server/routes/staffMeals.test.js, public/staff-meals.html. PUBLIC ->
+click-through before merge.
+
+## Step staff-meal-view - management's staff-meal view: budget, spent, rice, unchecked (A10)
+
+Decided (ADR-027, ADR-044, ADR-029). DEPENDS ON staff-meal-check (3zy). Read-only.
+
+What management sees: Staff meal report (linked from index.html). A date bar (business days,
+ADR-036) and a site picker (the user's sites; every site for bypass roles).
+- Day, per site: each slot - dish, head count, staff cost against its budget and maximum, over or
+  under in pesos, or "not logged". The OJT part's cost (no budget). Extra meals with their cost (no
+  budget). Tags: "not checked yet", "logged late". Typed lines are labelled "estimated"; unpriced
+  meats are listed.
+- "Staff rice (estimated): N cups - about P pesos" for the day (ADR-044): cups = the sum, over the
+  day's slot meals, of (head count + OJT head count) x cups per head; pesos = cups x grams per cup
+  / 1000 x price per kg, with riceRateOn(date). Never added to a meal's cost or its budget. No
+  rate: "Rice rate not set". No slot meal logged: no rice line.
+- The 7 days ending on the picked date: per site, meals logged of slots, staff cost against the
+  summed budgets, OJT cost, extra meals' cost, the rice estimate and the unchecked count.
+- Pesos are computed on each load (ADR-003). Known limit until bills exist (A9): meat uses the
+  meat's current settings cost, so changing a cost re-prices past meals; budgets (copied per meal)
+  and rice rates (dated) do not move.
+
+Module server/engines/staffMealReport.js: dayReport(db, siteCode, date), weekReport(db, siteCode,
+endDate). Route GET /api/staff-meals/report?site&date&span=day|week, scoped by requireSiteAccess
+(the site in the request). Nothing here is hidden from counters: it is not a count.
+
+Edge states: Empty - a day with no meals shows every slot "not logged". Stale - recomputed on each
+load. Blocked - 403 "No access to site <code>". Failure, partial and two devices - read-only, n/a.
+Inactive - an inactive slot appears on the days it has a meal.
+
+Tests: cost against budget per slot (fixed, rate only, both, neither); OJT and extra meals outside
+the budget; rice counts staff and OJT, uses the rate in force that day, and a later rate does not
+change an earlier day; an unpriced meat is listed and left out; the unchecked and late tags; the
+7-day totals; a user without the site gets 403.
+
+Click-through (390px): Claude checks as Test Management (both sites, a day and the 7 days) and as
+Test Head Chef RA (RA only); You check the looks.
+
+Touches: server/engines/staffMealReport.js (new), server/engines/staffMealReport.test.js (new),
+server/routes/staffMeals.js, server/routes/staffMeals.test.js, public/staff-meal-report.html (new),
+public/index.html. PUBLIC -> click-through before merge.

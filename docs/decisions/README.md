@@ -45,7 +45,7 @@ flight. (ADR-001 explains the split.)
 |---|---|---|
 | ADR-001 | Record decisions as decision records | Accepted 2026-10-20 |
 | ADR-002 | Definition of done: Beta and Final | Accepted 2026-10-20 |
-| ADR-003 | Staff meals recorded as quantities, not prices | Accepted 2026-10-20 |
+| ADR-003 | Staff meals recorded as quantities, not prices | Accepted 2026-10-20; the sides line, for staff meals, superseded by ADR-046 until the item lists exist |
 | ADR-004 | SPOS ownership while Prince is busy | Accepted 2026-10-20 |
 | ADR-005 | SPOS moves into this repo after Beta | Accepted 2026-10-21 |
 | ADR-006 | /naoki-qs merge policy: gates replace human code review | Accepted 2026-10-21 |
@@ -69,7 +69,7 @@ flight. (ADR-001 explains the split.)
 | ADR-024 | Side sheets: separate sheets, flexible units | Accepted 2026-10-24 |
 | ADR-025 | Bar: exact sales check, not blind | Accepted 2026-10-25 |
 | ADR-026 | Waste is its own entry | Accepted 2026-10-25 |
-| ADR-027 | Staff meals: slots, budgets and head count | Accepted 2026-10-28 |
+| ADR-027 | Staff meals: slots, budgets and head count | Accepted 2026-10-28; who logs superseded by ADR-045; rice answered by ADR-044 |
 | ADR-028 | In-house: staff meals and staff orders | Accepted 2026-10-25 |
 | ADR-029 | Management view: Spent and Used | Accepted 2026-10-24 |
 | ADR-030 | Likod is its own site | Accepted 2026-10-25 |
@@ -85,6 +85,10 @@ flight. (ADR-001 explains the split.)
 | ADR-040 | Logged-out visitors keep working until write-permission | Accepted 2026-11-02 |
 | ADR-041 | Site scoping: one owner site per request | Accepted 2026-11-02 |
 | ADR-042 | Settings changes need an admin | Accepted 2026-11-02 |
+| ADR-043 | Catalog reads stay open | Accepted 2026-11-11 |
+| ADR-044 | Staff rice is an estimate line, never in the meal budget | Accepted 2026-11-11 |
+| ADR-045 | Staff meals: any cook logs, the head chef checks | Accepted 2026-11-11 |
+| ADR-046 | Typed non-meat lines until the item lists exist | Accepted 2026-11-12 |
 
 ## Handoff item map
 
