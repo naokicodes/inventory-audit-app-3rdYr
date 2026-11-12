@@ -28,6 +28,7 @@
   --ok: #2C6E49;
   --ok-tint: #E2EFE7;
   --warn: #B26B12;
+  --warn-ink: #94570A;
   --warn-tint: #F6EAD6;
 }
 
@@ -320,7 +321,7 @@ nav a:hover {
 }
 
 .card-blocked {
-  color: var(--warn);
+  color: var(--warn-ink);
   background: var(--warn-tint);
   border-radius: 6px;
   padding: 0.1rem 0.4rem;

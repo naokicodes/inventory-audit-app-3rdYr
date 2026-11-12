@@ -237,6 +237,12 @@ const userResult = db.prepare(
 ).run('superadmin', superAdminRoleId);
 console.log(`Users: ${userResult.changes} inserted (bootstrap super-admin)`);
 
+// 7. Sheet definitions (step sheets-tier1): one MEAT "Landing" per restaurant
+// and one MEAT "Commi" per commissary. No SIDE rows here - those arrive with
+// the sides slice or the workbook import.
+const { ensureDefaultSheets } = require('../engines/sheetDefinitions.js');
+console.log(`Sheet definitions: ${ensureDefaultSheets(db).inserted} inserted`);
+
 // A reset must end on a consistent file: any dangling reference means the
 // clear or the reseed went wrong, so fail loudly rather than hand Beta a
 // broken database.

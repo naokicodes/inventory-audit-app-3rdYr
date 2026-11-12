@@ -1,6 +1,6 @@
 # Likod grill landing
 
-Status: IRL Confirmed - FLOW None - APP None
+Status: IRL Confirmed - FLOW None - APP Decided (counts blind; appointed head chef)
 
 ## IRL - how it works today
 Sheet "Likod ni Silingan - Landing" kept by the griller (source: photos
@@ -31,6 +31,10 @@ now is the grill's (its own kitchen comes later).
 None. Likod sales are read (Kitchen Sales preview) but grill items are
 unmatched; Likod is not a site. Decided: Likod becomes its own site (8).
 Queue item A12.
+- Decided 2026-11-01 (ADR-035, ADR-038): the grillers count blind; Naoki appoints a
+  trusted head chef at Likod (with a backup) who does the landing and sees expected. All
+  grillers keep standing commi access (ADR-017). Likod has no cooks yet; its podium job
+  is the cashier's for now (standing access, ADR-037).
 
 ## Open questions
 - Which commi product becomes which grill item (the commi side of skewering).

@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { computePreview, manilaDate } = require('../server/engines/loyversePreview.js');
+const { computePreview, businessDate } = require('../server/engines/loyversePreview.js');
 const { formatReport } = require('../server/engines/loyverseReport.js');
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
@@ -15,7 +15,7 @@ if (fs.existsSync(ENV_PATH)) process.loadEnvFile(ENV_PATH);
 async function main() {
   const args = process.argv.slice(2);
   const i = args.indexOf('--date');
-  const date = i >= 0 ? args[i + 1] : manilaDate(new Date());
+  const date = i >= 0 ? args[i + 1] : businessDate(new Date());
   const preview = await computePreview({ date });
   process.stdout.write(formatReport(preview, { all: args.includes('--all') }));
   return preview.accounts.every(a => a.ok) ? 0 : 1;

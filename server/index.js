@@ -3,8 +3,11 @@
 // docs/rules-for-claude-code.md before adding to this.
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const express = require('express');
+
+const { lanUrls } = require('./lanAddress.js');
 
 // Secrets (Loyverse tokens) live in .env at the repo root, gitignored. Load
 // it with Node's built-in loader when present, so it works however the
@@ -47,5 +50,18 @@ app.use('/api', dashboardRoutes);
 app.use('/api', loyverseRoutes);
 
 app.listen(PORT, () => {
-  console.log(`Inventory Audit App running at http://localhost:${PORT}`);
+  // Print localhost for this PC plus every LAN address a phone on the same
+  // Wi-Fi can reach, so nobody has to run ipconfig. Addresses only - never a
+  // token or anything from .env. The server still listens on all addresses.
+  const urls = lanUrls(os.networkInterfaces(), PORT);
+  console.log('Inventory Audit App running at:');
+  console.log(`  This PC:  http://localhost:${PORT}`);
+  if (urls.length === 0) {
+    console.log('  Phones: no network address found (check Wi-Fi)');
+  } else {
+    console.log('  Phones on the same Wi-Fi:');
+    for (const { name, url } of urls) {
+      console.log(`    ${url}   (${name})`);
+    }
+  }
 });

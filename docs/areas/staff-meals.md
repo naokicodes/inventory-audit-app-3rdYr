@@ -1,6 +1,6 @@
 # Staff meals and in-house
 
-Status: IRL Confirmed - FLOW Drafted - APP Decided
+Status: IRL Confirmed - FLOW Drafted - APP Specced
 
 ## IRL - how it works today
 - Meals per day differ by restaurant: Silingan 2 (afternoon and evening,
@@ -35,6 +35,11 @@ Status: IRL Confirmed - FLOW Drafted - APP Decided
 3. The landing shows tonight's in-house summary (staff meals + staff orders);
    management sees totals.
 
+Refined 2026-11-11/12 (A10, ADR-045): any cook logs (grillers too); a second cook opens the same
+slot's log instead of starting another; the head chef checks or fixes, adds named extra meals
+(birthdays, events), and logs up to 3 days late; a past meal can be copied and scaled. The OJT part
+sits inside each slot. Rice is never typed: management sees a daily estimate (ADR-044).
+
 ## APP
 - Decided: ADR-003 (quantities, never prices; pesos computed); inhouse column
   on the side sheet unused (13); in-house summary (18); budget from official
@@ -45,20 +50,31 @@ Status: IRL Confirmed - FLOW Drafted - APP Decided
   budget mode - a fixed amount, head count x a per-head rate, or no budget -
   with every value editable (values in the private notes). Budgets are per
   meal: the fixed amount is the budget, head count x rate the maximum. Head
-  count is typed per meal until the roster exists, then comes from it. OJT
+  count: one field per meal, prefilled from the people on duty at that
+  restaurant, editable by the cook (ADR-027). OJT
   uses "no budget": recorded and monitored, no limit; each slot can carry an
   optional OJT part with its own head count. Gas stays out (operating
   expenses). A logged meal stands alone (date, site, slot, cook, lines); the
   meal planner is a later, separate feature where a plan can be voided with a
   reason and stays in history.
-- Not specced. Queue item A10.
+- Specced 2026-11-01 (A6, roster-day-status 3zo): the head-count prefill is the
+  roster's Present for that site and date (on duty + floater, visitors included,
+  absent excluded). OJT are never on the roster; the cook types the OJT count
+  (ADR-037).
+- Decided 2026-11-11/12: rice is never in the budget; a daily "Staff rice
+  (estimated)" line from dated settings, never a stock deduction (ADR-044). One
+  meal per site, business day and slot; any cook logs ("log staff meals"); the
+  head chef checks, never approves; extra meals (named, no budget); copy a past
+  meal; late logs up to 3 days back by the head chef; cooking for another site
+  is logged where it was cooked, with the combined head count (ADR-045). Until
+  the item lists exist (A8), non-meat lines are a typed name and an estimated
+  peso amount at every site (ADR-046).
+- Specced 2026-11-12: staff-meal-settings (3zw), staff-meal-log (3zx),
+  staff-meal-check (3zy), staff-meal-view (3zz).
 
 ## Open questions
-- Does the meal budget also pay for rice (a pantry item)? Naoki asks the head
-  chef. If yes, rice becomes the one pantry item logged in staff meals.
-- Likod's non-meat ingredients: proposed as name + estimate lines until Likod's
-  Veggies and Pantry sheets open (meat comes from the grill's raw stock).
-- Miscuts used for staff meals (grill, and kitchen commi work): proposed flow
-  in the 2026-10-28 handoff; cost rule to confirm.
+- Rice (answered 2026-11-11, ADR-044) and Likod's non-meat ingredients
+  (answered 2026-11-12, ADR-046) are closed.
+- Miscut meals (ADR-018) are not in A10: they join when the miscut item exists.
 - Which Loyverse field carries the staff member's name on a staff order
   (customer or note)? Staff orders are recognised by the staff name (53).

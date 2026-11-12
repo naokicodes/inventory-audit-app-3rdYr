@@ -44,6 +44,23 @@ is. Read the step's own section in `session-status.md` before starting.
 > autopilot-preview, 3zb self-host-font, and 3u sheets-tier1 then 3j import-identity (they share
 > seed.js). After 3za: 3m site-filter, then 3l user-id-authorship, then 3zc allocation-requests.
 > 3zd sheet-close after 3u. 3ze is Naoki's own PR.
+> **2026-10-30:** 3zh name-map-refresh first (Likod sales are undercounted until it lands). 3zf loyverse-preview-iv any time, ahead of the rest (it shares no file with
+> another runnable step). 3zg lan-address any time too (server only, no shared file).
+> **2026-11-01 (A6, roster family):** 3zi business-day any time (no shared file). The rest waits for
+> the identity chain: 3za -> 3m -> 3l, then 3zj role-assignments (shares schema.sql with 3zc: one at
+> a time) -> 3zk roles-page; 3u and 3j before 3zl. Then in order (shared files): 3zl roster-stations
+> -> 3zm roster-staff -> 3zn roster-week -> 3zo roster-day-status -> 3zp tonight-picks -> 3zq
+> login-tonight -> 3zr write-permission.
+> **2026-11-02 (A0):** issues #53, #54 and #57 answered (see their steps). PR #52 (3u) and PR #56
+> (3q) stand as built. 3m site-filter is next in the identity chain. Any time: 3zb self-host-font;
+> 3zu settings-guard (one at a time with 3zd, and with 3l if 3l touches settings.js). After 3q:
+> 3zt test-accounts. After 3l: 3zs site-filter-ii (one at a time with 3zc: allocations.js).
+> **2026-11-12 (A10 + triage):** issues #60 and #62 answered (see their steps): PR #59 (3m)
+> changes to match; PR #61 (3zu) stands as built. Runnable now: 3zt, 3j, and table-scroll (markup
+> only, any time; one at a time with other PRs on its pages). 3zs also waits for 3zu now
+> (requireAdmin). 3zv sign-the-cookie after 3zr. Staff meals: 3zw staff-meal-settings after 3zu
+> (schema.sql: one schema step at a time), 3zx staff-meal-log after 3zw and 3zj, then 3zy
+> staff-meal-check, then 3zz staff-meal-view.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -103,7 +120,9 @@ migration -> sequences with other schema/migration steps. Full spec: session-sta
 "Step user-id-authorship".
 
 ### 3m. Step site-filter - query-layer site scoping enforcement  [blocked: blind-count]
-Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/index.js
+Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/index.js, server/db/siteAccess.js
+**2026-11-01:** goes through one canUseSite() helper (A6) - see the spec's added note.
+**2026-11-11:** issue #60 answered: meat ids and body rows are checked; /stock-receipts/meats leaves the guard (ADR-043). See the spec.
 requireSiteAccess middleware: checker scoped to memberships (siteAccess.js), management/admin/
 super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped routes; park
 ambiguous ones. Full spec: session-status.md -> "Step site-filter".
@@ -120,6 +139,7 @@ A 15-minute poll: a `run-now` label or a new `architect-docs` issue (naokicodes 
 session-status.md -> "Step autopilot-doorbell".
 
 ### 3q. Step autopilot-preview - serve a PR on port 3100 for phone click-throughs  [runnable]
+**CLOSED 2026-11-11, PR #56 (`fd061a1`).**
 Touches: scripts/preview.ps1 (new), scripts/doorbell.ps1
 A `preview` label on a PR serves that PR's code from a separate worktree on port 3100 with a
 reseeded throwaway DB, reachable over Tailscale. Never port 3000, never the live DB. Full
@@ -151,6 +171,7 @@ the route. Writes nothing. Not in the UI. Parallel-safe with loyverse-preview-ii
 session-status.md -> "Step loyverse-preview-iii".
 
 ### 3u. Step sheets-tier1 - sheet definitions: which sheets each site has (tier 1)  [runnable]
+**CLOSED 2026-11-11, PR #52 (`52e9290`).**
 Touches: server/db/schema.sql, server/db/seed.js, server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js
 First Sheets slice: the sheet_definitions table (site_code, category, engine_type MEAT|SIDE,
 active) + a validating module + a seed of one Landing per restaurant and one Commi per
@@ -191,15 +212,18 @@ the Look tokens, by meaning. No layout, markup or JS change. PUBLIC -> click-thr
 session-status.md -> "Step ui-pass-ii".
 
 ### 3z. Step warn-ink - darker warn text on the warn tint  [runnable]
+**CLOSED 2026-11-02, PR #58 (`d9fc0fc`).**
 Touches: public/style.css
 Adds --warn-ink (#94570A) for text on --warn-tint so small warn badges reach 4.5:1. Colors only,
 style.css only. PUBLIC -> click-through. Full spec: session-status.md -> "Step warn-ink".
 
 ### 3za. Step blind-count - meat counters count blind; quiet recount  [runnable]
+**CLOSED 2026-11-01, PR #51 (`d4d4245`).**
 Touches: server/db/schema.sql, server/engines/blindCount.js, server/engines/blindCount.test.js, server/routes/dailyAudit.js, public/daily-audit.html
 The 11-01 demo item. Counters see endings + remarks only (server strips the numbers); head chef
 orders recounts; every save kept in count_entries. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step blind-count".
+**2026-11-01:** isBlind(user, siteCode) and canOrderRecount(user, siteCode) - see the spec's added note.
 
 ### 3zb. Step self-host-font - serve Archivo from the app  [runnable]
 Touches: public/style.css, public/fonts/
@@ -211,13 +235,139 @@ Touches: server/db/schema.sql, server/engines/allocationRequests.js, server/engi
 PUBLIC -> click-through. Full spec: session-status.md -> "Step allocation-requests".
 
 ### 3zd. Step sheet-close - admins close a sheet  [blocked: sheets-tier1]
-Touches: server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js, server/routes/settings.js, public/settings.html
+Touches: server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js, server/routes/settings.js, public/settings.html, server/index.js
 PUBLIC -> click-through. Full spec: session-status.md -> "Step sheet-close".
 
 ### 3ze. Step restaurant-pc - the restaurant PC script, with an update mode  [Naoki's own PR]
 Touches: scripts/restaurant-pc.bat, .gitattributes
 Not for /naoki-qs: Naoki opens it with the architect-provided file. Full spec: session-status.md
 -> "Step restaurant-pc".
+**2026-11-11:** PR #47's review fixes (DB_PATH check, port before backup, errorlevel, PREV, firewall, no hard-coded tag, 14 backups) - see the spec.
+
+### 3zf. Step loyverse-preview-iv - Kitchen Sales: 8am day, last kitchen receipt, date bar  [runnable]
+**CLOSED 2026-10-30, PR #48 (`5852d65`).**
+Touches: server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, scripts/loyverse-matches.js, public/kitchen-sales.html
+The kitchen reads its own sales: the sales day turns at 8am (ADR-033), a "Last kitchen receipt"
+time per account, a Loyverse-style date bar (< date >, tap for a picker) and a Sync button.
+Read-only, no money. PUBLIC -> click-through. Full spec: session-status.md -> "Step
+loyverse-preview-iv".
+
+### 3zg. Step lan-address - the server prints the address phones use  [runnable]
+**CLOSED 2026-10-30, PR #49 (`b5a8f5d`).**
+Touches: server/index.js, server/lanAddress.js, server/lanAddress.test.js
+npm run dev prints the phone address (http://<PC IP>:3000) next to localhost. Server only, no
+click-through. Full spec: session-status.md -> "Step lan-address".
+
+### 3zh. Step name-map-refresh - the Loyverse name map catches up with the Sheet  [runnable]
+**CLOSED 2026-10-30, PR #50 (`60bdc8b`).**
+Touches: server/db/loyverse-name-map.json, docs/loyverse-name-map-2026-10-30.json, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, public/kitchen-sales.html
+Copies the Sheet's 43-dish map into the app, lets one cell hold "old | new" names, and collapses
+the Unmatched list. PUBLIC -> click-through. Full spec: session-status.md -> "Step
+name-map-refresh".
+
+### 3zi. Step business-day - one 8am business date for the whole app  [runnable]
+**CLOSED 2026-11-02, PR #55 (`cd50d51`).**
+Touches: server/businessDay.js, server/businessDay.test.js, server/engines/loyversePreview.js
+Moves the 8am businessDate (ADR-036) out of the Loyverse engine into a shared module, plus
+mondayOf(). No behaviour change. Server-only, no click-through. Full spec: session-status.md ->
+"Step business-day".
+
+### 3zj. Step role-assignments - roles per site, role switches, the supervisor role  [blocked: blind-count, site-filter, user-id-authorship]
+Touches: server/db/schema.sql, server/db/permissions.js, server/db/permissions.test.js, server/db/siteAccess.js, server/engines/blindCount.js, server/routes/auth.js, server/db/seed.js, server/db/testAccounts.js, server/index.js
+ADR-034 / ADR-038: a base role plus role assignments at a site (or all), switches as rows, one
+can(); blind = no "sees expected" switch at that site; the supervisor role. Login unchanged.
+Server-only, no click-through. Full spec: session-status.md -> "Step role-assignments".
+**2026-11-12:** + ensureRoleDefaults() at server start, because beta.db is never reseeded - see the spec.
+
+### 3zk. Step roles-page - switches per role, roles per person  [blocked: role-assignments]
+Touches: public/roles.html, public/index.html, server/routes/roles.js, server/routes/roles.test.js, server/index.js, server/db/permissions.js
+The first cut of the Discord-style screen. PUBLIC -> click-through. Full spec: session-status.md ->
+"Step roles-page".
+
+### 3zl. Step roster-stations - stations as roster rows and the sheets they open  [blocked: sheets-tier1, import-identity, role-assignments]
+Touches: server/db/schema.sql, server/engines/stations.js, server/engines/stations.test.js, server/routes/staff.js, server/routes/staff.test.js, server/index.js, scripts/import-settings.js, public/staff.html, public/index.html
+Stations per site (data, never seeded), a kitchen flag, links to sheets (also at another site), a
+Stations import tab and the Staff page's Stations section. PUBLIC -> click-through. Full spec:
+session-status.md -> "Step roster-stations".
+
+### 3zm. Step roster-staff - main station, sub-stations, standing access, login link  [blocked: roster-stations]
+Touches: server/db/schema.sql, server/engines/staff.js, server/engines/staff.test.js, server/routes/staff.js, server/routes/staff.test.js, scripts/import-settings.js, public/staff.html
+PUBLIC -> click-through. Full spec: session-status.md -> "Step roster-staff".
+
+### 3zn. Step roster-week - placements, rest days, copy last week  [blocked: roster-staff, business-day]
+Touches: server/db/schema.sql, server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js, server/routes/roster.test.js, server/index.js, public/roster.html, public/index.html
+PUBLIC -> click-through. Full spec: session-status.md -> "Step roster-week".
+
+### 3zo. Step roster-day-status - leave, sick, absent, floater, covering; totals and head count  [blocked: roster-week]
+Touches: server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js, server/routes/roster.test.js, public/roster.html
+Provides the staff-meal head-count prefill (A10 uses it). PUBLIC -> click-through. Full spec:
+session-status.md -> "Step roster-day-status".
+
+### 3zp. Step tonight-picks - tonight's kitchen counter and other picks  [blocked: roster-day-status]
+Touches: server/db/schema.sql, server/engines/tonightPicks.js, server/engines/tonightPicks.test.js, server/routes/roster.js, server/routes/roster.test.js, public/roster.html
+PUBLIC -> click-through. Full spec: session-status.md -> "Step tonight-picks".
+
+### 3zq. Step login-tonight - the login list from tonight's roster; "your work tonight"  [blocked: tonight-picks]
+Touches: server/engines/tonightWork.js, server/engines/tonightWork.test.js, server/routes/auth.js, server/routes/auth.test.js, server/routes/roster.js, public/login.html, public/index.html
+PUBLIC -> click-through. Full spec: session-status.md -> "Step login-tonight".
+
+### 3zr. Step write-permission - only tonight's people write  [blocked: login-tonight, site-filter]
+Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/tonightWork.test.js, server/middleware/requireSiteAccess.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, the site-scoped route tests
+ADR-011 enforced on the meat landing counts and the commissary writes; canUseSite widened. Click-
+through of the refusal message. Full spec: session-status.md -> "Step write-permission".
+
+### 3zs. Step site-filter-ii - two-site requests and lists across sites  [blocked: site-filter, user-id-authorship]
+Touches: server/middleware/requireSiteAccess.js, server/db/siteAccess.js, server/routes/commissary.js, server/routes/allocations.js, server/routes/dailyAudit.js, server/routes/dashboard.js, server/routes/commands.js, server/routes/commissary.test.js, server/routes/allocations.test.js, server/routes/dailyAudit.test.js, server/routes/dashboard.test.js, server/routes/commands.test.js, server/routes/stockReceipts.js, server/routes/stockReceipts.test.js
+ADR-041: each two-site request checks its owner site only; the picker and the rollup trim to the
+user's sites; admin commands need a bypass role. Server-only, no click-through. Full spec:
+session-status.md -> "Step site-filter-ii".
+**2026-11-11:** + lists with no site id narrow to the user's sites; saving presets and conversion standards needs an admin (issues #60, #62). Also after 3zu (requireAdmin). See the spec.
+
+### 3zt. Step test-accounts - fake tester accounts for previews and dev databases  [blocked: autopilot-preview]
+**CLOSED 2026-11-12, PR #64 (`5e50ddd`).**
+Touches: server/db/testAccounts.js, server/db/testAccounts.test.js, scripts/seed-test-accounts.js, package.json, scripts/preview.ps1
+ADR-039: `npm run seed:test` makes the "Test ..." accounts; refuses inventory.db and beta.db;
+previews run it after the reseed. Server and scripts only, no click-through. Full spec:
+session-status.md -> "Step test-accounts".
+
+### 3zu. Step settings-guard - Settings changes need an admin  [runnable]
+Touches: server/middleware/requireAdmin.js, server/routes/settings.js, server/routes/settings.test.js
+ADR-042: every Settings change needs a logged-in admin; reads stay open. Server-only. Full spec:
+session-status.md -> "Step settings-guard".
+**2026-11-11:** issue #62 answered (Reading B): PR #61 is complete as built.
+
+### Step table-scroll - wide tables scroll inside their own box on a phone  [runnable]
+Touches: public/allocations.html, public/commissary-shipments.html, public/commissary.html, public/dashboard.html, public/history.html, public/sales.html, public/settings.html, public/stock-receipts.html
+Issue #30. Markup only: every table not yet inside `.table-scroll` gets the wrapper (daily-audit's
+sheet excluded: cards). No style change. PUBLIC -> click-through. Full spec: session-status.md ->
+"Step table-scroll".
+
+### 3zv. Step sign-the-cookie - the login cookie carries a signature  [blocked: write-permission]
+Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example
+cubic's P1 on PR #61: an HMAC on the user_id cookie (node:crypto, COOKIE_SECRET in .env, no
+dependency). Server-only, no click-through. Full spec: session-status.md -> "Step sign-the-cookie".
+
+### 3zw. Step staff-meal-settings - meal slots, budgets and rice rates in Settings  [blocked: settings-guard]
+Touches: server/db/schema.sql, server/db/seed.js, server/engines/staffMealSettings.js, server/engines/staffMealSettings.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
+ADR-027, ADR-044: slots per restaurant with a fixed budget and/or a per-head rate; dated rice
+rates. Admin-only writes. PUBLIC -> click-through. Full spec: session-status.md -> "Step
+staff-meal-settings".
+
+### 3zx. Step staff-meal-log - the Staff meals page: log today's meals  [blocked: staff-meal-settings, role-assignments]
+Touches: server/db/schema.sql, server/db/permissions.js, server/db/permissions.test.js, server/engines/staffMeals.js, server/engines/staffMeals.test.js, server/routes/staffMeals.js, server/routes/staffMeals.test.js, server/index.js, public/staff-meals.html, public/index.html
+ADR-045, ADR-046: one meal per site, day and slot; any cook logs; meat posts through allocations;
+typed non-meat lines. PUBLIC -> click-through. Full spec: session-status.md -> "Step
+staff-meal-log".
+
+### 3zy. Step staff-meal-check - check, extra meals, late logs, copy a past meal  [blocked: staff-meal-log]
+Touches: server/engines/staffMeals.js, server/engines/staffMeals.test.js, server/routes/staffMeals.js, server/routes/staffMeals.test.js, public/staff-meals.html
+ADR-045: the head chef checks, never approves; extra meals; 3 days back; copy scaled by head
+count. PUBLIC -> click-through. Full spec: session-status.md -> "Step staff-meal-check".
+
+### 3zz. Step staff-meal-view - management's view: budget, spent, rice, unchecked  [blocked: staff-meal-check]
+Touches: server/engines/staffMealReport.js, server/engines/staffMealReport.test.js, server/routes/staffMeals.js, server/routes/staffMeals.test.js, public/staff-meal-report.html, public/index.html
+ADR-027, ADR-044, ADR-029: per day and 7 days; the rice estimate beside, never inside, the budget.
+Read-only. PUBLIC -> click-through. Full spec: session-status.md -> "Step staff-meal-view".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
@@ -339,8 +489,7 @@ Commi yield (Stage 1) is built (24d-i). Leans on commissary_meat_map + allocatio
 
 ## Planned — queued by the architect 2026-10-28 (NOT yet specified)
 
-- **table-scroll** (issue #30): wide tables scroll inside their own box on a phone. After 3y,
-  before grouped navigation. Needs a spec.
+- **table-scroll** (issue #30): specced 2026-11-12, now in the queue.
 - **grouped navigation**: the prototype's Tonight / Supply / Staff / Management groups. Touches
   every page, so after table-scroll. Needs a spec.
 - **spos-import**: SPOS moves into `spos/` by `git subtree add` with full history, after Beta, in

@@ -8,14 +8,14 @@
 // never logged and never sent to the browser.
 
 const express = require('express');
-const { computePreview, isValidDate, manilaDate } = require('../engines/loyversePreview.js');
+const { computePreview, isValidDate, businessDate } = require('../engines/loyversePreview.js');
 
 const router = express.Router();
 
 // Pure handler so tests can call it with a stub env + fetch.
 // Returns { status, body }.
 async function handlePreview(query, deps = {}) {
-  const date = query.date === undefined || query.date === '' ? manilaDate(deps.now || new Date()) : query.date;
+  const date = query.date === undefined || query.date === '' ? businessDate(deps.now || new Date()) : query.date;
   if (!isValidDate(date)) {
     return { status: 400, body: { error: 'date must be YYYY-MM-DD' } };
   }

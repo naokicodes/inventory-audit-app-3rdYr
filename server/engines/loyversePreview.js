@@ -13,11 +13,13 @@
 
 const fs = require('fs');
 const path = require('path');
+// The sales day turns at 8am: a receipt belongs to the business date of its
+// receipt_date. The rule lives in ../businessDay.js (ADR-036) for the whole app.
+const { manilaDate, businessDate, BUSINESS_DAY_START_HOUR } = require('../businessDay.js');
 
 const NAME_MAP_PATH = path.join(__dirname, '..', 'db', 'loyverse-name-map.json');
 const RECEIPTS_URL = 'https://api.loyverse.com/v1.0/receipts';
 const LOOKBACK_DAYS = 7;
-const TIMEZONE = 'Asia/Manila';
 const PAGE_LIMIT = 250;
 
 function loadNameMap() {
@@ -31,21 +33,12 @@ function isValidDate(s) {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
-const manilaDateFormat = new Intl.DateTimeFormat('en-CA', {
-  timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
-});
-
-// Calendar date (YYYY-MM-DD) of an instant, in Asia/Manila.
-function manilaDate(instant) {
-  const d = instant instanceof Date ? instant : new Date(instant);
-  if (Number.isNaN(d.getTime())) return null;
-  return manilaDateFormat.format(d);
-}
-
-// created_at window: <date>T00:00:00+08:00 to +LOOKBACK_DAYS. A late-synced
-// receipt's created_at is AFTER its receipt_date, never before.
+// created_at window: <date>T08:00:00+08:00 (the business day's start) to
+// +LOOKBACK_DAYS. A late-synced receipt's created_at is AFTER its
+// receipt_date, never before, so it is still caught.
 function receiptWindow(date) {
-  const start = new Date(`${date}T00:00:00+08:00`);
+  const hh = String(BUSINESS_DAY_START_HOUR).padStart(2, '0');
+  const start = new Date(`${date}T${hh}:00:00+08:00`);
   const end = new Date(start.getTime() + LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
   return { min: start.toISOString(), max: end.toISOString() };
 }
@@ -70,12 +63,20 @@ function buildResolver(dishes, accountKey) {
   const exact = new Map();
   const wildcards = [];
   for (const dish of dishes) {
-    const pattern = dish[accountKey];
-    if (!pattern) continue; // '' = this account doesn't sell the dish
-    const norm = normalize(pattern);
-    if (!exact.has(norm)) exact.set(norm, { dish_code: dish.dish_code, pattern });
-    if (norm.includes('*')) {
-      wildcards.push({ dish_code: dish.dish_code, pattern, re: wildcardRegex(norm) });
+    const cell = dish[accountKey];
+    if (!cell) continue; // '' = this account doesn't sell the dish
+    // A cell may list several names separated by '|' (the GAS behaviour) - a
+    // dish renamed keeps its old name beside the new one. Split, trim, drop
+    // empties; each name is exact or wildcard on its own. The reported pattern
+    // is the single name that matched, not the whole cell.
+    for (const name of String(cell).split('|')) {
+      const pattern = name.trim();
+      if (!pattern) continue; // an empty '|' part is ignored
+      const norm = normalize(pattern);
+      if (!exact.has(norm)) exact.set(norm, { dish_code: dish.dish_code, pattern });
+      if (norm.includes('*')) {
+        wildcards.push({ dish_code: dish.dish_code, pattern, re: wildcardRegex(norm) });
+      }
     }
   }
   return function resolve(itemName) {
@@ -125,7 +126,7 @@ function num(q) {
 // One account: fetch, keep, resolve. Never throws - a failure comes back as
 // { ok:false, error }.
 async function previewAccount({ account, date, dishes, env, fetchImpl }) {
-  const status = { label: account.label, ok: false, receiptsScanned: 0, receiptsKept: 0, receiptTypes: {} };
+  const status = { label: account.label, ok: false, receiptsScanned: 0, receiptsKept: 0, receiptTypes: {}, lastReceiptAt: null };
   const token = env[account.tokenEnv];
   if (!token) {
     status.error = 'token not set';
@@ -144,17 +145,21 @@ async function previewAccount({ account, date, dishes, env, fetchImpl }) {
   const quantities = new Map(); // dish_code -> qty
   const unmatched = new Map();  // raw item_name -> qty
   const candidates = new Map(); // dish|item_id|variant_id -> candidate
+  // The latest kept receipt that has at least one kitchen (name-mapped) line.
+  // Compared by time, since Loyverse may return receipts out of order.
+  let lastReceiptAtMs = -Infinity;
 
   status.receiptsScanned = receipts.length;
   for (const receipt of receipts) {
     if (receipt.cancelled_at) continue;
-    if (manilaDate(receipt.receipt_date) !== date) continue;
+    if (businessDate(receipt.receipt_date) !== date) continue;
     status.receiptsKept++;
     // Diagnostic only: REFUND receipts are still counted like sales (GAS
     // behaviour); the real port decides how refunds subtract.
     if (receipt.receipt_type) {
       status.receiptTypes[receipt.receipt_type] = (status.receiptTypes[receipt.receipt_type] || 0) + 1;
     }
+    let hasKitchenLine = false;
     for (const line of receipt.line_items || []) {
       const { item_name, quantity, item_id, variant_id, variant_name } = line;
       const qty = num(quantity);
@@ -163,6 +168,7 @@ async function previewAccount({ account, date, dishes, env, fetchImpl }) {
         unmatched.set(item_name, (unmatched.get(item_name) || 0) + qty);
         continue;
       }
+      hasKitchenLine = true;
       quantities.set(match.dish_code, (quantities.get(match.dish_code) || 0) + qty);
       const key = `${match.dish_code}|${item_id}|${variant_id}`;
       let c = candidates.get(key);
@@ -181,6 +187,15 @@ async function previewAccount({ account, date, dishes, env, fetchImpl }) {
         candidates.set(key, c);
       }
       c.quantity += qty;
+    }
+    // Drinks-only or unmatched-only receipts don't set the time; a REFUND
+    // with a kitchen line does. receipt_date is kept as Loyverse sent it.
+    if (hasKitchenLine) {
+      const t = new Date(receipt.receipt_date).getTime();
+      if (Number.isFinite(t) && t > lastReceiptAtMs) {
+        lastReceiptAtMs = t;
+        status.lastReceiptAt = receipt.receipt_date;
+      }
     }
   }
 
@@ -250,9 +265,11 @@ module.exports = {
   loadNameMap,
   isValidDate,
   manilaDate,
+  businessDate,
   receiptWindow,
   normalize,
   wildcardRegex,
   buildResolver,
   LOOKBACK_DAYS,
+  BUSINESS_DAY_START_HOUR,
 };

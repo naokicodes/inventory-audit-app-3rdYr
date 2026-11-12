@@ -39,10 +39,11 @@ ITEM NAME, BEG, NEW S., POS, INHOUSE, OVR/SHRT, END, RAW, REMARKS.
   veg / dry, and scullery items.
 
 ## FLOW - how they will use the app (drafted)
-1. The assigned meat counter opens the endings-only sheet and enters END for
+1. Tonight's kitchen counter (the Kitchen Window dispatcher, picked by the head
+   chef) opens the endings-only sheet and enters END for
    each item plus remarks. No expected, no variance. A later correction is an
    edit (kept in history), not a "+".
-2. The landing person sees expected vs counted and the variance; if something
+2. The head chef (the landing) sees expected vs counted and the variance; if something
    looks wrong, they quietly order a recount by someone else. The first count
    stays in history; the recount becomes the count.
 3. The landing person / head chef enters allocations. Staff meals come from the
@@ -61,8 +62,12 @@ ITEM NAME, BEG, NEW S., POS, INHOUSE, OVR/SHRT, END, RAW, REMARKS.
   allocation (type, amount, note); the head chef accepts, edits or rejects.
 - One unit per meat on the landing. A kg figure at a landing is commi work,
   done on the commissary page (see commissary.md).
-- Not blind: the commissary (never) and the Likod grill landing (until it has
-  a head).
+- Not blind: the commissary (never). The Likod grill landing counts blind
+  (ADR-038).
+- Decided 2026-11-01: the counter is tonight's kitchen pick (the Kitchen Window
+  dispatcher, ADR-014), and only they save the counts (write-permission, 3zr).
+  The landing is the head-chef role at the site, appointed people included
+  (ADR-035). Blind follows the site's roles (ADR-038; role-assignments, 3zj).
 - QTY (the counter's PO line) belongs to the supply family (A9).
 
 ## Open questions

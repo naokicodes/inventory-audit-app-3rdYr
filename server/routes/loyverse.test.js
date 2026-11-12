@@ -42,15 +42,15 @@ test('malformed date -> 400, nothing fetched', async () => {
   }
 });
 
-test('no date -> today in Manila', async () => {
+test("no date -> today's business date (ADR-033: past-midnight is the day before)", async () => {
   const calls = [];
   const r = await handlePreview({}, {
     nameMap: MAP, env: { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l' },
-    fetchImpl: fetchServing({}, calls), now: new Date('2026-10-02T17:30:00Z'),
+    fetchImpl: fetchServing({}, calls), now: new Date('2026-10-02T17:30:00Z'), // Manila 10-03 01:30
   });
   assert.strictEqual(r.status, 200);
-  assert.strictEqual(r.body.date, '2026-10-03');
-  assert.strictEqual(calls[0].searchParams.get('created_at_min'), '2026-10-02T16:00:00.000Z');
+  assert.strictEqual(r.body.date, '2026-10-02'); // 01:30am belongs to the 10-02 business day
+  assert.strictEqual(calls[0].searchParams.get('created_at_min'), '2026-10-02T00:00:00.000Z');
 });
 
 test('response shape: date, accounts, dishes (all rows, zeros), unmatched, idCandidates', async () => {
@@ -65,8 +65,8 @@ test('response shape: date, accounts, dishes (all rows, zeros), unmatched, idCan
   });
   assert.strictEqual(r.status, 200);
   assert.deepStrictEqual(r.body.accounts, [
-    { label: 'Silingan', ok: true, receiptsScanned: 1, receiptsKept: 1, receiptTypes: { SALE: 1 } },
-    { label: 'Likod', ok: true, receiptsScanned: 1, receiptsKept: 1, receiptTypes: { SALE: 1 } },
+    { label: 'Silingan', ok: true, receiptsScanned: 1, receiptsKept: 1, receiptTypes: { SALE: 1 }, lastReceiptAt: '2026-10-03T03:00:00Z' },
+    { label: 'Likod', ok: true, receiptsScanned: 1, receiptsKept: 1, receiptTypes: { SALE: 1 }, lastReceiptAt: '2026-10-03T03:00:00Z' },
   ]);
   assert.deepStrictEqual(r.body.dishes, [
     { dish_code: 'D001', name: 'Meatball Pasta', silingan: 2, likod: 3, total: 5 },
