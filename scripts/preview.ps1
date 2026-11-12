@@ -93,6 +93,10 @@ try {
     $env:DB_PATH = $dbPath
     $env:PORT = "$Port"
     Invoke-Native 'npm run reseed' { npm run reseed }
+    # Test accounts for the click-through. Same DB_PATH (preview.db); refuses
+    # the live file and beta.db on its own. A failure fails the preview, like
+    # the reseed above.
+    Invoke-Native 'npm run seed:test' { npm run seed:test }
 
     $proc = Start-Process -FilePath 'node' -ArgumentList 'server/index.js' -WorkingDirectory $worktree `
               -RedirectStandardOutput $logFile -RedirectStandardError $errFile -WindowStyle Hidden -PassThru
