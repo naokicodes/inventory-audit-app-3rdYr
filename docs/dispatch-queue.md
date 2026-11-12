@@ -104,6 +104,9 @@ Touches: scripts/import-settings.js, server/db/seed.js, package.json
 Standalone importer (decision A), identity tabs only, UPSERT/idempotent, uses siteAccess.js to
 validate memberships. Depends on users-roles + user-sites. DECIDED 2026-09-28: reader = B (CSV, zero-dep) behind a loadTab() adapter; PLUS an export mode (dump the DB to the template shape) so it round-trips export->edit->import. Server/scripts only, no
 click-through. Full spec: session-status.md -> "Step import-identity".
+**2026-11-12 (issue #66, ADR-047):** a duplicated name imports no row; names compare ignoring
+capitals and extra spaces; site_memberships is the person's full list (removals too). See the
+spec's 2026-11-12 decision block. PR #65 resumes (`/naoki-qs 65`).
 
 ### 3k. Step stub-login - pick-your-name login + currentUser middleware  [runnable]
 **CLOSED 2026-10-25, PR #33 (`ee0801f`).**

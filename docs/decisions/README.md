@@ -89,6 +89,24 @@ flight. (ADR-001 explains the split.)
 | ADR-044 | Staff rice is an estimate line, never in the meal budget | Accepted 2026-11-11 |
 | ADR-045 | Staff meals: any cook logs, the head chef checks | Accepted 2026-11-11 |
 | ADR-046 | Typed non-meat lines until the item lists exist | Accepted 2026-11-12 |
+| ADR-047 | People import: held duplicates, loose names, full site lists | Accepted 2026-11-12 |
+| ADR-048 | Every intake records a count and a weight | Superseded by ADR-049 |
+| ADR-049 | Intake is quantity-only; kg is weighed at production | Accepted 2026-09-28 |
+| ADR-050 | Counted yield outputs and a closing weight flow | Superseded by ADR-051 |
+| ADR-051 | Yield output is always kg (Path 1) | Accepted 2026-09-28 |
+| ADR-052 | Two-stage staging: the commi converts and ships | Superseded by ADR-053 |
+| ADR-053 | Three-stage staging: the ratio is the restaurant's | Accepted 2026-09-28 |
+| ADR-054 | MySQL as the database target on a merge with SPOS | Superseded by ADR-055 |
+| ADR-055 | Hybrid A: two apps, two databases; this web app is the core | Accepted 2026-10-03 |
+| ADR-056 | Money stays in the POS | Superseded in part by ADR-057 |
+| ADR-057 | Separate apps: stock and losses in pesos are computed here (D3) | Accepted 2026-10-19 |
+| ADR-058 | The 10-03 leans: SPOS owns supplier POs and cost prices | Superseded by ADR-059 |
+| ADR-059 | Supplier orders, arrivals and bills are ours | Accepted 2026-10-19; frozen-SPOS assumption superseded by ADR-005, unit-cost line by ADR-020 |
+
+**Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
+these records existed, in pairs: each older record is marked superseded by the one after it, and
+keeps its reasoning. They are numbered in the order recorded, so their dates are earlier than
+ADR-047's.
 
 ## Handoff item map
 

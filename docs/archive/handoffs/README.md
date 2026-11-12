@@ -32,6 +32,7 @@ listing what changed after it.
 | `ARCHITECTURE-HANDOFF-2026-11-01` | `6de85ac` | 521 | After A6: the roster family specced (3zi to 3zr), ADR-034 to ADR-038, the harvest split into A14a / A14b. |
 | `ARCHITECTURE-HANDOFF-2026-11-02` | `6786c95` | 544 | After A0: issues #53, #54, #57; ADR-039 to ADR-042 (test accounts, logged out, owner site, Settings admin); steps 3zs to 3zu. |
 | `ARCHITECTURE-HANDOFF-2026-11-11` | `2812ffc` | 550 | A10 and triage decided (#60, #62, #30, #47; rice, logging and checking); its drop-in landed 11-12. |
+| `ARCHITECTURE-HANDOFF-2026-11-12` | `2812ffc` | 550 | The A10 + triage drop-in, built and dry-run (landed as `abd87b0`, 561 tests with 3zt): ADR-043 to ADR-046, steps 3zv to 3zz and table-scroll, ensureRoleDefaults; the runnable list. |
 
 Not here: the 2026-09-15 handoff and the dispatcher handoff (never committed),
 and `architect-notes-PRIVATE.md` (stays private). Decisions 1-94 from the 10-22 to

@@ -132,9 +132,24 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-046; the index, and a map from handoff item numbers to records, is in
+to ADR-059; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-12 architect (A0 #66, A14a) - decided (recorded: ADR-047 to ADR-059)
+
+- **People import (ADR-047, issue #66).** A name on more than one row of the people workbook
+  imports no row. Names compare ignoring capitals and extra spaces (a person takes the sheet's
+  spelling, a role keeps the app's). A person's site_memberships cell is their full list, so the
+  import also removes sites it no longer lists; a skipped row, or one with an unresolved code,
+  removes nothing. Details: the 2026-11-12 decision block under "Step import-identity". PR #65
+  resumes.
+- **Reversal pairs harvested (A14a).** Swings decided before the records existed, each recorded
+  as a superseded record and its replacement: the intake weigh-in (ADR-048, ADR-049), counted
+  yield outputs vs Path 1 (ADR-050, ADR-051), two- vs three-stage staging (ADR-052, ADR-053), the
+  MySQL target vs hybrid A (ADR-054, ADR-055), money in the POS vs pesos computed here (ADR-056,
+  ADR-057), and the 10-03 supply leans vs the 10-19 supply decision (ADR-058, ADR-059). The
+  entries below that they record are unchanged; A14b groups them.
 
 ### 2026-11-12 architect (A10 + triage) - decided (recorded: ADR-043 to ADR-046)
 
@@ -1766,6 +1781,34 @@ first row holding these headers:
 - Staff: the columns roster-staff (3zm) defines. This step skips it.
 The importer reads the tabs it knows and lists the ones it skipped. Fake test accounts are not
 here: they come from test-accounts (3zt) and never reach beta.db (ADR-039).
+
+**Decisions 2026-11-12 (issue #66, Naoki; ADR-047).** These override any reading of the text above.
+- **Duplicates (Reading B).** A name on more than one row is not imported at all, in Roles.csv and
+  in Users.csv: every row with that name is skipped and listed under duplicate names ("all rows
+  skipped - fix the sheet"). The role or user keeps what the database had; a new user is not
+  added. Count the names first, then import.
+- **Same name.** Every name lookup in the import uses a key: lowercase, trimmed, runs of spaces
+  collapsed to one. That covers the duplicate check, finding an existing user or role
+  (default_role included), and the super-admin rename and its clash check. A user found by the key
+  whose stored name is spelled differently takes the sheet's spelling (UPDATE users.name; login
+  keys on user_id) and is reported as a spelling update. A role is never renamed: code looks
+  roles up by name (`super-admin`). A row whose key matches two existing users is skipped and
+  reported. No schema change.
+- **Memberships are the full list.** For each user row that imports, site_memberships is that
+  user's complete list: insert the codes that resolve and are missing, and DELETE that user's
+  user_sites rows whose site_code the cell no longer lists. A skipped row changes nothing. If any
+  code in the cell does not resolve, insert the resolved ones and delete nothing for that user
+  (reported). A blank cell means no sites. Users absent from the sheet are untouched. Same
+  transaction as the rest. This replaces "insert ... when it resolves" above for removals; the
+  warn-and-skip for an unresolved code stands.
+- **Report** gains "memberships removed", "spelling updated" and "removals skipped (unresolved
+  code)".
+- **Unchanged:** the workbook's super-admin row's active = 0 is ignored (as built).
+- **Tests gain:** a duplicated name changes nothing, in either tab; "kim" in the sheet updates an
+  existing "Kim" (one user, the sheet's spelling) and never adds a second; a code removed from the
+  cell deletes the membership; an unresolved code blocks removals for that user; a blank cell
+  removes them all; a second run is still a no-op.
+- Touches unchanged: the files PR #65 already has (scripts/import-settings.js and its test).
 
 ## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
 **CLOSED 2026-10-25, PR #33 (`ee0801f`).**
