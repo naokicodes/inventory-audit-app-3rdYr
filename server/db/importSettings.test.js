@@ -270,6 +270,28 @@ try {
     assert.ok(report.problems.some(p => /matches 2 existing users/.test(p)), report.problems.join('; '));
   });
 
+  test('a role name matching two existing roles by the key is skipped and reported (ADR-073)', () => {
+    const db = freshDb();
+    db.prepare("INSERT INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only) VALUES ('Admin', 0, 0, 0, 1)").run();
+    const flagsOf = n => db.prepare('SELECT can_enter_counts, can_finalize, can_admin, read_only FROM roles WHERE name = ?').get(n);
+    const before = { admin: { ...flagsOf('admin') }, Admin: { ...flagsOf('Admin') } };
+    const rolesBefore = db.prepare('SELECT COUNT(*) AS n FROM roles').get().n;
+    const report = importIdentity(db, workbook({
+      Roles: 'name,can_enter_counts,can_finalize,can_admin,read_only\n ADMIN ,1,0,0,0\n',
+      Users: 'name,default_role,active,site_memberships\nNoor,admin,1,RA\n',
+    }));
+    // Roles row: neither role changes, none added.
+    assert.deepStrictEqual({ ...flagsOf('admin') }, before.admin);
+    assert.deepStrictEqual({ ...flagsOf('Admin') }, before.Admin);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM roles').get().n, rolesBefore);
+    assert.strictEqual(report.rolesInserted + report.rolesUpdated, 0);
+    assert.ok(report.problems.some(p => /Roles row .*matches 2 existing roles/.test(p)), report.problems.join('; '));
+    // Users row whose default_role matches both: the user is not added.
+    assert.strictEqual(user(db, 'Noor'), undefined);
+    assert.strictEqual(counts(db).sites, 0);
+    assert.ok(report.problems.some(p => /role "admin" matches 2 roles/.test(p)), report.problems.join('; '));
+  });
+
   test('the super-admin rename and its clash check use the key', () => {
     const db = freshDb();
     const checker = db.prepare("SELECT id FROM roles WHERE name = 'checker'").get().id;
