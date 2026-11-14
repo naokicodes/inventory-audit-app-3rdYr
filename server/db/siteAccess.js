@@ -54,8 +54,13 @@ const SITE_CODE_SQL = {
   commissary: 'SELECT code FROM commissaries WHERE id = ?',
   commissary_meat: `SELECT c.code FROM commissary_meats cm
                       JOIN commissaries c ON c.id = cm.commissary_id WHERE cm.id = ?`,
-  stock_receipt: `SELECT r.code FROM stock_receipts s
-                    JOIN restaurants r ON r.id = s.restaurant_id WHERE s.id = ?`,
+  // ADR-074: a receipt with no restaurant (a retired "Unallocated" one) is
+  // the commissary's of its commissary_meat_id. Neither -> code NULL.
+  stock_receipt: `SELECT CASE WHEN s.restaurant_id IS NULL THEN c.code ELSE r.code END AS code
+                    FROM stock_receipts s
+                    LEFT JOIN restaurants r ON r.id = s.restaurant_id
+                    LEFT JOIN commissary_meats cm ON cm.id = s.commissary_meat_id
+                    LEFT JOIN commissaries c ON c.id = cm.commissary_id WHERE s.id = ?`,
   recount_order: `SELECT r.code FROM recount_orders o
                     JOIN restaurants r ON r.id = o.restaurant_id WHERE o.id = ?`,
   yield_log: `SELECT c.code FROM commissary_yield_log y
@@ -66,10 +71,20 @@ const SITE_CODE_SQL = {
                  JOIN commissaries c ON c.id = cm.commissary_id WHERE a.id = ?`,
 };
 
-/** The site code an id of `kind` belongs to, or null (no such row, or a row with no site). */
-function siteCodeFor(db, kind, id) {
+/**
+ * The site of an id of `kind`: undefined if there is no such row, else
+ * { code } where code is null for a row with no site (ADR-074 needs the
+ * difference for a stock receipt with neither restaurant nor commissary).
+ */
+function siteOfRow(db, kind, id) {
   const row = db.prepare(SITE_CODE_SQL[kind]).get(id);
-  return row ? row.code : null;
+  return row ? { code: row.code } : undefined;
 }
 
-module.exports = { getUserSiteCodes, userHasSite, resolveSiteCode, canUseSite, siteCodeFor };
+/** The site code an id of `kind` belongs to, or null (no such row, or a row with no site). */
+function siteCodeFor(db, kind, id) {
+  const site = siteOfRow(db, kind, id);
+  return site ? site.code : null;
+}
+
+module.exports = { getUserSiteCodes, userHasSite, resolveSiteCode, canUseSite, siteCodeFor, siteOfRow };

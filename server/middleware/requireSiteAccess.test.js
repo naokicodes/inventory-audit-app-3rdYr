@@ -14,7 +14,7 @@ process.env.DB_PATH = DB_FILE;
 const db = require('../db/connection.js');
 const { currentUser } = require('../routes/auth.js');
 const requireSiteAccess = require('./requireSiteAccess.js');
-const { siteCodeFor } = require('../db/siteAccess.js');
+const { siteCodeFor, siteOfRow } = require('../db/siteAccess.js');
 
 let passed = 0, failed = 0;
 const tests = [];
@@ -31,6 +31,8 @@ const comMeat = insert("INSERT INTO commissary_meats (commissary_id, code, name,
 const comB = insert("INSERT INTO commissaries (name, code) VALUES ('Commissary T2', 'SFT-COB')");
 const comBMeat = insert("INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, 'SFTD', 'Chicken T', 'kg', 5)", comB);
 const likodReceipt = insert("INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source) VALUES (?, ?, '2026-11-01', 3, 'DIRECT')", likod, likodMeat);
+// ADR-074: leftover "Unallocated" receipts - no restaurant, shipped by A or B, or neither.
+const noRestaurantReceipt = cmId => insert("INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id) VALUES (NULL, NULL, '2026-11-01', 2, 'COMMISSARY', ?)", cmId);
 
 const role = (name, flags) => insert(
   'INSERT INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only) VALUES (?, ?, ?, ?, ?)', name, ...flags);
@@ -43,6 +45,7 @@ const checkerRole = role('sft-checker', [1, 0, 0, 0]);
 const ana = user('SFT Ana', checkerRole, ['SFT-SIL']);              // one restaurant
 const cora = user('SFT Cora', checkerRole, ['SFT-COM']);          // commissary A only
 const flo = user('SFT Flo', checkerRole, ['SFT-SIL', 'SFT-LIK']);   // floater
+const bea = user('SFT Bea', checkerRole, ['SFT-COB']);          // commissary B only
 const bypass = {
   admin: user('SFT Admin', role('sft-admin', [1, 1, 1, 0]), []),
   'super-admin': user('SFT Super', role('sft-super', [1, 1, 1, 0]), []),
@@ -132,7 +135,7 @@ for (const route of ['/api/commissary/daily-audit?date=2026-11-01&', '/api/commi
     assert.strictEqual(res.status, 403);
     assert.deepStrictEqual(await res.json(), { error: 'No access to site SFT-COB' });
     const own = await call('GET', `${route}commissary_id=${comA}&commissary_meat_id=${comMeat}`, { as: cora });
-    assert.notStrictEqual(own.status, 403);
+    assert.strictEqual(own.status, 200);
   });
 }
 
@@ -151,6 +154,89 @@ test('Q2: a body row from another commissary refuses the whole save and writes n
 test('Q4: /stock-receipts/meats answers a logged-in checker for any restaurant', async () => {
   const res = await call('GET', `/api/stock-receipts/meats?restaurant_id=${likod}`, { as: ana });
   assert.strictEqual(res.status, 200);
+});
+
+// Decisions 2026-11-14 (issue #68; ADR-074).
+const ONE_NUMBER = name => ({ error: `${name} must be one whole number` });
+for (const route of ['/api/commissary/daily-audit?date=2026-11-01&', '/api/commissary/yield-log?',
+  '/api/commissary/adjustments?']) {
+  const path = route.split('?')[0];
+  test(`malformed ids get 400 on GET ${path}, logged in or not`, async () => {
+    for (const as of [cora, undefined]) {
+      const bad = [
+        [`commissary_id=${comA}&commissary_meat_id=abc`, 'commissary_meat_id'],
+        ['commissary_id=1abc', 'commissary_id'],
+        [`commissary_id=${comA}&commissary_id=${comB}`, 'commissary_id'],
+        ['commissary_id=1.5', 'commissary_id'],
+        ['commissary_id=0', 'commissary_id'],
+        ['commissary_id=-1', 'commissary_id'],
+      ];
+      for (const [qs, name] of bad) {
+        const res = await call('GET', route + qs, { as });
+        assert.strictEqual(res.status, 400, qs);
+        assert.deepStrictEqual(await res.json(), ONE_NUMBER(name));
+      }
+    }
+  });
+  test(`a missing or empty id still passes on GET ${path}`, async () => {
+    assert.strictEqual((await call('GET', `${route}commissary_id=${comA}&commissary_meat_id=`, { as: cora })).status, 200);
+    assert.strictEqual((await call('GET', `${route}commissary_id=${comA}`, { as: cora })).status, 200);
+  });
+}
+
+test('HEAD reads the query string like GET', async () => {
+  assert.strictEqual((await call('HEAD', `/api/commissary/meats?commissary_id=${comB}`, { as: cora })).status, 403);
+  assert.strictEqual((await call('HEAD', '/api/commissary/meats?commissary_id=abc')).status, 400);
+});
+
+test('a malformed rows[].commissary_meat_id refuses the save with 400 and writes nothing', async () => {
+  const count = () => db.prepare(
+    "SELECT COUNT(*) AS n FROM commissary_ending_actual WHERE business_date = '2026-11-03'").get().n;
+  for (const badId of ['abc', '1abc', 1.5, 0, -2, [comMeat]]) {
+    const res = await call('POST', '/api/commissary/daily-audit', { as: cora, body: {
+      commissary_id: comA, business_date: '2026-11-03',
+      rows: [{ commissary_meat_id: comMeat, ending_actual: 5 }, { commissary_meat_id: badId, ending_actual: 7 }],
+    } });
+    assert.strictEqual(res.status, 400, JSON.stringify(badId));
+    assert.deepStrictEqual(await res.json(), ONE_NUMBER('rows[].commissary_meat_id'));
+  }
+  assert.strictEqual(count(), 0);
+});
+
+test('a malformed :id gets 400; a well-formed missing one still 404', async () => {
+  const res = await call('PATCH', '/api/stock-receipts/abc', { body: { quantity: 1 } });
+  assert.strictEqual(res.status, 400);
+  assert.deepStrictEqual(await res.json(), ONE_NUMBER('id'));
+  assert.strictEqual((await call('DELETE', '/api/commissary/yield-log/1abc', { as: cora })).status, 400);
+  assert.strictEqual((await call('PATCH', '/api/stock-receipts/999999', { as: ana, body: { quantity: 1 } })).status, 404);
+});
+
+test('a no-restaurant receipt belongs to the commissary that shipped it', async () => {
+  const aReceipt = noRestaurantReceipt(comMeat);
+  const bReceipt = noRestaurantReceipt(comBMeat);
+  assert.strictEqual(siteCodeFor(db, 'stock_receipt', aReceipt), 'SFT-COM');
+  for (const method of ['PATCH', 'DELETE']) {
+    const res = await call(method, `/api/stock-receipts/${aReceipt}`, { as: bea, body: { quantity: 4 } });
+    assert.strictEqual(res.status, 403, method);
+    assert.deepStrictEqual(await res.json(), { error: 'No access to site SFT-COM' });
+  }
+  assert.strictEqual((await call('PATCH', `/api/stock-receipts/${bReceipt}`, { as: bea, body: { quantity: 4 } })).status, 200);
+  assert.strictEqual((await call('DELETE', `/api/stock-receipts/${bReceipt}`, { as: bea })).status, 200);
+});
+
+test('a receipt with neither restaurant nor commissary is admin-only', async () => {
+  const lost = noRestaurantReceipt(null);
+  assert.deepStrictEqual(siteOfRow(db, 'stock_receipt', lost), { code: null });
+  assert.strictEqual(siteOfRow(db, 'stock_receipt', 999999), undefined);
+  for (const as of [undefined, cora, bea, bypass.management]) {
+    for (const method of ['PATCH', 'DELETE']) {
+      const res = await call(method, `/api/stock-receipts/${lost}`, { as, body: { quantity: 4 } });
+      assert.strictEqual(res.status, 403, `${method} as ${as}`);
+      assert.deepStrictEqual(await res.json(), { error: 'Only an admin can change a receipt with no site' });
+    }
+  }
+  assert.strictEqual((await call('PATCH', `/api/stock-receipts/${lost}`, { as: bypass.admin, body: { quantity: 4 } })).status, 200);
+  assert.strictEqual((await call('DELETE', `/api/stock-receipts/${lost}`, { as: bypass['super-admin'] })).status, 200);
 });
 
 const server = app.listen(0, async () => {
