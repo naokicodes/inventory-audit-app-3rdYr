@@ -57,6 +57,14 @@ test('an ending count saved while logged in stamps created_by_user_id and the co
   assert.deepStrictEqual({ ...row }, { created_by: 'Ana Counter', created_by_user_id: userId });
 });
 
+test('the page re-posting an untouched, unchanged row (logged out) keeps the original author', async () => {
+  ok(await post('/api/daily-audit', false, {
+    restaurant_id: restaurantId, business_date: '2026-11-05', rows: [{ meat_id: meatId, ending_actual: 4, touched: false }]
+  }));
+  const row = db.prepare('SELECT created_by, created_by_user_id FROM ending_actual WHERE meat_id = ? AND business_date = ?').get(meatId, '2026-11-05');
+  assert.deepStrictEqual({ ...row }, { created_by: 'Ana Counter', created_by_user_id: userId });
+});
+
 test('prepped and portion counts saved while logged in are stamped; prepped.created_by stays NULL (provenance)', async () => {
   ok(await post('/api/daily-audit/portions', true, {
     restaurant_id: restaurantId, business_date: '2026-11-05', rows: [{ dish_id: dishId, prepped: 30, portion_actual: 12, touched: true }]
