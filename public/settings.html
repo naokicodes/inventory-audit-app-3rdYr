@@ -13,7 +13,9 @@
     .add-form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; margin-bottom: 1rem; }
     .add-form label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
     .add-form input, .add-form select { padding: 0.3rem; }
-    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    /* ADR-077: one row that swipes sideways itself; the page stays still. */
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tabs button { flex: 0 0 auto; white-space: nowrap; }
     .tabs button { background: var(--paper); border: 1px solid var(--line2); }
     .tabs button.active { background: var(--ink); color: var(--card); }
     .section-panel { display: none; }
@@ -254,6 +256,7 @@
         document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.section-panel').forEach(s => s.classList.remove('active'));
         btn.classList.add('active');
+        btn.scrollIntoView({ inline: 'nearest', block: 'nearest' });
         document.getElementById('section-' + btn.dataset.section).classList.add('active');
       });
     });
