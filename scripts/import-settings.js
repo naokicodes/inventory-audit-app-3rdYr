@@ -1,8 +1,13 @@
 // Step import-identity: import the people workbook (identity tabs) into the
 // database selected by DB_PATH (unset = the live inventory.db, as everywhere).
 //
-//   npm run import:settings -- <folder of tab CSVs>           import Roles.csv / Users.csv
+//   npm run import:settings -- <folder of tab CSVs>           import Roles / Users / Sheets / SideItems .csv
 //   npm run import:settings -- --export <empty folder>        write them from the database
+//
+// Step side-items (ADR-062) added the Sheets and SideItems tabs: the SIDE
+// sheets each site has and the side-item catalog they list. Same rules
+// (ADR-047): a duplicated row is held, names match by nameKey, one
+// transaction per run, a second run changes nothing.
 //
 // Standalone and off the runtime path; not wired into the reseed yet. The
 // logic below is exported for server/db/importSettings.test.js; the CLI at the
@@ -28,9 +33,15 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveSiteCode } = require('../server/db/siteAccess.js');
+const { createSheetDefinition } = require('../server/engines/sheetDefinitions.js');
+const sideItems = require('../server/engines/sideItems.js');
 
 const SUPER_ADMIN_ROLE = 'super-admin';
-const KNOWN_TABS = ['Roles', 'Users'];
+const KNOWN_TABS = ['Roles', 'Users', 'Sheets', 'SideItems'];
+const SHEET_HEADERS = ['site', 'sheet', 'active'];
+const SIDE_ITEM_HEADERS = ['site', 'sheet', 'item', 'main_unit', 'conversions', 'how_bought', 'cost'];
+// Import writes are logged like Settings writes, as the script.
+const IMPORT_CTX = { actor: 'import-settings', source: 'SYSTEM' };
 const ROLE_FLAGS = ['can_enter_counts', 'can_finalize', 'can_admin', 'read_only'];
 const ROLE_HEADERS = ['name', ...ROLE_FLAGS];
 const USER_HEADERS = ['name', 'default_role', 'active', 'site_memberships'];
@@ -127,6 +138,12 @@ function newReport() {
     spellingUpdated: [],    // "<old> -> <new>"
     removalsSkipped: [],    // "<user>: ..." - an unresolved code blocked removals
     problems: [],           // anything else that made a row skip
+    // Sheets / SideItems (step side-items)
+    sheetsAdded: 0, sheetsSwitched: 0,
+    itemsAdded: 0, itemsUpdated: 0, linksAdded: 0, linksSwitchedOff: 0,
+    sideDuplicates: [],     // "<tab>: <site> / <sheet> [/ <item>] (rows a, b)" - every such row held
+    unitClashes: [],        // "<item>: main unit is <x>, row says <y> (row n)"
+    sideUnresolved: [],     // unknown site / sheet, or bad values - row skipped
   };
 }
 
@@ -367,20 +384,189 @@ function importUsers(db, rows, report) {
   });
 }
 
-// Imports the identity tabs found in dir, in one transaction. Returns the
+// --- Sheets / SideItems (step side-items, ADR-062) ---
+
+// The site a code names, or null (unknown, or in both site tables).
+function siteOf(db, code) {
+  try {
+    return resolveSiteCode(db, code);
+  } catch (err) {
+    if (!/exists in both restaurants and commissaries/.test(err.message)) throw err;
+    return null;
+  }
+}
+
+// The site's sheet whose name has this key (any engine), or null.
+function sheetAt(db, siteCode, name) {
+  const key = nameKey(name);
+  return db.prepare('SELECT * FROM sheet_definitions WHERE site_code = ?').all(siteCode)
+    .find(s => nameKey(s.category) === key) || null;
+}
+
+// ADR-047 for the side tabs: a key (keyOf; null = row has no key) on more
+// than one row is held - every such row skipped - and reported once.
+function heldKeys(rows, tab, keyOf, label, report) {
+  const lines = new Map();
+  rows.forEach((row, i) => {
+    const key = keyOf(row);
+    if (key === null) return;
+    if (!lines.has(key)) lines.set(key, []);
+    lines.get(key).push({ i, line: rowNumber(row, i) });
+  });
+  const held = new Set();
+  for (const [key, ls] of lines) {
+    if (ls.length < 2) continue;
+    held.add(key);
+    report.sideDuplicates.push(`${tab}: ${label(rows[ls[0].i])} (rows ${ls.map(l => l.line).join(', ')})`);
+  }
+  return held;
+}
+
+// Sheets.csv: site, sheet, active. Adds a SIDE sheet or switches an existing
+// SIDE one on or off. A blank active means on.
+function importSheets(db, rows, report) {
+  const keyOf = r => (r.site && nameKey(r.sheet) ? `${r.site}\u0000${nameKey(r.sheet)}` : null);
+  const held = heldKeys(rows, 'Sheets', keyOf, r => `${r.site} / ${r.sheet}`, report);
+  const switchSheet = db.prepare('UPDATE sheet_definitions SET active = ? WHERE id = ?');
+  rows.forEach((row, i) => {
+    const skip = msg => report.sideUnresolved.push(`Sheets row ${rowNumber(row, i)}: ${msg} - skipped`);
+    if (keyOf(row) === null) return skip('needs a site and a sheet');
+    if (held.has(keyOf(row))) return;
+    if (!siteOf(db, row.site)) return skip(`site "${row.site}" not found`);
+    const active = row.active === '' || row.active === undefined ? 1 : parseBit(row.active);
+    if (active === null) return skip(`"${row.sheet}": active must be 0, 1 or blank`);
+    const existing = sheetAt(db, row.site, row.sheet);
+    if (!existing) {
+      createSheetDefinition(db, { siteCode: row.site, category: row.sheet, engineType: 'SIDE', active });
+      report.sheetsAdded++;
+    } else if (existing.engine_type !== 'SIDE') {
+      skip(`"${existing.category}" at ${row.site} is a meat sheet`);
+    } else if (existing.active !== active) {
+      switchSheet.run(active, existing.id);
+      report.sheetsSwitched++;
+    }
+  });
+}
+
+// "sack=25; tray=30" -> [['sack', 25], ['tray', 30]]; throws on a bad pair.
+function parseConversions(cell, mainUnit) {
+  return String(cell || '').split(';').map(p => p.trim()).filter(Boolean).map(p => {
+    const m = p.match(/^([^=]+)=(.+)$/);
+    const unit = m ? sideItems.normUnit(m[1]) : '';
+    const n = m ? Number(m[2].trim()) : NaN;
+    if (!unit || !Number.isFinite(n) || n <= 0) throw new Error(`conversion "${p}" must look like sack=25`);
+    if (unit === mainUnit) throw new Error(`conversion "${p}" is the main unit`);
+    return [unit, n];
+  });
+}
+
+// SideItems.csv: site, sheet, item, main_unit, conversions, how_bought, cost.
+// An item is created once; its fields come from its rows (how_bought and cost:
+// the last non-blank one; a blank cost keeps the stored cost); conversions are
+// added or changed, never removed. A sheet named here gets exactly its listed
+// items on, in order; its other links are switched off. A skipped row's item
+// keeps its link as it is.
+function importSideItems(db, rows, report) {
+  const keyOf = r => (r.site && nameKey(r.sheet) && nameKey(r.item)
+    ? [r.site, nameKey(r.sheet), nameKey(r.item)].join('\u0000') : null);
+  const held = heldKeys(rows, 'SideItems', keyOf, r => `${r.site} / ${r.sheet} / ${r.item}`, report);
+  const named = new Map(); // sheet id -> item keys any row names on it
+  const good = [];
+  rows.forEach((row, i) => {
+    const line = rowNumber(row, i);
+    const skip = msg => report.sideUnresolved.push(`SideItems row ${line}: ${msg} - skipped`);
+    if (keyOf(row) === null) return skip('needs a site, a sheet and an item');
+    if (!siteOf(db, row.site)) return skip(`site "${row.site}" not found`);
+    const sheet = sheetAt(db, row.site, row.sheet);
+    if (!sheet) return skip(`no sheet "${row.sheet}" at ${row.site} (add it in the Sheets tab)`);
+    if (sheet.engine_type !== 'SIDE') return skip(`"${sheet.category}" at ${row.site} is a meat sheet`);
+    if (!named.has(sheet.id)) named.set(sheet.id, new Set());
+    named.get(sheet.id).add(nameKey(row.item));
+    if (held.has(keyOf(row))) return;
+    const mainUnit = sideItems.normUnit(row.main_unit);
+    if (!mainUnit) return skip(`"${row.item}" needs a main unit`);
+    try {
+      good.push({
+        line, sheetId: sheet.id, key: nameKey(row.item), name: row.item, mainUnit,
+        conversions: parseConversions(row.conversions, mainUnit),
+        how_bought: sideItems.parseHowBought(row.how_bought),
+        cost: sideItems.parseCost(row.cost),
+      });
+    } catch (err) {
+      skip(`"${row.item}": ${err.message}`);
+    }
+  });
+
+  // Items, once each, from their rows.
+  const groups = new Map();
+  for (const g of good) {
+    if (!groups.has(g.key)) groups.set(g.key, []);
+    groups.get(g.key).push(g);
+  }
+  for (const list of groups.values()) {
+    const existing = sideItems.findItemByName(db, list[0].name);
+    const mainUnit = existing ? existing.main_unit : list[0].mainUnit;
+    const ok = list.filter(g => {
+      if (g.mainUnit === mainUnit) return true;
+      report.unitClashes.push(`${existing ? existing.name : list[0].name}: main unit is ${mainUnit}, row ${g.line} says ${g.mainUnit} - row skipped (use a second item)`);
+      return false;
+    });
+    if (ok.length === 0) continue;
+    const last = field => ok.map(g => g[field]).filter(v => v !== null).pop() ?? null;
+    const fields = { how_bought: last('how_bought') };
+    if (last('cost') !== null) fields.cost_per_unit = last('cost');
+    let id, changed = false;
+    if (existing) {
+      id = existing.id;
+      changed = sideItems.updateItem(db, id, fields, IMPORT_CTX).changed;
+    } else {
+      id = sideItems.createItem(db, { name: ok[0].name, main_unit: mainUnit, ...fields }, IMPORT_CTX).id;
+      report.itemsAdded++;
+    }
+    const units = new Map(ok.flatMap(g => g.conversions));
+    for (const [unit, n] of units) changed = sideItems.setUnit(db, id, unit, n, IMPORT_CTX) || changed;
+    if (existing && changed) report.itemsUpdated++;
+    for (const g of ok) g.itemId = id;
+  }
+
+  // Links: each named sheet's listed items on, in row order; the rest off.
+  const linkOf = db.prepare('SELECT active FROM side_item_sheets WHERE sheet_id = ? AND side_item_id = ?');
+  const activeLinks = db.prepare(
+    'SELECT l.side_item_id, i.name FROM side_item_sheets l JOIN side_items i ON i.id = l.side_item_id WHERE l.sheet_id = ? AND l.active = 1'
+  );
+  for (const [sheetId, keys] of named) {
+    good.filter(g => g.sheetId === sheetId && g.itemId).forEach((g, pos) => {
+      const had = linkOf.get(sheetId, g.itemId);
+      sideItems.setLink(db, sheetId, g.itemId, { sort_order: pos, active: 1 }, IMPORT_CTX);
+      if (!had || had.active === 0) report.linksAdded++;
+    });
+    for (const link of activeLinks.all(sheetId)) {
+      if (keys.has(nameKey(link.name))) continue;
+      sideItems.setLink(db, sheetId, link.side_item_id, { active: 0 }, IMPORT_CTX);
+      report.linksSwitchedOff++;
+    }
+  }
+}
+
+// Imports every known tab found in dir, in one transaction. Returns the
 // report; never throws for workbook content (a database error still throws,
 // after rolling back).
-function importIdentity(db, dir) {
+function importSettings(db, dir) {
   const report = newReport();
   report.tabsSkipped = skippedTabs(dir);
   const roles = loadTab(dir, 'Roles');
   const users = loadTab(dir, 'Users');
+  const sheets = loadTab(dir, 'Sheets');
+  const items = loadTab(dir, 'SideItems');
 
   db.exec('BEGIN');
   try {
     // Roles first, so a user row can name a role the same workbook adds.
     if (roles) { importRoles(db, roles, report); report.tabsRead.push('Roles'); }
     if (users) { importUsers(db, users, report); report.tabsRead.push('Users'); }
+    // Sheets before SideItems, so an item row can name a sheet the same workbook adds.
+    if (sheets) { importSheets(db, sheets, report); report.tabsRead.push('Sheets'); }
+    if (items) { importSideItems(db, items, report); report.tabsRead.push('SideItems'); }
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
@@ -391,11 +577,14 @@ function importIdentity(db, dir) {
 
 function formatReport(report) {
   const lines = [
-    `Tabs read: ${report.tabsRead.join(', ') || '(none - no Roles.csv or Users.csv found)'}`,
+    `Tabs read: ${report.tabsRead.join(', ') || `(none - no ${KNOWN_TABS.map(t => `${t}.csv`).join(', ')} found)`}`,
     `Tabs skipped (not part of this slice): ${report.tabsSkipped.join(', ') || '(none)'}`,
     `Roles: ${report.rolesInserted} inserted, ${report.rolesUpdated} updated`,
     `Users: ${report.usersInserted} inserted, ${report.usersUpdated} updated`,
     `Site memberships: ${report.membershipsAdded} added, ${report.membershipsRemoved} removed`,
+    `Side sheets: ${report.sheetsAdded} added, ${report.sheetsSwitched} switched on or off`,
+    `Side items: ${report.itemsAdded} added, ${report.itemsUpdated} updated`,
+    `Side sheet items: ${report.linksAdded} added or switched on, ${report.linksSwitchedOff} switched off`,
   ];
   const section = (title, items) => {
     if (items.length === 0) return;
@@ -407,16 +596,21 @@ function formatReport(report) {
   section('WARNING memberships removals skipped (unresolved code)', report.removalsSkipped);
   section('WARNING duplicate names - all rows skipped, fix the sheet', report.duplicateNames);
   section('WARNING other rows skipped or adjusted', report.problems);
+  section('WARNING side rows on more than one row - all held, fix the sheet', report.sideDuplicates);
+  section('WARNING side items with a different main unit - row skipped', report.unitClashes);
+  section('WARNING side rows skipped', report.sideUnresolved);
   return lines.join('\n');
 }
 
 // --- export (round trip: export -> edit -> import) ---
 
-// Writes Roles.csv and Users.csv in the template shape into dir. Refuses to
-// overwrite an existing file, so an export never clobbers an edited
-// workbook. Fake "Test ..." accounts (ADR-039) are not workbook people and are
-// left out. Returns { roles, users, files } or { refused }.
-function exportIdentity(db, dir) {
+// Writes Roles.csv, Users.csv, Sheets.csv and SideItems.csv in the template
+// shape into dir. Refuses to overwrite an existing file, so an export never
+// clobbers an edited workbook. Fake "Test ..." accounts (ADR-039) are not
+// workbook people and are left out. SideItems carries only the items each
+// sheet has switched on, cost included (the export runs on the owner's PC).
+// Returns { roles, users, sheets, sideItems, files } or { refused }.
+function exportSettings(db, dir) {
   const files = KNOWN_TABS.map(t => path.join(dir, `${t}.csv`));
   const existing = files.filter(f => fs.existsSync(f));
   if (existing.length > 0) {
@@ -437,13 +631,32 @@ function exportIdentity(db, dir) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(files[0], toCsv(ROLE_HEADERS, roles));
   fs.writeFileSync(files[1], toCsv(USER_HEADERS, userRows));
-  return { roles: roles.length, users: userRows.length, files };
+
+  const sheets = db.prepare(
+    "SELECT site_code AS site, category AS sheet, active FROM sheet_definitions WHERE engine_type = 'SIDE' ORDER BY site_code, category"
+  ).all();
+  const unitsOf = db.prepare('SELECT unit, per_main FROM side_item_units WHERE side_item_id = ? ORDER BY unit');
+  const sideRows = db.prepare(`
+    SELECT d.site_code AS site, d.category AS sheet, i.id, i.name AS item, i.main_unit, i.how_bought, i.cost_per_unit
+      FROM side_item_sheets l
+      JOIN sheet_definitions d ON d.id = l.sheet_id
+      JOIN side_items i ON i.id = l.side_item_id
+     WHERE l.active = 1
+     ORDER BY d.site_code, d.category, l.sort_order, i.name`).all().map(r => ({
+    ...r,
+    conversions: unitsOf.all(r.id).map(u => `${u.unit}=${u.per_main}`).join('; '),
+    how_bought: (r.how_bought || '').toLowerCase(),
+    cost: r.cost_per_unit,
+  }));
+  fs.writeFileSync(files[2], toCsv(SHEET_HEADERS, sheets));
+  fs.writeFileSync(files[3], toCsv(SIDE_ITEM_HEADERS, sideRows));
+  return { roles: roles.length, users: userRows.length, sheets: sheets.length, sideItems: sideRows.length, files };
 }
 
 module.exports = {
   parseCsv, loadTab, skippedTabs,
-  importIdentity, formatReport, exportIdentity,
-  ROLE_HEADERS, USER_HEADERS,
+  importSettings, formatReport, exportSettings,
+  ROLE_HEADERS, USER_HEADERS, SHEET_HEADERS, SIDE_ITEM_HEADERS,
 };
 
 // --- CLI ---
@@ -468,16 +681,16 @@ function main(argv) {
   const db = require('../server/db/connection.js');
 
   if (exportMode) {
-    const result = exportIdentity(db, dir);
+    const result = exportSettings(db, dir);
     if (result.refused) {
       console.error(result.refused);
       process.exit(1);
     }
-    console.log(`Exported ${result.roles} role(s) and ${result.users} user(s):`);
+    console.log(`Exported ${result.roles} role(s), ${result.users} user(s), ${result.sheets} side sheet(s) and ${result.sideItems} side item row(s):`);
     for (const f of result.files) console.log(`  ${f}`);
   } else {
-    console.log(`Importing identity tabs from ${dir}\n`);
-    console.log(formatReport(importIdentity(db, dir)));
+    console.log(`Importing settings tabs from ${dir}\n`);
+    console.log(formatReport(importSettings(db, dir)));
   }
 }
 

@@ -29,6 +29,7 @@ const allocationsRoutes = require('./routes/allocations.js');
 const dashboardRoutes = require('./routes/dashboard.js');
 const loyverseRoutes = require('./routes/loyverse.js');
 const authRoutes = require('./routes/auth.js');
+const sideItemsRoutes = require('./routes/sideItems.js');
 const requireSiteAccess = require('./middleware/requireSiteAccess.js');
 
 const app = express();
@@ -50,6 +51,7 @@ app.use('/api', salesRoutes);
 app.use('/api', allocationsRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', loyverseRoutes);
+app.use('/api', sideItemsRoutes);
 
 app.listen(PORT, () => {
   // Print localhost for this PC plus every LAN address a phone on the same
