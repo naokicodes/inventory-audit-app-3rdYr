@@ -113,9 +113,11 @@ flight. (ADR-001 explains the split.)
 | ADR-068 | Buyer runs: ticks and receipt photos | Accepted 2026-11-14 |
 | ADR-069 | Scope: every inventory sheet, not meat only | Accepted 2026-11-14 |
 | ADR-070 | Remote access through Tailscale | Accepted 2026-11-14 |
-| ADR-071 | cubic's findings are sorted by the builder | Accepted 2026-11-14 |
+| ADR-071 | cubic's findings are sorted by the builder | Accepted 2026-11-14; its wait superseded by ADR-075 |
 | ADR-072 | A PR is reviewed against main's spec, by the pr-reviewer agent | Accepted 2026-11-14 |
 | ADR-073 | Role names are unique by the name key | Accepted 2026-11-14 |
+| ADR-074 | The site guard refuses malformed ids; a receipt with no restaurant is its commissary's | Accepted 2026-11-14 |
+| ADR-075 | cubic is optional; late findings are swept up after merge | Accepted 2026-11-14 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

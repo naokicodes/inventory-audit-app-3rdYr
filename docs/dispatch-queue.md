@@ -70,6 +70,10 @@ is. Read the step's own section in `session-status.md` before starting.
 > busy-timeout, loyverse-fc, #63 (3zb), table-scroll, 3zw staff-meal-settings, side-items, 3l
 > user-id-authorship, side-sheets. Tag beta-2 after #61, #65 and #59 merge (smoke list first,
 > ADR-039).
+> **2026-11-14 (after #59):** PRs #61, #65, #59 merged; beta-2 is due (smoke list first). Order:
+> busy-timeout; 3l user-id-authorship; 3zj role-assignments; loyverse-fc, #63 (3zb) and
+> table-scroll together when Naoki can phone-check; 3zw staff-meal-settings; side-items; then
+> cost-guard, 3zx staff-meal-log, side-sheets, 3zs, 3zk, 3zd. Schema steps one at a time.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -135,9 +139,11 @@ migration -> sequences with other schema/migration steps. Full spec: session-sta
 "Step user-id-authorship".
 
 ### 3m. Step site-filter - query-layer site scoping enforcement  [blocked: blind-count]
+**CLOSED 2026-11-14, PR #59 (`8f0fd61`).**
 Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/index.js, server/db/siteAccess.js
 **2026-11-01:** goes through one canUseSite() helper (A6) - see the spec's added note.
 **2026-11-11:** issue #60 answered: meat ids and body rows are checked; /stock-receipts/meats leaves the guard (ADR-043). See the spec.
+**2026-11-14:** issue #68 answered (ADR-074): malformed ids get 400; a receipt with no restaurant is its commissary's. See the spec.
 requireSiteAccess middleware: checker scoped to memberships (siteAccess.js), management/admin/
 super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped routes; park
 ambiguous ones. Full spec: session-status.md -> "Step site-filter".

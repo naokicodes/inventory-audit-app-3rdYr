@@ -23,6 +23,13 @@ For each PR: `gh pr view <n> --comments`, `gh pr checks <n>`,
 `gh pr diff <n> --name-only`. Find its step id (the `(<step-id>)` in its title)
 and that step's spec in `docs/session-status.md`.
 
+Late cubic findings (ADR-075): `gh pr list --state merged --limit 30 --json number,title,mergedAt`,
+keep the PRs merged in the last 7 days, and for each read cubic's inline findings with their
+`created_at` (`gh api "repos/{owner}/{repo}/pulls/<n>/comments" --jq '.[] | select(.user.login |
+test("cubic")) | {path, line, created_at, body}'`) plus its review summaries in
+`gh pr view <n> --comments`. Keep the findings posted after `mergedAt`, and the ones the PR's
+`cubic on <hash>` comment does not mention.
+
 ## 3. Use existing evidence before doing new work
 
 A PR's comments may already hold its gates: a review draft from
@@ -84,6 +91,11 @@ Needs a decision: n · Needs a fix: n · Needs a phone check: n · Blocked: n ·
 
 ## In progress
 - <step-id> - <who> - since <date>
+
+## Late cubic findings (merged PRs, last 7 days)
+- PR #<n> (<step-id>), merged <date> - `<file>:<line>` - <the finding in one sentence> - posted
+  after the merge | not sorted by the builder
+(or "None.")
 ```
 
 Rules for the report: plain words, decisions first. Copy questions and readings

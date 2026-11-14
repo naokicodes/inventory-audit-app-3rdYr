@@ -132,9 +132,26 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-073; the index, and a map from handoff item numbers to records, is in
+to ADR-075; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, cubic optional) - decided (recorded: ADR-075)
+
+- **cubic is optional (ADR-075).** `/naoki-qs` never waits for cubic and sorts whatever it has
+  posted; `/naoki-qpr` lists cubic findings that arrived after a merge (last 7 days) for the
+  architect. Supersedes ADR-071's wait.
+- **Order after PR #59 (site-filter) merged:** busy-timeout, then the identity chain 3l
+  user-id-authorship -> 3zj role-assignments (it unblocks cost-guard, staff-meal-log, roles-page,
+  site-filter-ii and the roster); loyverse-fc, #63 and table-scroll when Naoki can phone-check;
+  then 3zw staff-meal-settings and side-items (schema steps one at a time).
+
+### 2026-11-14 architect (A0, #68) - decided (recorded: ADR-074)
+
+- **Site guard (ADR-074, issue #68).** A scoped id that is present must be one whole number above 0,
+  else 400 before the route runs (it closed a hole where "abc" or a repeated id read as "no
+  filter"). A stock receipt with no restaurant belongs to its commissary (admins only if it has
+  none). PR #59 changes to match.
 
 ### 2026-11-14 architect (A0, #67) - decided (recorded: ADR-073)
 
@@ -1939,6 +1956,7 @@ carrying created_by (+ tests). Server-only, no click-through. Big migration -> s
 other schema/migration steps (24d-i, users-roles, user-sites).
 
 ## Step site-filter - query-layer site scoping enforcement (slice 5)
+**CLOSED 2026-11-14, PR #59 (`8f0fd61`).**
 
 Multi-user slice 5. The scoping teeth: a checker sees only their sites; management / admin /
 super-admin see all. DEPENDS ON stub-login (req.user) + user-sites (siteAccess.js).
@@ -2002,6 +2020,23 @@ text above.
 - Tests gain: a meat id from another commissary gets 403 on each of the three GETs; a body row from
   another commissary refuses the save and writes nothing; /stock-receipts/meats answers a logged-in
   checker for any restaurant. PR #59 changes to match.
+
+**Decisions 2026-11-14 (issue #68, Naoki; ADR-074).** These override any reading of the text above.
+- **Malformed ids.** Every id the guard reads (query string, body, rows[], :id) that is present and
+  not empty must be one whole number above 0: a JSON integer or a string of digits only. Anything
+  else ("abc", "1abc", "1.5", 0, a negative, the field given twice) gets 400 { error: "<field> must
+  be one whole number" } before the route runs, logged in or not. This replaces "an id that finds
+  no site (missing row, bad input) passes through" for malformed input only: a well-formed id that
+  finds no row still passes through to the route's 404.
+- **A receipt with no restaurant** (the retired "Unallocated" commissary receipt): its site is the
+  commissary of its commissary_meat_id, so PATCH and DELETE /stock-receipts/:id check that
+  commissary. siteCodeFor('stock_receipt') falls back to it when restaurant_id is NULL. With no
+  commissary_meat_id either: admins only (403 for everyone else, logged out included).
+- Tests gain: `?commissary_meat_id=abc`, `?commissary_id=1abc` and a repeated commissary_id each get
+  400 on the three commissary GETs; a malformed rows[].commissary_meat_id refuses the save with 400
+  and writes nothing; a missing or empty id still passes; a checker of commissary B gets 403 editing
+  or deleting A's no-restaurant receipt and passes for B's own; a receipt with neither restaurant
+  nor commissary is admin-only. PR #59 changes to match, in its own files.
 
 ## Step autopilot-runner - runner lock, run log, pause switch, review drafts
 **CLOSED 2026-10-13, PR #25 (`1cf1c2a`).**
