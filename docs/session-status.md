@@ -2909,6 +2909,7 @@ Touches: server/db/schema.sql, server/engines/allocationRequests.js (new) + its 
 server/routes/allocations.js, public/daily-audit.html. PUBLIC -> click-through before merge.
 
 ## Step self-host-font - serve Archivo from the app, not from Google (A4)
+**CLOSED 2026-11-14, PR #63 (`8ed243e`).**
 
 Decided 2026-10-25 (handoff 58). On the restaurant Wi-Fi every page waits on
 fonts.googleapis.com because style.css @imports it. Archivo is OFL-licensed.

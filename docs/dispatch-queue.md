@@ -247,6 +247,7 @@ session-status.md -> "Step blind-count".
 **2026-11-01:** isBlind(user, siteCode) and canOrderRecount(user, siteCode) - see the spec's added note.
 
 ### 3zb. Step self-host-font - serve Archivo from the app  [runnable]
+**CLOSED 2026-11-14, PR #63 (`8ed243e`).**
 Touches: public/style.css, public/fonts/
 Pages stop waiting on Google Fonts over the restaurant Wi-Fi. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step self-host-font".
