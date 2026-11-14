@@ -204,6 +204,7 @@
       }
 
       document.getElementById('allocations-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead>
             <tr>
@@ -213,6 +214,7 @@
           </thead>
           <tbody>${rows.map(renderRow).join('')}</tbody>
         </table>
+        </div>
       `;
     }
 

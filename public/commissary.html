@@ -294,6 +294,7 @@
         return;
       }
       el.innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead>
             <tr><th>Meat</th><th>Beginning</th><th>Physical count</th><th>Notes</th><th>Status</th></tr>
@@ -308,6 +309,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
         <button id="save-counts">Save counts</button>
       `;
       document.getElementById('save-counts').addEventListener('click', saveCounts);
@@ -485,12 +487,14 @@
       }
 
       el.innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead>
             <tr><th>Date</th><th>Source meat</th><th>Kind</th><th>Quantity</th><th>Destination</th><th>Notes</th><th></th></tr>
           </thead>
           <tbody>${lastAdjustmentRows.map(renderAdjustmentRow).join('')}</tbody>
         </table>
+        </div>
       `;
 
       document.querySelectorAll('#adjustments-table .adj-edit-btn').forEach(btn => {

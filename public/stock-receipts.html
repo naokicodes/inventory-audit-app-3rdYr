@@ -233,6 +233,7 @@
       }
 
       document.getElementById('receipts-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead>
             <tr>
@@ -242,6 +243,7 @@
           </thead>
           <tbody>${lastRows.map(renderRow).join('')}</tbody>
         </table>
+        </div>
       `;
 
       attachRowHandlers();
