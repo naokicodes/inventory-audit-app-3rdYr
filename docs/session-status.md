@@ -132,9 +132,17 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-071; the index, and a map from handoff item numbers to records, is in
+to ADR-072; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, review fix) - decided (recorded: ADR-072)
+
+- **Reviews read main's spec (ADR-072).** The builder and pr-reviewer read the spec, the queue
+  entry and the ADRs from `origin/main`, never the PR branch. `/naoki-qs` updates a PR from main
+  before its review and first builds any decision block newer than the PR (PRs #59 and #65).
+  The reviewer fails Purpose when a newer block is missing. The review runs as `pr-reviewer`, never
+  general-purpose (fallback: general-purpose on `sonnet`, told to follow main's pr-reviewer.md).
 
 ### 2026-11-14 architect (A0, later) - decided (recorded: ADR-071)
 

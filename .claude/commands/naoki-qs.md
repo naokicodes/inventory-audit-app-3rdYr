@@ -101,7 +101,8 @@ skipped list), then keep going without a checkpoint.
 **One subagent only.** The only subagent this command runs is section 5's `pr-reviewer`. Build
 it yourself: do not hand searching or planning to Explore, Plan or general-purpose subagents, each
 of which starts from scratch and re-reads the docs. Read the step's own section, never the whole
-file: `awk '/^## Step <step-id> -/{f=1;print;next} /^## /{f=0} f' docs/session-status.md`. For "who
+file, and always from `origin/main` (ADR-072; the branch's copy can be older than the newest decision
+block): `git show origin/main:docs/session-status.md | awk '/^## Step <step-id> -/{f=1;print;next} /^## /{f=0} f'`. For "who
 calls this", use `graphify query` or grep.
 
 On the claimed branch, follow `start.md` sections 4 and 5, then `/continue` (the
@@ -113,11 +114,19 @@ commands say, comment on the draft that it is parked, merge nothing, and report.
 
 ## 5. Independent check (this replaces a person reading the code)
 
-Run the **`pr-reviewer` subagent** (`.claude/agents/pr-reviewer.md`), giving it only the
-PR number. It must not see your build reasoning. Its reply is the review. If that subagent is not
-available (a session opened before it existed: quit and reopen Claude Code), do the review
-yourself by following that file's sections 1 to 5, reading `gh pr diff <n>` cold, as if someone
-else wrote it.
+**First, bring the PR up to date (ADR-072).** `git fetch origin`. If the branch is behind
+`origin/main`, run `gh pr update-branch <n>` (a merge, never a rebase) and check the branch out
+again; a conflict stops the run: report it, never resolve one unattended. Then read the step's spec
+from `origin/main` (section 4's command). A decision block in it (`**Decisions <date>` or
+`**Added <date>`) dated on or after the PR's newest commit that is not a merge means the PR lacks
+those changes: build them on this branch as section 4 does, push, then review.
+
+Run the review with the Agent tool, **subagent_type `pr-reviewer`**, giving it only the PR number.
+Never another type: general-purpose and the rest run on this session's model and re-read the docs
+(ADR-072). It must not see your build reasoning. Its reply is the review. If `pr-reviewer` is not
+in your agent list, use subagent_type `general-purpose` with model `sonnet` and only this prompt:
+"Follow `git show origin/main:.claude/agents/pr-reviewer.md` exactly (sections 1 to 5, or 1 and 6
+for a re-check). PR <n>." and say in the report that the fallback ran.
 
 All of these must hold:
 - every mechanical check in the review is PASS;
