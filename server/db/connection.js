@@ -12,7 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 const { resolveDbPath } = require('./dbPath.js');
-const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateYieldLogMiscutWeightColumn, migrateCommissaryAdjustmentsTable, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns } = require('./migrate.js');
+const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, migrateConversionColumns, migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateYieldLogOutputMeatColumn, migrateYieldLogInputQuantityColumn, migrateYieldLogMiscutWeightColumn, migrateCommissaryAdjustmentsTable, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns, migrateCreatedByUserIdColumns } = require('./migrate.js');
 
 // Step reseed-beta-db (2026-09-27): DB_PATH env var selects the database
 // file, so Beta can run on a disposable beta.db. Unset = the live
@@ -89,6 +89,11 @@ migrateOpeningStockDateScoped(db);
 // rebuild recreates the opening tables without opening_source. See
 // server/db/migrate.js.
 migrateMonthStartRecountColumns(db);
+
+// Step user-id-authorship (2026-11-14): created_by_user_id on the ten
+// created_by tables, for a pre-existing local database. Runs last, after
+// every rebuild above. See server/db/migrate.js.
+migrateCreatedByUserIdColumns(db);
 
 // Run schema.sql on every startup. All statements use "CREATE TABLE IF
 // NOT EXISTS" and "INSERT OR IGNORE", so this is safe to re-run every

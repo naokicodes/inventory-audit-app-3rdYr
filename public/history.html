@@ -70,7 +70,7 @@
     // entry header, or timestamps that always differ between snapshots
     // for uninteresting reasons). Kept as a UI-only concern here - the
     // API returns the full row either way.
-    const SKIP_FIELDS = new Set(['id', 'created_at', 'created_by']);
+    const SKIP_FIELDS = new Set(['id', 'created_at', 'created_by', 'created_by_user_id']);
 
     function escapeHtml(str) {
       const div = document.createElement('div');

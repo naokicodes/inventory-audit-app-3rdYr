@@ -192,9 +192,9 @@ router.post('/commissary/daily-audit', (req, res) => {
   }
 
   const upsertEndingActual = db.prepare(`
-    INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity, notes, created_by)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(commissary_meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes, created_by = excluded.created_by
+    INSERT INTO commissary_ending_actual (commissary_meat_id, business_date, quantity, notes, created_by, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(commissary_meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes, created_by = excluded.created_by, created_by_user_id = excluded.created_by_user_id
   `);
 
   let saved = 0;
@@ -205,7 +205,7 @@ router.post('/commissary/daily-audit', (req, res) => {
         refused.push(row.commissary_meat_id);
         continue;
       }
-      upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), row.notes || null, actor || null);
+      upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), row.notes || null, actor || null, req.user?.id ?? null);
     }
     saved++;
   }
@@ -372,9 +372,9 @@ router.post('/commissary/shipments', (req, res) => {
   try {
     const shipmentId = withTransaction(db, () => {
       const shipmentResult = db.prepare(`
-        INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(commissary_meat_id, restaurant_id, business_date, Number(total_quantity), notes || null, actor || null);
+        INSERT INTO commissary_shipments (commissary_meat_id, restaurant_id, business_date, total_quantity, notes, created_by, created_by_user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(commissary_meat_id, restaurant_id, business_date, Number(total_quantity), notes || null, actor || null, req.user?.id ?? null);
 
       const newShipmentId = shipmentResult.lastInsertRowid;
 
@@ -388,9 +388,9 @@ router.post('/commissary/shipments', (req, res) => {
         // COMMISSARY receipt (POST /api/stock-receipts) - destination-side
         // mechanics are unchanged, not reinvented here.
         const receiptResult = db.prepare(`
-          INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id, notes, created_by)
-          VALUES (?, ?, ?, ?, 'COMMISSARY', ?, ?, ?)
-        `).run(restaurant_id, line.meat_id, business_date, Number(line.quantity), commissary_meat_id, notes || null, actor || null);
+          INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id, notes, created_by, created_by_user_id)
+          VALUES (?, ?, ?, ?, 'COMMISSARY', ?, ?, ?, ?)
+        `).run(restaurant_id, line.meat_id, business_date, Number(line.quantity), commissary_meat_id, notes || null, actor || null, req.user?.id ?? null);
 
         const after = getStockReceiptRow(receiptResult.lastInsertRowid);
         logActivity(db, {
@@ -791,9 +791,9 @@ router.post('/commissary/yield-log', (req, res) => {
   try {
     const id = withTransaction(db, () => {
       const result = db.prepare(`
-        INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, miscut_weight, output_commissary_meat_id, input_quantity, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), miscutWeight, outputId, inputQty, notes || null, actor || null);
+        INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out, miscut_weight, output_commissary_meat_id, input_quantity, notes, created_by, created_by_user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(commissary_meat_id, business_date, Number(raw_weight_in), Number(backed_weight_out), miscutWeight, outputId, inputQty, notes || null, actor || null, req.user?.id ?? null);
 
       const after = getYieldLogRow(result.lastInsertRowid);
       logActivity(db, {
@@ -1034,9 +1034,9 @@ router.post('/commissary/adjustments', (req, res) => {
 
   try {
     const result = db.prepare(`
-      INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity, destination_commissary_meat_id, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(commissary_meat_id, business_date, kind, Number(quantity), kind === 'ALLOCATION' ? destination_commissary_meat_id : null, notes || null, actor || null);
+      INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity, destination_commissary_meat_id, notes, created_by, created_by_user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(commissary_meat_id, business_date, kind, Number(quantity), kind === 'ALLOCATION' ? destination_commissary_meat_id : null, notes || null, actor || null, req.user?.id ?? null);
 
     res.json({ ok: true, id: result.lastInsertRowid });
   } catch (err) {

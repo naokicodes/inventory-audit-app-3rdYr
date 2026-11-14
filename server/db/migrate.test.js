@@ -10,7 +10,7 @@
 
 const { DatabaseSync } = require('node:sqlite');
 const assert = require('assert');
-const { migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns, migrateYieldLogMiscutWeightColumn } = require('./migrate.js');
+const { migrateCommissaryMultiTenant, migrateConversionStandardsMeatType, migrateOpeningStockDateScoped, migrateMonthStartRecountColumns, migrateYieldLogMiscutWeightColumn, migrateCreatedByUserIdColumns, CREATED_BY_USER_ID_TABLES } = require('./migrate.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -641,6 +641,47 @@ test('running the migration twice is idempotent - the second run is a no-op, row
   assert.deepStrictEqual(migrateYieldLogMiscutWeightColumn(db), { ran: false });
   assert.strictEqual(db.prepare(`SELECT miscut_weight FROM commissary_yield_log WHERE id = 1`).get().miscut_weight, 1.5);
   assert.strictEqual(db.prepare(`SELECT COUNT(*) AS n FROM commissary_yield_log`).get().n, 2);
+});
+
+console.log('\nMigration Tests: migrateCreatedByUserIdColumns (step user-id-authorship)\n');
+
+// The ten created_by tables in a minimal pre-step shape: created_by but no
+// created_by_user_id, one row each.
+function makePreAuthorshipDb() {
+  const db = new DatabaseSync(':memory:');
+  db.exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
+  for (const t of CREATED_BY_USER_ID_TABLES) {
+    db.exec(`CREATE TABLE ${t} (id INTEGER PRIMARY KEY, quantity REAL, created_by TEXT)`);
+    db.prepare(`INSERT INTO ${t} (quantity, created_by) VALUES (7, 'old name')`).run();
+  }
+  return db;
+}
+
+test('fresh install (no tables yet) is a no-op', () => {
+  assert.deepStrictEqual(migrateCreatedByUserIdColumns(new DatabaseSync(':memory:')), { added: [] });
+});
+
+test('adds created_by_user_id (FK users, nullable) to all ten tables, keeping rows', () => {
+  const db = makePreAuthorshipDb();
+  assert.deepStrictEqual(migrateCreatedByUserIdColumns(db).added, CREATED_BY_USER_ID_TABLES);
+  for (const t of CREATED_BY_USER_ID_TABLES) {
+    const col = db.prepare(`PRAGMA table_info(${t})`).all().find(c => c.name === 'created_by_user_id');
+    assert.ok(col, `${t} has the column`);
+    assert.strictEqual(col.notnull, 0, `${t}.created_by_user_id is nullable`);
+    const fk = db.prepare(`PRAGMA foreign_key_list(${t})`).all().find(f => f.from === 'created_by_user_id');
+    assert.strictEqual(fk && fk.table, 'users', `${t}.created_by_user_id references users`);
+    assert.deepStrictEqual({ ...db.prepare(`SELECT quantity, created_by, created_by_user_id FROM ${t}`).get() },
+      { quantity: 7, created_by: 'old name', created_by_user_id: null }, `${t} row kept, no backfill`);
+  }
+});
+
+test('running it twice is idempotent - second run adds nothing, rows unchanged', () => {
+  const db = makePreAuthorshipDb();
+  migrateCreatedByUserIdColumns(db);
+  assert.deepStrictEqual(migrateCreatedByUserIdColumns(db), { added: [] });
+  for (const t of CREATED_BY_USER_ID_TABLES) {
+    assert.strictEqual(db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n, 1);
+  }
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
