@@ -3956,6 +3956,7 @@ server/routes/staffMeals.js, server/routes/staffMeals.test.js, public/staff-meal
 public/index.html. PUBLIC -> click-through before merge.
 
 ## Step busy-timeout - SQLite waits for a lock instead of failing at once (A0)
+$L
 
 Decided 2026-11-14 (the 2026-09-15 plan's `busy_timeout`; ADR-070). DEPENDS ON nothing. Runnable
 now.
