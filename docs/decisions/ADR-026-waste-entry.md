@@ -1,6 +1,6 @@
 # ADR-026 Waste is its own entry
 
-- Status: Accepted 2026-10-25
+- Status: Accepted 2026-10-25; superseded in part by ADR-064 (side waste after endings)
 - Decided by: Naoki
 - Supersedes: none
 

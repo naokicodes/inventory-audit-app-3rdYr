@@ -48,6 +48,8 @@ Both:
   - Pizza is the last side sheet to build. First, a skeleton: the pizzaman
     sees pizzas sold (from Loyverse) on their sheet during testing.
 - Queue item A11.
+- 2026-11-14 (ADR-065, ADR-066): FC's pizza stays on paper; FC's pizzaman reads pizza sales on
+  Kitchen Sales (FC side) and writes them down.
 
 ## Open questions
 - Whose stock is the shared station's (Silingan's, like the kitchen, with

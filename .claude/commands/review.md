@@ -7,6 +7,9 @@ architect. **Do NOT approve, merge, request changes, or post anything.** Approva
 is a human act the architect performs after reading — this command only prepares
 the review.
 
+The `pr-reviewer` subagent (`.claude/agents/pr-reviewer.md`) is the narrow, read-only version of
+sections 1 to 4 that `/naoki-qs` and `/naoki-qpr` run. Change both together.
+
 ## 1. Get the PR branch and confirm it independently
 
 ```
@@ -17,8 +20,9 @@ npm run verify
 ```
 
 Run `verify` yourself — do NOT trust the verify output pasted in the PR body.
-Paste the real result. If it is not `SUITE GREEN` and `AUDIT CLEAN`, that is the
-headline finding; say so and stop the checks there.
+Paste only its summary lines (the `N files, X passed, Y failed` line, `SUITE GREEN` or the
+failing tests, and `AUDIT CLEAN` or the audit's findings), never the whole log. If it is not
+`SUITE GREEN` and `AUDIT CLEAN`, that is the headline finding; say so and stop the checks there.
 
 ## 2. Read the diff against main
 
@@ -29,6 +33,12 @@ git diff origin/main...HEAD
 Summarize in plain terms: which files changed, and what the change actually does.
 
 ## 3. Mechanical checks — report each as PASS/FAIL with the evidence
+
+Read the spec narrowly. Find the step's own section with
+`grep -n "^## Step <step-id> -" docs/session-status.md` and read from that line to the next
+`## ` heading. Read "Things NOT to re-litigate" the same way
+(`grep -n "^## Things NOT to re-litigate" docs/session-status.md`). Read no other part of
+session-status.md, and only the step's own entry in docs/dispatch-queue.md.
 
 - **Diff matches the stated purpose.** Does the code do what the PR title, commit
   message, and the step's `session-status.md` spec claim — no more, no less? A

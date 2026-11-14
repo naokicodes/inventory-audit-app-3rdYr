@@ -1,6 +1,6 @@
 # Kitchen veggies
 
-Status: IRL Confirmed (Silingan, FC) - FLOW Drafted - APP Decided
+Status: IRL Confirmed (Silingan, FC) - FLOW Drafted - APP Specced (side-items, side-sheets)
 
 ## IRL - how it works today
 Sheet "Inventory Form Kitchen - VEG/SPICES" at Silingan and FC (source: photos
@@ -37,4 +37,6 @@ Sheet "Inventory Form Kitchen - VEG/SPICES" at Silingan and FC (source: photos
   conversions, any-unit entry, fractions (17); usage = begin + received - end;
   COOKED / INHOUSE / WASTE shown from their own entries (handoff 38).
 - From the paper: "peso value" as a unit; one-tap "out of stock".
-- Not specced. Queue item A8.
+- Specced 2026-11-14: side-items (ADR-062: one catalog imported from the settings workbook)
+  and side-sheets (ADR-063: Used shows while the ending is typed; COOKED = usage less waste and
+  in-house). Planned: side-waste (ADR-064: a "Waste today?" screen after endings).

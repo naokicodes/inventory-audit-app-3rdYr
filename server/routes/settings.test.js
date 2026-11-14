@@ -443,5 +443,120 @@ test('restaurant meats: the same default / set / keep-when-omitted / clear behav
   assert.strictEqual(flag(), 0);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+// ---------- Step settings-guard (ADR-042): writes need an admin ----------
+// The real settings router and currentUser over HTTP on an ephemeral port,
+// against a throwaway DB file (DB_PATH set before the connection opens) - the
+// same harness as auth.test.js. The mirror tests above need no login: they
+// call SQL directly, not the HTTP layer.
+console.log('\nSettings Route Tests (settings-guard)\n');
+
+const os = require('os');
+const express = require('express');
+const GUARD_DB = path.join(os.tmpdir(), `settings-guard-test-${process.pid}.db`);
+process.env.DB_PATH = GUARD_DB;
+const liveDb = require('../db/connection.js');
+const { currentUser } = require('./auth.js');
+const settingsRouter = require('./settings.js');
+
+const roleUser = (name, flags) => {
+  const role = Number(liveDb.prepare(
+    'INSERT INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only) VALUES (?, ?, ?, ?, ?)'
+  ).run(name, ...flags).lastInsertRowid);
+  return Number(liveDb.prepare('INSERT INTO users (name, default_role_id) VALUES (?, ?)').run(`U ${name}`, role).lastInsertRowid);
+};
+// Flags as seed.js gives each role: can_enter_counts, can_finalize, can_admin, read_only.
+const users = {
+  'super-admin': roleUser('super-admin', [1, 1, 1, 0]),
+  admin: roleUser('admin', [1, 1, 1, 0]),
+  management: roleUser('management', [0, 0, 0, 1]),
+  'head-chef': roleUser('head-chef', [1, 1, 0, 0]),
+  checker: roleUser('checker', [1, 0, 0, 0]),
+};
+
+const app = express();
+app.use(express.json());
+app.use('/api', currentUser);
+app.use('/api', settingsRouter);
+// Stands in for the routers mounted after settings: reached only if the guard lets it through.
+app.post('/api/stock-receipts', (req, res) => res.json({ ok: true }));
+
+let base;
+const call = (method, url, as, body = {}) => fetch(base + url, {
+  method,
+  headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: `user_id=${users[as]}` } : {}) },
+  body: method === 'GET' ? undefined : JSON.stringify(body),
+});
+
+// One write per Settings resource (ids need not exist: the guard runs first).
+const WRITES = [
+  ['POST', '/api/settings/restaurants'], ['PUT', '/api/settings/commissaries/1'],
+  ['POST', '/api/settings/meat-types'], ['POST', '/api/settings/commissary-meats'],
+  ['POST', '/api/settings/meats'], ['POST', '/api/settings/dishes'],
+  ['POST', '/api/settings/recipes'], ['DELETE', '/api/settings/recipes/1'],
+  ['PUT', '/api/settings/adjustment-types/1'], ['POST', '/api/settings/locations'],
+];
+const READS = ['restaurants', 'commissaries', 'meat-types', 'commissary-meats?commissary_id=1',
+  'meats?restaurant_id=1', 'dishes?restaurant_id=1', 'recipes?restaurant_id=1', 'adjustment-types',
+  'locations'].map(r => `/api/settings/${r}`);
+
+const httpTests = [];
+const httpTest = (name, fn) => httpTests.push({ name, fn });
+
+httpTest('logged out: every Settings write -> 401 "Log in first"', async () => {
+  for (const [m, url] of WRITES) {
+    const res = await call(m, url, null);
+    assert.strictEqual(res.status, 401, `${m} ${url}`);
+    assert.deepStrictEqual(await res.json(), { error: 'Log in first' });
+  }
+});
+
+httpTest('checker, head-chef and management: every Settings write -> 403', async () => {
+  for (const as of ['checker', 'head-chef', 'management']) {
+    for (const [m, url] of WRITES) {
+      const res = await call(m, url, as);
+      assert.strictEqual(res.status, 403, `${as} ${m} ${url}`);
+      assert.deepStrictEqual(await res.json(), { error: 'Only an admin can change settings' });
+    }
+  }
+});
+
+httpTest('admin and super-admin pass the guard and the write lands', async () => {
+  for (const as of ['admin', 'super-admin']) {
+    for (const [m, url] of WRITES) {
+      const res = await call(m, url, as);
+      assert.ok(![401, 403].includes(res.status), `${as} ${m} ${url} got ${res.status}`);
+    }
+    const code = as === 'admin' ? 'GA' : 'GS';
+    const res = await call('POST', '/api/settings/restaurants', as, { name: `Guard ${code}`, code });
+    assert.strictEqual(res.status, 200, as);
+  }
+  assert.strictEqual(liveDb.prepare(`SELECT COUNT(*) AS n FROM restaurants WHERE code IN ('GA', 'GS')`).get().n, 2);
+});
+
+httpTest('logged out: every Settings GET still answers 200', async () => {
+  for (const url of READS) assert.strictEqual((await call('GET', url, null)).status, 200, url);
+});
+
+httpTest('a write outside Settings (POST /stock-receipts) is not caught by the guard', async () => {
+  assert.strictEqual((await call('POST', '/api/stock-receipts', null)).status, 200);
+});
+
+const server = app.listen(0, async () => {
+  base = `http://localhost:${server.address().port}`;
+  for (const { name, fn } of httpTests) {
+    try {
+      await fn();
+      console.log(`  PASS: ${name}`);
+      passed++;
+    } catch (err) {
+      console.log(`  FAIL: ${name}`);
+      console.log(`    ${err.message}`);
+      failed++;
+    }
+  }
+  server.close();
+  liveDb.close();
+  for (const f of [GUARD_DB, `${GUARD_DB}-wal`, `${GUARD_DB}-shm`]) fs.rmSync(f, { force: true });
+  console.log(`\n${passed} passed, ${failed} failed`);
+  process.exit(failed > 0 ? 1 : 0);
+});

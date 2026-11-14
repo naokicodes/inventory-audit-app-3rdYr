@@ -3,6 +3,7 @@
 - Status: Accepted 2026-10-20 (the check below was answered 2026-10-22: see ADR-027)
 - Decided by: Naoki
 - Supersedes: none
+- Superseded by: ADR-046 (the Sides line, for staff meals, until the item lists exist)
 
 ## Context
 

@@ -30,9 +30,14 @@ A PR's comments may already hold its gates: a review draft from
 line, a `Click-through: <hash> ...` line. Evidence counts only if it names the
 PR's **current** head commit; older evidence is listed as "out of date".
 
-Only for a non-draft PR with no current review evidence: run
-`.claude/commands/review.md` sections 1 to 4 in a **subagent with a fresh
-context**, one per PR. At most 5 new reviews per run, oldest PR first; list the
+cubic's findings (ADR-071): a `cubic on <hash>` comment naming the current head means they were
+sorted by the builder; list only its Contradicts and Not-in-this-step clauses. Otherwise list
+cubic's open findings as "not sorted yet". Neither puts a PR in "Needs a fix" by itself.
+
+Only for a non-draft PR with no current review evidence: run the
+`pr-reviewer` subagent (Agent tool, subagent_type `pr-reviewer`, never another type; the
+fallback is the one in `naoki-qs.md` section 5), one per PR, giving it only
+the PR number. At most 5 new reviews per run, oldest PR first; list the
 rest as "not reviewed yet, run again". Draft PRs are claims by a running
 `/naoki-qs`: never review them.
 

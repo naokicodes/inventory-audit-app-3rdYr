@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node server/index.js",
     "reseed": "node server/db/seed.js --reset",
+    "seed:test": "node scripts/seed-test-accounts.js",
+    "import:settings": "node scripts/import-settings.js",
     "test":"node scripts/run-tests.js",
     "audit:write-paths": "node scripts/audit-write-paths.js",
     "loyverse:matches": "node scripts/loyverse-matches.js",

@@ -231,11 +231,21 @@ console.log(`Roles: ${rolesInserted} inserted (of ${roles.length})`);
 
 // "superadmin" is a break-glass/bootstrap login, not a real person's name -
 // real names enter only via the off-repo workbook at import (#19, #22).
+// Inserted only when NO user holds the super-admin role: the import renames
+// this user to the workbook owner, and a later plain seed run must not add a
+// second super-admin next to the renamed one (import-identity, 2026-10-13).
 const superAdminRoleId = db.prepare(`SELECT id FROM roles WHERE name = 'super-admin'`).get().id;
-const userResult = db.prepare(
+const hasSuperAdmin = db.prepare('SELECT 1 FROM users WHERE default_role_id = ?').get(superAdminRoleId) !== undefined;
+const userResult = hasSuperAdmin ? { changes: 0 } : db.prepare(
   'INSERT OR IGNORE INTO users (name, default_role_id, active) VALUES (?, ?, 1)'
 ).run('superadmin', superAdminRoleId);
 console.log(`Users: ${userResult.changes} inserted (bootstrap super-admin)`);
+
+// 7. Sheet definitions (step sheets-tier1): one MEAT "Landing" per restaurant
+// and one MEAT "Commi" per commissary. No SIDE rows here - those arrive with
+// the sides slice or the workbook import.
+const { ensureDefaultSheets } = require('../engines/sheetDefinitions.js');
+console.log(`Sheet definitions: ${ensureDefaultSheets(db).inserted} inserted`);
 
 // A reset must end on a consistent file: any dangling reference means the
 // clear or the reseed went wrong, so fail loudly rather than hand Beta a

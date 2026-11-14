@@ -9,6 +9,8 @@ conversation (`/clear` first).
 repo. The only file you write is the report, and it goes outside the repo so it
 can never be committed.
 
+Quote only text you read in a file or an issue during this run; never reconstruct a quote.
+
 ## 1. Ground
 
 `git fetch origin` and note `main`'s short hash. Read `docs/dispatch-queue.md`
@@ -37,6 +39,10 @@ For each issue: `gh issue view <n> --comments`. Note any PR or step it names.
   number** (a count, balance, variance, yield or peso figure is wrong),
   **stops work** (someone can't finish their task), **looks wrong** (everything
   else).
+  Then find the queue step for it: `grep -n "#<n>" docs/dispatch-queue.md`. A step that has a
+  `## Step <step-id> -` section in `docs/session-status.md` is specced: give its id and its tag
+  (runnable, blocked or CLOSED). Write "not specced" only after that check finds nothing; a line
+  under a "Planned" heading is not a spec.
 - **Probably stale**: the step it names is CLOSED in `dispatch-queue.md` or its
   PR is merged. Say why in one line; do not close it.
 - **Other**: one line each.
