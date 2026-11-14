@@ -138,6 +138,7 @@ migration -> sequences with other schema/migration steps. Full spec: session-sta
 Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/index.js, server/db/siteAccess.js
 **2026-11-01:** goes through one canUseSite() helper (A6) - see the spec's added note.
 **2026-11-11:** issue #60 answered: meat ids and body rows are checked; /stock-receipts/meats leaves the guard (ADR-043). See the spec.
+**2026-11-14:** issue #68 answered (ADR-074): malformed ids get 400; a receipt with no restaurant is its commissary's. See the spec.
 requireSiteAccess middleware: checker scoped to memberships (siteAccess.js), management/admin/
 super-admin bypass; one middleware, never a per-query WHERE. Enumerate scoped routes; park
 ambiguous ones. Full spec: session-status.md -> "Step site-filter".
