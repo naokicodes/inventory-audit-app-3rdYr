@@ -132,7 +132,7 @@ enforcement yet. LEAN: plain cookie, no new dep (flag). Needs users present (imp
 dev seed). PUBLIC -> click-through. Full spec: session-status.md -> "Step stub-login".
 
 ### 3l. Step user-id-authorship - new writes carry user_id  [blocked: blind-count, then site-filter]
-$L
+**CLOSED 2026-11-14, PR #76 (`2e52542`).**
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, write routes
 **2026-11-14:** issue #77 answered (ADR-080): last saver credited, name in the old field, corrector credited; PR #76 complete as built (+ history.html, click-through).
 Add created_by_user_id (FK users) to the ~10 created_by tables; stamp it from req.user on new
