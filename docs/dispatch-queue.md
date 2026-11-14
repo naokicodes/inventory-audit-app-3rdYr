@@ -133,6 +133,7 @@ dev seed). PUBLIC -> click-through. Full spec: session-status.md -> "Step stub-l
 
 ### 3l. Step user-id-authorship - new writes carry user_id  [blocked: blind-count, then site-filter]
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, write routes
+**2026-11-14:** issue #77 answered (ADR-080): last saver credited, name in the old field, corrector credited; PR #76 complete as built (+ history.html, click-through).
 Add created_by_user_id (FK users) to the ~10 created_by tables; stamp it from req.user on new
 writes; legacy created_by retired at wipe, no backfill. Invasive (many routes), one pass. Big
 migration -> sequences with other schema/migration steps. Full spec: session-status.md ->
@@ -373,6 +374,7 @@ sheet excluded: cards). No style change. PUBLIC -> click-through. Full spec: ses
 **2026-11-14:** issue #70 answered (ADR-077): PR #69 merges as built; Settings' tab row is settings-tabs.
 
 ### Step settings-tabs - the Settings tab row scrolls in its own strip  [blocked: table-scroll]
+**CLOSED 2026-11-14, PR #75 (`2440655`).**
 Touches: public/settings.html
 Issue #70 (ADR-077): `.tabs` becomes one row that swipes sideways; the page stays still. Style
 only, page-local. PUBLIC -> click-through. Full spec: session-status.md -> "Step settings-tabs".
