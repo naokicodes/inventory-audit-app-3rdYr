@@ -28,6 +28,8 @@ const likod = insert("INSERT INTO restaurants (name, code) VALUES ('Likod T', 'S
 const comA = insert("INSERT INTO commissaries (name, code) VALUES ('Commissary T', 'SFT-COM')");
 const likodMeat = insert("INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (?, 'SFT1', 'Pork T', 'kg')", likod);
 const comMeat = insert("INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, 'SFTC', 'Beef T', 'kg', 5)", comA);
+const comB = insert("INSERT INTO commissaries (name, code) VALUES ('Commissary T2', 'SFT-COB')");
+const comBMeat = insert("INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, 'SFTD', 'Chicken T', 'kg', 5)", comB);
 const likodReceipt = insert("INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source) VALUES (?, ?, '2026-11-01', 3, 'DIRECT')", likod, likodMeat);
 
 const role = (name, flags) => insert(
@@ -39,6 +41,7 @@ const user = (name, roleId, sites) => {
 };
 const checkerRole = role('sft-checker', [1, 0, 0, 0]);
 const ana = user('SFT Ana', checkerRole, ['SFT-SIL']);              // one restaurant
+const cora = user('SFT Cora', checkerRole, ['SFT-COM']);          // commissary A only
 const flo = user('SFT Flo', checkerRole, ['SFT-SIL', 'SFT-LIK']);   // floater
 const bypass = {
   admin: user('SFT Admin', role('sft-admin', [1, 1, 1, 0]), []),
@@ -119,6 +122,35 @@ test('a missing row id still gets 404, not 403', async () => {
 test('a two-site route (group c) is left open for site-filter-ii', async () => {
   const res = await call('GET', `/api/commissary/adjustments/destinations?commissary_meat_id=${comMeat}`, { as: ana });
   assert.notStrictEqual(res.status, 403);
+});
+
+// Decisions 2026-11-11 (issue #60).
+for (const route of ['/api/commissary/daily-audit?date=2026-11-01&', '/api/commissary/yield-log?',
+  '/api/commissary/adjustments?']) {
+  test(`Q1: a meat id from another commissary gets 403 on GET ${route.split('?')[0]}`, async () => {
+    const res = await call('GET', `${route}commissary_id=${comA}&commissary_meat_id=${comBMeat}`, { as: cora });
+    assert.strictEqual(res.status, 403);
+    assert.deepStrictEqual(await res.json(), { error: 'No access to site SFT-COB' });
+    const own = await call('GET', `${route}commissary_id=${comA}&commissary_meat_id=${comMeat}`, { as: cora });
+    assert.notStrictEqual(own.status, 403);
+  });
+}
+
+test('Q2: a body row from another commissary refuses the whole save and writes nothing', async () => {
+  const count = () => db.prepare(
+    "SELECT COUNT(*) AS n FROM commissary_ending_actual WHERE business_date = '2026-11-02'").get().n;
+  const res = await call('POST', '/api/commissary/daily-audit', { as: cora, body: {
+    commissary_id: comA, business_date: '2026-11-02',
+    rows: [{ commissary_meat_id: comMeat, ending_actual: 5 }, { commissary_meat_id: comBMeat, ending_actual: 7 }],
+  } });
+  assert.strictEqual(res.status, 403);
+  assert.deepStrictEqual(await res.json(), { error: 'No access to site SFT-COB' });
+  assert.strictEqual(count(), 0);
+});
+
+test('Q4: /stock-receipts/meats answers a logged-in checker for any restaurant', async () => {
+  const res = await call('GET', `/api/stock-receipts/meats?restaurant_id=${likod}`, { as: ana });
+  assert.strictEqual(res.status, 200);
 });
 
 const server = app.listen(0, async () => {

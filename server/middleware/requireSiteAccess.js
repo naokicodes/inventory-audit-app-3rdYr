@@ -9,6 +9,11 @@
 //   lists go to site-filter-ii (3zs); Settings to settings-guard (3zu).
 // - An id that finds no site (missing row, bad input) passes through, so
 //   the route answers 400/404 exactly as it does today.
+// Decisions 2026-11-11 (issue #60; ADR-043):
+// - Q1: a commissary_meat_id on the three commissary GETs is checked too.
+// - Q2: POST /commissary/daily-audit checks every rows[].commissary_meat_id;
+//   one refused row refuses the whole save before anything is written.
+// - Q4: /stock-receipts/meats is a catalog read, not guarded here.
 
 const express = require('express');
 const db = require('../db/connection.js');
@@ -18,19 +23,33 @@ const { canUseSite, siteCodeFor } = require('../db/siteAccess.js');
 const field = name => req => (req.method === 'GET' ? req.query : req.body || {})[name];
 const rowId = req => req.params.id;
 
-function requireSite(kind, idOf) {
+// The first site among `ids` (of one kind) the user may not use, or null.
+function refusedSite(user, kind, ids) {
+  for (const raw of ids) {
+    const id = Number(raw);
+    const code = Number.isInteger(id) && id > 0 ? siteCodeFor(db, kind, id) : null;
+    if (code !== null && !canUseSite(db, user, code, null)) return code;
+  }
+  return null;
+}
+
+function requireSites(kind, idsOf) {
   return (req, res, next) => {
     if (!req.user) return next();
-    const id = Number(idOf(req));
-    const code = Number.isInteger(id) && id > 0 ? siteCodeFor(db, kind, id) : null;
-    if (code === null || canUseSite(db, req.user, code, null)) return next();
+    const code = refusedSite(req.user, kind, idsOf(req));
+    if (code === null) return next();
     res.status(403).json({ error: `No access to site ${code}` });
   };
 }
+const requireSite = (kind, idOf) => requireSites(kind, req => [idOf(req)]);
 
 const restaurant = requireSite('restaurant', field('restaurant_id'));
 const commissary = requireSite('commissary', field('commissary_id'));
 const commissaryMeat = requireSite('commissary_meat', field('commissary_meat_id'));
+const commissaryRowMeats = requireSites('commissary_meat', req => {
+  const rows = (req.body || {}).rows;
+  return Array.isArray(rows) ? rows.map(r => (r || {}).commissary_meat_id) : [];
+});
 
 const router = express.Router();
 
@@ -40,14 +59,15 @@ router.get(['/daily-audit', '/daily-audit/mixed', '/daily-audit/month-opening',
 router.post(['/daily-audit', '/daily-audit/month-opening', '/daily-audit/month-opening/copy-all',
   '/daily-audit/portions', '/daily-audit/recount-orders'], restaurant);
 router.patch('/daily-audit/opening-stock', restaurant);
-router.get(['/stock-receipts', '/stock-receipts/meats'], restaurant);
+router.get('/stock-receipts', restaurant);
 router.post('/stock-receipts', restaurant);
 router.get('/sales', restaurant);
 router.patch('/sales', restaurant);
-router.get(['/commissary/daily-audit', '/commissary/month-opening', '/commissary/meats',
-  '/commissary/yield-log', '/commissary/adjustments'], commissary);
-router.post(['/commissary/daily-audit', '/commissary/month-opening',
-  '/commissary/month-opening/copy-all'], commissary);
+router.get(['/commissary/month-opening', '/commissary/meats'], commissary);
+router.get(['/commissary/daily-audit', '/commissary/yield-log', '/commissary/adjustments'],
+  commissary, commissaryMeat);
+router.post('/commissary/daily-audit', commissary, commissaryRowMeats);
+router.post(['/commissary/month-opening', '/commissary/month-opening/copy-all'], commissary);
 
 // (b) The site is found through a row.
 router.patch('/stock-receipts/:id', requireSite('stock_receipt', rowId));
