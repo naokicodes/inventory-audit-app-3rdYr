@@ -22,9 +22,9 @@ const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 const db = new DatabaseSync(DB_PATH);
 
-// A couple of pragmas for a shared, multi-user local SQLite file
-// (busy_timeout still to be added — see 2026-09-15 handoff §3.11):
+// A couple of pragmas for a shared, multi-user local SQLite file:
 db.exec('PRAGMA journal_mode = WAL');   // better crash-safety, minimal downside here
+db.exec('PRAGMA busy_timeout = 5000');  // Step busy-timeout: another process's lock waits up to 5s instead of failing at once
 db.exec('PRAGMA foreign_keys = ON');    // enforce FK constraints once tables exist
 
 // Step 9 (2026-08-28): one-time, idempotent migration for anyone with a
