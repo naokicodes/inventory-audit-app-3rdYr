@@ -323,7 +323,7 @@ try {
   test('a database error while resolving a site code rolls the import back', () => {
     const db = freshDb();
     db.exec('DROP TABLE commissaries');
-    assert.throws(() => importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' })));
+    assert.throws(() => importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' })), /no such table: commissaries/);
     assert.strictEqual(user(db, 'Ana'), undefined, 'the user insert was rolled back');
   });
 
