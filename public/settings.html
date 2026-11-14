@@ -256,8 +256,8 @@
         document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.section-panel').forEach(s => s.classList.remove('active'));
         btn.classList.add('active');
-        btn.scrollIntoView({ inline: 'nearest', block: 'nearest' });
         document.getElementById('section-' + btn.dataset.section).classList.add('active');
+        btn.scrollIntoView({ inline: 'nearest', block: 'nearest' });
       });
     });
 
