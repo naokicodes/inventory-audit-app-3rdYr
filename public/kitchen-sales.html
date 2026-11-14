@@ -32,6 +32,25 @@
     }
     .ks-sync { text-align: center; margin: 0 0 0.75rem; }
     #last-receipt, #synced { margin: 0.2rem 0; }
+    /* Step loyverse-fc: the POS switch - one pill, two halves, the active half
+       filled (ADR-066). 44px tall so a thumb hits it. */
+    .ks-switch {
+      display: flex; max-width: 22rem; margin: 0.75rem auto 0;
+      border: 1px solid var(--accent); border-radius: 999px; overflow: hidden;
+    }
+    .ks-switch button {
+      flex: 1; min-height: 44px; padding: 0.4rem 0.75rem;
+      border: 0; border-radius: 0; background: var(--card); color: var(--accent-ink);
+      font-weight: 600;
+    }
+    .ks-switch button[aria-pressed="true"] { background: var(--accent); color: var(--card); }
+    /* FC's side: one card per Loyverse category. */
+    .ks-card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 0.6rem 0.75rem; margin-bottom: 0.6rem;
+    }
+    .ks-card h2 { font-size: 1.1rem; margin: 0 0 0.4rem; }
+    .ks-card table { width: 100%; }
   </style>
 </head>
 <body>
@@ -51,6 +70,11 @@
 
   <h1>Kitchen Sales (Loyverse)</h1>
   <p class="ks-note">Preview - read-only, nothing is saved</p>
+
+  <div class="ks-switch" role="group" aria-label="Which POS">
+    <button type="button" id="pos-sl" aria-pressed="true">Silingan + Likod</button>
+    <button type="button" id="pos-fc" aria-pressed="false">FC</button>
+  </div>
 
   <div class="ks-bar">
     <button type="button" id="prev-btn" class="ks-arrow" aria-label="Previous day">&lsaquo;</button>
@@ -98,6 +122,13 @@
     <textarea id="copy-text" rows="8" readonly hidden></textarea>
   </div>
 
+  <!-- Step loyverse-fc: FC's side - items sold, one card per FC category. -->
+  <div id="fc-result" hidden>
+    <p id="fc-partial" class="ks-note" hidden></p>
+    <p id="fc-empty" hidden>No sales for this date.</p>
+    <div id="fc-cards"></div>
+  </div>
+
   <script>
     // Step loyverse-preview-iv: the Kitchen Sales page for
     // GET /api/loyverse/preview. The sales day turns at 8am (ADR-033), so the
@@ -123,9 +154,51 @@
     const copyBtn = document.getElementById('copy-btn');
     const copyStatus = document.getElementById('copy-status');
     const copyText = document.getElementById('copy-text');
+    const posSlBtn = document.getElementById('pos-sl');
+    const posFcBtn = document.getElementById('pos-fc');
+    const fcResultEl = document.getElementById('fc-result');
+    const fcPartialEl = document.getElementById('fc-partial');
+    const fcEmptyEl = document.getElementById('fc-empty');
+    const fcCardsEl = document.getElementById('fc-cards');
 
     let current = null;
     let selected = null;
+    let loadSeq = 0; // only the newest load may draw (switching mid-load)
+
+    // --- POS switch (Step loyverse-fc, ADR-066) ---
+    // 'silingan-likod' (left, the dish table) or 'fc' (right, FC's categories).
+    // Remembered on this phone (localStorage, in try/catch like draft-store.js)
+    // and in the address (?pos=fc), so a link opens the right side.
+    const POS_KEY = 'kitchenSales.pos';
+    function initialPos() {
+      const fromUrl = new URLSearchParams(location.search).get('pos');
+      if (fromUrl === 'fc' || fromUrl === 'silingan-likod') return fromUrl;
+      let saved = null;
+      try { saved = localStorage.getItem(POS_KEY); } catch (e) { saved = null; }
+      return saved === 'fc' ? 'fc' : 'silingan-likod';
+    }
+    let pos = initialPos();
+    // A ?pos= link also becomes this phone's remembered side.
+    try { localStorage.setItem(POS_KEY, pos); } catch (e) { /* private mode: not remembered */ }
+
+    function showPos() {
+      posSlBtn.setAttribute('aria-pressed', String(pos === 'silingan-likod'));
+      posFcBtn.setAttribute('aria-pressed', String(pos === 'fc'));
+      try {
+        const url = new URL(location.href);
+        if (pos === 'fc') url.searchParams.set('pos', 'fc');
+        else url.searchParams.delete('pos');
+        history.replaceState(null, '', url);
+      } catch (e) { /* the address just won't carry the side */ }
+    }
+
+    function setPos(next) {
+      if (next === pos) return;
+      pos = next;
+      try { localStorage.setItem(POS_KEY, pos); } catch (e) { /* private mode: not remembered */ }
+      showPos();
+      load();
+    }
 
     // --- business-date helpers (mirror the engine's 8am rule) ---
     function manilaDateOf(ms) {
@@ -177,6 +250,12 @@
 
     function failureLine(a) {
       return `${a.label} could not be fetched: ${a.error}`;
+    }
+
+    // FC's side: a missing token gets its own plain sentence.
+    function fcFailureLine(a) {
+      if (a.error === 'token not set') return `${a.label}'s Loyverse token isn't set on this PC yet`;
+      return failureLine(a);
     }
 
     function banner(text) {
@@ -238,31 +317,71 @@
       resultEl.hidden = false;
     }
 
+    // FC's side: one card per category (the engine sorts categories by name
+    // and items biggest first, and leaves 0s out).
+    function renderFc(data) {
+      bannersEl.innerHTML = '';
+      failedAccounts(data).forEach(a => banner(fcFailureLine(a)));
+
+      lastReceiptEl.textContent = lastReceiptText(data).replace('Last kitchen receipt', 'Last receipt');
+      syncedEl.textContent = syncedText(data);
+
+      const partial = data.accounts.filter(a => a.ok && a.catalogError);
+      fcPartialEl.hidden = partial.length === 0;
+      fcPartialEl.textContent = partial.length
+        ? "Loyverse's item list or categories could not be loaded, so every item is under No category."
+        : '';
+
+      const anyOk = data.accounts.some(a => a.ok);
+      fcEmptyEl.hidden = !(anyOk && data.categories.length === 0);
+      fcCardsEl.innerHTML = data.categories.map(c =>
+        `<section class="ks-card"><h2>${esc(c.name)}</h2><table><tbody>` +
+        c.items.map(i => `<tr><td>${esc(i.name)}</td><td class="num">${esc(String(i.quantity))}</td></tr>`).join('') +
+        `</tbody></table></section>`
+      ).join('');
+      fcResultEl.hidden = false;
+    }
+
     async function load() {
+      const mySeq = ++loadSeq;
+      const loadPos = pos;
       syncBtn.disabled = true;
       prevBtn.disabled = true;
       nextBtn.disabled = true;
       loadingEl.hidden = false;
       resultEl.hidden = true;
+      fcResultEl.hidden = true;
       bannersEl.innerHTML = '';
+      lastReceiptEl.textContent = '';
+      syncedEl.textContent = '';
       try {
-        const res = await fetch(`/api/loyverse/preview?date=${encodeURIComponent(selected)}`);
+        const posParam = loadPos === 'fc' ? '&pos=fc' : '';
+        const res = await fetch(`/api/loyverse/preview?date=${encodeURIComponent(selected)}${posParam}`);
         // A proxy or crash page may not be JSON: report the HTTP status, not a parse error.
         const body = await res.json().catch(() => ({}));
+        if (mySeq !== loadSeq) return; // the switch or date moved on
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-        current = body;
-        render(body);
+        if (loadPos === 'fc') {
+          current = null; // Copy as text belongs to the left side
+          renderFc(body);
+        } else {
+          current = body;
+          render(body);
+        }
       } catch (err) {
+        if (mySeq !== loadSeq) return;
         current = null;
         lastReceiptEl.textContent = '';
         syncedEl.textContent = '';
         banner(`Could not load sales: ${err.message}`);
       } finally {
-        syncBtn.disabled = false;
-        prevBtn.disabled = false;
-        // ">" stays disabled on the current business date.
-        nextBtn.disabled = selected >= currentBusinessDate();
-        loadingEl.hidden = true;
+        if (mySeq === loadSeq) {
+          syncBtn.disabled = false;
+          prevBtn.disabled = false;
+          // ">" stays disabled on the current business date.
+          nextBtn.disabled = selected >= currentBusinessDate();
+          loadingEl.hidden = true;
+        }
       }
     }
 
@@ -327,8 +446,11 @@
     });
     syncBtn.addEventListener('click', load);
     copyBtn.addEventListener('click', copy);
+    posSlBtn.addEventListener('click', () => setPos('silingan-likod'));
+    posFcBtn.addEventListener('click', () => setPos('fc'));
 
-    // Default: the current business date, loaded on open.
+    // Default: the current business date, loaded on open, on the remembered side.
+    showPos();
     setSelected(currentBusinessDate());
   </script>
 </body>

@@ -3980,6 +3980,7 @@ Touches: server/db/connection.js, server/db/connection.test.js (new), and any sc
 Server-only.
 
 ## Step loyverse-fc - FC's Loyverse account and a Silingan + Likod | FC switch (A0)
+**CLOSED 2026-11-14, PR #71 (`569a168`).**
 
 Decided 2026-11-14 (ADR-066, ADR-065). DEPENDS ON nothing open (loyverse-preview-iv is closed).
 Runnable now.
