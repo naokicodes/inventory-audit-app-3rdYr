@@ -427,6 +427,7 @@ cost-guard".
 #### Sides (A8)
 
 ### Step side-items - the side-item catalog and its import  [blocked: import-identity, settings-guard]
+**CLOSED 2026-11-14, PR #74 (`c3b1777`).**
 Touches: server/db/schema.sql, server/engines/sideItems.js, server/engines/sideItems.test.js, scripts/import-settings.js, server/db/importSettings.test.js, server/routes/sideItems.js, server/routes/sideItems.test.js, server/index.js, public/settings.html
 ADR-062: Sheets and Side items tabs through import-settings; one catalog, units and conversions;
 Settings fixes single items. PUBLIC -> click-through. Full spec: session-status.md -> "Step

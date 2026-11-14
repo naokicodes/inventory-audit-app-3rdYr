@@ -4094,6 +4094,7 @@ server/routes/sideItems.js if side-items is on main). PUBLIC -> click-through: C
 Counter RA (no costs) and Test Head Chef RA (costs); You check the looks.
 
 ## Step side-items - the side-item catalog and its import (A8)
+**CLOSED 2026-11-14, PR #74 (`c3b1777`).**
 
 Decided 2026-11-14 (ADR-062, ADR-024, ADR-022, ADR-020, ADR-047, ADR-065). DEPENDS ON
 import-identity (PR #65, scripts/import-settings.js) and settings-guard (PR #61, requireAdmin).
