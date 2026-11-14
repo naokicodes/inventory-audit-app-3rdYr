@@ -1948,7 +1948,7 @@ users-roles.
   page anyway.
 
 ## Step user-id-authorship - new writes carry user_id (slice 4b)
-$L
+**CLOSED 2026-11-14, PR #76 (`2e52542`).**
 
 Multi-user slice 4b. Forward-clean authorship: new writes stamp the logged-in user. DEPENDS ON
 stub-login (needs req.user) + users-roles.
