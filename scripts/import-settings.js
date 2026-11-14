@@ -625,7 +625,7 @@ function formatReport(report) {
   section('WARNING side rows on more than one row - all held, fix the sheet', report.sideDuplicates);
   section('WARNING side items with a different main unit - row skipped', report.unitClashes);
   section('WARNING side rows skipped', report.sideUnresolved);
-  section('WARNING side item rows disagree - stored value kept, fix the sheet', report.fieldConflicts);
+  section('WARNING side item rows disagree - stored value kept (left blank on a new item), fix the sheet', report.fieldConflicts);
   return lines.join('\n');
 }
 

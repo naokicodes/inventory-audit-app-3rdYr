@@ -233,6 +233,7 @@
     .side-sheet-tabs button.active { background: var(--ink); color: var(--card); }
     .side-item { padding: 0.6rem 0.75rem; margin-bottom: 0.5rem; }
     .side-item > button.side-item-head { all: unset; cursor: pointer; display: flex; justify-content: space-between; gap: 0.5rem; width: 100%; }
+    .side-item > button.side-item-head:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
     .side-item.off .side-item-head { color: var(--ink3); }
     .side-item-form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
     .side-item-form label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
@@ -1194,9 +1195,13 @@
       loadSideItems();
     }
 
+    // A site switched while a load is in flight: only the newest load renders.
+    let sideLoad = 0;
     async function loadSideItems() {
+      const mine = ++sideLoad;
       const res = await fetch(`/api/side-items?site=${encodeURIComponent(sideSite.value)}`);
       const body = await res.json();
+      if (mine !== sideLoad) return;
       if (!res.ok) { sideTabs.innerHTML = ''; sideList.textContent = body.error || 'Could not load side items.'; return; }
       sideSheets = body;
       if (!currentSideSheet()) sideSheetId = sideSheets.length ? sideSheets[0].id : null;
@@ -1237,7 +1242,7 @@
         <div>Conversions${i.units.length ? '' : ': none'}</div>
         ${i.units.length ? `<ul class="side-conv-list">${i.units.map(u => `
           <li><span>1 ${esc(u.unit)} = ${u.per_main} ${unit}</span>
-            <button type="button" data-act="remove-unit" data-unit="${esc(u.unit)}">Remove</button></li>`).join('')}</ul>` : ''}
+            <button type="button" data-act="remove-unit" data-unit="${esc(u.unit)}" aria-label="Remove the ${esc(u.unit)} conversion">Remove</button></li>`).join('')}</ul>` : ''}
         <label>Add a conversion (or change one: type its unit again)
           <span class="side-conv-row">
             <input data-f="conv_unit" placeholder="unit, e.g. sack" aria-label="Conversion unit">
@@ -1284,14 +1289,15 @@
     async function removeSideUnit(box, unit) {
       const msg = box.querySelector('.side-item-form .status-message');
       if (!confirm(`Remove the "${unit}" conversion? Counts already saved keep their numbers.`)) return;
-      const res = await fetch(`/api/side-items/${Number(box.dataset.id)}/units/${encodeURIComponent(unit)}`, { method: 'DELETE' });
-      const out = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      try {
+        const res = await fetch(`/api/side-items/${Number(box.dataset.id)}/units/${encodeURIComponent(unit)}`, { method: 'DELETE' });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || `Remove failed (${res.status})`);
+        await loadSideItems();
+      } catch (err) {
         msg.className = 'status-message error';
-        msg.textContent = out.error || `Remove failed (${res.status})`;
-        return;
+        msg.textContent = err.message;
       }
-      await loadSideItems();
     }
 
     sideSite.addEventListener('change', loadSideItems);
