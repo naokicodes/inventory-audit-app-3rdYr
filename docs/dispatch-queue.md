@@ -430,6 +430,7 @@ Touches: server/db/schema.sql, server/engines/sideItems.js, server/engines/sideI
 ADR-062: Sheets and Side items tabs through import-settings; one catalog, units and conversions;
 Settings fixes single items. PUBLIC -> click-through. Full spec: session-status.md -> "Step
 side-items".
+**2026-11-14:** PR #74's review questions answered (ADR-078): skipped rows change nothing, conflicts are held, item on / off, main unit fixed once it has conversions. PR #74 changes to match.
 
 ### Step side-sheets - count a side sheet; usage shows as you type  [blocked: side-items, site-filter]
 Touches: server/db/schema.sql, server/engines/sideCounts.js, server/engines/sideCounts.test.js, server/routes/sideSheets.js, server/routes/sideSheets.test.js, server/index.js, public/side-sheets.html, public/index.html

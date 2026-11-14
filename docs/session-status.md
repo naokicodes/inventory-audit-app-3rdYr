@@ -132,9 +132,16 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-077; the index, and a map from handoff item numbers to records, is in
+to ADR-078; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, PR #74) - decided (recorded: ADR-078)
+
+- **Side items import and units (ADR-078).** A skipped row changes nothing; an item's fields that
+  disagree across rows keep their stored values and are reported (no winner); the item has its own
+  on / off switch; the main unit cannot change once the item has conversions (or counts). PR #74
+  changes to match.
 
 ### 2026-11-14 architect (A0, #70 #73) - decided (recorded: ADR-076, ADR-077)
 
@@ -4166,6 +4173,26 @@ click-through. One at a time with any open PR on schema.sql or settings.html.
 Not in scope: counting (side-sheets), waste (side-waste), the bar check (bar-check), using the
 how-it's-bought tag (A9).
 
+**Decisions 2026-11-14 (PR #74 review, Naoki; ADR-078).** These override any reading of the text
+above.
+- Q1 (Reading A): a skipped SideItems row (held duplicate, unit clash, bad value) changes nothing;
+  the item's existing link on that sheet keeps its state. Only items absent from the tab for a
+  named sheet are switched off.
+- Q2 (not as built): an item's own fields (main_unit, conversions, how_bought, cost) must agree
+  across all its rows; blank = no opinion. Two different non-blank values: that field keeps its
+  stored value and the report lists "conflicting values: <item> <field>". A conversion unit with
+  two different factors is a conflict (that conversion unchanged); non-clashing conversions merge.
+  The item's links still apply.
+- Q3: Settings' item form has an on / off switch for side_items.active (off: the item leaves every
+  sheet's counting page; history stays), as the Page line says.
+- Main unit (cubic P1): PUT on an item refuses a main_unit change while the item has any
+  conversion: 409 { error: "This item has conversions. Make a new item instead." } (ADR-062).
+- The Side items section's sheet tabs follow ADR-077 (one row that scrolls sideways itself).
+- Tests gain: a skipped row leaves its link on; two rows with different costs keep the stored cost
+  and report the conflict; a conversion with two factors is unchanged and reported; the item's
+  switch hides it; a main_unit change with a conversion gets 409, without one it saves.
+- GET /api/side-items stays open: a catalog read (ADR-043), with the cost only for an admin.
+
 ## Step side-sheets - count a side sheet; usage shows as you type (A8)
 
 Decided 2026-11-14 (ADR-063, ADR-024, ADR-026, ADR-040; 2026-09-28 B3 and Q3). DEPENDS ON side-items
@@ -4230,6 +4257,9 @@ public/side-sheets.html (new), public/index.html. PUBLIC -> click-through before
 
 Not in scope: the waste screen (side-waste), the bar's exact check (bar-check), arrivals filling
 Received (A9), who counts which sheet tonight (tonight-picks).
+
+**Added 2026-11-14 (ADR-078).** The main-unit rule gains counts: PUT on a side item also refuses a
+main_unit change once the item has any side_counts row (same 409 message). Tests gain it.
 
 ## Step settings-tabs - the Settings tab row scrolls in its own strip (issue #70)
 
