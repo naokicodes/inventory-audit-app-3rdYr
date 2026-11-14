@@ -121,6 +121,7 @@ flight. (ADR-001 explains the split.)
 | ADR-076 | FC's sales side: refunds subtract, deleted items keep their category | Accepted 2026-11-14 |
 | ADR-077 | No page scrolls sideways: rows of tabs stay in their own strip | Accepted 2026-11-14 |
 | ADR-078 | Side items: a skipped row changes nothing; conflicts are held; the main unit is fixed | Accepted 2026-11-14 |
+| ADR-079 | A side-item conversion is removed only in Settings | Accepted 2026-11-14 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

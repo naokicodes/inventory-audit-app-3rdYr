@@ -132,9 +132,14 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-078; the index, and a map from handoff item numbers to records, is in
+to ADR-079; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, PR #74 conversions) - decided (recorded: ADR-079)
+
+- **Removing a conversion (ADR-079).** Only in Settings, confirmed and logged; the import never
+  removes one; past counts keep their numbers.
 
 ### 2026-11-14 architect (A0, PR #74) - decided (recorded: ADR-078)
 
@@ -4193,6 +4198,9 @@ above.
   and report the conflict; a conversion with two factors is unchanged and reported; the item's
   switch hides it; a main_unit change with a conversion gets 409, without one it saves.
 - GET /api/side-items stays open: a catalog read (ADR-043), with the cost only for an admin.
+- Removing a conversion (ADR-079): only in Settings, with a confirm and an activity_log row; the
+  import never removes one. Tests gain: a removed conversion is gone and logged; an import with the
+  conversion blank leaves it.
 
 ## Step side-sheets - count a side sheet; usage shows as you type (A8)
 
