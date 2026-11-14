@@ -22,6 +22,7 @@ read graphify-out/, and never paste a whole log.
 ## 1. Branch and verify
 
 ```
+git fetch -q origin
 gh pr view <n> --json title,headRefOid,body
 gh pr checkout <n>
 npm run verify 2>&1 | grep -E " files, |SUITE |AUDIT |not ok|FAIL"
@@ -32,12 +33,13 @@ headline finding: say so and stop.
 
 ## 2. The spec, narrowly
 
-The step id is the `(<step-id>)` in the PR title.
+The step id is the `(<step-id>)` in the PR title. Read every doc from `origin/main`, never from
+the checked-out branch: an old branch has an old spec (ADR-072).
 
 ```
-awk '/^## Step <step-id> -/{f=1;print;next} /^## /{f=0} f' docs/session-status.md
-awk '/^### .*Step <step-id> -/{f=1;print;next} /^### /{f=0} f' docs/dispatch-queue.md
-grep '^| ADR-' docs/decisions/README.md
+git show origin/main:docs/session-status.md | awk '/^## Step <step-id> -/{f=1;print;next} /^## /{f=0} f'
+git show origin/main:docs/dispatch-queue.md | awk '/^### .*Step <step-id> -/{f=1;print;next} /^### /{f=0} f'
+git show origin/main:docs/decisions/README.md | grep '^| ADR-'
 ```
 
 The first is the spec. The second gives its Touches line. The third is the index of settled
@@ -45,9 +47,10 @@ decisions, one line each. A decision block in the spec ("Decisions <date> ... Th
 reading of the text above") wins over the text above it.
 
 Settled decisions: open the ADR files the spec names, plus any whose index line covers what the
-diff changes (docs/decisions/ADR-<number>-*.md). Only if the diff touches server/engines/,
+diff changes (`git ls-tree --name-only origin/main docs/decisions/` for the names, then
+`git show origin/main:docs/decisions/<file>`). Only if the diff touches server/engines/,
 server/db/schema.sql or server/db/migrate.js, also read the older decisions that are not ADRs yet:
-`awk '/^## Things NOT to re-litigate/{f=1;print;next} /^## /{f=0} f' docs/session-status.md`.
+`git show origin/main:docs/session-status.md | awk '/^## Things NOT to re-litigate/{f=1;print;next} /^## /{f=0} f'`.
 Read nothing else from session-status.md or dispatch-queue.md.
 
 ## 3. The diff
@@ -60,7 +63,8 @@ git diff origin/main...HEAD -- . ':(exclude)package-lock.json' ':(exclude)graphi
 ## 4. Checks: one line each, PASS or FAIL, with the evidence
 
 - **Purpose:** the diff does what the spec says, no more and no less. A commit message is a
-  claim; the diff is the evidence.
+  claim; the diff is the evidence. A decision block in the spec dated on or after the PR's newest
+  non-merge commit whose changes the diff lacks: FAIL ("misses the <date> decision block").
 - **Scope:** only files on the Touches line (plus what the spec says it gains). Flag any other
   file, especially schema.sql, migrations, public/, or data-model.md,
   commissary-and-stock-receipts.md, scope.md.
