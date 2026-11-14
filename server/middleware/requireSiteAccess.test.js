@@ -124,7 +124,30 @@ test('a missing row id still gets 404, not 403', async () => {
 
 test('a two-site route (group c) is left open for site-filter-ii', async () => {
   const res = await call('GET', `/api/commissary/adjustments/destinations?commissary_meat_id=${comMeat}`, { as: ana });
-  assert.notStrictEqual(res.status, 403);
+  assert.strictEqual(res.status, 200);
+});
+
+test('every row-found kind maps to its site: yield log, adjustment, recount order', async () => {
+  const yieldRow = insert("INSERT INTO commissary_yield_log (commissary_meat_id, business_date, raw_weight_in, backed_weight_out) VALUES (?, '2026-11-01', 5, 4)", comMeat);
+  const adjRow = insert("INSERT INTO commissary_adjustments (commissary_meat_id, business_date, kind, quantity) VALUES (?, '2026-11-01', 'LOSS', 1)", comMeat);
+  const recount = insert("INSERT INTO recount_orders (restaurant_id, business_date, kind, item_id, ordered_by_user_id, assigned_user_id) VALUES (?, '2026-11-01', 'MEAT', ?, ?, ?)", likod, likodMeat, flo, flo);
+  assert.strictEqual(siteCodeFor(db, 'yield_log', yieldRow), 'SFT-COM');
+  assert.strictEqual(siteCodeFor(db, 'adjustment', adjRow), 'SFT-COM');
+  assert.strictEqual(siteCodeFor(db, 'recount_order', recount), 'SFT-LIK');
+  const refused = [
+    ['PATCH', `/api/commissary/yield-log/${yieldRow}`, bea, 'SFT-COM'],
+    ['DELETE', `/api/commissary/yield-log/${yieldRow}`, bea, 'SFT-COM'],
+    ['PATCH', `/api/commissary/adjustments/${adjRow}`, bea, 'SFT-COM'],
+    ['DELETE', `/api/commissary/adjustments/${adjRow}`, bea, 'SFT-COM'],
+    ['POST', `/api/daily-audit/recount-orders/${recount}/cancel`, ana, 'SFT-LIK'],
+  ];
+  for (const [method, url, as, code] of refused) {
+    const res = await call(method, url, { as, body: {} });
+    assert.strictEqual(res.status, 403, `${method} ${url}`);
+    assert.deepStrictEqual(await res.json(), { error: `No access to site ${code}` });
+  }
+  assert.strictEqual((await call('DELETE', `/api/commissary/yield-log/${yieldRow}`, { as: cora })).status, 200);
+  assert.strictEqual((await call('DELETE', `/api/commissary/adjustments/${adjRow}`, { as: cora })).status, 200);
 });
 
 // Decisions 2026-11-11 (issue #60).
