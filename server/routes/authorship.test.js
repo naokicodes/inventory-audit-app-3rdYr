@@ -34,6 +34,7 @@ app.use('/api', currentUser);
 app.use('/api', require('./dailyAudit.js'));
 app.use('/api', require('./stockReceipts.js'));
 app.use('/api', require('./allocations.js'));
+app.use('/api', require('./commissary.js'));
 
 let base;
 const post = async (url, loggedIn, body) => {
@@ -95,6 +96,34 @@ test('a stock receipt and an allocation saved while logged in are stamped', asyn
   });
   ok(alloc);
   assert.strictEqual(db.prepare('SELECT created_by_user_id FROM adjustments WHERE id = ?').get(alloc.body.id).created_by_user_id, userId);
+});
+
+test('a conversion saved while logged in stamps both linked adjustment rows', async () => {
+  const toMeatId = Number(db.prepare("INSERT INTO meats (restaurant_id, meat_code, name, unit) VALUES (?, 'M02', 'Chicken portion', 'unit')").run(restaurantId).lastInsertRowid);
+  db.prepare("INSERT INTO adjustment_types (name) SELECT 'Portion Conversion' WHERE NOT EXISTS (SELECT 1 FROM adjustment_types WHERE name = 'Portion Conversion')").run();
+  ok(await post('/api/allocations/conversion', true, {
+    restaurant_id: restaurantId, business_date: '2026-11-05', from_meat_id: meatId, from_quantity: 2, to_meat_id: toMeatId, to_quantity: 8
+  }));
+  const rows = db.prepare('SELECT created_by_user_id FROM adjustments WHERE meat_id IN (?, ?) AND business_date = ? AND adjustment_type_id = (SELECT id FROM adjustment_types WHERE name = ?)')
+    .all(meatId, toMeatId, '2026-11-05', 'Portion Conversion');
+  assert.deepStrictEqual(rows.map(r => r.created_by_user_id), [userId, userId]);
+});
+
+test('a commissary count is stamped, and a re-save credits the last saver (ADR-080 Q1)', async () => {
+  const comId = Number(db.prepare("INSERT INTO commissaries (code, name) VALUES ('COM-A', 'Commissary A')").run().lastInsertRowid);
+  const cMeatId = Number(db.prepare("INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, 'C01', 'Pork', 'kg', 5)").run(comId).lastInsertRowid);
+  db.prepare("INSERT INTO commissary_opening_stock (commissary_meat_id, business_date, quantity, opening_source) VALUES (?, '2026-11-01', 10, 'RECOUNT')").run(cMeatId);
+  const otherId = Number(db.prepare('INSERT INTO users (name, default_role_id) VALUES (?, ?)').run('Ben Counter', roleId).lastInsertRowid);
+  const save = async cookie => {
+    const res = await fetch(base + '/api/commissary/daily-audit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ commissary_id: comId, business_date: '2026-11-05', rows: [{ commissary_meat_id: cMeatId, ending_actual: 7 }] }),
+    });
+    assert.strictEqual(res.status, 200);
+    return db.prepare('SELECT created_by_user_id FROM commissary_ending_actual WHERE commissary_meat_id = ?').get(cMeatId).created_by_user_id;
+  };
+  assert.strictEqual(await save(`user_id=${userId}`), userId);
+  assert.strictEqual(await save(`user_id=${otherId}`), otherId);
 });
 
 test('a write while logged out leaves created_by_user_id NULL', async () => {
