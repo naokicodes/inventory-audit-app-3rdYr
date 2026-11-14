@@ -132,9 +132,16 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-075; the index, and a map from handoff item numbers to records, is in
+to ADR-077; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, #70 #73) - decided (recorded: ADR-076, ADR-077)
+
+- **FC sales side (ADR-076, #73).** Refunds subtract on FC's side (the left side follows at the real
+  port); a deleted item keeps its category; rows by item name. PR #71 complete as built.
+- **No page scrolls sideways (ADR-077, #70).** PR #69 (table-scroll) merges as built; rows of tabs
+  follow the nav's rule; new step settings-tabs fixes Settings' tab row.
 
 ### 2026-11-14 architect (A0, cubic optional) - decided (recorded: ADR-075)
 
@@ -3658,6 +3665,7 @@ as Test Counter RA, saving a setting shows "Only an admin can change settings".
   security; sign-the-cookie (3zv) signs it after write-permission.
 
 ## Step table-scroll - wide tables scroll inside their own box on a phone (issue #30)
+**CLOSED 2026-11-14, PR #69 (`6e98a93`).**
 
 Decided 2026-11-11 (issue #30; ui-conventions.md -> Tables). Runnable now. Markup only: the
 `.table-scroll` class already exists in style.css.
@@ -3685,6 +3693,10 @@ Touches: public/allocations.html, public/commissary-shipments.html, public/commi
 public/dashboard.html, public/history.html, public/sales.html, public/settings.html,
 public/stock-receipts.html. PUBLIC -> click-through before merge. One at a time with any open PR
 on these pages (settings.html: sheet-close 3zd, staff-meal-settings 3zw).
+
+**Decisions 2026-11-14 (issue #70, Naoki; ADR-077).** These override any reading of the text above.
+- Reading A: the Click-through's "the page itself never scrolls sideways" is about tables. PR #69
+  merges as built; Settings' tab row is step settings-tabs.
 
 ## Step sign-the-cookie - the login cookie carries a signature (A0 follow-up)
 
@@ -4022,6 +4034,13 @@ public/kitchen-sales.html, .env.example. PUBLIC -> click-through before merge.
 Not in scope: matching FC's items to FC's dishes for the landing's expected values (fc-dish-map,
 planned: FC's menu has changed since the app's FC dish list); FC's bar check (bar-check).
 
+**Decisions 2026-11-14 (issue #73, Naoki; ADR-076).** These override any reading of the text above.
+- Q1 (Reading A): FC's side subtracts refunds (sale 4, refund 1 shows 3). "The same ... refund
+  handling ... as previewAccount" is overridden for refunds only; the Silingan + Likod side stays as
+  today until the real Loyverse port, which subtracts refunds too.
+- Q2 (Reading A): `/items` is read with `show_deleted=true`; a deleted item keeps its old category.
+- Rows are by item name; FC sells no variants today. PR #71 is complete as built.
+
 ## Step cost-guard - unit costs need the see_costs switch (A0)
 
 Decided 2026-11-14 (ADR-060, ADR-062). DEPENDS ON role-assignments (3zj: can(), switch rows,
@@ -4210,3 +4229,25 @@ public/side-sheets.html (new), public/index.html. PUBLIC -> click-through before
 
 Not in scope: the waste screen (side-waste), the bar's exact check (bar-check), arrivals filling
 Received (A9), who counts which sheet tonight (tonight-picks).
+
+## Step settings-tabs - the Settings tab row scrolls in its own strip (issue #70)
+
+Decided 2026-11-14 (ADR-077). DEPENDS ON table-scroll (settings.html). Runnable once it merges.
+
+- public/settings.html, its page-local style only: `.tabs` stays one row (`flex-wrap: nowrap`) and
+  scrolls sideways itself (`overflow-x: auto`, `-webkit-overflow-scrolling: touch`); each tab button
+  keeps its width and text on one line (`flex: 0 0 auto; white-space: nowrap`). The active tab
+  scrolls into view when picked (`scrollIntoView({ inline: 'nearest', block: 'nearest' })`).
+- No other markup, no script change beyond the scrollIntoView line, no style.css change.
+
+Edge states: no data, so failure, partial, stale, inactive and two devices do not apply. Empty -
+not possible (the tabs are fixed).
+
+Tests: none new (style only); verify stays green.
+
+Click-through (390px): Claude checks that Settings' page width equals the viewport (scrollWidth ==
+clientWidth on the page), the tab row swipes sideways, and every tab still opens its section; You
+check the looks.
+
+Touches: public/settings.html. PUBLIC -> click-through before merge. One at a time with any open
+PR on settings.html (staff-meal-settings 3zw, side-items, sheet-close 3zd).

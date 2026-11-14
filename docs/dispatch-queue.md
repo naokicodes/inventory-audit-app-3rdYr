@@ -365,10 +365,17 @@ session-status.md -> "Step settings-guard".
 **2026-11-11:** issue #62 answered (Reading B): PR #61 is complete as built.
 
 ### Step table-scroll - wide tables scroll inside their own box on a phone  [runnable]
+**CLOSED 2026-11-14, PR #69 (`6e98a93`).**
 Touches: public/allocations.html, public/commissary-shipments.html, public/commissary.html, public/dashboard.html, public/history.html, public/sales.html, public/settings.html, public/stock-receipts.html
 Issue #30. Markup only: every table not yet inside `.table-scroll` gets the wrapper (daily-audit's
 sheet excluded: cards). No style change. PUBLIC -> click-through. Full spec: session-status.md ->
 "Step table-scroll".
+**2026-11-14:** issue #70 answered (ADR-077): PR #69 merges as built; Settings' tab row is settings-tabs.
+
+### Step settings-tabs - the Settings tab row scrolls in its own strip  [blocked: table-scroll]
+Touches: public/settings.html
+Issue #70 (ADR-077): `.tabs` becomes one row that swipes sideways; the page stays still. Style
+only, page-local. PUBLIC -> click-through. Full spec: session-status.md -> "Step settings-tabs".
 
 ### 3zv. Step sign-the-cookie - the login cookie carries a signature  [blocked: write-permission]
 Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example
@@ -407,6 +414,7 @@ Touches: server/db/loyverse-name-map.json, server/engines/loyversePreview.js, se
 ADR-066: FC is the third Loyverse account; Kitchen Sales switches between Silingan + Likod and FC,
 FC's side grouped by FC's own categories (the pizzaman reads Pizza there). PUBLIC ->
 click-through. Full spec: session-status.md -> "Step loyverse-fc".
+**2026-11-14:** issue #73 answered (ADR-076): refunds subtract on FC's side, deleted items keep their category; PR #71 complete as built.
 
 ### Step cost-guard - unit costs need the see_costs switch  [blocked: role-assignments]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html

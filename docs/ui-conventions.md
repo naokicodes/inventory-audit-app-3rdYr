@@ -20,6 +20,8 @@ acknowledgment, sides) are known. Add to it; don't wait for it to be complete.
   non-wrapping row contained to the viewport (`overflow-x: auto`), so the page body
   never scrolls sideways - only the nav strip scrolls. (Issue #13: 11 flex links
   with no wrap made every page ~866px wide at a 390px viewport.)
+- **Any row of tabs follows the same rule** (ADR-077): one non-wrapping row that scrolls
+  sideways itself; the page body never does.
 - **`#command-panel-toggle` stays `position: fixed` bottom-right.** It only appeared
   to overflow because the nav widened the page; a contained nav fixes it with no JS
   change.
