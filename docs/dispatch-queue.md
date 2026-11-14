@@ -113,6 +113,8 @@ Touches: scripts/import-settings.js, server/db/seed.js, package.json
 Standalone importer (decision A), identity tabs only, UPSERT/idempotent, uses siteAccess.js to
 validate memberships. Depends on users-roles + user-sites. DECIDED 2026-09-28: reader = B (CSV, zero-dep) behind a loadTab() adapter; PLUS an export mode (dump the DB to the template shape) so it round-trips export->edit->import. Server/scripts only, no
 click-through. Full spec: session-status.md -> "Step import-identity".
+**2026-11-14 (issue #67, ADR-073):** a role name matching two existing roles by the key is
+skipped and reported; PR #65 is complete as built on that point. `/naoki-qs 65` merges it.
 **2026-11-12 (issue #66, ADR-047):** a duplicated name imports no row; names compare ignoring
 capitals and extra spaces; site_memberships is the person's full list (removals too). See the
 spec's 2026-11-12 decision block. PR #65 resumes (`/naoki-qs 65`).
@@ -299,6 +301,7 @@ Server-only, no click-through. Full spec: session-status.md -> "Step role-assign
 Touches: public/roles.html, public/index.html, server/routes/roles.js, server/routes/roles.test.js, server/index.js, server/db/permissions.js
 The first cut of the Discord-style screen. PUBLIC -> click-through. Full spec: session-status.md ->
 "Step roles-page".
+**2026-11-14 (ADR-073):** create and rename refuse a name another role holds by the name key.
 
 ### 3zl. Step roster-stations - stations as roster rows and the sheets they open  [blocked: sheets-tier1, import-identity, role-assignments]
 Touches: server/db/schema.sql, server/engines/stations.js, server/engines/stations.test.js, server/routes/staff.js, server/routes/staff.test.js, server/index.js, scripts/import-settings.js, public/staff.html, public/index.html

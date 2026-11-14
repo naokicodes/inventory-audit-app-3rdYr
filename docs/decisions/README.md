@@ -115,6 +115,7 @@ flight. (ADR-001 explains the split.)
 | ADR-070 | Remote access through Tailscale | Accepted 2026-11-14 |
 | ADR-071 | cubic's findings are sorted by the builder | Accepted 2026-11-14 |
 | ADR-072 | A PR is reviewed against main's spec, by the pr-reviewer agent | Accepted 2026-11-14 |
+| ADR-073 | Role names are unique by the name key | Accepted 2026-11-14 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and
