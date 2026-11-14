@@ -1946,6 +1946,7 @@ carrying created_by (+ tests). Server-only, no click-through. Big migration -> s
 other schema/migration steps (24d-i, users-roles, user-sites).
 
 ## Step site-filter - query-layer site scoping enforcement (slice 5)
+**CLOSED 2026-11-14, PR #59 (`8f0fd61`).**
 
 Multi-user slice 5. The scoping teeth: a checker sees only their sites; management / admin /
 super-admin see all. DEPENDS ON stub-login (req.user) + user-sites (siteAccess.js).

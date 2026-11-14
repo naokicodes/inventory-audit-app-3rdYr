@@ -135,6 +135,7 @@ migration -> sequences with other schema/migration steps. Full spec: session-sta
 "Step user-id-authorship".
 
 ### 3m. Step site-filter - query-layer site scoping enforcement  [blocked: blind-count]
+**CLOSED 2026-11-14, PR #59 (`8f0fd61`).**
 Touches: server/middleware/requireSiteAccess.js, site-scoped routes, server/index.js, server/db/siteAccess.js
 **2026-11-01:** goes through one canUseSite() helper (A6) - see the spec's added note.
 **2026-11-11:** issue #60 answered: meat ids and body rows are checked; /stock-receipts/meats leaves the guard (ADR-043). See the spec.
