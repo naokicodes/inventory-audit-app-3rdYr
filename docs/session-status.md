@@ -1759,6 +1759,7 @@ not concurrent.
   written: see the 2026-10-25 line under "Step import-identity".
 
 ## Step import-identity - import-settings.js, identity slice (Roles, Users, memberships)
+**CLOSED 2026-11-14, PR #65 (`19e285e`).**
 
 Third slice of the multi-user surface (architect 2026-09-28). Decision A: a standalone
 scripts/import-settings.js. This FIRST cut imports only the IDENTITY tabs - Roles, Users,
