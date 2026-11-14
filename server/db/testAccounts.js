@@ -13,7 +13,7 @@ const { LIVE_DB_PATH, resolveDbPath } = require('./dbPath.js');
 const { resolveSiteCode } = require('./siteAccess.js');
 
 // The seed's sites are RA, FC (restaurants) and COM-A (commissary). Later
-// steps add their own accounts (role-assignments: Test Supervisor RA).
+// steps add their own accounts.
 const TEST_ACCOUNTS = [
   { name: 'Test Admin',        role: 'admin',      sites: [] },           // bypass
   { name: 'Test Management',   role: 'management', sites: [] },           // bypass
@@ -24,6 +24,7 @@ const TEST_ACCOUNTS = [
   { name: 'Test Commi',        role: 'checker',    sites: ['COM-A'] },
   { name: 'Test Floater',      role: 'checker',    sites: ['RA', 'FC'] },
   { name: 'Test No Sites',     role: 'checker',    sites: [] },
+  { name: 'Test Supervisor RA', role: 'supervisor', sites: ['RA'] },  // role-assignments
 ];
 
 // Same case rule as dbPath.js samePath: Windows paths are case-insensitive.

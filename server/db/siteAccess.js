@@ -7,6 +7,8 @@
 //
 // Every helper takes the db handle first, like logActivity in activityLog.js.
 
+const { businessDate } = require('../businessDay.js');
+
 function getUserSiteCodes(db, userId) {
   return db.prepare('SELECT site_code FROM user_sites WHERE user_id = ? ORDER BY site_code')
     .all(userId)
@@ -39,12 +41,21 @@ function resolveSiteCode(db, siteCode) {
  * Step site-filter (A6): THE site check, for a logged-in user (the caller
  * handles a null user). Bypass roles reach every site: can_admin (admin,
  * super-admin) or read_only (management). Everyone else needs a user_sites
- * row. `date` is accepted and unused - role-assignments (3zj) and
- * write-permission (3zr) widen this helper without touching the routes.
+ * row, or (step role-assignments) a live user_roles row at that site: an
+ * active role whose until_date is NULL or on/after `date` (a business date;
+ * default today's). write-permission (3zr) widens this helper again without
+ * touching the routes.
  */
 function canUseSite(db, user, siteCode, date) {
   if (user.can_admin === 1 || user.read_only === 1) return true;
-  return userHasSite(db, user.id, siteCode);
+  if (userHasSite(db, user.id, siteCode)) return true;
+  return db.prepare(`
+    SELECT 1 FROM user_roles ur
+      JOIN roles r ON r.id = ur.role_id
+      JOIN users u ON u.id = ur.user_id
+     WHERE ur.user_id = ? AND ur.site_code = ? AND r.active = 1 AND u.active = 1
+       AND (ur.until_date IS NULL OR ur.until_date >= ?)
+  `).get(user.id, siteCode, date || businessDate(new Date())) !== undefined;
 }
 
 // Each kind of id -> the code of the site it belongs to, through

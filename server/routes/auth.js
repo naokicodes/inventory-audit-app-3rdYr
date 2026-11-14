@@ -7,10 +7,14 @@
 // GET  /api/auth/users  - active users, for the login page
 // POST /api/auth/login  - { user_id } -> sets the cookie
 // POST /api/auth/logout - clears the cookie
-// GET  /api/auth/me     - { user } (req.user, or null)
+// GET  /api/auth/me     - { user, capabilities_by_site } (req.user, or null;
+//                         what the user may do at each site - step
+//                         role-assignments. Pages may show or hide buttons
+//                         with it; the server always re-checks.)
 
 const express = require('express');
 const db = require('../db/connection.js');
+const { capabilitiesBySite } = require('../db/permissions.js');
 
 const router = express.Router();
 const COOKIE = 'user_id';
@@ -72,7 +76,7 @@ router.post('/auth/logout', (req, res) => {
 });
 
 router.get('/auth/me', (req, res) => {
-  res.json({ user: req.user });
+  res.json({ user: req.user, capabilities_by_site: capabilitiesBySite(db, req.user) });
 });
 
 module.exports = router;
