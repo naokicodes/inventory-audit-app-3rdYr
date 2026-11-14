@@ -132,6 +132,23 @@ looks only at what changed since. A fresh first review only if the fix rewrote m
 most two fix rounds. Still failing after two: leave the PR open, comment what is wrong in
 plain words, and stop.
 
+**cubic's findings (ADR-071).** cubic, the automatic GitHub reviewer, reviews every push. Once CI
+is green, read its open findings on the current head:
+`gh api "repos/{owner}/{repo}/pulls/<n>/comments" --jq '.[] | select(.user.login | test("cubic")) | select(.position != null) | {path, line, body}'`,
+plus its summary in `gh pr view <n> --comments`. If it has not reviewed the current head yet, look
+once more after about five minutes; if still nothing, say "cubic had not reviewed <hash>" in the
+comment below and go on. Sort each finding into exactly one:
+- **Fix**: a real bug inside the step's spec and its Touches files, fixed without changing anything
+  the spec describes. Fix it as a fix round (the two-round limit above counts it), then re-check.
+- **Contradicts**: following it would break the spec, a decision block or an ADR (for example,
+  "never remove memberships" against ADR-047). Do not act.
+- **Not in this step**: anything else (new behavior, other files, a design call). Do not act and do
+  not open an issue for it.
+Then comment on the PR, before section 7:
+`cubic on <short head hash>: fixed <n>. Contradicts: <finding> (<ADR or spec line>). Not in this step: <finding>.`
+One short clause per finding, "none" where a group is empty. cubic is never a gate: an unsorted or
+unfixed finding never blocks a merge by itself.
+
 ## 6. Phone check (only if the PR touches `public/`)
 
 A green suite has let real screen bugs through before, so a person looks before
@@ -177,6 +194,8 @@ At most eight short lines, no jargon, no file names unless someone must act on o
 - **See it:** where to look in the app, or "nothing to see, it works behind the
   scenes".
 - **You need to:** the one thing a person must do, if anything.
+- **cubic:** only when something was left as Contradicts or Not in this step: how many, and "see
+  the PR comment".
 - **Skipped:** for the automatic order, each candidate passed over and why
   (one line each, at most three; "and N more" after that).
 - **Next:** "`/clear`, then `/naoki-qs`" (or `/naoki-qs <n>` for a specific PR).

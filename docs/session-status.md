@@ -132,9 +132,20 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-070; the index, and a map from handoff item numbers to records, is in
+to ADR-071; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, later) - decided (recorded: ADR-071)
+
+- **cubic (ADR-071).** `/naoki-qs` sorts cubic's open findings on the current head into Fix (inside
+  the spec and Touches files), Contradicts (the spec or an ADR) and Not in this step, fixes only the
+  first, and comments `cubic on <hash>: ...`. `/naoki-qpr` lists only what was left. Never a gate.
+- **naoki-qi** looks up the queue step that names an issue before calling it unspecced (its 18:06
+  report called #30 unspecced; table-scroll is specced and runnable).
+- **beta-2:** tagged after PRs #61, #65 and #59 merge, once Claude in Chrome has run the Beta smoke
+  list on that commit (ADR-039); then the restaurant PC runs `restaurant-pc.bat update beta-2` with
+  the app closed. A rerun of the bat itself changes the PC's settings only, never the code.
 
 ### 2026-11-14 architect (A0, A8, A9 part 1) - decided (recorded: ADR-060 to ADR-070)
 
@@ -2899,6 +2910,7 @@ settings-guard (3zu) already refuses Settings changes from non-admins; setSheetA
 check. Touches gains: server/index.js. One at a time with settings-guard (both touch settings.js).
 
 ## Step restaurant-pc - the restaurant PC script in the repo, with an update mode (A3)
+**CLOSED 2026-11-14, PR #47 (`310e033`).**
 
 Decided 2026-10-28. The restaurant PC is the Beta server. Its setup script
 (restaurant-pc.bat, written 2026-10-28) installs a separate clone in

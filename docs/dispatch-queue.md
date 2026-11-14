@@ -66,6 +66,10 @@ is. Read the step's own section in `session-status.md` before starting.
 > needs it and PR #61 (3zu); side-sheets needs side-items and PR #59 (3m). cost-guard after 3zj
 > role-assignments. 3ze (#47): Naoki commits the architect-provided file (Tailscale range, FC
 > token) before merging. The rest of A8 and A9 is under "Planned - sides and supply".
+> **2026-11-14 (later):** PR #47 (3ze) merged. Order now: #61 (3zu), #65 (3j), #59 (3m), then
+> busy-timeout, loyverse-fc, #63 (3zb), table-scroll, 3zw staff-meal-settings, side-items, 3l
+> user-id-authorship, side-sheets. Tag beta-2 after #61, #65 and #59 merge (smoke list first,
+> ADR-039).
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -247,6 +251,7 @@ Touches: server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.tes
 PUBLIC -> click-through. Full spec: session-status.md -> "Step sheet-close".
 
 ### 3ze. Step restaurant-pc - the restaurant PC script, with an update mode  [Naoki's own PR]
+**CLOSED 2026-11-14, PR #47 (`310e033`).**
 Touches: scripts/restaurant-pc.bat, .gitattributes
 Not for /naoki-qs: Naoki opens it with the architect-provided file. Full spec: session-status.md
 -> "Step restaurant-pc".
