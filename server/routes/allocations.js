@@ -111,13 +111,13 @@ router.post('/allocations', (req, res) => {
   }
 
   const result = db.prepare(`
-    INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id, from_location_id, to_location_id, notes, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id, from_location_id, to_location_id, notes, created_by, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     restaurant_id, meat_id, business_date, Number(quantity), adjustment_type_id,
     type.requires_transfer_locations ? from_location_id : null,
     type.requires_transfer_locations ? to_location_id : null,
-    notes || null, created_by || null
+    notes || null, created_by || null, req.user?.id ?? null
   );
 
   res.json({ ok: true, id: result.lastInsertRowid });
@@ -184,17 +184,18 @@ router.post('/allocations/conversion', (req, res) => {
 
   const noteText = notes || null;
   const actor = created_by || null;
+  const userId = req.user?.id ?? null;
 
   const ids = withTransaction(db, () => {
     const fromResult = db.prepare(`
-      INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(restaurant_id, from_meat_id, business_date, Number(from_quantity), type.id, noteText, actor);
+      INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id, notes, created_by, created_by_user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(restaurant_id, from_meat_id, business_date, Number(from_quantity), type.id, noteText, actor, userId);
 
     const toResult = db.prepare(`
-      INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id, linked_adjustment_id, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(restaurant_id, to_meat_id, business_date, -Number(to_quantity), type.id, fromResult.lastInsertRowid, noteText, actor);
+      INSERT INTO adjustments (restaurant_id, meat_id, business_date, quantity, adjustment_type_id, linked_adjustment_id, notes, created_by, created_by_user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(restaurant_id, to_meat_id, business_date, -Number(to_quantity), type.id, fromResult.lastInsertRowid, noteText, actor, userId);
 
     return { fromId: fromResult.lastInsertRowid, toId: toResult.lastInsertRowid };
   });

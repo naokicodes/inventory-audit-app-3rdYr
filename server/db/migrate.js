@@ -790,3 +790,43 @@ function migrateYieldLogMiscutWeightColumn(db) {
 }
 
 module.exports.migrateYieldLogMiscutWeightColumn = migrateYieldLogMiscutWeightColumn;
+
+// ----------------------------------------------------------------------
+// Step user-id-authorship (2026-11-14): created_by_user_id (FK users,
+// nullable) on every table that carries the legacy created_by TEXT - see
+// docs/session-status.md "Step user-id-authorship". Plain ADD COLUMN, no
+// backfill: old rows stay NULL (forward-clean). Same per-column check as
+// migrateMonthStartRecountColumns. Must run BEFORE schema.sql and AFTER
+// every rebuild above (a rebuild recreates its table without the column) -
+// see connection.js.
+
+const CREATED_BY_USER_ID_TABLES = [
+  'stock_receipts', 'ending_actual', 'prepped', 'portion_ending_actual', 'adjustments',
+  'commissary_yield_log', 'commissary_ending_actual', 'commissary_stock_receipts',
+  'commissary_shipments', 'commissary_adjustments'
+];
+
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @returns {{ added: string[] }} each table that actually got the column
+ */
+function migrateCreatedByUserIdColumns(db) {
+  const added = [];
+  for (const table of CREATED_BY_USER_ID_TABLES) {
+    const tableExists = db.prepare(
+      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`
+    ).get(table);
+    // Fresh install - schema.sql creates the table with the column already.
+    if (!tableExists) continue;
+
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (columns.some(c => c.name === 'created_by_user_id')) continue;
+
+    db.exec(`ALTER TABLE ${table} ADD COLUMN created_by_user_id INTEGER REFERENCES users(id)`);
+    added.push(table);
+  }
+  return { added };
+}
+
+module.exports.migrateCreatedByUserIdColumns = migrateCreatedByUserIdColumns;
+module.exports.CREATED_BY_USER_ID_TABLES = CREATED_BY_USER_ID_TABLES;

@@ -109,9 +109,9 @@ router.post('/stock-receipts', (req, res) => {
   try {
     const id = withTransaction(db, () => {
       const result = db.prepare(`
-        INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
-      `).run(restaurant_id, meat_id, business_date, Number(quantity), source, notes || null, actor || null);
+        INSERT INTO stock_receipts (restaurant_id, meat_id, business_date, quantity, source, commissary_meat_id, notes, created_by, created_by_user_id)
+        VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)
+      `).run(restaurant_id, meat_id, business_date, Number(quantity), source, notes || null, actor || null, req.user?.id ?? null);
 
       const after = getReceiptRow(result.lastInsertRowid);
       logActivity(db, {

@@ -19,12 +19,10 @@
       "photo_path": "Rule 13 - photo attachments are references only. No upload path is built anywhere, by design."
     },
     "ending_actual": {
-      "photo_path": "Rule 13 - photo attachments are references only.",
-      "created_by": "UNVERIFIED. The restaurant-side physical count does not record who entered it, while the commissary side does. Flagged to the architect 2026-09-03; allowlisted so it does not block CI, not because it is known-correct."
+      "photo_path": "Rule 13 - photo attachments are references only."
     },
     "portion_ending_actual": {
-      "photo_path": "Rule 13 - photo attachments are references only.",
-      "created_by": "UNVERIFIED. Same gap as ending_actual.created_by. Flagged 2026-09-03."
+      "photo_path": "Rule 13 - photo attachments are references only."
     },
     "commissary_ending_actual": {
       "photo_path": "Rule 13 - photo attachments are references only."

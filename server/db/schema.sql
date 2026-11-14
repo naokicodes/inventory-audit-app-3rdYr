@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS stock_receipts (
   notes TEXT,
   photo_path TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT,                -- soft delete only, no hard DELETE
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
@@ -110,6 +111,7 @@ CREATE TABLE IF NOT EXISTS ending_actual (
   notes TEXT,
   photo_path TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (meat_id) REFERENCES meats(id),
@@ -167,6 +169,7 @@ CREATE TABLE IF NOT EXISTS prepped (
   business_date TEXT NOT NULL,
   portions_produced REAL NOT NULL,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (dish_id) REFERENCES dishes(id),
   UNIQUE (restaurant_id, dish_id, business_date)
@@ -180,6 +183,7 @@ CREATE TABLE IF NOT EXISTS portion_ending_actual (
   portions_counted REAL NOT NULL,
   photo_path TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (dish_id) REFERENCES dishes(id),
   UNIQUE (restaurant_id, dish_id, business_date)
@@ -217,6 +221,7 @@ CREATE TABLE IF NOT EXISTS adjustments (
   linked_adjustment_id INTEGER,
   notes TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
   FOREIGN KEY (meat_id) REFERENCES meats(id),
   FOREIGN KEY (adjustment_type_id) REFERENCES adjustment_types(id),
@@ -307,6 +312,7 @@ CREATE TABLE IF NOT EXISTS commissary_yield_log (
   miscut_weight REAL NOT NULL DEFAULT 0,  -- step 24d-i: recoverable trim, kg. Analytics only - NOT subtracted from loss%.
   notes TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT,                -- soft delete only, no hard DELETE
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
@@ -331,6 +337,7 @@ CREATE TABLE IF NOT EXISTS commissary_ending_actual (
   notes TEXT,
   photo_path TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
   UNIQUE (commissary_meat_id, business_date)
@@ -365,6 +372,7 @@ CREATE TABLE IF NOT EXISTS commissary_stock_receipts (
   notes TEXT,
   photo_path TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id)
 );
@@ -380,6 +388,7 @@ CREATE TABLE IF NOT EXISTS commissary_shipments (
   total_quantity REAL NOT NULL,
   notes TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),
   FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
@@ -444,6 +453,7 @@ CREATE TABLE IF NOT EXISTS commissary_adjustments (
   destination_commissary_meat_id INTEGER,   -- NULL for LOSS, required for ALLOCATION
   notes TEXT,
   created_by TEXT,
+  created_by_user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT,                -- soft delete only, no hard DELETE
   FOREIGN KEY (commissary_meat_id) REFERENCES commissary_meats(id),

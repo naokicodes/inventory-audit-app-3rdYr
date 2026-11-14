@@ -168,9 +168,9 @@ router.post('/daily-audit', (req, res) => {
   }
 
   const upsertEndingActual = db.prepare(`
-    INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity, notes)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(restaurant_id, meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes
+    INSERT INTO ending_actual (restaurant_id, meat_id, business_date, quantity, notes, created_by, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(restaurant_id, meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes, created_by = excluded.created_by, created_by_user_id = excluded.created_by_user_id
   `);
 
   let saved = 0;
@@ -186,7 +186,7 @@ router.post('/daily-audit', (req, res) => {
       saveCount(db, {
         restaurantId: Number(restaurant_id), date: business_date, kind: 'MEAT', itemId: Number(row.meat_id),
         quantity, remark: row.remarks || null, touched: row.touched === true, user: req.user
-      }, remark => upsertEndingActual.run(restaurant_id, row.meat_id, business_date, quantity, remark));
+      }, remark => upsertEndingActual.run(restaurant_id, row.meat_id, business_date, quantity, remark, req.user?.name ?? null, req.user?.id ?? null));
     }
     saved++;
   }
@@ -279,18 +279,18 @@ router.post('/daily-audit/portions', (req, res) => {
     SELECT * FROM prepped WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?
   `);
   const insertPrepped = db.prepare(`
-    INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced, created_by)
-    VALUES (?, ?, ?, ?, NULL)
+    INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced, created_by, created_by_user_id)
+    VALUES (?, ?, ?, ?, NULL, ?)
   `);
   const updatePrepped = db.prepare(`
-    UPDATE prepped SET portions_produced = ?, created_by = NULL
+    UPDATE prepped SET portions_produced = ?, created_by = NULL, created_by_user_id = ?
     WHERE restaurant_id = ? AND dish_id = ? AND business_date = ?
   `);
 
   const upsertPortionActual = db.prepare(`
-    INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET portions_counted = excluded.portions_counted
+    INSERT INTO portion_ending_actual (restaurant_id, dish_id, business_date, portions_counted, created_by, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(restaurant_id, dish_id, business_date) DO UPDATE SET portions_counted = excluded.portions_counted, created_by = excluded.created_by, created_by_user_id = excluded.created_by_user_id
   `);
 
   let saved = 0;
@@ -307,9 +307,9 @@ router.post('/daily-audit/portions', (req, res) => {
       if (!existing || existing.portions_produced !== value) {
         withTransaction(db, () => {
           if (existing) {
-            updatePrepped.run(value, restaurant_id, row.dish_id, business_date);
+            updatePrepped.run(value, req.user?.id ?? null, restaurant_id, row.dish_id, business_date);
           } else {
-            insertPrepped.run(restaurant_id, row.dish_id, business_date, value);
+            insertPrepped.run(restaurant_id, row.dish_id, business_date, value, req.user?.id ?? null);
           }
           const after = getPrepped.get(restaurant_id, row.dish_id, business_date);
           logActivity(db, {
@@ -334,7 +334,7 @@ router.post('/daily-audit/portions', (req, res) => {
       saveCount(db, {
         restaurantId: Number(restaurant_id), date: business_date, kind: 'PORTION', itemId: Number(row.dish_id),
         quantity, remark: row.remark, touched: row.touched === true, user: req.user
-      }, () => upsertPortionActual.run(restaurant_id, row.dish_id, business_date, quantity));
+      }, () => upsertPortionActual.run(restaurant_id, row.dish_id, business_date, quantity, req.user?.name ?? null, req.user?.id ?? null));
       wrote = true;
     }
 
