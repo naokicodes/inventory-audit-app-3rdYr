@@ -405,6 +405,7 @@ ADR-027, ADR-044, ADR-029: per day and 7 days; the rice estimate beside, never i
 Read-only. PUBLIC -> click-through. Full spec: session-status.md -> "Step staff-meal-view".
 
 ### Step busy-timeout - SQLite waits for a lock instead of failing at once  [runnable]
+**CLOSED 2026-11-14, PR #72 (`35c75ef`).**
 Touches: server/db/connection.js, server/db/connection.test.js, plus any script that opens its own DatabaseSync
 The 2026-09-15 plan's `PRAGMA busy_timeout = 5000`, still missing. Server-only. Full spec:
 session-status.md -> "Step busy-timeout".
