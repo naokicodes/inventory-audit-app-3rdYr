@@ -3665,6 +3665,7 @@ as Test Counter RA, saving a setting shows "Only an admin can change settings".
   security; sign-the-cookie (3zv) signs it after write-permission.
 
 ## Step table-scroll - wide tables scroll inside their own box on a phone (issue #30)
+**CLOSED 2026-11-14, PR #69 (`6e98a93`).**
 
 Decided 2026-11-11 (issue #30; ui-conventions.md -> Tables). Runnable now. Markup only: the
 `.table-scroll` class already exists in style.css.

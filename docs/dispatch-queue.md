@@ -365,6 +365,7 @@ session-status.md -> "Step settings-guard".
 **2026-11-11:** issue #62 answered (Reading B): PR #61 is complete as built.
 
 ### Step table-scroll - wide tables scroll inside their own box on a phone  [runnable]
+**CLOSED 2026-11-14, PR #69 (`6e98a93`).**
 Touches: public/allocations.html, public/commissary-shipments.html, public/commissary.html, public/dashboard.html, public/history.html, public/sales.html, public/settings.html, public/stock-receipts.html
 Issue #30. Markup only: every table not yet inside `.table-scroll` gets the wrapper (daily-audit's
 sheet excluded: cards). No style change. PUBLIC -> click-through. Full spec: session-status.md ->
