@@ -37,3 +37,8 @@ Status: IRL Written - FLOW Drafted - APP Decided
 
 - Decided (handoff 56): an admin sets each item's "how it is bought" tag in
   Settings; the landing person can suggest a change.
+- Decided 2026-11-14: how it's bought has three values (supplier delivery, buyer run, from the
+  commi); the landing's meat lines become the built internal meat request; FC buys sirloin, pork
+  chops, tuna cubes and tuna steaks direct (ADR-067). The buyer can tick lines bought or "not
+  found" (rolls to tomorrow) and attaches receipt photos (ADR-068). Later: an in-app alert for
+  supervisors on "not found". Planned (A9).

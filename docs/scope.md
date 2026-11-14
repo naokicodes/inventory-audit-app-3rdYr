@@ -41,10 +41,10 @@ question: open a `needs-architect` issue rather than deciding it.
   unless deliberately exported.
 
 ## What this app is NOT
-- **Not a full restaurant inventory system.** It does not track produce, dry
-  goods, beverages, or anything besides meat. The existing station-by-station
-  daily inventory process for everything else continues unchanged, outside
-  this app.
+- **No longer meat only (ADR-069, 2026-11-14).** The app covers every inventory sheet a site keeps
+  in it - meat, veggies, pantry and bar (pizza later; FC keeps some sheets on paper, ADR-065) - and
+  the supply around them: supplier orders, arrivals and bills. Still out: money in (sales, revenue,
+  payments; ADR-057), recipe costing and menu engineering. The full rewrite of this file is A5.
 - **Multi-user with role-based access (in progress).** Moving from the original
   single-user local tool to a multi-user system: multiple concurrent checkers on
   one shared database on one PC serving co-located sites, with configurable roles

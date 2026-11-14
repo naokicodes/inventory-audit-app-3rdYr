@@ -1,6 +1,6 @@
 # Bar
 
-Status: IRL Confirmed (all three restaurants) - FLOW None - APP Decided (sales check)
+Status: IRL Confirmed (all three restaurants) - FLOW None - APP Decided (sales check; FC drinks only)
 
 ## IRL - how it works today
 Source: photos 2026-10-24.
@@ -28,6 +28,8 @@ sugar, cups, straws, and dining supplies (condiments, toothpicks, tissues,
 pest spray, alcohol, rags, cellophane, foil, cling wrap). Units: pcs, case,
 pack, kilo, "half", roll, "1 and a half". SOLD and OVR/SHRT exist but are
 empty.
+- FC (2026-11-14): the boodle deal includes four free small soft drinks; when those run out,
+  customers may upgrade all four to panalo. 7UP is gone (counted as Mountain Dew).
 
 - The roster's bar person counts; with two, either one.
 
@@ -36,7 +38,8 @@ empty.
   (expected from Loyverse sales vs counted). Bar is NOT blind: the bar counter
   sees expected and variance. Raw bar items stay side-sheet style for now.
 - Desserts need a conversion (slices per whole).
-- Not specced. Queue item A8.
+- 2026-11-14: each bar is checked against its own restaurant's Loyverse account; FC's bar in
+  the app is drinks only, the list in ADR-065 (ADR-065, ADR-066). Planned: bar-check (A8).
 
 ## Open questions
 - What Likod's OUT column records (unclear even to Naoki; low priority).
