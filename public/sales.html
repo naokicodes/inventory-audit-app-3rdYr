@@ -120,10 +120,12 @@
       }).join('');
 
       gridContainer.innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th class="dish-name">Dish</th>${headerCells}</tr></thead>
           <tbody>${rows || `<tr><td class="dish-name" colspan="${days.length + 1}">No active dishes for this restaurant.</td></tr>`}</tbody>
         </table>
+        </div>
       `;
 
       gridContainer.querySelectorAll('input[data-dish-id]').forEach(input => {

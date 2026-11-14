@@ -172,6 +172,7 @@
       }).join('');
 
       tableEl.innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead>
             <tr>
@@ -183,6 +184,7 @@
           </thead>
           <tbody>${bodyRows}</tbody>
         </table>
+        </div>
         <p class="hint">"n/a" means no Conversion Standard exists linking that restaurant's stock back to this Commissary meat - set one up in Settings if this pairing should be tracked. "-" means a standard exists but there's no data yet for that meat/date. Click ▸ on a meat-type row to see which commissaries make up its total.</p>
       `;
 

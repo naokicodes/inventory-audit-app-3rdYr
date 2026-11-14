@@ -142,10 +142,12 @@
     <div class="add-form">
       <label>Name <input id="new-preset-name" placeholder="e.g. Standard Jowl split"></label>
     </div>
+    <div class="table-scroll">
     <table class="lines-table" style="border-collapse: collapse; width: 100%; font-size: 0.9rem;">
       <thead><tr><th>Destination meat</th><th>Default quantity</th><th></th></tr></thead>
       <tbody id="new-preset-lines-body"></tbody>
     </table>
+    </div>
     <button id="new-preset-add-line" type="button">+ Add line</button>
     <br><br>
     <button id="add-shipment-preset">Add Preset</button>
@@ -239,6 +241,7 @@
       const res = await fetch('/api/settings/restaurants');
       const restaurants = await res.json();
       document.getElementById('restaurants-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Code</th><th>Name</th><th>Active</th></tr></thead>
           <tbody>${restaurants.map(r => `
@@ -249,6 +252,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.restaurant-edit').forEach(el => el.addEventListener('change', saveRestaurantRow));
     }
@@ -293,6 +297,7 @@
       const res = await fetch(`/api/settings/meats?restaurant_id=${currentRestaurantId}`);
       const meats = await res.json();
       document.getElementById('meats-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Cost/unit</th><th>Recount at month start</th><th>Active</th></tr></thead>
           <tbody>${meats.map(m => `
@@ -311,6 +316,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.meat-edit').forEach(el => el.addEventListener('change', saveMeatRow));
     }
@@ -355,6 +361,7 @@
       const res = await fetch(`/api/settings/dishes?restaurant_id=${currentRestaurantId}`);
       const dishes = await res.json();
       document.getElementById('dishes-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Code</th><th>Name</th><th>Prep Type</th><th>Cost/portion</th><th>Active</th></tr></thead>
           <tbody>${dishes.map(d => `
@@ -372,6 +379,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.dish-edit').forEach(el => el.addEventListener('change', saveDishRow));
     }
@@ -426,6 +434,7 @@
       const res = await fetch(`/api/settings/recipes?restaurant_id=${currentRestaurantId}`);
       const rows = await res.json();
       document.getElementById('recipes-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Dish</th><th>Meat</th><th>Quantity</th><th>Unit</th><th></th></tr></thead>
           <tbody>${rows.map(r => `
@@ -438,6 +447,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.recipe-qty-edit').forEach(el => el.addEventListener('change', async (e) => {
         await fetch(`/api/settings/recipes/${e.target.dataset.id}`, {
@@ -473,6 +483,7 @@
       const res = await fetch('/api/settings/adjustment-types');
       const types = await res.json();
       document.getElementById('adjustment-types-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Name</th><th>Requires Transfer Locations</th><th>Active</th></tr></thead>
           <tbody>${types.map(t => `
@@ -483,6 +494,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.adjtype-edit').forEach(el => el.addEventListener('change', saveAdjustmentTypeRow));
     }
@@ -533,6 +545,7 @@
       const res = await fetch('/api/settings/locations');
       const locs = await res.json();
       document.getElementById('locations-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Name</th><th>Restaurant</th><th>Restaurant-level</th><th>Active</th></tr></thead>
           <tbody>${locs.map(l => `
@@ -544,6 +557,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.location-edit').forEach(el => el.addEventListener('change', saveLocationRow));
     }
@@ -661,6 +675,7 @@
         return;
       }
       presetsTableDiv.innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Name</th><th>Lines</th><th>Active</th></tr></thead>
           <tbody>${presets.map(p => `
@@ -674,6 +689,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.preset-edit').forEach(el => el.addEventListener('change', savePresetRow));
     }
@@ -791,6 +807,7 @@
         return;
       }
       csTableDiv.innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Destination meat</th><th>Ratio per unit</th><th>Notes</th><th>Active</th></tr></thead>
           <tbody>${standards.map(s => `
@@ -802,6 +819,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.cs-edit').forEach(el => el.addEventListener('change', saveConversionStandardRow));
     }
@@ -878,6 +896,7 @@
       const res = await fetch('/api/settings/commissaries');
       const commissaries = await res.json();
       document.getElementById('commissaries-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Code</th><th>Name</th><th>Active</th></tr></thead>
           <tbody>${commissaries.map(c => `
@@ -888,6 +907,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.commissary-edit').forEach(el => el.addEventListener('change', saveCommissaryRow));
     }
@@ -932,6 +952,7 @@
       const res = await fetch('/api/settings/meat-types');
       const types = await res.json();
       document.getElementById('meat-types-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Name</th><th>Active</th></tr></thead>
           <tbody>${types.map(t => `
@@ -941,6 +962,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.meattype-edit').forEach(el => el.addEventListener('change', saveMeatTypeRow));
     }
@@ -1023,6 +1045,7 @@
         types.filter(t => t.active || t.id === selectedId)
           .map(t => `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.name}${t.active ? '' : ' (retired)'}</option>`).join('');
       document.getElementById('commissary-meats-table').innerHTML = `
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Leeway %</th><th>Cost/unit</th><th>Meat Type</th><th>Recount at month start</th><th>Active</th></tr></thead>
           <tbody>${meats.map(m => `
@@ -1047,6 +1070,7 @@
             </tr>
           `).join('')}</tbody>
         </table>
+        </div>
       `;
       document.querySelectorAll('.commissary-meat-edit').forEach(el => el.addEventListener('change', saveCommissaryMeatRow));
     }
