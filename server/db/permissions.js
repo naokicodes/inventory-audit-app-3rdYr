@@ -171,6 +171,7 @@ function removeAssignment(db, { userId, roleId, siteCode }, actor) {
   const role = roleById(db, roleId);
   if (!role) return { status: 400, error: 'Unknown role.' };
   if (role.name === SUPER_ADMIN) return { status: 400, error: 'The super-admin role is never removed here.' };
+  if (role.active !== 1) return { status: 400, error: 'That role is inactive.' };
   const site = normSite(siteCode);
   if (site !== null && resolveSiteCode(db, site) === null) return { status: 400, error: 'Unknown site.' };
   const row = findAssignment(db, Number(userId), role.id, site);

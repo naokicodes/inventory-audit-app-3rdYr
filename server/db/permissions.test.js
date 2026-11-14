@@ -156,6 +156,9 @@ test('an inactive role grants nothing; its assignment stays listed. An inactive 
   assert.strictEqual(can(db, finn, 'sees_expected', 'FC'), false);
   assert.strictEqual(canUseSite(db, finn, 'FC'), false, 'an inactive role opens no site');
   assert.strictEqual(assignments(finn.id).length, 1, 'assignment stays listed');
+  // The spec: assignRole / removeAssignment validate an active role.
+  assert.deepStrictEqual(removeAssignment(db, { userId: finn.id, roleId: tempRole, siteCode: 'FC' }, admin), { status: 400, error: 'That role is inactive.' });
+  assert.strictEqual(assignments(finn.id).length, 1, 'not removed');
   // Inactive base role: grants nothing either (stub-login Q3).
   db.prepare('UPDATE roles SET active = 0 WHERE id = ?').run(role['head-chef']);
   assert.strictEqual(can(db, hugo, 'finalize', 'RA'), false);
