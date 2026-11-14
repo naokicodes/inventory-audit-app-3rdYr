@@ -200,6 +200,7 @@ function setRoleCapability(db, { roleId, capability, on }, actor) {
   if (!role) return { status: 400, error: 'Unknown role.' };
   if (role.name === SUPER_ADMIN) return { status: 400, error: 'The super-admin role is never edited.' };
   if (!SWITCHES.includes(capability)) return { status: 400, error: `"${capability}" is not a switch.` };
+  if (on !== true && on !== false) return { status: 400, error: 'on must be true or false.' };
 
   const changed = withTransaction(db, () => {
     const result = on

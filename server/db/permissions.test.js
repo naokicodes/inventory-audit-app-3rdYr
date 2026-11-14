@@ -268,6 +268,12 @@ test('setRoleCapability turns a switch on and off with a log row; a legacy flag 
   assert.strictEqual(can(db, finn, 'pick_tonight', 'RA'), false);
   assert.strictEqual(logCount(), logs + 2);
   assert.strictEqual(setRoleCapability(db, { roleId: role.checker, capability: 'finalize', on: true }, admin).status, 400);
+  // Only a real boolean: the text "false" must not turn a switch on.
+  for (const on of ['false', 'true', 1, undefined]) {
+    assert.deepStrictEqual(setRoleCapability(db, { roleId: role.checker, capability: 'pick_tonight', on }, admin), { status: 400, error: 'on must be true or false.' });
+  }
+  assert.strictEqual(can(db, finn, 'pick_tonight', 'RA'), false);
+  assert.strictEqual(logCount(), logs + 2);
 });
 
 test('GET /api/auth/me returns capabilities_by_site for the sites the user can use', async () => {

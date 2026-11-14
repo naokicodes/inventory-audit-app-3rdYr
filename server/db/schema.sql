@@ -657,7 +657,9 @@ CREATE TABLE IF NOT EXISTS side_item_sheets (
 );
 
 -- 18. Role switches and role assignments (step role-assignments, ADR-034 /
--- ADR-038). server/db/permissions.js is the only reader and writer.
+-- ADR-038). server/db/permissions.js is the only writer and answers every
+-- capability question; canUseSite in server/db/siteAccess.js also reads
+-- user_roles (a live assignment at a site opens that site).
 -- role_capabilities: one row per switch a role has on. Capability names are
 -- validated by permissions.js, not a CHECK, so a new switch needs no rebuild.
 CREATE TABLE IF NOT EXISTS role_capabilities (
