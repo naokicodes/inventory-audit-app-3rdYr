@@ -219,6 +219,7 @@ const roles = [
   ['management',  0, 0, 0, 1],
   ['head-chef',   1, 1, 0, 0],
   ['checker',     1, 0, 0, 0],
+  ['supervisor',  0, 0, 0, 0], // role-assignments (ADR-010: never counts)
 ];
 const insertRole = db.prepare(
   'INSERT OR IGNORE INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only, active) VALUES (?, ?, ?, ?, ?, 1)'
@@ -228,6 +229,11 @@ for (const r of roles) {
   if (insertRole.run(...r).changes > 0) rolesInserted++;
 }
 console.log(`Roles: ${rolesInserted} inserted (of ${roles.length})`);
+
+// Role switches (step role-assignments): each named default set is applied
+// once per database, so an admin's later removal is never undone by a reseed.
+const { ensureRoleDefaults } = require('./permissions.js');
+console.log(`Role defaults: applied ${JSON.stringify(ensureRoleDefaults(db).applied)}`);
 
 // "superadmin" is a break-glass/bootstrap login, not a real person's name -
 // real names enter only via the off-repo workbook at import (#19, #22).

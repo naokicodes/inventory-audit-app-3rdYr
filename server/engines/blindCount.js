@@ -3,26 +3,34 @@
 // count_entries, and a head chef can order a quiet recount.
 //
 // isBlind and canOrderRecount are the only places that decide who is blind
-// and who may order; role-assignments (3zj) changes them here and nowhere
-// else. siteCode is unused until then (ADR-038).
+// and who may order. Step role-assignments (ADR-038): both ask can() in
+// server/db/permissions.js at the site - blind = no sees_expected switch
+// there. They keep their (user, siteCode) shape so the routes are untouched,
+// and read the shared connection lazily.
 //
-// Every helper takes the db handle first, like logActivity in activityLog.js.
+// Every other helper takes the db handle first, like logActivity in activityLog.js.
 
 const { withTransaction } = require('../db/activityLog.js');
+const { can } = require('../db/permissions.js');
 const { isBlocked } = require('./monthOpening.js');
 
 const KINDS = ['MEAT', 'PORTION'];
 const ENTRY_TYPES = ['COUNT', 'RECOUNT', 'EDIT'];
 
-// Blind = can enter counts and nothing more (today: checker). No user = blind.
+const connection = () => require('../db/connection.js');
+
+// Blind = no "sees expected" switch at that site. No user = blind.
 function isBlind(user, siteCode) {
   if (!user) return true;
-  return user.can_enter_counts === 1 && user.can_finalize === 0 && user.can_admin === 0 && user.read_only === 0;
+  return !can(connection(), user, 'sees_expected', siteCode);
 }
 
-// head-chef, admin, super-admin. Management sees, never orders.
+// Not blind, and finalize or admin at that site (head chef, admin; a
+// supervisor sees but never orders, nor does management).
 function canOrderRecount(user, siteCode) {
-  return !isBlind(user, siteCode) && (user.can_finalize === 1 || user.can_admin === 1);
+  if (isBlind(user, siteCode)) return false;
+  const db = connection();
+  return can(db, user, 'finalize', siteCode) || can(db, user, 'admin', siteCode);
 }
 
 function checkKind(kind) {

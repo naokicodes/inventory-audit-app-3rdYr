@@ -52,6 +52,8 @@ const EXPECTED_ROLES = [
   { name: 'management',  can_enter_counts: 0, can_finalize: 0, can_admin: 0, read_only: 1, active: 1 },
   { name: 'head-chef',   can_enter_counts: 1, can_finalize: 1, can_admin: 0, read_only: 0, active: 1 },
   { name: 'checker',     can_enter_counts: 1, can_finalize: 0, can_admin: 0, read_only: 0, active: 1 },
+  // role-assignments: the sixth role (ADR-010: never counts)
+  { name: 'supervisor',  can_enter_counts: 0, can_finalize: 0, can_admin: 0, read_only: 0, active: 1 },
 ];
 
 function readRoles(db) {
@@ -72,7 +74,7 @@ try {
 
   test('seed runs cleanly on a fresh scratch DB', () => {
     assert.strictEqual(first.status, 0, first.stderr);
-    assert.match(first.stdout, /Roles: 5 inserted \(of 5\)/);
+    assert.match(first.stdout, /Roles: 6 inserted \(of 6\)/);
     assert.match(first.stdout, /Users: 1 inserted/);
   });
 
@@ -85,7 +87,7 @@ try {
     });
   });
 
-  test('seeds exactly the five roles with the spec default flags', () => {
+  test('seeds exactly the six roles with the spec default flags', () => {
     withDb(db => assert.deepStrictEqual(readRoles(db), EXPECTED_ROLES));
   });
 
@@ -100,10 +102,10 @@ try {
     });
   });
 
-  test('re-running the seed is idempotent: still 5 roles and 1 user', () => {
+  test('re-running the seed is idempotent: still 6 roles and 1 user', () => {
     const again = runSeed();
     assert.strictEqual(again.status, 0, again.stderr);
-    assert.match(again.stdout, /Roles: 0 inserted \(of 5\)/);
+    assert.match(again.stdout, /Roles: 0 inserted \(of 6\)/);
     assert.match(again.stdout, /Users: 0 inserted/);
     withDb(db => {
       assert.deepStrictEqual(readRoles(db), EXPECTED_ROLES);
