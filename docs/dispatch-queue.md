@@ -410,6 +410,7 @@ The 2026-09-15 plan's `PRAGMA busy_timeout = 5000`, still missing. Server-only. 
 session-status.md -> "Step busy-timeout".
 
 ### Step loyverse-fc - FC's Loyverse account and a Silingan + Likod | FC switch  [runnable]
+**CLOSED 2026-11-14, PR #71 (`569a168`).**
 Touches: server/db/loyverse-name-map.json, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, public/kitchen-sales.html, .env.example
 ADR-066: FC is the third Loyverse account; Kitchen Sales switches between Silingan + Likod and FC,
 FC's side grouped by FC's own categories (the pizzaman reads Pizza there). PUBLIC ->
