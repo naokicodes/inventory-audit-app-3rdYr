@@ -118,6 +118,8 @@ flight. (ADR-001 explains the split.)
 | ADR-073 | Role names are unique by the name key | Accepted 2026-11-14 |
 | ADR-074 | The site guard refuses malformed ids; a receipt with no restaurant is its commissary's | Accepted 2026-11-14 |
 | ADR-075 | cubic is optional; late findings are swept up after merge | Accepted 2026-11-14 |
+| ADR-076 | FC's sales side: refunds subtract, deleted items keep their category | Accepted 2026-11-14 |
+| ADR-077 | No page scrolls sideways: rows of tabs stay in their own strip | Accepted 2026-11-14 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and
