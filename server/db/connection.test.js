@@ -33,7 +33,8 @@ const probe = `
   const db = require(${JSON.stringify(path.join(__dirname, 'connection.js'))});
   const timeout = db.prepare('PRAGMA busy_timeout').get();
   const journal = db.prepare('PRAGMA journal_mode').get();
-  process.stdout.write(JSON.stringify({ timeout: Object.values(timeout)[0], journal: Object.values(journal)[0] }));
+  const file = db.prepare("SELECT file FROM pragma_database_list WHERE name = 'main'").get().file;
+  process.stdout.write(JSON.stringify({ timeout: Object.values(timeout)[0], journal: Object.values(journal)[0], file }));
   db.close();
 `;
 const run = spawnSync(process.execPath, ['-e', probe], {
@@ -41,6 +42,11 @@ const run = spawnSync(process.execPath, ['-e', probe], {
   env: { ...process.env, DB_PATH: scratchDb },
 });
 const out = run.status === 0 ? JSON.parse(run.stdout) : null;
+
+test('connection.js opened the scratch DB_PATH, not the live database', () => {
+  assert.ok(out, `child failed: ${run.stderr}`);
+  assert.strictEqual(fs.realpathSync(out.file), fs.realpathSync(scratchDb));
+});
 
 test('connection.js opens with busy_timeout = 5000', () => {
   assert.ok(out, `child failed: ${run.stderr}`);
