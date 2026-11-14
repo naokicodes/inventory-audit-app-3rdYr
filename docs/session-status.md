@@ -3551,6 +3551,7 @@ scripts/seed-test-accounts.js (new), package.json, scripts/preview.ps1. Server a
 no click-through, no migration.
 
 ## Step settings-guard - Settings changes need an admin (A0)
+**CLOSED 2026-11-14, PR #61 (`a7a420f`).**
 
 Decided 2026-11-02 (ADR-042, ADR-040). DEPENDS ON stub-login (req.user; closed). Runnable now.
 

@@ -342,6 +342,7 @@ previews run it after the reseed. Server and scripts only, no click-through. Ful
 session-status.md -> "Step test-accounts".
 
 ### 3zu. Step settings-guard - Settings changes need an admin  [runnable]
+**CLOSED 2026-11-14, PR #61 (`a7a420f`).**
 Touches: server/middleware/requireAdmin.js, server/routes/settings.js, server/routes/settings.test.js
 ADR-042: every Settings change needs a logged-in admin; reads stay open. Server-only. Full spec:
 session-status.md -> "Step settings-guard".
