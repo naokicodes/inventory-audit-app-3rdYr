@@ -154,12 +154,17 @@ set /p "TOK=        Likod Loyverse token: "
 if defined TOK (>>".env" echo LOYVERSE_LIKOD_TOKEN=%TOK%)
 if not defined TOK (>>".env" echo # LOYVERSE_LIKOD_TOKEN=)
 set "TOK="
+set /p "TOK=        FC Loyverse token: "
+if defined TOK (>>".env" echo LOYVERSE_FC_TOKEN=%TOK%)
+if not defined TOK (>>".env" echo # LOYVERSE_FC_TOKEN=)
+set "TOK="
 echo        Written.
 goto :env_done
 :env_have
 call :checkenv
 if errorlevel 1 goto :fail
 echo        Already there - kept as is. DB_PATH=%ENVDB%
+call :fctoken
 :env_done
 
 REM --- 8. Beta database, created once -----------------------------------
@@ -199,7 +204,7 @@ echo            Run this file again and click Yes.
 set "WARN=1"
 goto :admin_done
 :admin_ok
-echo        Port %APP_PORT% open to phones on this network only, sleep off.
+echo        Port %APP_PORT% open to phones on this network and on Tailscale, sleep off.
 :admin_done
 
 REM --- Desktop launcher -------------------------------------------------
@@ -437,6 +442,21 @@ REM errorlevel 1 when something already listens on the app's port.
 powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort %APP_PORT% -State Listen -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
 exit /b %errorlevel%
 
+:fctoken
+REM FC joined Loyverse after the first setups. Setup only: if .env has no FC line at all,
+REM ask once and append it. Nothing else in .env is touched; the daily start never asks.
+findstr /b /c:"LOYVERSE_FC_TOKEN=" /c:"# LOYVERSE_FC_TOKEN=" ".env" >nul 2>&1
+if not errorlevel 1 exit /b 0
+echo        FC is on Loyverse now. Paste its token and press Enter, or just Enter to skip.
+set "TOK="
+set /p "TOK=        FC Loyverse token: "
+>>".env" echo.
+if defined TOK (>>".env" echo LOYVERSE_FC_TOKEN=%TOK%)
+if not defined TOK (>>".env" echo # LOYVERSE_FC_TOKEN=)
+set "TOK="
+echo        FC token line added to .env.
+exit /b 0
+
 :checkenv
 REM An existing .env must point at beta.db. Never rewritten here: stop and say what it found.
 set "ENVDB="
@@ -466,11 +486,13 @@ REM Clear old rules, including any block rule Windows made if its own
 REM "allow node?" prompt was ever cancelled - a block rule beats an allow.
 netsh advfirewall firewall delete rule name="Inventory Audit App" >nul 2>&1
 netsh advfirewall firewall delete rule name="Node.js JavaScript Runtime" >nul 2>&1
-REM ONE rule: node, on the app's port only, from this network only, on Private only.
+REM ONE rule: node, on the app's port only, from this network and from Tailscale
+REM (100.64.0.0/10), on Private and Public: Windows may class the Tailscale adapter
+REM as Public, and the remoteip limit keeps everyone else out.
 REM Naming node stops Windows' own "Allow Node.js?" pop-up, whose Allow would open
 REM every node port (3100 too) and whose Cancel would add a block rule.
-if defined NODEEXE netsh advfirewall firewall add rule name="Inventory Audit App" dir=in action=allow program="%NODEEXE%" protocol=TCP localport=%APP_PORT% remoteip=localsubnet profile=private >nul
-if not defined NODEEXE netsh advfirewall firewall add rule name="Inventory Audit App" dir=in action=allow protocol=TCP localport=%APP_PORT% remoteip=localsubnet profile=private >nul
+if defined NODEEXE netsh advfirewall firewall add rule name="Inventory Audit App" dir=in action=allow program="%NODEEXE%" protocol=TCP localport=%APP_PORT% remoteip=localsubnet,100.64.0.0/10 profile=private,public >nul
+if not defined NODEEXE netsh advfirewall firewall add rule name="Inventory Audit App" dir=in action=allow protocol=TCP localport=%APP_PORT% remoteip=localsubnet,100.64.0.0/10 profile=private,public >nul
 REM Only the network this PC is connected through becomes Private, never every network.
 powershell -NoProfile -Command "$r = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -First 1; if ($r) { Set-NetConnectionProfile -InterfaceIndex $r.InterfaceIndex -NetworkCategory Private }"
 REM Never sleep or hibernate while plugged in.
