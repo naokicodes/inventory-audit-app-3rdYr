@@ -6,12 +6,20 @@
     {
       "label": "Silingan",
       "key": "silingan",
-      "tokenEnv": "LOYVERSE_SILINGAN_TOKEN"
+      "tokenEnv": "LOYVERSE_SILINGAN_TOKEN",
+      "group": "silingan-likod"
     },
     {
       "label": "Likod",
       "key": "likod",
-      "tokenEnv": "LOYVERSE_LIKOD_TOKEN"
+      "tokenEnv": "LOYVERSE_LIKOD_TOKEN",
+      "group": "silingan-likod"
+    },
+    {
+      "label": "FC",
+      "key": "fc",
+      "tokenEnv": "LOYVERSE_FC_TOKEN",
+      "group": "fc"
     }
   ],
   "dishes": [

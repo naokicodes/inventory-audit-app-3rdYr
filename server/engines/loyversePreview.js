@@ -1,6 +1,7 @@
 // Loyverse sales preview (Step loyverse-preview-i) - the read-only dry run
 // of the Loyverse port (docs/loyverse-sync.md -> "Dry-run sync for a date").
-// Per-dish sales from BOTH Loyverse accounts for one business date.
+// Per-dish sales from the Silingan + Likod Loyverse accounts for one business
+// date, and (Step loyverse-fc) FC's items by its own Loyverse categories.
 //
 // WRITES NOTHING: no table, no migration, not on the audit engine's path
 // (rule 14). Pure logic plus an injected fetch, so tests never touch the
@@ -19,6 +20,13 @@ const { manilaDate, businessDate, BUSINESS_DAY_START_HOUR } = require('../busine
 
 const NAME_MAP_PATH = path.join(__dirname, '..', 'db', 'loyverse-name-map.json');
 const RECEIPTS_URL = 'https://api.loyverse.com/v1.0/receipts';
+const ITEMS_URL = 'https://api.loyverse.com/v1.0/items';
+const CATEGORIES_URL = 'https://api.loyverse.com/v1.0/categories';
+// The POS groups the Kitchen Sales switch shows (ADR-066). Only the first has
+// the dish table; the others are listed by their own Loyverse categories.
+const DISH_GROUP = 'silingan-likod';
+const POS_GROUPS = ['silingan-likod', 'fc'];
+const NO_CATEGORY = 'No category';
 const LOOKBACK_DAYS = 7;
 const PAGE_LIMIT = 250;
 
@@ -90,19 +98,16 @@ function buildResolver(dishes, accountKey) {
   };
 }
 
-// Pages through every receipt in the window, following `cursor` until null.
-// Throws on non-200 or a network error; the message never carries the token.
-async function fetchReceipts({ token, window, fetchImpl }) {
-  const receipts = [];
+// Pages through one Loyverse list endpoint, following `cursor` until null, and
+// returns every entry under `listKey`. Throws on non-200 or a network error;
+// the message never carries the token.
+async function fetchPaged({ url, query = {}, listKey, token, fetchImpl }) {
+  const out = [];
   let cursor = null;
   do {
-    const params = new URLSearchParams({
-      created_at_min: window.min,
-      created_at_max: window.max,
-      limit: String(PAGE_LIMIT),
-    });
+    const params = new URLSearchParams({ ...query, limit: String(PAGE_LIMIT) });
     if (cursor) params.set('cursor', cursor);
-    const res = await fetchImpl(`${RECEIPTS_URL}?${params}`, {
+    const res = await fetchImpl(`${url}?${params}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.status !== 200) {
@@ -112,10 +117,25 @@ async function fetchReceipts({ token, window, fetchImpl }) {
       throw new Error(msg.split(token).join('[redacted]'));
     }
     const body = await res.json();
-    receipts.push(...(Array.isArray(body.receipts) ? body.receipts : []));
+    out.push(...(Array.isArray(body[listKey]) ? body[listKey] : []));
     cursor = body.cursor || null;
   } while (cursor);
-  return receipts;
+  return out;
+}
+
+// Every receipt in the window.
+function fetchReceipts({ token, window, fetchImpl }) {
+  return fetchPaged({
+    url: RECEIPTS_URL,
+    query: { created_at_min: window.min, created_at_max: window.max },
+    listKey: 'receipts',
+    token,
+    fetchImpl,
+  });
+}
+
+function redact(err, token) {
+  return String(err && err.message ? err.message : err).split(token).join('[redacted]');
 }
 
 function num(q) {
@@ -137,7 +157,7 @@ async function previewAccount({ account, date, dishes, env, fetchImpl }) {
   try {
     receipts = await fetchReceipts({ token, window: receiptWindow(date), fetchImpl });
   } catch (err) {
-    status.error = String(err && err.message ? err.message : err).split(token).join('[redacted]');
+    status.error = redact(err, token);
     return { status };
   }
 
@@ -208,26 +228,34 @@ async function previewAccount({ account, date, dishes, env, fetchImpl }) {
   };
 }
 
+// The accounts of one POS group (ADR-066): 'silingan-likod' (the dish table)
+// or 'fc' (the category cards).
+function groupAccounts(nameMap, group) {
+  return (nameMap.accounts || []).filter(a => a.group === group);
+}
+
 // The full preview for one business date. `env` holds the tokens (normally
-// process.env); `fetchImpl` is injected (normally global fetch).
+// process.env); `fetchImpl` is injected (normally global fetch). Reads only
+// the silingan-likod accounts, so FC's token (set or not) never touches it.
 async function computePreview({ date, nameMap = loadNameMap(), env = process.env, fetchImpl = fetch }) {
   if (!isValidDate(date)) throw new Error('date must be YYYY-MM-DD');
   const dishes = nameMap.dishes || [];
+  const accounts = groupAccounts(nameMap, DISH_GROUP);
 
   const results = await Promise.all(
-    nameMap.accounts.map(account => previewAccount({ account, date, dishes, env, fetchImpl }))
+    accounts.map(account => previewAccount({ account, date, dishes, env, fetchImpl }))
   );
 
   const byKey = {};
-  nameMap.accounts.forEach((account, i) => { byKey[account.key] = results[i]; });
+  accounts.forEach((account, i) => { byKey[account.key] = results[i]; });
 
   const dishRows = dishes.map(dish => {
     const row = { dish_code: dish.dish_code, name: dish.name };
-    for (const account of nameMap.accounts) {
+    for (const account of accounts) {
       const r = byKey[account.key];
       row[account.key] = r.status.ok ? (r.quantities.get(dish.dish_code) || 0) : null;
     }
-    row.total = dishTotal(row, dish, nameMap.accounts);
+    row.total = dishTotal(row, dish, accounts);
     return row;
   });
 
@@ -260,8 +288,117 @@ function dishTotal(row, dish, accounts) {
   return sellers > 0 && sellersOk === 0 ? null : total;
 }
 
+// One account for the category view (Step loyverse-fc). Same window, fetch and
+// failure rules as previewAccount; a REFUND receipt's lines SUBTRACT here.
+// Then the account's /items and /categories place each line's item_id in a
+// category. If either catalog call fails, the receipts still count: every
+// line lands in "No category" and status.catalogError says why. Never throws.
+async function categoryAccount({ account, date, env, fetchImpl }) {
+  const status = { label: account.label, ok: false, receiptsScanned: 0, receiptsKept: 0, receiptTypes: {}, lastReceiptAt: null };
+  const token = env[account.tokenEnv];
+  if (!token) {
+    status.error = 'token not set';
+    return { status };
+  }
+
+  let receipts;
+  try {
+    receipts = await fetchReceipts({ token, window: receiptWindow(date), fetchImpl });
+  } catch (err) {
+    status.error = redact(err, token);
+    return { status };
+  }
+
+  // item_id -> category name. Deleted items and categories are asked for too:
+  // an item sold that day may have been deleted since.
+  let categoryOf = null;
+  try {
+    const [items, categories] = await Promise.all([
+      fetchPaged({ url: ITEMS_URL, query: { show_deleted: 'true' }, listKey: 'items', token, fetchImpl }),
+      fetchPaged({ url: CATEGORIES_URL, query: { show_deleted: 'true' }, listKey: 'categories', token, fetchImpl }),
+    ]);
+    const catName = new Map(categories.map(c => [c.id, c.name]));
+    categoryOf = new Map();
+    for (const item of items) {
+      const name = item.category_id != null ? catName.get(item.category_id) : null;
+      if (name) categoryOf.set(item.id, name);
+    }
+  } catch (err) {
+    status.catalogError = redact(err, token);
+  }
+
+  const lines = []; // { category, name, quantity }
+  let lastReceiptAtMs = -Infinity;
+  status.receiptsScanned = receipts.length;
+  for (const receipt of receipts) {
+    if (receipt.cancelled_at) continue;
+    if (businessDate(receipt.receipt_date) !== date) continue;
+    status.receiptsKept++;
+    if (receipt.receipt_type) {
+      status.receiptTypes[receipt.receipt_type] = (status.receiptTypes[receipt.receipt_type] || 0) + 1;
+    }
+    const sign = receipt.receipt_type === 'REFUND' ? -1 : 1;
+    let hasLine = false;
+    for (const line of receipt.line_items || []) {
+      const { item_name, quantity, item_id } = line;
+      hasLine = true;
+      const category = (categoryOf && categoryOf.get(item_id)) || NO_CATEGORY;
+      lines.push({ category, name: item_name == null ? '' : String(item_name), quantity: sign * num(quantity) });
+    }
+    if (hasLine) {
+      const t = new Date(receipt.receipt_date).getTime();
+      if (Number.isFinite(t) && t > lastReceiptAtMs) {
+        lastReceiptAtMs = t;
+        status.lastReceiptAt = receipt.receipt_date;
+      }
+    }
+  }
+
+  status.ok = true;
+  return { status, lines };
+}
+
+// FC's side of Kitchen Sales (ADR-066): items sold on one business date,
+// grouped by the group's own Loyverse categories. Categories sorted by name;
+// items biggest first (then by name); an item netting 0 is left out, and a
+// category left empty is dropped. Only item_name, quantity and item_id are
+// read from a line - never a money field.
+async function computeCategories({ date, group, nameMap = loadNameMap(), env = process.env, fetchImpl = fetch }) {
+  if (!isValidDate(date)) throw new Error('date must be YYYY-MM-DD');
+  const accounts = groupAccounts(nameMap, group);
+  const results = await Promise.all(
+    accounts.map(account => categoryAccount({ account, date, env, fetchImpl }))
+  );
+
+  const byCategory = new Map(); // category -> Map(item name -> qty)
+  for (const r of results) {
+    for (const { category, name, quantity } of r.lines || []) {
+      if (!byCategory.has(category)) byCategory.set(category, new Map());
+      const items = byCategory.get(category);
+      items.set(name, (items.get(name) || 0) + quantity);
+    }
+  }
+
+  const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const categories = [...byCategory]
+    .map(([name, items]) => ({
+      name,
+      items: [...items]
+        .filter(([, quantity]) => quantity !== 0)
+        .map(([itemName, quantity]) => ({ name: itemName, quantity }))
+        .sort((a, b) => b.quantity - a.quantity || byName(a.name.toLowerCase(), b.name.toLowerCase())),
+    }))
+    .filter(c => c.items.length > 0)
+    .sort((a, b) => byName(a.name.toLowerCase(), b.name.toLowerCase()));
+
+  return { date, group, accounts: results.map(r => r.status), categories };
+}
+
 module.exports = {
   computePreview,
+  computeCategories,
+  POS_GROUPS,
+  NO_CATEGORY,
   loadNameMap,
   isValidDate,
   manilaDate,

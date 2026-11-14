@@ -5,7 +5,7 @@
 
 const assert = require('assert');
 const {
-  computePreview, loadNameMap, isValidDate, manilaDate, businessDate, receiptWindow, normalize, buildResolver,
+  computePreview, computeCategories, loadNameMap, isValidDate, manilaDate, businessDate, receiptWindow, normalize, buildResolver,
 } = require('./loyversePreview.js');
 
 let passed = 0, failed = 0;
@@ -16,8 +16,8 @@ console.log('Loyverse Preview Engine Tests (loyverse-preview-i)\n');
 
 const MAP = {
   accounts: [
-    { label: 'Silingan', key: 'silingan', tokenEnv: 'TOK_S' },
-    { label: 'Likod', key: 'likod', tokenEnv: 'TOK_L' },
+    { label: 'Silingan', key: 'silingan', tokenEnv: 'TOK_S', group: 'silingan-likod' },
+    { label: 'Likod', key: 'likod', tokenEnv: 'TOK_L', group: 'silingan-likod' },
   ],
   dishes: [
     { dish_code: 'D001', name: 'Meatball Pasta', silingan: 'Meatball Pasta', likod: 'Meatball  pasta', note: '' },
@@ -485,7 +485,11 @@ test('every map row present in map order, zeros included; no price/total-money k
 
 test('the committed name map loads with 43 dishes and resolves the October renames', () => {
   const map = loadNameMap();
-  assert.deepStrictEqual(map.accounts.map(a => a.tokenEnv), ['LOYVERSE_SILINGAN_TOKEN', 'LOYVERSE_LIKOD_TOKEN']);
+  assert.deepStrictEqual(map.accounts.map(a => [a.tokenEnv, a.group]), [
+    ['LOYVERSE_SILINGAN_TOKEN', 'silingan-likod'],
+    ['LOYVERSE_LIKOD_TOKEN', 'silingan-likod'],
+    ['LOYVERSE_FC_TOKEN', 'fc'],
+  ]);
   assert.strictEqual(map.dishes.length, 43);
   for (const d of map.dishes) {
     assert.ok(d.dish_code && typeof d.silingan === 'string' && typeof d.likod === 'string', d.dish_code);
@@ -503,6 +507,175 @@ test('the committed name map loads with 43 dishes and resolves the October renam
 
 test('malformed date is rejected', async () => {
   await assert.rejects(() => computePreview({ date: '2026-13-01', nameMap: MAP, env: ENV, fetchImpl: stubFetch({}) }), /YYYY-MM-DD/);
+});
+
+// --- Step loyverse-fc: FC's account and the category view ---
+
+const FC_ACCOUNT = { label: 'FC', key: 'fc', tokenEnv: 'TOK_FC', group: 'fc' };
+const MAP_FC = { ...MAP, accounts: [...MAP.accounts, FC_ACCOUNT] };
+
+// Routes by path: /receipts pages as stubFetch; /items and /categories from
+// `catalog[token]` ({ items, categories } or { itemsStatus / categoriesStatus }).
+function stubFetchFc(receiptPages, catalog = {}, calls = []) {
+  const receipts = stubFetch(receiptPages, calls);
+  return async (url, opts) => {
+    const u = new URL(url);
+    const token = opts.headers.Authorization.replace('Bearer ', '');
+    if (u.pathname.endsWith('/receipts')) return receipts(url, opts);
+    calls.push({ token, url: u });
+    const c = catalog[token] || {};
+    const kind = u.pathname.endsWith('/items') ? 'items' : 'categories';
+    const status = c[kind + 'Status'];
+    if (status) return { status, text: async () => 'nope ' + token, json: async () => ({}) };
+    return { status: 200, text: async () => '', json: async () => ({ [kind]: c[kind] || [], cursor: null }) };
+  };
+}
+
+const FC_CATALOG = {
+  'secret-fc': {
+    categories: [{ id: 'cat-p', name: 'Pizza' }, { id: 'cat-a', name: 'Add-ons' }, { id: 'cat-d', name: 'Drinks' }],
+    items: [
+      { id: 'i-Margherita', item_name: 'Margherita', category_id: 'cat-p' },
+      { id: 'i-Pepperoni', item_name: 'Pepperoni', category_id: 'cat-p' },
+      { id: 'i-Extra Cheese', item_name: 'Extra Cheese', category_id: 'cat-a' },
+      { id: 'i-Coke', item_name: 'Coke', category_id: 'cat-d' },
+      { id: 'i-Loose', item_name: 'Loose', category_id: null },
+    ],
+  },
+};
+const ENV_FC = { ...ENV, TOK_FC: 'secret-fc' };
+const D = '2026-10-03T04:00:00Z';
+
+test('loyverse-fc: the dish preview is byte-for-byte the same with FC in the map, token set or not', async () => {
+  const pages = {
+    'secret-s': [[receipt(D, [['Meatball Pasta', 2], ['Odd', 1]])]],
+    'secret-l': [[receipt(D, [['Meatball pasta', 3]])]],
+    'secret-fc': [[receipt(D, [['Margherita', 9]])]],
+  };
+  const base = JSON.stringify(await computePreview({ date: '2026-10-03', nameMap: MAP, env: ENV, fetchImpl: stubFetch(pages) }));
+  const calls = [];
+  const withToken = JSON.stringify(await computePreview({ date: '2026-10-03', nameMap: MAP_FC, env: ENV_FC, fetchImpl: stubFetch(pages, calls) }));
+  const noToken = JSON.stringify(await computePreview({ date: '2026-10-03', nameMap: MAP_FC, env: ENV, fetchImpl: stubFetch(pages) }));
+  assert.strictEqual(withToken, base);
+  assert.strictEqual(noToken, base);
+  assert.ok(calls.every(c => c.token !== 'secret-fc'), 'FC fetched by the dish preview');
+});
+
+test('loyverse-fc: FC lines are grouped by its categories, sorted by name, items biggest first, 0 left out', async () => {
+  const r = await computeCategories({
+    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
+    fetchImpl: stubFetchFc({ 'secret-fc': [[
+      receipt(D, [['Margherita', 2], ['Pepperoni', 5], ['Coke', 1]]),
+      receipt(D, [['Margherita', 1], ['Extra Cheese', 2]]),
+      receipt('2026-10-04T04:00:00Z', [['Pepperoni', 50]]), // another business date
+      receipt(D, [['Pepperoni', 7]], { cancelled_at: D }),
+    ]] }, FC_CATALOG),
+  });
+  assert.strictEqual(r.date, '2026-10-03');
+  assert.strictEqual(r.group, 'fc');
+  assert.deepStrictEqual(r.categories, [
+    { name: 'Add-ons', items: [{ name: 'Extra Cheese', quantity: 2 }] },
+    { name: 'Drinks', items: [{ name: 'Coke', quantity: 1 }] },
+    { name: 'Pizza', items: [{ name: 'Pepperoni', quantity: 5 }, { name: 'Margherita', quantity: 3 }] },
+  ]);
+  assert.strictEqual(r.accounts.length, 1);
+  assert.strictEqual(r.accounts[0].label, 'FC');
+  assert.strictEqual(r.accounts[0].ok, true);
+  assert.strictEqual(r.accounts[0].receiptsKept, 2);
+  assert.strictEqual(r.accounts[0].lastReceiptAt, D);
+});
+
+test('loyverse-fc: REFUND lines subtract; an item netting 0 is left out', async () => {
+  const r = await computeCategories({
+    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
+    fetchImpl: stubFetchFc({ 'secret-fc': [[
+      receipt(D, [['Margherita', 4], ['Coke', 1]]),
+      receipt(D, [['Margherita', 1], ['Coke', 1]], { receipt_type: 'REFUND' }),
+    ]] }, FC_CATALOG),
+  });
+  assert.deepStrictEqual(r.categories, [{ name: 'Pizza', items: [{ name: 'Margherita', quantity: 3 }] }]);
+  assert.deepStrictEqual(r.accounts[0].receiptTypes, { SALE: 1, REFUND: 1 });
+});
+
+test('loyverse-fc: an item missing from /items, or without a category, lands in "No category"', async () => {
+  const r = await computeCategories({
+    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
+    fetchImpl: stubFetchFc({ 'secret-fc': [[receipt(D, [['Ghost', 2], ['Loose', 1], ['Margherita', 1]])]] }, FC_CATALOG),
+  });
+  assert.deepStrictEqual(r.categories, [
+    { name: 'No category', items: [{ name: 'Ghost', quantity: 2 }, { name: 'Loose', quantity: 1 }] },
+    { name: 'Pizza', items: [{ name: 'Margherita', quantity: 1 }] },
+  ]);
+  assert.strictEqual(r.accounts[0].catalogError, undefined);
+});
+
+test('loyverse-fc: /items or /categories failing -> every item under "No category" and catalogError, token redacted', async () => {
+  for (const failing of ['itemsStatus', 'categoriesStatus']) {
+    const catalog = { 'secret-fc': { ...FC_CATALOG['secret-fc'], [failing]: 500 } };
+    const r = await computeCategories({
+      date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
+      fetchImpl: stubFetchFc({ 'secret-fc': [[receipt(D, [['Margherita', 2], ['Coke', 1]])]] }, catalog),
+    });
+    assert.strictEqual(r.accounts[0].ok, true, failing);
+    assert.ok(/500/.test(r.accounts[0].catalogError), failing);
+    assert.deepStrictEqual(r.categories, [
+      { name: 'No category', items: [{ name: 'Margherita', quantity: 2 }, { name: 'Coke', quantity: 1 }] },
+    ], failing);
+    assert.ok(!JSON.stringify(r).includes('secret-fc'), 'token leaked (' + failing + ')');
+  }
+});
+
+test('loyverse-fc: categories and items follow the cursor across pages', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const u = new URL(url);
+    calls.push(u);
+    const page = u.searchParams.get('cursor') ? 2 : 1;
+    if (u.pathname.endsWith('/receipts')) {
+      return { status: 200, json: async () => ({ receipts: [receipt(D, [['Margherita', 1], ['Coke', 1]])], cursor: null }) };
+    }
+    if (u.pathname.endsWith('/items')) {
+      return { status: 200, json: async () => (page === 1
+        ? { items: [{ id: 'i-Margherita', category_id: 'cat-p' }], cursor: 'x' }
+        : { items: [{ id: 'i-Coke', category_id: 'cat-d' }], cursor: null }) };
+    }
+    return { status: 200, json: async () => (page === 1
+      ? { categories: [{ id: 'cat-p', name: 'Pizza' }], cursor: 'y' }
+      : { categories: [{ id: 'cat-d', name: 'Drinks' }], cursor: null }) };
+  };
+  const r = await computeCategories({ date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC, fetchImpl });
+  assert.deepStrictEqual(r.categories.map(c => c.name), ['Drinks', 'Pizza']);
+  assert.strictEqual(calls.filter(u => u.pathname.endsWith('/items')).length, 2);
+  assert.strictEqual(calls.filter(u => u.pathname.endsWith('/categories')).length, 2);
+});
+
+test('loyverse-fc: an unset FC token fails only FC; no sales -> empty categories', async () => {
+  const r = await computeCategories({ date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV, fetchImpl: stubFetchFc({}) });
+  assert.deepStrictEqual(r.accounts.map(a => [a.label, a.ok, a.error]), [['FC', false, 'token not set']]);
+  assert.deepStrictEqual(r.categories, []);
+  const empty = await computeCategories({ date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC, fetchImpl: stubFetchFc({}, FC_CATALOG) });
+  assert.strictEqual(empty.accounts[0].ok, true);
+  assert.deepStrictEqual(empty.categories, []);
+});
+
+test('loyverse-fc: a receipts failure never carries the token; no price or total field in the FC body', async () => {
+  const bad = await computeCategories({
+    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC, fetchImpl: stubFetchFc({ 'secret-fc': { status: 401 } }),
+  });
+  assert.strictEqual(bad.accounts[0].ok, false);
+  assert.ok(/401/.test(bad.accounts[0].error));
+  assert.ok(!JSON.stringify(bad).includes('secret-fc'));
+  const thrown = await computeCategories({
+    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
+    fetchImpl: async () => { throw new Error('socket hang up for secret-fc'); },
+  });
+  assert.strictEqual(thrown.accounts[0].ok, false);
+  assert.ok(!JSON.stringify(thrown).includes('secret-fc'));
+  const ok = await computeCategories({
+    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
+    fetchImpl: stubFetchFc({ 'secret-fc': [[receipt(D, [['Margherita', 2]])]] }, FC_CATALOG),
+  });
+  assert.ok(!/price|total|money|cost/i.test(JSON.stringify(ok)), 'money field in FC body');
 });
 
 (async () => {
