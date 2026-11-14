@@ -117,11 +117,13 @@
       }
 
       return `
+        <div class="table-scroll">
         <table class="diff">
           <tbody>
             ${rows.map(r => `<tr><th>${escapeHtml(r.key)}</th><td>${r.html}</td></tr>`).join('')}
           </tbody>
         </table>
+        </div>
       `;
     }
 
