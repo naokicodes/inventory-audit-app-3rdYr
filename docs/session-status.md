@@ -4272,6 +4272,7 @@ Received (A9), who counts which sheet tonight (tonight-picks).
 main_unit change once the item has any side_counts row (same 409 message). Tests gain it.
 
 ## Step settings-tabs - the Settings tab row scrolls in its own strip (issue #70)
+**CLOSED 2026-11-14, PR #75 (`2440655`).**
 
 Decided 2026-11-14 (ADR-077). DEPENDS ON table-scroll (settings.html). Runnable once it merges.
 

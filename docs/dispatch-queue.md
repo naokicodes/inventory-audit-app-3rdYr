@@ -373,6 +373,7 @@ sheet excluded: cards). No style change. PUBLIC -> click-through. Full spec: ses
 **2026-11-14:** issue #70 answered (ADR-077): PR #69 merges as built; Settings' tab row is settings-tabs.
 
 ### Step settings-tabs - the Settings tab row scrolls in its own strip  [blocked: table-scroll]
+**CLOSED 2026-11-14, PR #75 (`2440655`).**
 Touches: public/settings.html
 Issue #70 (ADR-077): `.tabs` becomes one row that swipes sideways; the page stays still. Style
 only, page-local. PUBLIC -> click-through. Full spec: session-status.md -> "Step settings-tabs".
