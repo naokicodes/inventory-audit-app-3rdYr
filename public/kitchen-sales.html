@@ -178,6 +178,8 @@
       return saved === 'fc' ? 'fc' : 'silingan-likod';
     }
     let pos = initialPos();
+    // A ?pos= link also becomes this phone's remembered side.
+    try { localStorage.setItem(POS_KEY, pos); } catch (e) { /* private mode: not remembered */ }
 
     function showPos() {
       posSlBtn.setAttribute('aria-pressed', String(pos === 'silingan-likod'));
@@ -327,7 +329,7 @@
       const partial = data.accounts.filter(a => a.ok && a.catalogError);
       fcPartialEl.hidden = partial.length === 0;
       fcPartialEl.textContent = partial.length
-        ? "Loyverse's categories could not be loaded, so every item is under No category."
+        ? "Loyverse's item list or categories could not be loaded, so every item is under No category."
         : '';
 
       const anyOk = data.accounts.some(a => a.ok);
