@@ -70,6 +70,10 @@ is. Read the step's own section in `session-status.md` before starting.
 > busy-timeout, loyverse-fc, #63 (3zb), table-scroll, 3zw staff-meal-settings, side-items, 3l
 > user-id-authorship, side-sheets. Tag beta-2 after #61, #65 and #59 merge (smoke list first,
 > ADR-039).
+> **2026-11-14 (after #59):** PRs #61, #65, #59 merged; beta-2 is due (smoke list first). Order:
+> busy-timeout; 3l user-id-authorship; 3zj role-assignments; loyverse-fc, #63 (3zb) and
+> table-scroll together when Naoki can phone-check; 3zw staff-meal-settings; side-items; then
+> cost-guard, 3zx staff-meal-log, side-sheets, 3zs, 3zk, 3zd. Schema steps one at a time.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 

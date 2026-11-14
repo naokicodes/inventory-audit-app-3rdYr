@@ -132,9 +132,19 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-074; the index, and a map from handoff item numbers to records, is in
+to ADR-075; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, cubic optional) - decided (recorded: ADR-075)
+
+- **cubic is optional (ADR-075).** `/naoki-qs` never waits for cubic and sorts whatever it has
+  posted; `/naoki-qpr` lists cubic findings that arrived after a merge (last 7 days) for the
+  architect. Supersedes ADR-071's wait.
+- **Order after PR #59 (site-filter) merged:** busy-timeout, then the identity chain 3l
+  user-id-authorship -> 3zj role-assignments (it unblocks cost-guard, staff-meal-log, roles-page,
+  site-filter-ii and the roster); loyverse-fc, #63 and table-scroll when Naoki can phone-check;
+  then 3zw staff-meal-settings and side-items (schema steps one at a time).
 
 ### 2026-11-14 architect (A0, #68) - decided (recorded: ADR-074)
 

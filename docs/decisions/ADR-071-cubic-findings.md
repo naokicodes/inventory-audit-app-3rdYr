@@ -1,6 +1,6 @@
 # ADR-071 cubic's findings are sorted by the builder
 
-- Status: Accepted 2026-11-14
+- Status: Accepted 2026-11-14; superseded in part by ADR-075 (no waiting; late findings swept up)
 - Decided by: Naoki
 - Supersedes: -
 

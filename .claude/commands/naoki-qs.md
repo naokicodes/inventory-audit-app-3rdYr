@@ -141,12 +141,13 @@ looks only at what changed since. A fresh first review only if the fix rewrote m
 most two fix rounds. Still failing after two: leave the PR open, comment what is wrong in
 plain words, and stop.
 
-**cubic's findings (ADR-071).** cubic, the automatic GitHub reviewer, reviews every push. Once CI
-is green, read its open findings on the current head:
+**cubic's findings (ADR-071, ADR-075).** cubic, the automatic GitHub reviewer, is optional: it does
+not review every push and often reviews hours later, so never wait for it. Once CI is green, read
+whatever it has posted on this PR so far (open findings, not outdated, any commit):
 `gh api "repos/{owner}/{repo}/pulls/<n>/comments" --jq '.[] | select(.user.login | test("cubic")) | select(.position != null) | {path, line, body}'`,
-plus its summary in `gh pr view <n> --comments`. If it has not reviewed the current head yet, look
-once more after about five minutes; if still nothing, say "cubic had not reviewed <hash>" in the
-comment below and go on. Sort each finding into exactly one:
+plus its summary in `gh pr view <n> --comments`. If it has posted nothing, write "cubic: not
+reviewed yet" in the comment below and go on; findings that arrive after the merge are listed by
+`/naoki-qpr` (ADR-075). Sort each finding into exactly one:
 - **Fix**: a real bug inside the step's spec and its Touches files, fixed without changing anything
   the spec describes. Fix it as a fix round (the two-round limit above counts it), then re-check.
 - **Contradicts**: following it would break the spec, a decision block or an ADR (for example,
