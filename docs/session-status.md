@@ -132,9 +132,15 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-079; the index, and a map from handoff item numbers to records, is in
+to ADR-080; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, #77) - decided (recorded: ADR-080)
+
+- **Authorship stamps (ADR-080, issue #77).** The last saver is credited; restaurant counts also get
+  the name in the old created_by (allowlist entries deleted); a corrected sync-filled prep number
+  credits the corrector. PR #76 complete as built.
 
 ### 2026-11-14 architect (A0, PR #74 conversions) - decided (recorded: ADR-079)
 
@@ -1973,6 +1979,15 @@ idempotent + preserves rows.
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, the write routes
 carrying created_by (+ tests). Server-only, no click-through. Big migration -> sequences with the
 other schema/migration steps (24d-i, users-roles, user-sites).
+
+**Decisions 2026-11-14 (issue #77, Naoki; ADR-080).** These override any reading of the text above.
+- Q1: a row saved again is credited to its last saver (count_entries keeps every save).
+- Q2: ending_actual and portion_ending_actual also get the saver's name in created_by (new writes
+  only, no backfill); the two "UNVERIFIED" allowlist entries are deleted.
+- Q3: correcting a sync-filled prep number credits the corrector in created_by_user_id;
+  prepped.created_by stays provenance as today.
+- Touches gains public/history.html (one line: hide created_by_user_id in History's diffs). PUBLIC
+  -> a click-through of History before merge. PR #76 is complete as built.
 
 ## Step site-filter - query-layer site scoping enforcement (slice 5)
 **CLOSED 2026-11-14, PR #59 (`8f0fd61`).**
