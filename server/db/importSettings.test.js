@@ -159,12 +159,12 @@ try {
       'name,default_role,active,site_memberships',
       'Owner Person,super-admin,1,',
       'Other Owner,super-admin,1,',
-      'Owner Person,checker,1,',      // duplicate name too
       'superadmin,checker,1,',        // nobody holds this name any more: plain insert
     ].join('\n') }));
     assert.deepStrictEqual(superAdmins(db), ['Owner Person']);
     assert.strictEqual(user(db, 'Other Owner'), undefined);
-    assert.ok(report.duplicateNames.includes('Users: Owner Person'));
+    assert.ok(report.problems.some(p => /a second super-admin row/.test(p)), report.problems.join('; '));
+    assert.strictEqual(user(db, 'superadmin').role, 'checker');
 
     // Re-import naming the (renamed) super-admin with another role.
     const report2 = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nOwner Person,admin,1,\n' }));
@@ -197,9 +197,125 @@ try {
     const after1 = counts(db);
     const report = importIdentity(db, dir);
     assert.deepStrictEqual(counts(db), after1);
-    for (const k of ['rolesInserted', 'rolesUpdated', 'usersInserted', 'usersUpdated', 'membershipsAdded']) {
+    for (const k of ['rolesInserted', 'rolesUpdated', 'usersInserted', 'usersUpdated', 'membershipsAdded', 'membershipsRemoved']) {
       assert.strictEqual(report[k], 0, `${k} on the second run`);
     }
+    assert.deepStrictEqual(report.spellingUpdated, []);
+  });
+
+  // --- decisions 2026-11-12 (issue #66, ADR-047) ---
+
+  test('a duplicated name changes nothing, in Roles.csv and in Users.csv', () => {
+    const db = freshDb();
+    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nKim,checker,1,RA\n' }));
+    const kim = user(db, 'Kim');
+    const before = counts(db);
+    const report = importIdentity(db, workbook({
+      Roles: [
+        'name,can_enter_counts,can_finalize,can_admin,read_only',
+        'checker,1,1,1,0',
+        'Checker ,0,0,0,1',            // same key as "checker"
+        'twice,1,0,0,0',
+        'TWICE,1,0,0,0',               // a new role named twice is not added
+      ].join('\n'),
+      Users: [
+        'name,default_role,active,site_memberships',
+        'Kim,admin,0,FC',
+        'kim,head-chef,1,',            // same key as "Kim"
+        'New Person,checker,1,RA',
+        'new  person,checker,1,RA',    // spaces collapse: same key, not added
+      ].join('\n'),
+    }));
+    assert.deepStrictEqual({ ...role(db, 'checker') }, { can_enter_counts: 1, can_finalize: 0, can_admin: 0, read_only: 0 });
+    assert.strictEqual(role(db, 'twice'), undefined);
+    const after = user(db, 'Kim');
+    assert.deepStrictEqual({ ...after }, { ...kim }, 'Kim keeps role, active and name');
+    assert.deepStrictEqual(sites(db, kim.id), ['RA'], 'Kim keeps the memberships');
+    assert.deepStrictEqual(counts(db), before, 'nothing added or removed');
+    assert.deepStrictEqual(report.duplicateNames, [
+      'Roles: checker (rows 2, 3)', 'Roles: twice (rows 4, 5)',
+      'Users: Kim (rows 2, 3)', 'Users: New Person (rows 4, 5)',
+    ]);
+    assert.match(formatReport(report), /duplicate names - all rows skipped, fix the sheet/);
+  });
+
+  test('"kim" in the sheet updates an existing "Kim": one user, the sheet\'s spelling', () => {
+    const db = freshDb();
+    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nKim,checker,1,RA\n' }));
+    const id = user(db, 'Kim').id;
+    const before = counts(db).users;
+    const report = importIdentity(db, workbook({
+      Users: 'name,default_role,active,site_memberships\n  kim ,HEAD-CHEF,1,RA\n',
+    }));
+    assert.strictEqual(counts(db).users, before, 'no second user');
+    assert.strictEqual(user(db, 'Kim'), undefined);
+    assert.strictEqual(user(db, 'kim').id, id, 'same user_id, renamed');
+    assert.strictEqual(user(db, 'kim').role, 'head-chef', 'default_role matched by the key');
+    assert.deepStrictEqual(report.spellingUpdated, ['Kim -> kim']);
+    assert.match(formatReport(report), /Spelling updated/);
+    // And the next run with the same spelling changes nothing.
+    const again = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nkim,head-chef,1,RA\n' }));
+    assert.deepStrictEqual(again.spellingUpdated, []);
+    assert.strictEqual(again.usersUpdated, 0);
+  });
+
+  test('a row matching two existing users by the key is skipped and reported', () => {
+    const db = freshDb();
+    const checker = db.prepare("SELECT id FROM roles WHERE name = 'checker'").get().id;
+    db.prepare("INSERT INTO users (name, default_role_id) VALUES ('Lee', ?), ('LEE', ?)").run(checker, checker);
+    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nlee,admin,1,RA\n' }));
+    assert.strictEqual(user(db, 'Lee').role, 'checker');
+    assert.strictEqual(user(db, 'LEE').role, 'checker');
+    assert.strictEqual(counts(db).sites, 0);
+    assert.ok(report.problems.some(p => /matches 2 existing users/.test(p)), report.problems.join('; '));
+  });
+
+  test('the super-admin rename and its clash check use the key', () => {
+    const db = freshDb();
+    const checker = db.prepare("SELECT id FROM roles WHERE name = 'checker'").get().id;
+    db.prepare("INSERT INTO users (name, default_role_id) VALUES ('Mia Tan', ?)").run(checker);
+    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nmia  tan,super-admin,1,\n' }));
+    assert.deepStrictEqual(superAdmins(db), ['superadmin'], 'clash by key: not renamed');
+    assert.ok(report.problems.some(p => /already belongs to another user/.test(p)), report.problems.join('; '));
+
+    const report2 = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nSuperAdmin,Super-Admin,1,\n' }));
+    assert.deepStrictEqual(superAdmins(db), ['SuperAdmin']);
+    assert.deepStrictEqual(report2.spellingUpdated, ['superadmin -> SuperAdmin']);
+  });
+
+  test('site_memberships is the full list: a removed code deletes the membership', () => {
+    const db = freshDb();
+    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC, COM-A"\nBo,checker,1,RA\n' }));
+    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' }));
+    assert.deepStrictEqual(sites(db, user(db, 'Ana').id), ['RA']);
+    assert.deepStrictEqual(sites(db, user(db, 'Bo').id), ['RA'], 'a user absent from the sheet is untouched');
+    assert.strictEqual(report.membershipsRemoved, 2);
+    assert.match(formatReport(report), /2 removed/);
+  });
+
+  test('an unresolved code blocks removals for that user', () => {
+    const db = freshDb();
+    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
+    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"COM-A, SILT"\n' }));
+    assert.deepStrictEqual(sites(db, user(db, 'Ana').id), ['COM-A', 'FC', 'RA'], 'resolved code added, nothing removed');
+    assert.strictEqual(report.membershipsRemoved, 0);
+    assert.deepStrictEqual(report.removalsSkipped, ['Ana: SILT did not resolve - nothing removed (kept FC, RA)']);
+    assert.match(formatReport(report), /removals skipped \(unresolved code\)/);
+  });
+
+  test('a blank site_memberships cell removes them all', () => {
+    const db = freshDb();
+    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
+    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,\n' }));
+    assert.deepStrictEqual(sites(db, user(db, 'Ana').id), []);
+    assert.strictEqual(report.membershipsRemoved, 2);
+  });
+
+  test('a skipped row changes no memberships', () => {
+    const db = freshDb();
+    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
+    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,maybe,\n' }));
+    assert.deepStrictEqual(sites(db, user(db, 'Ana').id), ['FC', 'RA']);
   });
 
   test('lists the tabs it skipped (Stations, Staff) and reads only Roles / Users', () => {

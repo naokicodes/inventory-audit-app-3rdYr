@@ -16,8 +16,10 @@
 //
 // Every write is SELECT-then-INSERT/UPDATE by natural key (no sqlite-only
 // ON CONFLICT), so a second run is a no-op and the script survives a MySQL
-// move. Problems in the workbook are collected into a report and printed,
-// never thrown.
+// move. A name on two rows is skipped entirely, names match case- and
+// space-insensitively, and site_memberships is each user's full list
+// (decisions 2026-11-12, ADR-047). Problems in the workbook are collected
+// into a report and printed, never thrown.
 //
 // The CSV reader sits behind ONE adapter, loadTab(dir, name), so swapping in
 // an .xlsx reader later (Q6 option A) touches only that function.
@@ -113,13 +115,22 @@ function newReport() {
   return {
     rolesInserted: 0, rolesUpdated: 0,
     usersInserted: 0, usersUpdated: 0,
-    membershipsAdded: 0,
+    membershipsAdded: 0, membershipsRemoved: 0,
     tabsRead: [], tabsSkipped: [],
     unknownRoles: [],       // "<user>: <role>"
     unresolvedSites: [],    // "<user>: <code>" (unknown, or in both site tables)
-    duplicateNames: [],     // "<tab>: <name>"
+    duplicateNames: [],     // "<tab>: <name> (rows a, b)" - every such row skipped
+    spellingUpdated: [],    // "<old> -> <new>"
+    removalsSkipped: [],    // "<user>: ..." - an unresolved code blocked removals
     problems: [],           // anything else that made a row skip
   };
+}
+
+// The one key every name lookup uses (decision 2026-11-12, ADR-047):
+// lowercase, trimmed, runs of spaces collapsed to one. "Kim", " kim" and
+// "KIM" are the same name.
+function nameKey(name) {
+  return String(name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 // 0 / 1 as text -> number; anything else -> null.
@@ -127,25 +138,51 @@ function parseBit(value) {
   return value === '0' ? 0 : value === '1' ? 1 : null;
 }
 
+// Counts the names first (Reading B, ADR-047): a name on more than one row is
+// not imported at all - every row with it is skipped and reported once.
+// Returns the set of duplicated keys.
+function findDuplicates(rows, tab, report) {
+  const linesByKey = new Map();
+  rows.forEach((row, i) => {
+    const key = nameKey(row.name);
+    if (!key) return;
+    if (!linesByKey.has(key)) linesByKey.set(key, []);
+    linesByKey.get(key).push(i + 2);
+  });
+  const duplicated = new Set();
+  for (const [key, lines] of linesByKey) {
+    if (lines.length < 2) continue;
+    duplicated.add(key);
+    report.duplicateNames.push(`${tab}: ${rows[lines[0] - 2].name} (rows ${lines.join(', ')})`);
+  }
+  return duplicated;
+}
+
+// Every row of table whose name has this key (0, 1, or - if the database
+// already holds two spellings - more).
+function byKey(stmt, key) {
+  return stmt.all().filter(r => nameKey(r.name) === key);
+}
+
 function importRoles(db, rows, report) {
-  const findRole = db.prepare(`SELECT id, ${ROLE_FLAGS.join(', ')} FROM roles WHERE name = ?`);
+  const allRoles = db.prepare(`SELECT id, name, ${ROLE_FLAGS.join(', ')} FROM roles`);
   const insertRole = db.prepare(
     `INSERT INTO roles (name, ${ROLE_FLAGS.join(', ')}, active) VALUES (?, ?, ?, ?, ?, 1)`
   );
   const updateRole = db.prepare(
     `UPDATE roles SET ${ROLE_FLAGS.map(f => `${f} = ?`).join(', ')} WHERE id = ?`
   );
-  const seen = new Set();
+  const duplicated = findDuplicates(rows, 'Roles', report);
 
   rows.forEach((row, i) => {
     const name = row.name;
+    const key = nameKey(name);
     const where = `Roles row ${i + 2}`;
-    if (!name) { report.problems.push(`${where}: no name - skipped`); return; }
-    if (seen.has(name)) { report.duplicateNames.push(`Roles: ${name}`); return; }
-    seen.add(name);
+    if (!key) { report.problems.push(`${where}: no name - skipped`); return; }
+    if (duplicated.has(key)) return;
 
     // Super-admin is seeded and never lockable: the workbook cannot change it.
-    if (name === SUPER_ADMIN_ROLE) {
+    if (key === SUPER_ADMIN_ROLE) {
       report.problems.push(`${where}: "${SUPER_ADMIN_ROLE}" flags are fixed (it can never be locked out) - row ignored`);
       return;
     }
@@ -157,11 +194,17 @@ function importRoles(db, rows, report) {
       return;
     }
 
-    const existing = findRole.get(name);
+    const matches = byKey(allRoles, key);
+    if (matches.length > 1) {
+      report.problems.push(`${where} "${name}": matches ${matches.length} existing roles (${matches.map(r => r.name).join(', ')}) - skipped`);
+      return;
+    }
+    const existing = matches[0];
     if (!existing) {
       insertRole.run(name, ...flags);
       report.rolesInserted++;
     } else if (ROLE_FLAGS.some((f, k) => existing[f] !== flags[k])) {
+      // A role is never renamed: code looks roles up by name.
       updateRole.run(...flags, existing.id);
       report.rolesUpdated++;
     }
@@ -169,10 +212,18 @@ function importRoles(db, rows, report) {
   });
 }
 
-function addMemberships(db, userName, userId, cell, report) {
-  const findMembership = db.prepare('SELECT 1 FROM user_sites WHERE user_id = ? AND site_code = ?');
+// site_memberships is the user's complete list (ADR-047): insert the codes
+// that resolve and are missing, delete the user's other memberships. If any
+// code does not resolve, insert the resolved ones and delete nothing. A blank
+// cell means no sites.
+function syncMemberships(db, userName, userId, cell, report) {
+  const currentSites = db.prepare('SELECT site_code FROM user_sites WHERE user_id = ?');
   const insertMembership = db.prepare('INSERT INTO user_sites (user_id, site_code) VALUES (?, ?)');
+  const deleteMembership = db.prepare('DELETE FROM user_sites WHERE user_id = ? AND site_code = ?');
   const codes = [...new Set((cell || '').split(',').map(c => c.trim()).filter(Boolean))];
+  const current = new Set(currentSites.all(userId).map(r => r.site_code));
+
+  const unresolved = [];
   for (const code of codes) {
     let site;
     try {
@@ -182,18 +233,32 @@ function addMemberships(db, userName, userId, cell, report) {
     }
     if (site === null) {
       report.unresolvedSites.push(`${userName}: ${code}`);
+      unresolved.push(code);
       continue;
     }
-    if (!findMembership.get(userId, code)) {
+    if (!current.has(code)) {
       insertMembership.run(userId, code);
       report.membershipsAdded++;
     }
+  }
+
+  const listed = new Set(codes);
+  const unlisted = [...current].filter(c => !listed.has(c)).sort();
+  if (unresolved.length > 0) {
+    const kept = unlisted.length > 0 ? ` (kept ${unlisted.join(', ')})` : '';
+    report.removalsSkipped.push(`${userName}: ${unresolved.join(', ')} did not resolve - nothing removed${kept}`);
+    return;
+  }
+  for (const code of unlisted) {
+    deleteMembership.run(userId, code);
+    report.membershipsRemoved++;
   }
 }
 
 function importUsers(db, rows, report) {
   const roleByName = db.prepare('SELECT id FROM roles WHERE name = ?');
-  const findUser = db.prepare('SELECT id, name, default_role_id, active FROM users WHERE name = ?');
+  const allRoles = db.prepare('SELECT id, name FROM roles');
+  const allUsers = db.prepare('SELECT id, name, default_role_id, active FROM users');
   const insertUser = db.prepare('INSERT INTO users (name, default_role_id, active) VALUES (?, ?, ?)');
   const updateUser = db.prepare('UPDATE users SET default_role_id = ?, active = ? WHERE id = ?');
   const renameUser = db.prepare('UPDATE users SET name = ? WHERE id = ?');
@@ -204,18 +269,23 @@ function importUsers(db, rows, report) {
     : db.prepare('SELECT id, name FROM users WHERE default_role_id = ? ORDER BY id').all(superRoleId);
   const superUser = superUsers.length === 1 ? superUsers[0] : null;
 
-  const seen = new Set();
+  const duplicated = findDuplicates(rows, 'Users', report);
   let superRowSeen = false;
 
   rows.forEach((row, i) => {
     const name = row.name;
+    const key = nameKey(name);
     const where = `Users row ${i + 2}`;
-    if (!name) { report.problems.push(`${where}: no name - skipped`); return; }
-    if (seen.has(name)) { report.duplicateNames.push(`Users: ${name}`); return; }
-    seen.add(name);
+    if (!key) { report.problems.push(`${where}: no name - skipped`); return; }
+    if (duplicated.has(key)) return;
 
-    const role = roleByName.get(row.default_role);
-    if (!role) { report.unknownRoles.push(`${name}: ${row.default_role || '(blank)'}`); return; }
+    const roles = byKey(allRoles, nameKey(row.default_role));
+    if (roles.length === 0) { report.unknownRoles.push(`${name}: ${row.default_role || '(blank)'}`); return; }
+    if (roles.length > 1) {
+      report.problems.push(`${where} "${name}": role "${row.default_role}" matches ${roles.length} roles (${roles.map(r => r.name).join(', ')}) - skipped`);
+      return;
+    }
+    const role = roles[0];
 
     const active = parseBit(row.active);
     if (active === null) {
@@ -240,18 +310,24 @@ function importUsers(db, rows, report) {
         report.problems.push(`${where} "${name}": the super-admin is never deactivated - active ignored`);
       }
       if (superUser.name !== name) {
-        const clash = findUser.get(name);
-        if (clash) {
+        const clash = byKey(allUsers, key).filter(u => u.id !== superUser.id);
+        if (clash.length > 0) {
           report.problems.push(`${where} "${name}": that name already belongs to another user - super-admin not renamed`);
           return;
         }
         renameUser.run(name, superUser.id);
+        if (nameKey(superUser.name) === key) report.spellingUpdated.push(`${superUser.name} -> ${name}`);
+        else report.usersUpdated++;
         superUser.name = name;
-        report.usersUpdated++;
       }
       userId = superUser.id;
     } else {
-      const existing = findUser.get(name);
+      const matches = byKey(allUsers, key);
+      if (matches.length > 1) {
+        report.problems.push(`${where} "${name}": matches ${matches.length} existing users (${matches.map(u => u.name).join(', ')}) - skipped`);
+        return;
+      }
+      const existing = matches[0];
       if (existing && existing.default_role_id === superRoleId) {
         // Changing the super-admin's role here would leave none.
         report.problems.push(`${where} "${name}": is the super-admin - its role cannot change to ${row.default_role}, skipped`);
@@ -262,6 +338,12 @@ function importUsers(db, rows, report) {
         report.usersInserted++;
       } else {
         userId = existing.id;
+        if (existing.name !== name) {
+          // Found by the key, spelled differently: the sheet's spelling wins
+          // (login keys on user_id, not the name).
+          renameUser.run(name, existing.id);
+          report.spellingUpdated.push(`${existing.name} -> ${name}`);
+        }
         if (existing.default_role_id !== role.id || existing.active !== active) {
           updateUser.run(role.id, active, existing.id);
           report.usersUpdated++;
@@ -269,7 +351,7 @@ function importUsers(db, rows, report) {
       }
     }
 
-    addMemberships(db, name, userId, row.site_memberships, report);
+    syncMemberships(db, name, userId, row.site_memberships, report);
   });
 }
 
@@ -301,15 +383,17 @@ function formatReport(report) {
     `Tabs skipped (not part of this slice): ${report.tabsSkipped.join(', ') || '(none)'}`,
     `Roles: ${report.rolesInserted} inserted, ${report.rolesUpdated} updated`,
     `Users: ${report.usersInserted} inserted, ${report.usersUpdated} updated`,
-    `Site memberships: ${report.membershipsAdded} added`,
+    `Site memberships: ${report.membershipsAdded} added, ${report.membershipsRemoved} removed`,
   ];
   const section = (title, items) => {
     if (items.length === 0) return;
     lines.push('', `${title} (${items.length}):`, ...items.map(s => `  - ${s}`));
   };
+  section('Spelling updated (matched an existing user)', report.spellingUpdated);
   section('WARNING unknown role names - user skipped', report.unknownRoles);
   section('WARNING unresolved site codes - membership skipped', report.unresolvedSites);
-  section('WARNING duplicate names - later row skipped', report.duplicateNames);
+  section('WARNING memberships removals skipped (unresolved code)', report.removalsSkipped);
+  section('WARNING duplicate names - all rows skipped, fix the sheet', report.duplicateNames);
   section('WARNING other rows skipped or adjusted', report.problems);
   return lines.join('\n');
 }
