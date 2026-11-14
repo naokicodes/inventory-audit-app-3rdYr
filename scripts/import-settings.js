@@ -68,6 +68,9 @@ function parseCsv(text) {
     }
   }
   if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
+  // Each row remembers its spreadsheet row number (non-enumerable), so the
+  // report still points at the right row once blank lines are dropped.
+  rows.forEach((r, i) => Object.defineProperty(r, 'sheetRow', { value: i + 1 }));
   // Blank lines (a trailing newline, an empty line between rows) carry nothing.
   return rows.filter(r => r.some(cell => cell.trim() !== ''));
 }
@@ -96,6 +99,7 @@ function loadTab(dir, name) {
   return dataRows.map(cells => {
     const obj = {};
     headers.forEach((h, i) => { obj[h] = (cells[i] ?? '').trim(); });
+    Object.defineProperty(obj, 'sheetRow', { value: cells.sheetRow });
     return obj;
   });
 }
@@ -133,6 +137,11 @@ function nameKey(name) {
   return String(name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+// The spreadsheet row a tab row came from (header = row 1).
+function rowNumber(row, i) {
+  return row.sheetRow ?? i + 2;
+}
+
 // 0 / 1 as text -> number; anything else -> null.
 function parseBit(value) {
   return value === '0' ? 0 : value === '1' ? 1 : null;
@@ -147,13 +156,13 @@ function findDuplicates(rows, tab, report) {
     const key = nameKey(row.name);
     if (!key) return;
     if (!linesByKey.has(key)) linesByKey.set(key, []);
-    linesByKey.get(key).push(i + 2);
+    linesByKey.get(key).push({ i, line: rowNumber(row, i) });
   });
   const duplicated = new Set();
   for (const [key, lines] of linesByKey) {
     if (lines.length < 2) continue;
     duplicated.add(key);
-    report.duplicateNames.push(`${tab}: ${rows[lines[0] - 2].name} (rows ${lines.join(', ')})`);
+    report.duplicateNames.push(`${tab}: ${rows[lines[0].i].name} (rows ${lines.map(l => l.line).join(', ')})`);
   }
   return duplicated;
 }
@@ -177,7 +186,7 @@ function importRoles(db, rows, report) {
   rows.forEach((row, i) => {
     const name = row.name;
     const key = nameKey(name);
-    const where = `Roles row ${i + 2}`;
+    const where = `Roles row ${rowNumber(row, i)}`;
     if (!key) { report.problems.push(`${where}: no name - skipped`); return; }
     if (duplicated.has(key)) return;
 
@@ -229,7 +238,10 @@ function syncMemberships(db, userName, userId, cell, report) {
     try {
       site = resolveSiteCode(db, code);
     } catch (err) {
-      site = null; // the code is in both restaurants and commissaries
+      // Only the known collision (the code is in both restaurants and
+      // commissaries) is a bad code; any other error rolls the import back.
+      if (!/exists in both restaurants and commissaries/.test(err.message)) throw err;
+      site = null;
     }
     if (site === null) {
       report.unresolvedSites.push(`${userName}: ${code}`);
@@ -275,7 +287,7 @@ function importUsers(db, rows, report) {
   rows.forEach((row, i) => {
     const name = row.name;
     const key = nameKey(name);
-    const where = `Users row ${i + 2}`;
+    const where = `Users row ${rowNumber(row, i)}`;
     if (!key) { report.problems.push(`${where}: no name - skipped`); return; }
     if (duplicated.has(key)) return;
 

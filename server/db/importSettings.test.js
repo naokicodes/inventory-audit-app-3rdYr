@@ -311,6 +311,22 @@ try {
     assert.strictEqual(report.membershipsRemoved, 2);
   });
 
+  test('report row numbers are spreadsheet rows, even after a blank line', () => {
+    const db = freshDb();
+    const report = importIdentity(db, workbook({ Users: [
+      'name,default_role,active,site_memberships', '', 'Ana,checker,yes,', 'Bo,checker,1,', ',,,', 'bo,checker,1,',
+    ].join('\n') }));
+    assert.ok(report.problems.some(p => p.startsWith('Users row 3 "Ana"')), report.problems.join('; '));
+    assert.deepStrictEqual(report.duplicateNames, ['Users: Bo (rows 4, 6)']);
+  });
+
+  test('a database error while resolving a site code rolls the import back', () => {
+    const db = freshDb();
+    db.exec('DROP TABLE commissaries');
+    assert.throws(() => importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' })));
+    assert.strictEqual(user(db, 'Ana'), undefined, 'the user insert was rolled back');
+  });
+
   test('a skipped row changes no memberships', () => {
     const db = freshDb();
     importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
@@ -361,16 +377,22 @@ try {
     const first = runSeed();
     assert.strictEqual(first.status, 0, first.stderr);
     let db = new DatabaseSync(scratchDb);
-    assert.deepStrictEqual(superAdmins(db), ['superadmin']);
-    db.prepare("UPDATE users SET name = 'Owner Person' WHERE name = 'superadmin'").run();
-    db.close();
+    try {
+      assert.deepStrictEqual(superAdmins(db), ['superadmin']);
+      db.prepare("UPDATE users SET name = 'Owner Person' WHERE name = 'superadmin'").run();
+    } finally {
+      db.close();
+    }
 
     const second = runSeed();
     assert.strictEqual(second.status, 0, second.stderr);
     assert.match(second.stdout, /Users: 0 inserted/);
     db = new DatabaseSync(scratchDb);
-    assert.deepStrictEqual(superAdmins(db), ['Owner Person']);
-    db.close();
+    try {
+      assert.deepStrictEqual(superAdmins(db), ['Owner Person']);
+    } finally {
+      db.close();
+    }
   });
 } finally {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
