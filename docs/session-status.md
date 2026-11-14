@@ -132,9 +132,15 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-072; the index, and a map from handoff item numbers to records, is in
+to ADR-073; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, #67) - decided (recorded: ADR-073)
+
+- **Role names are unique by the name key (ADR-073, issue #67).** A people-sheet role, or a
+  user's default_role, that matches two existing roles by the key is skipped and reported (PR #65
+  as built). roles-page refuses to create or rename a role to a name another role holds by the key.
 
 ### 2026-11-14 architect (A0, review fix) - decided (recorded: ADR-072)
 
@@ -1854,6 +1860,10 @@ here: they come from test-accounts (3zt) and never reach beta.db (ADR-039).
   removes them all; a second run is still a no-op.
 - Touches unchanged: the files PR #65 already has (scripts/import-settings.js and its test).
 
+**Decisions 2026-11-14 (issue #67, Naoki; ADR-073).** These override any reading of the text above.
+- A Roles.csv row, or a Users.csv row's default_role, whose key matches two or more existing roles
+  is skipped and reported. PR #65 is complete as built on this point.
+
 ## Step stub-login - pick-your-name login + currentUser middleware (slice 4a)
 **CLOSED 2026-10-25, PR #33 (`ee0801f`).**
 
@@ -3122,6 +3132,11 @@ checker, the page shows no buttons.
 Touches: public/roles.html (new), public/index.html, server/routes/roles.js (new),
 server/routes/roles.test.js (new), server/index.js, server/db/permissions.js. PUBLIC ->
 click-through before merge.
+
+**Added 2026-11-14 (ADR-073).** POST /api/roles and PUT /api/roles/:id refuse a name whose key
+(lowercase, trimmed, inner spaces collapsed; ADR-047) another role already holds: 409 { error: "A
+role with that name already exists" }. Tests gain: "Admin" (next to "admin") and "Head  Chef" (next
+to "head chef") are refused on create and on rename.
 
 ## Step roster-stations - stations as roster rows, and which sheets each opens (A6)
 
