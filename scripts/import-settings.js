@@ -144,6 +144,7 @@ function newReport() {
     sideDuplicates: [],     // "<tab>: <site> / <sheet> [/ <item>] (rows a, b)" - every such row held
     unitClashes: [],        // "<item>: main unit is <x>, row says <y> (row n)"
     sideUnresolved: [],     // unknown site / sheet, or bad values - row skipped
+    fieldConflicts: [],     // "conflicting values: <item> <field>" - stored value kept (ADR-078)
   };
 }
 
@@ -461,11 +462,12 @@ function parseConversions(cell, mainUnit) {
 }
 
 // SideItems.csv: site, sheet, item, main_unit, conversions, how_bought, cost.
-// An item is created once; its fields come from its rows (how_bought and cost:
-// the last non-blank one; a blank cost keeps the stored cost); conversions are
-// added or changed, never removed. A sheet named here gets exactly its listed
-// items on, in order; its other links are switched off. A skipped row's item
-// keeps its link as it is.
+// An item is created once. Its own fields must agree across its rows; a blank
+// cell has no opinion. Two different non-blank values: that field keeps its
+// stored value and the report lists the conflict - the import never picks a
+// winner (ADR-078). Conversions are added or changed, never removed (ADR-079).
+// A sheet named here gets exactly its listed items on, in order; its other
+// links are switched off. A skipped row's item keeps its link as it is.
 function importSideItems(db, rows, report) {
   const keyOf = r => (r.site && nameKey(r.sheet) && nameKey(r.item)
     ? [r.site, nameKey(r.sheet), nameKey(r.item)].join('\u0000') : null);
@@ -505,16 +507,33 @@ function importSideItems(db, rows, report) {
   }
   for (const list of groups.values()) {
     const existing = sideItems.findItemByName(db, list[0].name);
-    const mainUnit = existing ? existing.main_unit : list[0].mainUnit;
+    const name = existing ? existing.name : list[0].name;
+    const conflict = field => report.fieldConflicts.push(`conflicting values: ${name} ${field}`);
+    // The one value the rows agree on; null = every row blank (no opinion);
+    // undefined = a conflict (reported, the stored value stays).
+    const agreed = (values, field) => {
+      const distinct = [...new Set(values.filter(v => v !== null))];
+      if (distinct.length > 1) { conflict(field); return undefined; }
+      return distinct.length ? distinct[0] : null;
+    };
+    let mainUnit;
+    if (existing) {
+      mainUnit = existing.main_unit;
+    } else {
+      mainUnit = agreed(list.map(g => g.mainUnit), 'main_unit');
+      if (mainUnit === undefined) continue; // nothing stored to keep: the item is not added
+    }
     const ok = list.filter(g => {
       if (g.mainUnit === mainUnit) return true;
-      report.unitClashes.push(`${existing ? existing.name : list[0].name}: main unit is ${mainUnit}, row ${g.line} says ${g.mainUnit} - row skipped (use a second item)`);
+      report.unitClashes.push(`${name}: main unit is ${mainUnit}, row ${g.line} says ${g.mainUnit} - row skipped (use a second item)`);
       return false;
     });
     if (ok.length === 0) continue;
-    const last = field => ok.map(g => g[field]).filter(v => v !== null).pop() ?? null;
-    const fields = { how_bought: last('how_bought') };
-    if (last('cost') !== null) fields.cost_per_unit = last('cost');
+    const fields = {};
+    const howBought = agreed(ok.map(g => g.how_bought), 'how_bought');
+    if (howBought !== null && howBought !== undefined) fields.how_bought = howBought;
+    const cost = agreed(ok.map(g => g.cost), 'cost');
+    if (cost !== null && cost !== undefined) fields.cost_per_unit = cost;
     let id, changed = false;
     if (existing) {
       id = existing.id;
@@ -523,8 +542,15 @@ function importSideItems(db, rows, report) {
       id = sideItems.createItem(db, { name: ok[0].name, main_unit: mainUnit, ...fields }, IMPORT_CTX).id;
       report.itemsAdded++;
     }
-    const units = new Map(ok.flatMap(g => g.conversions));
-    for (const [unit, n] of units) changed = sideItems.setUnit(db, id, unit, n, IMPORT_CTX) || changed;
+    const factors = new Map(); // unit -> factors its rows give
+    for (const [unit, n] of ok.flatMap(g => g.conversions)) {
+      if (!factors.has(unit)) factors.set(unit, []);
+      factors.get(unit).push(n);
+    }
+    for (const [unit, ns] of factors) {
+      const n = agreed(ns, `conversion ${unit}`);
+      if (n !== undefined) changed = sideItems.setUnit(db, id, unit, n, IMPORT_CTX) || changed;
+    }
     if (existing && changed) report.itemsUpdated++;
     for (const g of ok) g.itemId = id;
   }
@@ -599,6 +625,7 @@ function formatReport(report) {
   section('WARNING side rows on more than one row - all held, fix the sheet', report.sideDuplicates);
   section('WARNING side items with a different main unit - row skipped', report.unitClashes);
   section('WARNING side rows skipped', report.sideUnresolved);
+  section('WARNING side item rows disagree - stored value kept, fix the sheet', report.fieldConflicts);
   return lines.join('\n');
 }
 

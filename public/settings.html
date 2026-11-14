@@ -226,7 +226,9 @@
     <div id="side-items-list">Loading...</div>
   </section>
   <style>
-    .side-sheet-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    /* ADR-077: one row that scrolls sideways itself; the page never does. */
+    .side-sheet-tabs { display: flex; gap: 0.5rem; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; margin-bottom: 1rem; padding-bottom: 0.25rem; }
+    .side-sheet-tabs button { flex: 0 0 auto; white-space: nowrap; }
     .side-sheet-tabs button { background: var(--paper); border: 1px solid var(--line2); }
     .side-sheet-tabs button.active { background: var(--ink); color: var(--card); }
     .side-item { padding: 0.6rem 0.75rem; margin-bottom: 0.5rem; }
@@ -238,6 +240,8 @@
     .side-item-form input, .side-item-form select { padding: 0.4rem; font-size: 1rem; max-width: 100%; box-sizing: border-box; }
     .side-conv-row { display: flex; gap: 0.5rem; }
     .side-conv-row input { flex: 1; min-width: 0; }
+    .side-conv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9rem; }
+    .side-conv-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
   </style>
 
   <script>
@@ -1211,9 +1215,9 @@
       const items = currentSideSheet().items;
       if (items.length === 0) { sideList.textContent = 'No items on this sheet yet. Import the Side items tab.'; return; }
       sideList.innerHTML = items.map(i => `
-        <div class="box side-item ${i.link_active ? '' : 'off'}" data-id="${i.id}">
+        <div class="box side-item ${i.link_active && i.item_active ? '' : 'off'}" data-id="${i.id}">
           <button type="button" class="side-item-head">
-            <span>${esc(i.name)}</span><span>${esc(i.main_unit)}${i.link_active ? '' : ' · off'}</span>
+            <span>${esc(i.name)}</span><span>${esc(i.main_unit)}${i.item_active ? (i.link_active ? '' : ' · off here') : ' · item off'}</span>
           </button>
         </div>`).join('');
     }
@@ -1228,8 +1232,12 @@
       form.className = 'side-item-form';
       form.innerHTML = `
         <label>Name <input data-f="name" value="${esc(i.name)}"></label>
-        <label>Main unit <input data-f="main_unit" value="${unit}"></label>
-        <small class="hint">Conversions: ${i.units.length ? i.units.map(u => `1 ${esc(u.unit)} = ${u.per_main} ${unit}`).join(', ') : 'none'}</small>
+        <label>Main unit <input data-f="main_unit" value="${unit}" ${i.units.length ? 'disabled' : ''}></label>
+        ${i.units.length ? '<small class="hint">The main unit is fixed while the item has conversions. Make a new item instead.</small>' : ''}
+        <div>Conversions${i.units.length ? '' : ': none'}</div>
+        ${i.units.length ? `<ul class="side-conv-list">${i.units.map(u => `
+          <li><span>1 ${esc(u.unit)} = ${u.per_main} ${unit}</span>
+            <button type="button" data-act="remove-unit" data-unit="${esc(u.unit)}">Remove</button></li>`).join('')}</ul>` : ''}
         <label>Add a conversion (or change one: type its unit again)
           <span class="side-conv-row">
             <input data-f="conv_unit" placeholder="unit, e.g. sack" aria-label="Conversion unit">
@@ -1240,6 +1248,7 @@
           `<option value="${v}" ${(i.how_bought || '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         ${'cost_per_unit' in i ? `<label>Cost per ${unit} <input data-f="cost" type="number" step="any" min="0" inputmode="decimal" value="${i.cost_per_unit ?? ''}"></label>` : ''}
         <label class="inline"><input type="checkbox" data-f="on" ${i.link_active ? 'checked' : ''}> On this sheet</label>
+        <label class="inline"><input type="checkbox" data-f="item_on" ${i.item_active ? 'checked' : ''}> Item on (off: it leaves every sheet's counting page; its history stays)</label>
         <div><button type="button" data-act="save">Save</button> <span class="status-message" role="status"></span></div>`;
       box.appendChild(form);
     }
@@ -1257,7 +1266,7 @@
         if (!res.ok) throw new Error(out.error || `Save failed (${res.status})`);
       };
       try {
-        const item = { name: f('name').value, main_unit: f('main_unit').value, how_bought: f('how_bought').value };
+        const item = { name: f('name').value, main_unit: f('main_unit').value, how_bought: f('how_bought').value, active: f('item_on').checked };
         if (f('cost')) item.cost_per_unit = f('cost').value;
         await send('PUT', `/api/side-items/${id}`, item);
         if (f('conv_unit').value.trim() || f('conv_per').value !== '') {
@@ -1269,6 +1278,20 @@
         msg.className = 'status-message error';
         msg.textContent = err.message;
       }
+    }
+
+    // Removes one conversion after a confirm (ADR-079); logged by the server.
+    async function removeSideUnit(box, unit) {
+      const msg = box.querySelector('.side-item-form .status-message');
+      if (!confirm(`Remove the "${unit}" conversion? Counts already saved keep their numbers.`)) return;
+      const res = await fetch(`/api/side-items/${Number(box.dataset.id)}/units/${encodeURIComponent(unit)}`, { method: 'DELETE' });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        msg.className = 'status-message error';
+        msg.textContent = out.error || `Remove failed (${res.status})`;
+        return;
+      }
+      await loadSideItems();
     }
 
     sideSite.addEventListener('change', loadSideItems);
@@ -1283,6 +1306,7 @@
       if (!box) return;
       if (e.target.closest('.side-item-head')) toggleSideItem(box);
       else if (e.target.closest('[data-act="save"]')) saveSideItem(box);
+      else if (e.target.closest('[data-act="remove-unit"]')) removeSideUnit(box, e.target.closest('[data-act="remove-unit"]').dataset.unit);
     });
     loadSideSites();
   </script>

@@ -488,6 +488,65 @@ try {
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM side_items').get().n, 0);
   });
 
+  test('sides: a skipped row (bad value) leaves its link as it was (ADR-078)', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Rice,kg,,friend,',
+    ].join('\n') }));
+    assert.strictEqual(report.sideUnresolved.length, 1);
+    assert.strictEqual(report.linksSwitchedOff, 1, 'only Test Onion, absent from the tab, goes off');
+    assert.deepStrictEqual(linksOn(db, 'RA'), ['Test Rice']);
+  });
+
+  test('sides: two rows with different costs keep the stored cost and report it; links still apply (ADR-078)', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Rice,kg,,,60',
+      'FC,Bar Sides,Test Rice,kg,,,70',
+      'FC,Bar Sides,Test Egg,pc,,buyer,',
+      'RA,Bar Sides,Test Egg,pc,,,',
+    ].join('\n') }));
+    const rice = db.prepare("SELECT * FROM side_items WHERE name = 'Test Rice'").get();
+    assert.strictEqual(rice.cost_per_unit, 50);
+    assert.strictEqual(rice.how_bought, 'SUPPLIER', 'blank how_bought has no opinion');
+    assert.deepStrictEqual(report.fieldConflicts, ['conflicting values: Test Rice cost']);
+    assert.strictEqual(db.prepare("SELECT how_bought FROM side_items WHERE name = 'Test Egg'").get().how_bought, 'BUYER');
+    assert.deepStrictEqual(linksOn(db, 'RA'), ['Test Rice', 'Test Egg']);
+    assert.match(formatReport(report), /conflicting values: Test Rice cost/);
+  });
+
+  test('sides: a conversion with two factors is unchanged and reported; others merge; blank never removes (ADR-078, ADR-079)', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Rice,kg,sack=20; cup=0.2,,',
+      'FC,Bar Sides,Test Rice,kg,sack=30,,',
+      'RA,Bar Sides,Test Onion,kg,,,',
+    ].join('\n') }));
+    const rice = db.prepare("SELECT id FROM side_items WHERE name = 'Test Rice'").get();
+    assert.deepStrictEqual(db.prepare('SELECT unit, per_main FROM side_item_units WHERE side_item_id = ? ORDER BY unit').all(rice.id)
+      .map(u => `${u.unit}=${u.per_main}`), ['cup=0.2', 'sack=25', 'tray=2'], 'sack kept, cup merged, tray (blank) left');
+    assert.deepStrictEqual(report.fieldConflicts, ['conflicting values: Test Rice conversion sack']);
+  });
+
+  test('sides: a new item whose rows disagree on the main unit is not added', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Egg,pc,,,',
+      'FC,Bar Sides,Test Egg,tray,,,',
+    ].join('\n') }));
+    assert.strictEqual(report.itemsAdded, 0);
+    assert.deepStrictEqual(report.fieldConflicts, ['conflicting values: Test Egg main_unit']);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM side_items').get().n, 0);
+  });
+
   test('sides: export then import changes nothing', () => {
     const db = freshDb();
     importSettings(db, workbook({ Sheets: SHEETS_CSV + 'RA,Old Sides,0\n', SideItems: ITEMS_CSV }));

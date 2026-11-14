@@ -107,5 +107,46 @@ test('siteSideSheets leaves the cost out unless asked', () => {
   assert.strictEqual(s.siteSideSheets(db, 'RA', { withCost: true })[0].items[0].cost_per_unit, 8);
 });
 
+test('a main unit change is refused (409) while the item has a conversion; without one it saves (ADR-078)', () => {
+  const db = freshDb();
+  const rice = s.createItem(db, { name: 'Rice', main_unit: 'kg' });
+  s.setUnit(db, rice.id, 'sack', 25);
+  const before = logCount(db);
+  assert.throws(() => s.updateItem(db, rice.id, { main_unit: 'g' }),
+    e => e.status === 409 && e.message === 'This item has conversions. Make a new item instead.');
+  assert.strictEqual(db.prepare('SELECT main_unit FROM side_items WHERE id = ?').get(rice.id).main_unit, 'kg');
+  assert.strictEqual(logCount(db), before);
+  const egg = s.createItem(db, { name: 'Egg', main_unit: 'pc' });
+  assert.strictEqual(s.updateItem(db, egg.id, { main_unit: 'Tray' }).item.main_unit, 'tray');
+});
+
+test('removing a conversion deletes it and logs a DELETE row (ADR-079)', () => {
+  const db = freshDb();
+  const rice = s.createItem(db, { name: 'Rice', main_unit: 'kg' });
+  s.setUnit(db, rice.id, 'sack', 25);
+  assert.strictEqual(s.removeUnit(db, rice.id, ' Sack', { actor: 'Kim' }), true);
+  assert.strictEqual(s.toMain(db, rice.id, 1, 'sack'), null);
+  const row = db.prepare('SELECT entity_type, action, actor, before, after FROM activity_log ORDER BY id DESC LIMIT 1').get();
+  assert.strictEqual(row.entity_type, 'side_item_units');
+  assert.strictEqual(row.action, 'DELETE');
+  assert.strictEqual(row.actor, 'Kim');
+  assert.strictEqual(JSON.parse(row.before).per_main, 25);
+  assert.strictEqual(row.after, null);
+  assert.throws(() => s.removeUnit(db, rice.id, 'sack'), e => e.status === 404);
+});
+
+test('the item\'s own switch turns it off everywhere; "false" is refused, not read as on', () => {
+  const db = freshDb();
+  const item = s.createItem(db, { name: 'Egg', main_unit: 'pc' });
+  const sheet = db.prepare("INSERT INTO sheet_definitions (site_code, category, engine_type) VALUES ('RA', 'Bar', 'SIDE')").run().lastInsertRowid;
+  s.setLink(db, sheet, item.id, {});
+  assert.strictEqual(s.updateItem(db, item.id, { active: false }).changed, true);
+  const listed = s.siteSideSheets(db, 'RA')[0].items[0];
+  assert.strictEqual(listed.item_active, 0);
+  assert.strictEqual(listed.link_active, 1);
+  assert.throws(() => s.updateItem(db, item.id, { active: 'false' }), e => e.status === 400);
+  assert.throws(() => s.setLink(db, sheet, item.id, { active: 'false' }), e => e.status === 400);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

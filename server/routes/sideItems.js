@@ -46,6 +46,11 @@ function setUnit(req, res) {
   write(res, () => ({ changed: sideItems.setUnit(db, Number(req.params.id), unit, per_main, ctx(req)) }));
 }
 
+// Removes one conversion (ADR-079: Settings only, behind a confirm).
+router.delete('/side-items/:id/units/:unit', requireAdmin, (req, res) => write(res, () => ({
+  changed: sideItems.removeUnit(db, Number(req.params.id), req.params.unit, ctx(req)),
+})));
+
 // Body { sheet_id, side_item_id, sort_order?, active? }: puts an item on a
 // side sheet, or changes its order or on/off there.
 router.route('/side-item-links').all(requireAdmin).post(setLink).put(setLink);

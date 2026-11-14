@@ -104,6 +104,27 @@ test('a bad save answers 400 with the message; switching off keeps the link', as
   assert.strictEqual(items[0].link_active, 0);
 });
 
+test('a main unit change with a conversion -> 409; removing the conversion -> logged, then the change saves', async () => {
+  const refused = await call('PUT', `/api/side-items/${itemId}`, 'admin', { main_unit: 'g' });
+  assert.strictEqual(refused.status, 409);
+  assert.deepStrictEqual(refused.body, { error: 'This item has conversions. Make a new item instead.' });
+  assert.strictEqual((await call('DELETE', `/api/side-items/${itemId}/units/sack`, 'checker')).status, 403);
+  const removed = await call('DELETE', `/api/side-items/${itemId}/units/sack`, 'admin');
+  assert.strictEqual(removed.status, 200, JSON.stringify(removed.body));
+  const log = db.prepare("SELECT action, actor FROM activity_log WHERE entity_type = 'side_item_units' ORDER BY id DESC LIMIT 1").get();
+  assert.deepStrictEqual({ ...log }, { action: 'DELETE', actor: 'U admin' });
+  assert.strictEqual((await call('DELETE', `/api/side-items/${itemId}/units/sack`, 'admin')).status, 404);
+  const saved = await call('PUT', `/api/side-items/${itemId}`, 'admin', { main_unit: 'g' });
+  assert.strictEqual(saved.status, 200);
+  assert.strictEqual(saved.body.item.main_unit, 'g');
+});
+
+test("the item's own switch turns it off and the list shows it", async () => {
+  assert.strictEqual((await call('PUT', `/api/side-items/${itemId}`, 'admin', { active: false })).status, 200);
+  const items = (await call('GET', '/api/side-items?site=RA', 'admin')).body[0].items;
+  assert.strictEqual(items[0].item_active, 0);
+});
+
 test('an empty site lists no sheets; a missing site is a 400', async () => {
   assert.deepStrictEqual((await call('GET', '/api/side-items?site=ZZ', 'admin')).body, []);
   assert.strictEqual((await call('GET', '/api/side-items', 'admin')).status, 400);

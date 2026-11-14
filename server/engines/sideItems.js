@@ -56,6 +56,14 @@ function parseHowBought(value) {
   return v;
 }
 
+// An on/off flag: true/false, 1/0 or "1"/"0"; anything else throws (so the
+// string "false" is never read as on).
+function parseFlag(value) {
+  if (value === true || value === 1 || value === '1') return 1;
+  if (value === false || value === 0 || value === '0') return 0;
+  throw bad('On / off must be true or false');
+}
+
 // '' / null -> null; otherwise a number 0 or more.
 function parseCost(value) {
   if (value === null || value === undefined || String(value).trim() === '') return null;
@@ -80,7 +88,7 @@ function cleanFields(db, fields, id = null) {
   }
   if ('how_bought' in fields) out.how_bought = parseHowBought(fields.how_bought);
   if ('cost_per_unit' in fields) out.cost_per_unit = parseCost(fields.cost_per_unit);
-  if ('active' in fields) out.active = fields.active ? 1 : 0;
+  if ('active' in fields) out.active = parseFlag(fields.active);
   return out;
 }
 
@@ -106,9 +114,11 @@ function updateItem(db, id, fields, { actor = null, source = 'MANUAL' } = {}) {
   if ((f.main_unit ?? before.main_unit) === PESO) f.cost_per_unit = 1;
   const keys = Object.keys(f).filter(k => f[k] !== before[k]);
   if (keys.length === 0) return { item: before, changed: false };
-  if (keys.includes('main_unit')) {
-    const clash = db.prepare('SELECT 1 FROM side_item_units WHERE side_item_id = ? AND unit = ?').get(id, f.main_unit);
-    if (clash) throw bad(`"${f.main_unit}" is already a conversion of this item`);
+  // ADR-078: the main unit is fixed once the item has a conversion (every
+  // factor is "main units in one of this unit"). side-sheets adds "no counts".
+  if (keys.includes('main_unit')
+      && db.prepare('SELECT 1 FROM side_item_units WHERE side_item_id = ?').get(id)) {
+    throw Object.assign(new Error('This item has conversions. Make a new item instead.'), { status: 409 });
   }
   db.prepare(`UPDATE side_items SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`)
     .run(...keys.map(k => f[k]), id);
@@ -118,8 +128,7 @@ function updateItem(db, id, fields, { actor = null, source = 'MANUAL' } = {}) {
 }
 
 // Adds a conversion, or changes how many main units one of `unit` is.
-// Conversions are never removed (counts may use them). Returns whether
-// anything changed.
+// Returns whether anything changed. Only removeUnit (Settings) removes one.
 function setUnit(db, itemId, unit, perMain, { actor = null, source = 'MANUAL' } = {}) {
   const item = getItem(db, itemId);
   if (!item) throw Object.assign(new Error('No such item'), { status: 404 });
@@ -148,6 +157,18 @@ function setUnit(db, itemId, unit, perMain, { actor = null, source = 'MANUAL' } 
   return true;
 }
 
+// Removes a conversion (ADR-079: Settings only, with a confirm; the import
+// never calls this). Past counts keep their saved main-unit numbers.
+function removeUnit(db, itemId, unit, { actor = null, source = 'MANUAL' } = {}) {
+  if (!getItem(db, itemId)) throw Object.assign(new Error('No such item'), { status: 404 });
+  const u = normUnit(unit);
+  const before = db.prepare('SELECT * FROM side_item_units WHERE side_item_id = ? AND unit = ?').get(itemId, u);
+  if (!before) throw Object.assign(new Error(`This item has no "${u}" conversion`), { status: 404 });
+  db.prepare('DELETE FROM side_item_units WHERE id = ?').run(before.id);
+  logActivity(db, { actor, entityType: 'side_item_units', entityId: before.id, action: 'DELETE', before, after: null, source });
+  return true;
+}
+
 // Puts an item on a SIDE sheet, or changes its order or on/off there.
 // `link` holds sort_order and/or active. Returns whether anything changed.
 function setLink(db, sheetId, itemId, link, { actor = null, source = 'MANUAL' } = {}) {
@@ -160,7 +181,7 @@ function setLink(db, sheetId, itemId, link, { actor = null, source = 'MANUAL' } 
     want.sort_order = Number(link.sort_order);
     if (!Number.isInteger(want.sort_order)) throw bad('Order must be a whole number');
   }
-  if ('active' in link) want.active = link.active ? 1 : 0;
+  if ('active' in link) want.active = parseFlag(link.active);
 
   const before = db.prepare('SELECT * FROM side_item_sheets WHERE sheet_id = ? AND side_item_id = ?').get(sheetId, itemId);
   let id;
@@ -207,5 +228,5 @@ function siteSideSheets(db, siteCode, { withCost = false } = {}) {
 
 module.exports = {
   HOW_BOUGHT, nameKey, normUnit, parseQuantity, toMain, parseHowBought, parseCost,
-  findItemByName, createItem, updateItem, setUnit, setLink, siteSideSheets,
+  findItemByName, createItem, updateItem, setUnit, removeUnit, setLink, siteSideSheets,
 };
