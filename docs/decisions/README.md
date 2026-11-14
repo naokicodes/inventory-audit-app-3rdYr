@@ -45,7 +45,7 @@ flight. (ADR-001 explains the split.)
 |---|---|---|
 | ADR-001 | Record decisions as decision records | Accepted 2026-10-20 |
 | ADR-002 | Definition of done: Beta and Final | Accepted 2026-10-20 |
-| ADR-003 | Staff meals recorded as quantities, not prices | Accepted 2026-10-20 |
+| ADR-003 | Staff meals recorded as quantities, not prices | Accepted 2026-10-20; the sides line, for staff meals, superseded by ADR-046 until the item lists exist |
 | ADR-004 | SPOS ownership while Prince is busy | Accepted 2026-10-20 |
 | ADR-005 | SPOS moves into this repo after Beta | Accepted 2026-10-21 |
 | ADR-006 | /naoki-qs merge policy: gates replace human code review | Accepted 2026-10-21 |
@@ -59,7 +59,7 @@ flight. (ADR-001 explains the split.)
 | ADR-014 | Kitchen dispatch and tonight's kitchen counter | Accepted 2026-10-28; landing line superseded by ADR-035 |
 | ADR-015 | Blind counting and the quiet recount | Accepted 2026-10-28; derivation and Likod lines superseded by ADR-038 |
 | ADR-016 | One unit per meat on the landing | Accepted 2026-10-28 |
-| ADR-017 | Commi access, not a sub-commi | Accepted 2026-10-28 |
+| ADR-017 | Commi access, not a sub-commi | Accepted 2026-10-28; superseded in part by ADR-067 (FC's direct meats) |
 | ADR-018 | Counted-meat costing and miscut as stock | Accepted 2026-10-28 |
 | ADR-019 | Allocation requests | Accepted 2026-10-28 |
 | ADR-020 | Prices: the last billed unit price | Accepted 2026-10-22 |
@@ -68,8 +68,8 @@ flight. (ADR-001 explains the split.)
 | ADR-023 | Receiving and arrivals | Accepted 2026-10-24 |
 | ADR-024 | Side sheets: separate sheets, flexible units | Accepted 2026-10-24 |
 | ADR-025 | Bar: exact sales check, not blind | Accepted 2026-10-25 |
-| ADR-026 | Waste is its own entry | Accepted 2026-10-25 |
-| ADR-027 | Staff meals: slots, budgets and head count | Accepted 2026-10-28 |
+| ADR-026 | Waste is its own entry | Accepted 2026-10-25; superseded in part by ADR-064 (side waste after endings) |
+| ADR-027 | Staff meals: slots, budgets and head count | Accepted 2026-10-28; who logs superseded by ADR-045; rice answered by ADR-044 |
 | ADR-028 | In-house: staff meals and staff orders | Accepted 2026-10-25 |
 | ADR-029 | Management view: Spent and Used | Accepted 2026-10-24 |
 | ADR-030 | Likod is its own site | Accepted 2026-10-25 |
@@ -85,6 +85,39 @@ flight. (ADR-001 explains the split.)
 | ADR-040 | Logged-out visitors keep working until write-permission | Accepted 2026-11-02 |
 | ADR-041 | Site scoping: one owner site per request | Accepted 2026-11-02 |
 | ADR-042 | Settings changes need an admin | Accepted 2026-11-02 |
+| ADR-043 | Catalog reads stay open | Accepted 2026-11-11; its cost question answered by ADR-060 |
+| ADR-044 | Staff rice is an estimate line, never in the meal budget | Accepted 2026-11-11 |
+| ADR-045 | Staff meals: any cook logs, the head chef checks | Accepted 2026-11-11 |
+| ADR-046 | Typed non-meat lines until the item lists exist | Accepted 2026-11-12 |
+| ADR-047 | People import: held duplicates, loose names, full site lists | Accepted 2026-11-12 |
+| ADR-048 | Every intake records a count and a weight | Superseded by ADR-049 |
+| ADR-049 | Intake is quantity-only; kg is weighed at production | Accepted 2026-09-28 |
+| ADR-050 | Counted yield outputs and a closing weight flow | Superseded by ADR-051 |
+| ADR-051 | Yield output is always kg (Path 1) | Accepted 2026-09-28 |
+| ADR-052 | Two-stage staging: the commi converts and ships | Superseded by ADR-053 |
+| ADR-053 | Three-stage staging: the ratio is the restaurant's | Accepted 2026-09-28 |
+| ADR-054 | MySQL as the database target on a merge with SPOS | Superseded by ADR-055 |
+| ADR-055 | Hybrid A: two apps, two databases; this web app is the core | Accepted 2026-10-03 |
+| ADR-056 | Money stays in the POS | Superseded in part by ADR-057 |
+| ADR-057 | Separate apps: stock and losses in pesos are computed here (D3) | Accepted 2026-10-19 |
+| ADR-058 | The 10-03 leans: SPOS owns supplier POs and cost prices | Superseded by ADR-059 |
+| ADR-059 | Supplier orders, arrivals and bills are ours | Accepted 2026-10-19; frozen-SPOS assumption superseded by ADR-005, unit-cost line by ADR-020 |
+| ADR-060 | Unit costs need a "see costs" switch | Accepted 2026-11-14 |
+| ADR-061 | Queue steps are named, not numbered | Accepted 2026-11-14 |
+| ADR-062 | Side items: one imported catalog with units | Accepted 2026-11-14 |
+| ADR-063 | Side sheets show usage while counting | Accepted 2026-11-14 |
+| ADR-064 | Side waste: a prompt after endings | Accepted 2026-11-14 |
+| ADR-065 | FC: kitchen sheets in the app, the rest on paper | Accepted 2026-11-14 |
+| ADR-066 | FC on Loyverse; Kitchen Sales switches between POS groups | Accepted 2026-11-14 |
+| ADR-067 | How it's bought: from the commi; FC's direct meats | Accepted 2026-11-14 |
+| ADR-068 | Buyer runs: ticks and receipt photos | Accepted 2026-11-14 |
+| ADR-069 | Scope: every inventory sheet, not meat only | Accepted 2026-11-14 |
+| ADR-070 | Remote access through Tailscale | Accepted 2026-11-14 |
+
+**Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
+these records existed, in pairs: each older record is marked superseded by the one after it, and
+keeps its reasoning. They are numbered in the order recorded, so their dates are earlier than
+ADR-047's.
 
 ## Handoff item map
 

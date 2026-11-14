@@ -1,6 +1,6 @@
 # Pantry
 
-Status: IRL Confirmed (Silingan, FC) - FLOW Drafted - APP Decided
+Status: IRL Confirmed (Silingan, FC) - FLOW Drafted - APP Specced (side-items, side-sheets)
 
 ## IRL - how it works today
 Sheet "Inventory Pantry" (Silingan) / "Inventory Form Kitchen - PANTRY" (FC)
@@ -24,7 +24,8 @@ quantity per item, remarks; the landing person consolidates the PO.
 
 ## APP
 - Decided: separate sheet (16), flexible units (17), waste from separate
-  entries (38). Not specced. Queue item A8.
+  entries (38).
+- Specced 2026-11-14: side-items and side-sheets, as veggies.md (ADR-062, ADR-063).
 
 ## Open questions
 - Items shared with a pizza station: how they are counted (pizza.md).

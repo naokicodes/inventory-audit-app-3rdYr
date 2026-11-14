@@ -98,6 +98,12 @@ skipped list), then keep going without a checkpoint.
 
 ## 4. Build (for 3c, or a resumed 3.0)
 
+**One subagent only.** The only subagent this command runs is section 5's `pr-reviewer`. Build
+it yourself: do not hand searching or planning to Explore, Plan or general-purpose subagents, each
+of which starts from scratch and re-reads the docs. Read the step's own section, never the whole
+file: `awk '/^## Step <step-id> -/{f=1;print;next} /^## /{f=0} f' docs/session-status.md`. For "who
+calls this", use `graphify query` or grep.
+
 On the claimed branch, follow `start.md` sections 4 and 5, then `/continue` (the
 `/step` procedure, phases 4 to 7), without pausing for `/continue`. At phase 7 do
 not open a new PR: write the filled `.github/pull_request_template.md` to a file,
@@ -107,10 +113,11 @@ commands say, comment on the draft that it is parked, merge nothing, and report.
 
 ## 5. Independent check (this replaces a person reading the code)
 
-Run a review in a **subagent with a fresh context**, giving it only the PR number
-and `.claude/commands/review.md` sections 1 to 4 to follow. It must not see your
-build reasoning. If no subagent tool is available, do it yourself from
-`gh pr diff <n>` read cold, as if someone else wrote it.
+Run the **`pr-reviewer` subagent** (`.claude/agents/pr-reviewer.md`), giving it only the
+PR number. It must not see your build reasoning. Its reply is the review. If that subagent is not
+available (a session opened before it existed: quit and reopen Claude Code), do the review
+yourself by following that file's sections 1 to 5, reading `gh pr diff <n>` cold, as if someone
+else wrote it.
 
 All of these must hold:
 - every mechanical check in the review is PASS;
@@ -119,8 +126,10 @@ All of these must hold:
   is answered word for word by the step's spec. Anything that needs a human
   decision means **do not merge**: open a `needs-architect` issue and stop.
 
-If a check fails, fix it on the same branch, push, and check again. At most two
-fix rounds. Still failing after two: leave the PR open, comment what is wrong in
+If a check fails, fix it on the same branch, push, and check again with a
+**re-check**: give `pr-reviewer` the PR number, the commit it reviewed and its FAIL lines, so it
+looks only at what changed since. A fresh first review only if the fix rewrote most of the PR. At
+most two fix rounds. Still failing after two: leave the PR open, comment what is wrong in
 plain words, and stop.
 
 ## 6. Phone check (only if the PR touches `public/`)
