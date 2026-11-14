@@ -1,6 +1,6 @@
 # ADR-043 Catalog reads stay open
 
-- Status: Accepted 2026-11-11
+- Status: Accepted 2026-11-11; its cost question answered by ADR-060
 - Decided by: Naoki
 - Supersedes: none
 

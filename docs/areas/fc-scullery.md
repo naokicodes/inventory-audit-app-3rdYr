@@ -1,6 +1,6 @@
 # FC scullery
 
-Status: IRL Confirmed - FLOW None - APP Decided
+Status: IRL Confirmed - FLOW None - APP Paper (ADR-065)
 
 ## IRL - how it works today
 Sheet "Inventory Scullery" at FC, one person (source: photo of 10-22 to 10-24).
@@ -13,4 +13,5 @@ Silingan and Likod sculleries have none.
 - PO lines are ticked and carried to the landing PO.
 
 ## APP
-- Decided as a side sheet (flexible units). Not specced. Queue item A8.
+- Decided as a side sheet (flexible units), then kept on paper (ADR-065, 2026-11-14): its sheet
+  exists switched off.

@@ -1,6 +1,6 @@
 # ADR-017 Commi access, not a sub-commi
 
-- Status: Accepted 2026-10-28
+- Status: Accepted 2026-10-28; superseded in part by ADR-067 (FC's direct meats)
 - Decided by: Naoki
 - Supersedes: the 10-28 item 73 (a standing commi membership for station cooks)
 

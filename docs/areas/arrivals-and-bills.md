@@ -30,3 +30,6 @@ Status: IRL Written - FLOW Drafted - APP Decided
 
 - Decided (handoff 57): one bill per receipt; a buyer's receipts for the day
   are grouped under that day's run.
+- Decided 2026-11-14 (ADR-068): the buyer photographs buyer-run receipts, the receiver supplier
+  receipts; photos are files next to the database on the restaurant PC. FC's direct meats arrive
+  on FC's landing (ADR-067). The podium logs name and quantity (podium.md). Planned (A9).

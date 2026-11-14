@@ -132,9 +132,34 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-059; the index, and a map from handoff item numbers to records, is in
+to ADR-070; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-14 architect (A0, A8, A9 part 1) - decided (recorded: ADR-060 to ADR-070)
+
+- **Costs (ADR-060).** A `see_costs` switch (head-chef, supervisor, management; admin through
+  admin) guards every read of a unit cost or price, logged out included. Leeway % and the cook's
+  staff-meal totals stay. Step cost-guard. Answers ADR-043's open question.
+- **Named steps (ADR-061).** New queue steps get no number; family headings group them.
+- **Sides (ADR-062 to ADR-064).** One side-item catalog from the settings workbook (Sheets and Side
+  items tabs, ADR-047's import rules, a listed sheet gets exactly its items). Usage shows while
+  counting; COOKED = usage less waste and in-house. Side waste: a "Waste today?" screen after
+  endings (supersedes ADR-026 in part). Steps side-items and side-sheets; side-waste and bar-check
+  planned.
+- **FC (ADR-065, ADR-066).** In the app: landing, veggies, pantry and a drinks-only bar; the rest
+  stays on paper (sheets switched off). FC is the third Loyverse account; Kitchen Sales gets a
+  Silingan + Likod | FC switch, FC's side grouped by FC's Loyverse categories. Step loyverse-fc;
+  fc-dish-map planned.
+- **Supply (ADR-067, ADR-068).** How it's bought: supplier delivery, buyer run, from the commi (the
+  landing's meat lines become the built internal request). FC's sirloin, pork chops, tuna cubes and
+  tuna steaks come direct to FC (exception to ADR-017). Buyer ticks and receipt photos; photos as
+  files next to the database. The A9 steps are planned, specced as the steps before them land.
+- **Scope and access (ADR-069, ADR-070).** scope.md covers every inventory sheet. Remote phones use
+  Tailscale; restaurant-pc's firewall rule admits 100.64.0.0/10.
+- **Also:** busy-timeout (the 2026-09-15 plan's `busy_timeout`, still missing from connection.js)
+  is a runnable step. The podium logbook is name and quantity only (podium IRL Written). The money
+  flow around buyers is recorded in docs/areas/money.md for A13.
 
 ### 2026-11-12 architect (A0 #66, A14a) - decided (recorded: ADR-047 to ADR-059)
 
@@ -2909,6 +2934,14 @@ Touches: scripts/restaurant-pc.bat (new), .gitattributes. Not public/.
 - Keep the newest 14 beta.db backups; delete older ones only after a new backup succeeded.
 - Fill the PR template.
 
+**Added 2026-11-14 (ADR-070, ADR-066).** On PR #47 before merge, in the architect-provided file:
+- Firewall: the one inbound rule becomes `remoteip=localsubnet,100.64.0.0/10
+  profile=private,public` (Tailscale phones come from 100.64.0.0/10, and Windows may class the
+  Tailscale adapter as public). The admin-step message says "this network and Tailscale".
+- Setup asks for a third token, FC's (`LOYVERSE_FC_TOKEN`), like the other two. Run again on a PC
+  whose `.env` has no FC line (`LOYVERSE_FC_TOKEN=` or `# LOYVERSE_FC_TOKEN=`), it asks once and
+  appends the line; nothing else in `.env` is touched. The daily start never asks.
+
 ## Step business-day - one 8am business date for the whole app (A6)
 **CLOSED 2026-11-02, PR #55 (`cd50d51`).**
 
@@ -3836,3 +3869,271 @@ Test Head Chef RA (RA only); You check the looks.
 Touches: server/engines/staffMealReport.js (new), server/engines/staffMealReport.test.js (new),
 server/routes/staffMeals.js, server/routes/staffMeals.test.js, public/staff-meal-report.html (new),
 public/index.html. PUBLIC -> click-through before merge.
+
+## Step busy-timeout - SQLite waits for a lock instead of failing at once (A0)
+
+Decided 2026-11-14 (the 2026-09-15 plan's `busy_timeout`; ADR-070). DEPENDS ON nothing. Runnable
+now.
+
+- server/db/connection.js: right after `PRAGMA journal_mode = WAL`, `db.exec('PRAGMA busy_timeout =
+  5000')`. The "busy_timeout still to be added" comment goes.
+- Any non-test file that opens its own `DatabaseSync` on a database file (find them with
+  `grep -rn "new DatabaseSync" server scripts --include=*.js`, tests excluded) sets the same
+  pragma after opening.
+- Why it matters: the server is one process with one connection, so it never waits on itself. A
+  second process writing while the server runs (import-settings, a seed, a script) would fail at
+  once with "database is locked"; now it waits up to 5 seconds.
+
+Edge states: Blocked - a lock held longer than 5 seconds fails as today, with the route's normal
+error. Everything else unchanged.
+
+Tests: a connection opened through connection.js on a temp DB_PATH reports `PRAGMA busy_timeout` =
+5000 and journal_mode wal; each script found above sets it (one assertion per script, through a
+small exported open function or by reading its source, whichever the file allows).
+
+Touches: server/db/connection.js, server/db/connection.test.js (new), and any script found above.
+Server-only.
+
+## Step loyverse-fc - FC's Loyverse account and a Silingan + Likod | FC switch (A0)
+
+Decided 2026-11-14 (ADR-066, ADR-065). DEPENDS ON nothing open (loyverse-preview-iv is closed).
+Runnable now.
+
+What the kitchen sees: Kitchen Sales has a two-way switch above the date bar, "Silingan + Likod"
+on the left and "FC" on the right, like a light switch. The left side is today's page, unchanged.
+The right side shows FC's sales for the same business date (ADR-036) as one card per FC Loyverse
+category, sorted by name, each listing item name and quantity sold, biggest first, items with 0
+left out. FC's pizzaman reads the Pizza card (and its add-ons and free-pizza cards) and writes the
+numbers on paper. The switch remembers its side on that phone (localStorage in try/catch, like
+draft-store.js) and in the address (`?pos=fc`), so a link opens the right side. The last FC receipt
+time and the Sync button work as on the left.
+
+Server:
+- server/db/loyverse-name-map.json: `accounts` gains `{ "label": "FC", "key": "fc", "tokenEnv":
+  "LOYVERSE_FC_TOKEN", "group": "fc" }`; the existing two gain `"group": "silingan-likod"`. The
+  dish list stays the Silingan + Likod group's; FC gets no dish column.
+- computePreview reads only the silingan-likod accounts, so its body is exactly today's and an
+  unset FC token can never mark the left side partial.
+- New computeCategories({ date, group, env, fetchImpl }) in loyversePreview.js: for each account
+  in the group, the same receipt window, fetch, refund handling and per-account failure rules as
+  previewAccount; then `GET /v1.0/items` and `GET /v1.0/categories` (paged by cursor) to place
+  each line's item_id in a category. An item missing from /items, or without a category, lands in
+  "No category". Returns { date, group, accounts: [status], categories: [{ name, items: [{ name,
+  quantity }] }] }. Line money fields are never read.
+- GET /api/loyverse/preview?date=&pos=fc returns that body. No `pos`, or `pos=silingan-likod`,
+  returns today's body unchanged. Any other `pos` -> 400.
+- .env.example gains `LOYVERSE_FC_TOKEN=`. The token is never logged or sent to the browser.
+
+Page public/kitchen-sales.html: the switch is one pill with two halves (active half filled, 44px
+tall), above the date bar. An FC failure shows the same banner as the left side; a missing token
+says "FC's Loyverse token isn't set on this PC yet".
+
+Edge states: Failure - Loyverse down or a wrong token: that side's banner, the other side unaffected.
+Empty - no FC sales that day: "No sales for this date." Partial - receipts came but /items or
+/categories failed: every item listed under "No category" with a one-line note. Stale - the Sync
+button, as today. Blocked - none: the page stays open (ADR-041: no money, no stock). Two devices -
+read-only.
+
+Tests: the default body is byte-for-byte today's with FC in the map, token set or not; `pos=fc`
+groups stubbed receipts by stubbed categories; refunds subtract; an item missing from /items lands
+in "No category"; an unset FC token fails only FC; `pos=nope` -> 400; no price or total field in the
+FC body; the token never appears in an error.
+
+Click-through (390px): Claude checks the switch both ways, the FC empty state and the missing-token
+state on a preview; You check the looks.
+
+Touches: server/db/loyverse-name-map.json, server/engines/loyversePreview.js,
+server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js,
+public/kitchen-sales.html, .env.example. PUBLIC -> click-through before merge.
+
+Not in scope: matching FC's items to FC's dishes for the landing's expected values (fc-dish-map,
+planned: FC's menu has changed since the app's FC dish list); FC's bar check (bar-check).
+
+## Step cost-guard - unit costs need the see_costs switch (A0)
+
+Decided 2026-11-14 (ADR-060, ADR-062). DEPENDS ON role-assignments (3zj: can(), switch rows,
+ensureRoleDefaults with named sets). No schema change.
+
+What people see: a counter, or anyone logged out, opening Settings or a commissary meat list sees
+every meat and dish without its cost. Head chefs, supervisors, management and admins see costs as today.
+
+- permissions.js: CAPABILITIES gains `see_costs` and `edit_side_items`.
+- ensureRoleDefaults gains the named set `cost-switches`: head-chef -> see_costs, edit_side_items;
+  supervisor -> see_costs; management -> see_costs. Admin and super-admin have both through admin.
+- One helper in permissions.js, withoutCosts(row), drops every field named in COST_FIELDS (today
+  `cost_per_unit` and `cost_per_portion`). The reads call it when the user lacks `see_costs` at the
+  row's site: GET /api/commissary/meats (with no commissary_id: per row's commissary site),
+  GET /api/settings/commissary-meats, GET /api/settings/meats and GET /api/settings/dishes (per
+  row's site).
+- The PUT routes for commissary meats, meats and dishes keep the stored cost when the body has no
+  cost key, so a form that never saw the cost cannot erase it.
+- If side-items is on main, its reads go through withoutCosts and its unit routes accept
+  can(edit_side_items) at the sheet's site; if not, side-items does both when it lands.
+- Not touched: `allowed_leeway_pct` (not money); the staff-meal routes' running cost and budget
+  (ADR-027).
+- settings.html: a meat or dish form with no cost in the data shows no cost field.
+
+Edge states: Blocked - money fields missing, nothing else changes. Logged out - treated as without
+see_costs. Inactive role - grants nothing, as in role-assignments.
+
+Tests: a checker and a logged-out request get no cost field on the four reads; head-chef,
+supervisor, management and admin get them; leeway is present for everyone; a PUT without a cost
+key keeps the stored cost; the named set applies once, a second start changes nothing,
+and an admin's removal of see_costs from head-chef is not undone.
+
+Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/commissary.js,
+server/routes/commissary.test.js, server/routes/settings.js, server/routes/settings.test.js,
+public/settings.html (and
+server/routes/sideItems.js if side-items is on main). PUBLIC -> click-through: Claude checks as Test
+Counter RA (no costs) and Test Head Chef RA (costs); You check the looks.
+
+## Step side-items - the side-item catalog and its import (A8)
+
+Decided 2026-11-14 (ADR-062, ADR-024, ADR-022, ADR-020, ADR-047, ADR-065). DEPENDS ON
+import-identity (PR #65, scripts/import-settings.js) and settings-guard (PR #61, requireAdmin).
+Schema step: one at a time.
+
+What the owner does: fills two tabs in the settings workbook, saved as CSV beside the people tabs,
+Sheets.csv and SideItems.csv, and runs `npm run import:settings -- <folder>`. Settings then shows
+each site's side sheets with their items, and an admin fixes single items there.
+
+Schema (schema.sql, new tables):
+- side_items: id, name TEXT NOT NULL UNIQUE, main_unit TEXT NOT NULL, how_bought TEXT (NULL,
+  'SUPPLIER', 'BUYER' or 'COMMI'; the module validates), cost_per_unit REAL (per main unit; NULL =
+  not priced), active INTEGER NOT NULL DEFAULT 1, created_at.
+- side_item_units: id, side_item_id (FK), unit TEXT NOT NULL, per_main REAL NOT NULL (> 0: main
+  units in one of this unit), UNIQUE (side_item_id, unit).
+- side_item_sheets: id, sheet_id (FK sheet_definitions, engine_type SIDE), side_item_id (FK),
+  sort_order INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, UNIQUE (sheet_id,
+  side_item_id).
+- Units are stored lowercased and trimmed. An item whose main unit is `peso` is priced 1 per peso
+  (the module sets it).
+
+Module server/engines/sideItems.js:
+- parseQuantity(text): "1 1/2" -> 1.5; "3/4", "1/8" and decimals accepted; negatives and other
+  text rejected.
+- toMain(db, itemId, qty, unit): main units, or null when the unit is neither the main unit nor a
+  conversion (never a guess, ADR-024).
+- Create and update an item, set its units, link, unlink and order it on a sheet; each writes an
+  activity_log row (MANUAL) in the same transaction (withTransaction, logActivity).
+- Names compare by ADR-047's key (lowercase, trimmed, inner spaces collapsed).
+
+Import (scripts/import-settings.js; KNOWN_TABS gains Sheets and SideItems; the identity tabs are
+untouched):
+- Sheets.csv: site, sheet, active. Adds a SIDE sheet_definitions row (createSheetDefinition) or
+  sets active on an existing SIDE one. A name already used by a MEAT sheet at that site is
+  reported and skipped.
+- SideItems.csv: site, sheet, item, main_unit, conversions, how_bought, cost. conversions is
+  `sack=25; tray=30`; how_bought is supplier, buyer, commi or blank; cost is a number, or blank to
+  leave the stored cost as it is.
+- An item is created once. A row naming an existing item with a different main unit is reported
+  and skipped (ADR-062: use a second item).
+- A sheet named in SideItems.csv gets exactly its listed items active, in the listed order; links
+  not listed are set active = 0, never deleted. Sheets not in the tab are untouched.
+- ADR-047's rules: a (site, sheet, item) on more than one row is held (all its rows skipped) and
+  reported; an unresolved site, or a sheet in neither Sheets.csv nor the database, is reported and
+  skipped.
+- The report gains: sheets added or switched, items added or updated, links switched off,
+  duplicates held, unit clashes, unresolved rows. One transaction per run; a second run changes
+  nothing.
+- `--export` writes Sheets.csv and SideItems.csv too (cost included: the export runs on the owner's
+  PC, never in the repo).
+
+Routes (server/routes/sideItems.js, mounted at /api; scoped paths only, never a bare router.use):
+- GET /api/side-items?site= -> the site's SIDE sheets, each with its items (id, name, main_unit,
+  units, how_bought, link active, order). cost_per_unit only for someone who may see costs: an
+  admin until cost-guard lands, then can(see_costs).
+- POST and PUT for items, units and links: requireAdmin. Units also accept can(edit_side_items) at
+  the sheet's site when permissions.js has it.
+
+Page: settings.html gains a Side items section: site picker, sheet tabs, the item list in order;
+tap an item to edit name, main unit, conversions ("Add a conversion": unit, how many main units),
+how it's bought, cost, on or off.
+
+Edge states: Empty - no side sheets: "No side sheets for this site yet. Import the Side items tab."
+Failure - a save shows the server's message. Blocked - a non-admin gets Settings' 403 message.
+Inactive - a switched-off item keeps its history and leaves the counting page. Partial import -
+every skipped row is in the report and nothing half-written. Two devices - last save wins, both
+logged.
+
+Tests: parseQuantity cases; toMain with and without a conversion; an import adds sheets and items
+and a second run is a no-op; an item dropped from a sheet is switched off there only; a duplicated
+row is held; a unit clash is skipped; "Onion" and "onion " are one item; a blank cost keeps the
+stored cost; export then import changes nothing; non-admin writes get 403; GET leaves out the cost
+for a non-admin.
+
+Click-through (390px): Claude checks as Test Admin on a preview with a small test import (fake item
+names, never beta.db, ADR-039); You check the looks.
+
+Touches: server/db/schema.sql, server/engines/sideItems.js (new), server/engines/sideItems.test.js
+(new), scripts/import-settings.js, server/db/importSettings.test.js, server/routes/sideItems.js
+(new), server/routes/sideItems.test.js (new), server/index.js, public/settings.html. PUBLIC ->
+click-through. One at a time with any open PR on schema.sql or settings.html.
+
+Not in scope: counting (side-sheets), waste (side-waste), the bar check (bar-check), using the
+how-it's-bought tag (A9).
+
+## Step side-sheets - count a side sheet; usage shows as you type (A8)
+
+Decided 2026-11-14 (ADR-063, ADR-024, ADR-026, ADR-040; 2026-09-28 B3 and Q3). DEPENDS ON side-items
+and site-filter (PR #59, the site check). Schema step: one at a time.
+
+What the counter sees: "Side sheets" (linked from index.html) opens on today's business date at the
+counter's site (a picker for people with several sites), with a tab per active SIDE sheet. Each
+item is a card:
+- Yesterday: the previous business date's ending, in the main unit ("-" if not counted).
+- Received: quantity and unit, typed for now.
+- Ending: quantity and unit; "+ part" adds another part ("1 sack + 3 kg"). A one-tap "Out of
+  stock" sets the ending to 0 and shows OS.
+- Remark, and PO: quantity, unit and a short note (brand, "ASAP").
+- As the ending is typed: "Used: X <main unit>" = yesterday + received - ending. A part with no
+  conversion shows what was typed and "Needs a conversion" (with an "Add a conversion" link for
+  someone who may edit side items), never a guessed usage.
+Save per card; unsaved entries are kept with draft-store.js. The foot of the page shows items
+counted out of the total, and the PO lines.
+
+Schema (new table):
+- side_counts: id, sheet_id (FK), side_item_id (FK), business_date TEXT NOT NULL, ending_parts TEXT
+  (JSON [{qty, unit}]), ending_main REAL (NULL when a part has no conversion), out_of_stock INTEGER
+  NOT NULL DEFAULT 0, received_parts TEXT, received_main REAL, remark TEXT, po_qty REAL, po_unit
+  TEXT, po_note TEXT, counted_by_user_id, counted_at, updated_by_user_id, updated_at. UNIQUE
+  (sheet_id, side_item_id, business_date).
+
+Module server/engines/sideCounts.js:
+- saveCount(db, { sheetId, itemId, businessDate, ending, received, outOfStock, remark, po }, actor):
+  the item must be active on that sheet and the sheet active; quantities >= 0; parts converted
+  with sideItems.toMain. Upserts and writes an activity_log row with before and after in the same
+  transaction (a later change is an edit with history, ADR-026).
+- sheetDay(db, sheetId, date): every active item in order with yesterday, received, ending, used,
+  out of stock, remark and PO. used = yesterday + received - ending, null when any of them is null.
+  Yesterday is the previous business date's ending only (B3: no carry from older days).
+
+Routes (server/routes/sideSheets.js, scoped paths): GET /api/side-sheets?site=&date= (the site's
+sheets and counted / total), GET /api/side-sheets/:sheetId?date=, PUT
+/api/side-sheets/:sheetId/items/:itemId?date=. Site check: site-filter's check on the sheet's site;
+logged out passes until write-permission (ADR-040). Never blind, no expected value (ADR-015,
+ADR-038). A switched-off sheet: GET read-only, PUT 409. Past dates may be edited; every change is
+logged.
+
+Edge states: Empty - no items on the sheet: "No items yet. Ask an admin to import the Side items
+tab." No yesterday - Used shows "no ending yesterday". Partial - some cards saved: the foot counts
+them. Failure - a failed save keeps the draft and shows the message. Stale - a past date shows a
+banner with the date. Blocked - another site: 403 with site-filter's message. Inactive - a
+switched-off sheet or item: read-only. Two devices - last save wins, both logged.
+
+Tests: save and read back; parts with conversions sum in the main unit; a part without one gives
+ending_main null and used null; out of stock stores 0 and the flag; used = yesterday + received -
+ending, null with no yesterday; a switched-off sheet refuses PUT with 409; an item not on the
+sheet is refused; activity_log rows on create and edit; logged out passes; a user without the site
+gets 403.
+
+Click-through (390px): Claude checks as Test Counter RA on a preview with a small test import (fake
+items): type an ending and see Used, Out of stock, a two-part ending, a missing conversion; You
+check the looks.
+
+Touches: server/db/schema.sql, server/engines/sideCounts.js (new), server/engines/sideCounts.test.js
+(new), server/routes/sideSheets.js (new), server/routes/sideSheets.test.js (new), server/index.js,
+public/side-sheets.html (new), public/index.html. PUBLIC -> click-through before merge.
+
+Not in scope: the waste screen (side-waste), the bar's exact check (bar-check), arrivals filling
+Received (A9), who counts which sheet tonight (tonight-picks).

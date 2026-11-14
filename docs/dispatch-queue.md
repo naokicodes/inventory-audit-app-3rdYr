@@ -61,6 +61,11 @@ is. Read the step's own section in `session-status.md` before starting.
 > (requireAdmin). 3zv sign-the-cookie after 3zr. Staff meals: 3zw staff-meal-settings after 3zu
 > (schema.sql: one schema step at a time), 3zx staff-meal-log after 3zw and 3zj, then 3zy
 > staff-meal-check, then 3zz staff-meal-view.
+> **2026-11-14 (A0, A8, A9 part 1):** new steps are named, not numbered (ADR-061). Runnable now:
+> busy-timeout and loyverse-fc (no file shared with an open PR). PR #65 (3j) first; side-items
+> needs it and PR #61 (3zu); side-sheets needs side-items and PR #59 (3m). cost-guard after 3zj
+> role-assignments. 3ze (#47): Naoki commits the architect-provided file (Tailscale range, FC
+> token) before merging. The rest of A8 and A9 is under "Planned - sides and supply".
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -246,6 +251,9 @@ Touches: scripts/restaurant-pc.bat, .gitattributes
 Not for /naoki-qs: Naoki opens it with the architect-provided file. Full spec: session-status.md
 -> "Step restaurant-pc".
 **2026-11-11:** PR #47's review fixes (DB_PATH check, port before backup, errorlevel, PREV, firewall, no hard-coded tag, 14 backups) - see the spec.
+**2026-11-14 (ADR-070, ADR-066):** before merge, the firewall rule also admits Tailscale
+(100.64.0.0/10, private and public profiles) and setup asks for the FC Loyverse token (once, on a
+rerun, if `.env` has no FC line). Naoki commits the architect-provided file on PR #47's branch.
 
 ### 3zf. Step loyverse-preview-iv - Kitchen Sales: 8am day, last kitchen receipt, date bar  [runnable]
 **CLOSED 2026-10-30, PR #48 (`5852d65`).**
@@ -371,6 +379,36 @@ count. PUBLIC -> click-through. Full spec: session-status.md -> "Step staff-meal
 Touches: server/engines/staffMealReport.js, server/engines/staffMealReport.test.js, server/routes/staffMeals.js, server/routes/staffMeals.test.js, public/staff-meal-report.html, public/index.html
 ADR-027, ADR-044, ADR-029: per day and 7 days; the rice estimate beside, never inside, the budget.
 Read-only. PUBLIC -> click-through. Full spec: session-status.md -> "Step staff-meal-view".
+
+### Step busy-timeout - SQLite waits for a lock instead of failing at once  [runnable]
+Touches: server/db/connection.js, server/db/connection.test.js, plus any script that opens its own DatabaseSync
+The 2026-09-15 plan's `PRAGMA busy_timeout = 5000`, still missing. Server-only. Full spec:
+session-status.md -> "Step busy-timeout".
+
+### Step loyverse-fc - FC's Loyverse account and a Silingan + Likod | FC switch  [runnable]
+Touches: server/db/loyverse-name-map.json, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, public/kitchen-sales.html, .env.example
+ADR-066: FC is the third Loyverse account; Kitchen Sales switches between Silingan + Likod and FC,
+FC's side grouped by FC's own categories (the pizzaman reads Pizza there). PUBLIC ->
+click-through. Full spec: session-status.md -> "Step loyverse-fc".
+
+### Step cost-guard - unit costs need the see_costs switch  [blocked: role-assignments]
+Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
+ADR-060: cost fields leave every read for anyone without see_costs, logged out included; adds
+edit_side_items (ADR-062). PUBLIC -> click-through. Full spec: session-status.md -> "Step
+cost-guard".
+
+#### Sides (A8)
+
+### Step side-items - the side-item catalog and its import  [blocked: import-identity, settings-guard]
+Touches: server/db/schema.sql, server/engines/sideItems.js, server/engines/sideItems.test.js, scripts/import-settings.js, server/db/importSettings.test.js, server/routes/sideItems.js, server/routes/sideItems.test.js, server/index.js, public/settings.html
+ADR-062: Sheets and Side items tabs through import-settings; one catalog, units and conversions;
+Settings fixes single items. PUBLIC -> click-through. Full spec: session-status.md -> "Step
+side-items".
+
+### Step side-sheets - count a side sheet; usage shows as you type  [blocked: side-items, site-filter]
+Touches: server/db/schema.sql, server/engines/sideCounts.js, server/engines/sideCounts.test.js, server/routes/sideSheets.js, server/routes/sideSheets.test.js, server/index.js, public/side-sheets.html, public/index.html
+ADR-063: ending in any unit, out of stock, remark, PO; Used = yesterday + received - ending as you
+type. PUBLIC -> click-through. Full spec: session-status.md -> "Step side-sheets".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
@@ -502,6 +540,9 @@ Commi yield (Stage 1) is built (24d-i). Leans on commissary_meat_map + allocatio
 
 ## Planned — supply, cost and SPOS sales (architect-defined 2026-10-19, NOT yet sliced)
 
+**2026-11-14:** the supply steps are re-planned under "Planned - sides and supply" below
+(ADR-067, ADR-068); the valuation, dashboard and SPOS adapter lines here stand.
+
 Decided in session-status "Supply, cost and SPOS integration" and "Management dashboard".
 Family, roughly in order:
 - **Suppliers catalog** (one list for meat and sides).
@@ -513,6 +554,24 @@ Family, roughly in order:
 - **Management dashboard** + the sales sneak peek (needs loyverse-preview-i).
 - **SPOS sales adapter** (column-limited read-only MySQL user, source SPOS) - after the real
   Loyverse port.
+
+## Planned - sides and supply (A8, A9; architect-defined 2026-11-14, NOT yet specified)
+
+Decided in ADR-062 to ADR-068. Each gets its full spec in session-status as the step before it
+lands, so it is written against the code it builds on. Roughly in order:
+- **Sides:** side-waste (ADR-064: the "Waste today?" screen after endings); bar-check (ADR-025,
+  ADR-065: bottles, cans and dessert slices against each bar's own Loyverse account; FC's drinks;
+  the boodle's four free drinks and the panalo upgrade); fc-dish-map (FC's Loyverse items to FC's
+  dishes, after FC's dish list is refreshed).
+- **Supply:** supply-tags (how it's bought on side items and meats, ADR-067); suppliers;
+  supplier-orders (the landing's consolidation with history, picture plus text, estimated cost
+  behind see_costs); buyer-list (ticks, "not found" to tomorrow, receipt photos, ADR-068); arrivals
+  (the receiver's check, including the podium's name-and-quantity log and Misc; moving a line to
+  the other restaurant; FC's direct meats onto FC's landing; fills the side sheets' Received);
+  bills (the bills-only cashier role, ADR-020, ADR-059); commi-meat-lines (the landing's meat lines
+  into the built internal request); sides-valuation (pesos used, wasted and on hand, ADR-057).
+- Later: an in-app alert for supervisors when a buyer marks a line "not found"; phone
+  notifications once the PC has an HTTPS name (ADR-070).
 
 ## Available engineer-lane work
 
