@@ -10,7 +10,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
-const { parseCsv, loadTab, importIdentity, formatReport, exportIdentity } = require('../../scripts/import-settings.js');
+const { parseCsv, loadTab, importSettings, formatReport, exportSettings } = require('../../scripts/import-settings.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -106,7 +106,7 @@ try {
 
   test('upserts role flags: updates a seeded role, inserts a new one, deletes none', () => {
     const db = freshDb();
-    const report = importIdentity(db, workbook({ Roles: ROLES_CSV }));
+    const report = importSettings(db, workbook({ Roles: ROLES_CSV }));
     assert.deepStrictEqual({ ...role(db, 'checker') }, { can_enter_counts: 1, can_finalize: 1, can_admin: 0, read_only: 0 });
     assert.deepStrictEqual({ ...role(db, 'bills-only') }, { can_enter_counts: 0, can_finalize: 0, can_admin: 0, read_only: 1 });
     assert.ok(role(db, 'management'), 'a role absent from the sheet is kept');
@@ -116,7 +116,7 @@ try {
 
   test("never changes super-admin's flags; a bad flag skips only that row", () => {
     const db = freshDb();
-    const report = importIdentity(db, workbook({ Roles: [
+    const report = importSettings(db, workbook({ Roles: [
       'name,can_enter_counts,can_finalize,can_admin,read_only',
       'super-admin,0,0,0,1',
       'admin,1,1,yes,0',
@@ -130,7 +130,7 @@ try {
 
   test("resolves each user's default_role and active; adds resolving memberships", () => {
     const db = freshDb();
-    const report = importIdentity(db, workbook({ Roles: ROLES_CSV, Users: USERS_CSV }));
+    const report = importSettings(db, workbook({ Roles: ROLES_CSV, Users: USERS_CSV }));
     const ana = user(db, 'Ana Cruz');
     assert.strictEqual(ana.role, 'checker');
     assert.strictEqual(ana.active, 1);
@@ -147,7 +147,7 @@ try {
   test('the super-admin row renames the ONE bootstrap super-admin, never adds a second', () => {
     const db = freshDb();
     const before = counts(db).users;
-    importIdentity(db, workbook({ Roles: ROLES_CSV, Users: USERS_CSV }));
+    importSettings(db, workbook({ Roles: ROLES_CSV, Users: USERS_CSV }));
     assert.deepStrictEqual(superAdmins(db), ['Owner Person']);
     assert.strictEqual(user(db, 'superadmin'), undefined, 'bootstrap name is gone');
     assert.strictEqual(counts(db).users, before + 3, 'only the three non-super-admin users were added');
@@ -155,7 +155,7 @@ try {
 
   test('a second super-admin row, or demoting the super-admin by name, is refused', () => {
     const db = freshDb();
-    const report = importIdentity(db, workbook({ Users: [
+    const report = importSettings(db, workbook({ Users: [
       'name,default_role,active,site_memberships',
       'Owner Person,super-admin,1,',
       'Other Owner,super-admin,1,',
@@ -167,7 +167,7 @@ try {
     assert.strictEqual(user(db, 'superadmin').role, 'checker');
 
     // Re-import naming the (renamed) super-admin with another role.
-    const report2 = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nOwner Person,admin,1,\n' }));
+    const report2 = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nOwner Person,admin,1,\n' }));
     assert.deepStrictEqual(superAdmins(db), ['Owner Person'], 'still the super-admin');
     assert.ok(report2.problems.some(p => /is the super-admin/.test(p)), report2.problems.join('; '));
   });
@@ -175,7 +175,7 @@ try {
   test('warns on an unresolved site code and an unknown role, without throwing', () => {
     const db = freshDb();
     db.prepare("INSERT INTO commissaries (name, code) VALUES ('Clash', 'FC')").run(); // FC in both tables
-    const report = importIdentity(db, workbook({ Users: [
+    const report = importSettings(db, workbook({ Users: [
       'name,default_role,active,site_memberships',
       'Dan Uy,checker,1,"RA, SILT, FC"',
       'Eve Go,cashier,1,RA',
@@ -193,9 +193,9 @@ try {
   test('a second run is a no-op (idempotent)', () => {
     const db = freshDb();
     const dir = workbook({ Roles: ROLES_CSV, Users: USERS_CSV });
-    importIdentity(db, dir);
+    importSettings(db, dir);
     const after1 = counts(db);
-    const report = importIdentity(db, dir);
+    const report = importSettings(db, dir);
     assert.deepStrictEqual(counts(db), after1);
     for (const k of ['rolesInserted', 'rolesUpdated', 'usersInserted', 'usersUpdated', 'membershipsAdded', 'membershipsRemoved']) {
       assert.strictEqual(report[k], 0, `${k} on the second run`);
@@ -207,10 +207,10 @@ try {
 
   test('a duplicated name changes nothing, in Roles.csv and in Users.csv', () => {
     const db = freshDb();
-    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nKim,checker,1,RA\n' }));
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nKim,checker,1,RA\n' }));
     const kim = user(db, 'Kim');
     const before = counts(db);
-    const report = importIdentity(db, workbook({
+    const report = importSettings(db, workbook({
       Roles: [
         'name,can_enter_counts,can_finalize,can_admin,read_only',
         'checker,1,1,1,0',
@@ -241,10 +241,10 @@ try {
 
   test('"kim" in the sheet updates an existing "Kim": one user, the sheet\'s spelling', () => {
     const db = freshDb();
-    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nKim,checker,1,RA\n' }));
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nKim,checker,1,RA\n' }));
     const id = user(db, 'Kim').id;
     const before = counts(db).users;
-    const report = importIdentity(db, workbook({
+    const report = importSettings(db, workbook({
       Users: 'name,default_role,active,site_memberships\n  kim ,HEAD-CHEF,1,RA\n',
     }));
     assert.strictEqual(counts(db).users, before, 'no second user');
@@ -254,7 +254,7 @@ try {
     assert.deepStrictEqual(report.spellingUpdated, ['Kim -> kim']);
     assert.match(formatReport(report), /Spelling updated/);
     // And the next run with the same spelling changes nothing.
-    const again = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nkim,head-chef,1,RA\n' }));
+    const again = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nkim,head-chef,1,RA\n' }));
     assert.deepStrictEqual(again.spellingUpdated, []);
     assert.strictEqual(again.usersUpdated, 0);
   });
@@ -263,7 +263,7 @@ try {
     const db = freshDb();
     const checker = db.prepare("SELECT id FROM roles WHERE name = 'checker'").get().id;
     db.prepare("INSERT INTO users (name, default_role_id) VALUES ('Lee', ?), ('LEE', ?)").run(checker, checker);
-    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nlee,admin,1,RA\n' }));
+    const report = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nlee,admin,1,RA\n' }));
     assert.strictEqual(user(db, 'Lee').role, 'checker');
     assert.strictEqual(user(db, 'LEE').role, 'checker');
     assert.strictEqual(counts(db).sites, 0);
@@ -276,7 +276,7 @@ try {
     const flagsOf = n => db.prepare('SELECT can_enter_counts, can_finalize, can_admin, read_only FROM roles WHERE name = ?').get(n);
     const before = { admin: { ...flagsOf('admin') }, Admin: { ...flagsOf('Admin') } };
     const rolesBefore = db.prepare('SELECT COUNT(*) AS n FROM roles').get().n;
-    const report = importIdentity(db, workbook({
+    const report = importSettings(db, workbook({
       Roles: 'name,can_enter_counts,can_finalize,can_admin,read_only\n ADMIN ,1,0,0,0\n',
       Users: 'name,default_role,active,site_memberships\nNoor,admin,1,RA\n',
     }));
@@ -296,19 +296,19 @@ try {
     const db = freshDb();
     const checker = db.prepare("SELECT id FROM roles WHERE name = 'checker'").get().id;
     db.prepare("INSERT INTO users (name, default_role_id) VALUES ('Mia Tan', ?)").run(checker);
-    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nmia  tan,super-admin,1,\n' }));
+    const report = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nmia  tan,super-admin,1,\n' }));
     assert.deepStrictEqual(superAdmins(db), ['superadmin'], 'clash by key: not renamed');
     assert.ok(report.problems.some(p => /already belongs to another user/.test(p)), report.problems.join('; '));
 
-    const report2 = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nSuperAdmin,Super-Admin,1,\n' }));
+    const report2 = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nSuperAdmin,Super-Admin,1,\n' }));
     assert.deepStrictEqual(superAdmins(db), ['SuperAdmin']);
     assert.deepStrictEqual(report2.spellingUpdated, ['superadmin -> SuperAdmin']);
   });
 
   test('site_memberships is the full list: a removed code deletes the membership', () => {
     const db = freshDb();
-    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC, COM-A"\nBo,checker,1,RA\n' }));
-    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' }));
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC, COM-A"\nBo,checker,1,RA\n' }));
+    const report = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' }));
     assert.deepStrictEqual(sites(db, user(db, 'Ana').id), ['RA']);
     assert.deepStrictEqual(sites(db, user(db, 'Bo').id), ['RA'], 'a user absent from the sheet is untouched');
     assert.strictEqual(report.membershipsRemoved, 2);
@@ -317,8 +317,8 @@ try {
 
   test('an unresolved code blocks removals for that user', () => {
     const db = freshDb();
-    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
-    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"COM-A, SILT"\n' }));
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
+    const report = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"COM-A, SILT"\n' }));
     assert.deepStrictEqual(sites(db, user(db, 'Ana').id), ['COM-A', 'FC', 'RA'], 'resolved code added, nothing removed');
     assert.strictEqual(report.membershipsRemoved, 0);
     assert.deepStrictEqual(report.removalsSkipped, ['Ana: SILT did not resolve - nothing removed (kept FC, RA)']);
@@ -327,15 +327,15 @@ try {
 
   test('a blank site_memberships cell removes them all', () => {
     const db = freshDb();
-    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
-    const report = importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,\n' }));
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
+    const report = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,\n' }));
     assert.deepStrictEqual(sites(db, user(db, 'Ana').id), []);
     assert.strictEqual(report.membershipsRemoved, 2);
   });
 
   test('report row numbers are spreadsheet rows, even after a blank line', () => {
     const db = freshDb();
-    const report = importIdentity(db, workbook({ Users: [
+    const report = importSettings(db, workbook({ Users: [
       'name,default_role,active,site_memberships', '', 'Ana,checker,yes,', 'Bo,checker,1,', ',,,', 'bo,checker,1,',
     ].join('\n') }));
     assert.ok(report.problems.some(p => p.startsWith('Users row 3 "Ana"')), report.problems.join('; '));
@@ -345,20 +345,20 @@ try {
   test('a database error while resolving a site code rolls the import back', () => {
     const db = freshDb();
     db.exec('DROP TABLE commissaries');
-    assert.throws(() => importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' })), /no such table: commissaries/);
+    assert.throws(() => importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' })), /no such table: commissaries/);
     assert.strictEqual(user(db, 'Ana'), undefined, 'the user insert was rolled back');
   });
 
   test('a skipped row changes no memberships', () => {
     const db = freshDb();
-    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
-    importIdentity(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,maybe,\n' }));
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,"RA, FC"\n' }));
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,maybe,\n' }));
     assert.deepStrictEqual(sites(db, user(db, 'Ana').id), ['FC', 'RA']);
   });
 
   test('lists the tabs it skipped (Stations, Staff) and reads only Roles / Users', () => {
     const db = freshDb();
-    const report = importIdentity(db, workbook({ Users: USERS_CSV, Stations: 'x\n1\n', Staff: 'y\n2\n' }));
+    const report = importSettings(db, workbook({ Users: USERS_CSV, Stations: 'x\n1\n', Staff: 'y\n2\n' }));
     assert.deepStrictEqual(report.tabsRead, ['Users']);
     assert.deepStrictEqual(report.tabsSkipped, ['Staff', 'Stations']);
   });
@@ -367,14 +367,14 @@ try {
 
   test('export -> import round-trips into an identical database, without Test accounts', () => {
     const db = freshDb();
-    importIdentity(db, workbook({ Roles: ROLES_CSV, Users: USERS_CSV }));
+    importSettings(db, workbook({ Roles: ROLES_CSV, Users: USERS_CSV }));
     db.prepare("INSERT INTO users (name, default_role_id) VALUES ('Test Counter RA', (SELECT id FROM roles WHERE name = 'checker'))").run();
     const out = path.join(tmpRoot, 'export1');
-    const result = exportIdentity(db, out);
+    const result = exportSettings(db, out);
     assert.strictEqual(result.users, 4, 'Test account left out');
     assert.ok(!fs.readFileSync(path.join(out, 'Users.csv'), 'utf8').includes('Test '));
 
-    const again = importIdentity(db, out);
+    const again = importSettings(db, out);
     for (const k of ['rolesInserted', 'rolesUpdated', 'usersInserted', 'usersUpdated', 'membershipsAdded']) {
       assert.strictEqual(again[k], 0, `${k} re-importing the export`);
     }
@@ -385,8 +385,181 @@ try {
   test('export refuses to overwrite an existing Roles.csv / Users.csv', () => {
     const db = freshDb();
     const dir = workbook({ Users: 'keep me\n' });
-    assert.match(exportIdentity(db, dir).refused, /already exist/);
+    assert.match(exportSettings(db, dir).refused, /already exist/);
     assert.strictEqual(fs.readFileSync(path.join(dir, 'Users.csv'), 'utf8'), 'keep me\n');
+  });
+
+  // --- Sheets / SideItems (step side-items) ---
+
+  const SHEETS_CSV = 'site,sheet,active\nRA,Bar Sides,1\nFC,Bar Sides,1\n';
+  const ITEMS_CSV = [
+    'site,sheet,item,main_unit,conversions,how_bought,cost',
+    'RA,Bar Sides,Test Rice,kg,sack=25; Tray = 2,supplier,50',
+    'RA,Bar Sides,Test Onion,kg,,buyer,',
+    'FC,Bar Sides,Test Rice,kg,sack=25,supplier,50',
+    'FC,Bar Sides,Test Load,peso,,,',
+  ].join('\n') + '\n';
+  const linksOn = (db, site) => db.prepare(`
+    SELECT i.name FROM side_item_sheets l
+      JOIN sheet_definitions d ON d.id = l.sheet_id JOIN side_items i ON i.id = l.side_item_id
+     WHERE d.site_code = ? AND l.active = 1 ORDER BY l.sort_order`).all(site).map(r => r.name);
+  const sideChanges = r => ['sheetsAdded', 'sheetsSwitched', 'itemsAdded', 'itemsUpdated', 'linksAdded', 'linksSwitchedOff']
+    .filter(k => r[k] !== 0).map(k => `${k}=${r[k]}`);
+
+  test('sides: an import adds sheets and items, and a second run changes nothing', () => {
+    const db = freshDb();
+    const dir = workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV });
+    const report = importSettings(db, dir);
+    assert.deepStrictEqual(report.tabsRead, ['Sheets', 'SideItems']);
+    assert.strictEqual(report.sheetsAdded, 2);
+    assert.strictEqual(report.itemsAdded, 3, 'Test Rice is one item on two sheets');
+    assert.strictEqual(report.linksAdded, 4);
+    assert.deepStrictEqual(linksOn(db, 'RA'), ['Test Rice', 'Test Onion']);
+    const rice = db.prepare("SELECT * FROM side_items WHERE name = 'Test Rice'").get();
+    assert.strictEqual(rice.how_bought, 'SUPPLIER');
+    assert.strictEqual(rice.cost_per_unit, 50);
+    assert.deepStrictEqual(db.prepare('SELECT unit, per_main FROM side_item_units WHERE side_item_id = ? ORDER BY unit').all(rice.id)
+      .map(u => `${u.unit}=${u.per_main}`), ['sack=25', 'tray=2']);
+    assert.strictEqual(db.prepare("SELECT cost_per_unit FROM side_items WHERE name = 'Test Load'").get().cost_per_unit, 1);
+    assert.strictEqual(db.prepare("SELECT engine_type FROM sheet_definitions WHERE category = 'Bar Sides' LIMIT 1").get().engine_type, 'SIDE');
+
+    const logs = db.prepare('SELECT COUNT(*) AS n FROM activity_log').get().n;
+    const again = importSettings(db, dir);
+    assert.deepStrictEqual(sideChanges(again), []);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM activity_log').get().n, logs, 'no log rows on a no-op run');
+  });
+
+  test('sides: an item dropped from a sheet is switched off there only', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Onion,kg,,buyer,',
+    ].join('\n') }));
+    assert.strictEqual(report.linksSwitchedOff, 1);
+    assert.deepStrictEqual(linksOn(db, 'RA'), ['Test Onion']);
+    assert.deepStrictEqual(linksOn(db, 'FC'), ['Test Rice', 'Test Load'], 'the other sheet is untouched');
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM side_item_sheets').get().n, 4, 'switched off, never deleted');
+  });
+
+  test('sides: a duplicated row is held, a unit clash is skipped, both reported', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Rice,kg,,supplier,60',
+      'RA,bar sides,test rice ,kg,,supplier,70',
+      'RA,Bar Sides,Test Onion,pc,,buyer,',
+      'RA,Bar Sides,Test Egg,pc,,,',
+    ].join('\n') }));
+    assert.strictEqual(report.sideDuplicates.length, 1);
+    assert.match(report.sideDuplicates[0], /rows 2, 3/);
+    assert.strictEqual(report.unitClashes.length, 1);
+    assert.match(report.unitClashes[0], /Test Onion: main unit is kg/);
+    assert.strictEqual(db.prepare("SELECT cost_per_unit FROM side_items WHERE name = 'Test Rice'").get().cost_per_unit, 50, 'held rows change nothing');
+    assert.deepStrictEqual(linksOn(db, 'RA').sort(), ['Test Egg', 'Test Onion', 'Test Rice'], 'skipped rows keep their links');
+    assert.match(formatReport(report), /different main unit/);
+  });
+
+  test('sides: a blank cost keeps the stored cost; "Onion" and "onion " are one item', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    db.prepare("UPDATE side_items SET cost_per_unit = 12 WHERE name = 'Test Onion'").run();
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,test  onion ,KG,,buyer,',
+      'RA,Bar Sides,Test Rice,kg,sack=25; tray=2,supplier,50',
+    ].join('\n') }));
+    assert.strictEqual(report.itemsAdded, 0);
+    assert.strictEqual(db.prepare("SELECT COUNT(*) AS n FROM side_items WHERE name LIKE '%onion%'").get().n, 1);
+    assert.strictEqual(db.prepare("SELECT cost_per_unit FROM side_items WHERE name = 'Test Onion'").get().cost_per_unit, 12);
+  });
+
+  test('sides: unknown site, missing sheet and a MEAT sheet name are reported and skipped', () => {
+    const db = freshDb();
+    db.prepare("INSERT INTO sheet_definitions (site_code, category, engine_type) VALUES ('RA', 'Landing', 'MEAT')").run();
+    const report = importSettings(db, workbook({
+      Sheets: 'site,sheet,active\nZZ,Bar,1\nRA,landing,1\n',
+      SideItems: 'site,sheet,item,main_unit,conversions,how_bought,cost\nRA,Nowhere,Test X,kg,,,\nRA,Landing,Test Y,kg,,,\nRA,Landing,Test Z,kg,,friend,\n',
+    }));
+    assert.strictEqual(report.sheetsAdded, 0);
+    assert.strictEqual(report.itemsAdded, 0);
+    assert.strictEqual(report.sideUnresolved.length, 5);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM side_items').get().n, 0);
+  });
+
+  test('sides: a skipped row (bad value) leaves its link as it was (ADR-078)', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Rice,kg,,friend,',
+    ].join('\n') }));
+    assert.strictEqual(report.sideUnresolved.length, 1);
+    assert.strictEqual(report.linksSwitchedOff, 1, 'only Test Onion, absent from the tab, goes off');
+    assert.deepStrictEqual(linksOn(db, 'RA'), ['Test Rice']);
+  });
+
+  test('sides: two rows with different costs keep the stored cost and report it; links still apply (ADR-078)', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Rice,kg,,,60',
+      'FC,Bar Sides,Test Rice,kg,,,70',
+      'FC,Bar Sides,Test Egg,pc,,buyer,',
+      'RA,Bar Sides,Test Egg,pc,,,',
+    ].join('\n') }));
+    const rice = db.prepare("SELECT * FROM side_items WHERE name = 'Test Rice'").get();
+    assert.strictEqual(rice.cost_per_unit, 50);
+    assert.strictEqual(rice.how_bought, 'SUPPLIER', 'blank how_bought has no opinion');
+    assert.deepStrictEqual(report.fieldConflicts, ['conflicting values: Test Rice cost']);
+    assert.strictEqual(db.prepare("SELECT how_bought FROM side_items WHERE name = 'Test Egg'").get().how_bought, 'BUYER');
+    assert.deepStrictEqual(linksOn(db, 'RA'), ['Test Rice', 'Test Egg']);
+    assert.match(formatReport(report), /conflicting values: Test Rice cost/);
+  });
+
+  test('sides: a conversion with two factors is unchanged and reported; others merge; blank never removes (ADR-078, ADR-079)', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV, SideItems: ITEMS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Rice,kg,sack=20; cup=0.2,,',
+      'FC,Bar Sides,Test Rice,kg,sack=30,,',
+      'RA,Bar Sides,Test Onion,kg,,,',
+    ].join('\n') }));
+    const rice = db.prepare("SELECT id FROM side_items WHERE name = 'Test Rice'").get();
+    assert.deepStrictEqual(db.prepare('SELECT unit, per_main FROM side_item_units WHERE side_item_id = ? ORDER BY unit').all(rice.id)
+      .map(u => `${u.unit}=${u.per_main}`), ['cup=0.2', 'sack=25', 'tray=2'], 'sack kept, cup merged, tray (blank) left');
+    assert.deepStrictEqual(report.fieldConflicts, ['conflicting values: Test Rice conversion sack']);
+  });
+
+  test('sides: a new item whose rows disagree on the main unit is not added', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV }));
+    const report = importSettings(db, workbook({ SideItems: [
+      'site,sheet,item,main_unit,conversions,how_bought,cost',
+      'RA,Bar Sides,Test Egg,pc,,,',
+      'FC,Bar Sides,Test Egg,tray,,,',
+    ].join('\n') }));
+    assert.strictEqual(report.itemsAdded, 0);
+    assert.deepStrictEqual(report.fieldConflicts, ['conflicting values: Test Egg main_unit']);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM side_items').get().n, 0);
+  });
+
+  test('sides: export then import changes nothing', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Sheets: SHEETS_CSV + 'RA,Old Sides,0\n', SideItems: ITEMS_CSV }));
+    const out = path.join(tmpRoot, 'export-sides');
+    const result = exportSettings(db, out);
+    assert.strictEqual(result.sheets, 3);
+    assert.strictEqual(result.sideItems, 4);
+    assert.match(fs.readFileSync(path.join(out, 'SideItems.csv'), 'utf8'), /Test Rice,kg,sack=25; tray=2,supplier,50/);
+    const logs = db.prepare('SELECT COUNT(*) AS n FROM activity_log').get().n;
+    const again = importSettings(db, out);
+    assert.deepStrictEqual(sideChanges(again), []);
+    assert.deepStrictEqual([again.sideDuplicates, again.unitClashes, again.sideUnresolved], [[], [], []]);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM activity_log').get().n, logs);
   });
 
   // --- seed guard (real seed.js on a scratch file) ---

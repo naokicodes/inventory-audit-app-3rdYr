@@ -51,6 +51,7 @@
     <button data-section="commissaries">Commissaries</button>
     <button data-section="meat-types">Meat Types</button>
     <button data-section="commissary-meats">Commissary Meats</button>
+    <button data-section="side-items">Side items</button>
   </div>
 
   <section id="section-restaurants" class="section-panel active">
@@ -212,6 +213,37 @@
     </div>
     <div id="commissary-meats-table">Loading...</div>
   </section>
+
+  <!-- Step side-items (ADR-062): each site's side sheets and their items.
+       The lists come from the workbook import; here an admin fixes single items. -->
+  <section id="section-side-items" class="section-panel">
+    <h2>Side items</h2>
+    <small class="hint">Sheets and items come from the Side items tab of the settings workbook. Tap an item to fix it.</small>
+    <div class="add-form">
+      <label>Site <select id="side-site"></select></label>
+    </div>
+    <div id="side-sheet-tabs" class="side-sheet-tabs"></div>
+    <div id="side-items-list">Loading...</div>
+  </section>
+  <style>
+    /* ADR-077: one row that scrolls sideways itself; the page never does. */
+    .side-sheet-tabs { display: flex; gap: 0.5rem; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; margin-bottom: 1rem; padding-bottom: 0.25rem; }
+    .side-sheet-tabs button { flex: 0 0 auto; white-space: nowrap; }
+    .side-sheet-tabs button { background: var(--paper); border: 1px solid var(--line2); }
+    .side-sheet-tabs button.active { background: var(--ink); color: var(--card); }
+    .side-item { padding: 0.6rem 0.75rem; margin-bottom: 0.5rem; }
+    .side-item > button.side-item-head { all: unset; cursor: pointer; display: flex; justify-content: space-between; gap: 0.5rem; width: 100%; }
+    .side-item > button.side-item-head:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .side-item.off .side-item-head { color: var(--ink3); }
+    .side-item-form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+    .side-item-form label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .side-item-form label.inline { flex-direction: row; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
+    .side-item-form input, .side-item-form select { padding: 0.4rem; font-size: 1rem; max-width: 100%; box-sizing: border-box; }
+    .side-conv-row { display: flex; gap: 0.5rem; }
+    .side-conv-row input { flex: 1; min-width: 0; }
+    .side-conv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9rem; }
+    .side-conv-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+  </style>
 
   <script>
     const restaurantSelect = document.getElementById('restaurant');
@@ -1142,6 +1174,147 @@
     loadMeatTypesTable();
     loadCommissaryMeatCommissaryDropdown().then(() => loadCommissaryMeats());
     loadCommissaryMeatTypeDropdown();
+
+    // ---------- Side items (step side-items) ----------
+    const sideSite = document.getElementById('side-site');
+    const sideTabs = document.getElementById('side-sheet-tabs');
+    const sideList = document.getElementById('side-items-list');
+    let sideSheets = [];
+    let sideSheetId = null;
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const HOW_BOUGHT = { '': '(not set)', SUPPLIER: 'Supplier', BUYER: 'Buyer', COMMI: 'Commi' };
+    const currentSideSheet = () => sideSheets.find(s => s.id === sideSheetId);
+
+    async function loadSideSites() {
+      const [restaurants, commissaries] = await Promise.all([
+        fetch('/api/restaurants').then(r => r.json()),
+        fetch('/api/settings/commissaries').then(r => r.json()),
+      ]);
+      const sites = [...restaurants, ...commissaries.filter(c => c.active)];
+      sideSite.innerHTML = sites.map(s => `<option value="${esc(s.code)}">${esc(s.name)} (${esc(s.code)})</option>`).join('');
+      loadSideItems();
+    }
+
+    // A site switched while a load is in flight: only the newest load renders.
+    let sideLoad = 0;
+    async function loadSideItems() {
+      const mine = ++sideLoad;
+      const res = await fetch(`/api/side-items?site=${encodeURIComponent(sideSite.value)}`);
+      const body = await res.json();
+      if (mine !== sideLoad) return;
+      if (!res.ok) { sideTabs.innerHTML = ''; sideList.textContent = body.error || 'Could not load side items.'; return; }
+      sideSheets = body;
+      if (!currentSideSheet()) sideSheetId = sideSheets.length ? sideSheets[0].id : null;
+      renderSideItems();
+    }
+
+    function renderSideItems() {
+      if (sideSheets.length === 0) {
+        sideTabs.innerHTML = '';
+        sideList.textContent = 'No side sheets for this site yet. Import the Side items tab.';
+        return;
+      }
+      sideTabs.innerHTML = sideSheets.map(s =>
+        `<button type="button" data-id="${s.id}" class="${s.id === sideSheetId ? 'active' : ''}">${esc(s.name)}${s.active ? '' : ' (off)'}</button>`
+      ).join('');
+      const items = currentSideSheet().items;
+      if (items.length === 0) { sideList.textContent = 'No items on this sheet yet. Import the Side items tab.'; return; }
+      sideList.innerHTML = items.map(i => `
+        <div class="box side-item ${i.link_active && i.item_active ? '' : 'off'}" data-id="${i.id}">
+          <button type="button" class="side-item-head">
+            <span>${esc(i.name)}</span><span>${esc(i.main_unit)}${i.item_active ? (i.link_active ? '' : ' · off here') : ' · item off'}</span>
+          </button>
+        </div>`).join('');
+    }
+
+    // Tap an item: open (or close) its edit form under it.
+    function toggleSideItem(box) {
+      const open = box.querySelector('.side-item-form');
+      if (open) return open.remove();
+      const i = currentSideSheet().items.find(x => x.id === Number(box.dataset.id));
+      const unit = esc(i.main_unit);
+      const form = document.createElement('div');
+      form.className = 'side-item-form';
+      form.innerHTML = `
+        <label>Name <input data-f="name" value="${esc(i.name)}"></label>
+        <label>Main unit <input data-f="main_unit" value="${unit}" ${i.units.length ? 'disabled' : ''}></label>
+        ${i.units.length ? '<small class="hint">The main unit is fixed while the item has conversions. Make a new item instead.</small>' : ''}
+        <div>Conversions${i.units.length ? '' : ': none'}</div>
+        ${i.units.length ? `<ul class="side-conv-list">${i.units.map(u => `
+          <li><span>1 ${esc(u.unit)} = ${u.per_main} ${unit}</span>
+            <button type="button" data-act="remove-unit" data-unit="${esc(u.unit)}" aria-label="Remove the ${esc(u.unit)} conversion">Remove</button></li>`).join('')}</ul>` : ''}
+        <label>Add a conversion (or change one: type its unit again)
+          <span class="side-conv-row">
+            <input data-f="conv_unit" placeholder="unit, e.g. sack" aria-label="Conversion unit">
+            <input data-f="conv_per" type="number" step="any" min="0" inputmode="decimal" placeholder="how many ${unit}" aria-label="How many ${unit}">
+          </span>
+        </label>
+        <label>How it's bought <select data-f="how_bought">${Object.entries(HOW_BOUGHT).map(([v, t]) =>
+          `<option value="${v}" ${(i.how_bought || '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        ${'cost_per_unit' in i ? `<label>Cost per ${unit} <input data-f="cost" type="number" step="any" min="0" inputmode="decimal" value="${i.cost_per_unit ?? ''}"></label>` : ''}
+        <label class="inline"><input type="checkbox" data-f="on" ${i.link_active ? 'checked' : ''}> On this sheet</label>
+        <label class="inline"><input type="checkbox" data-f="item_on" ${i.item_active ? 'checked' : ''}> Item on (off: it leaves every sheet's counting page; its history stays)</label>
+        <div><button type="button" data-act="save">Save</button> <span class="status-message" role="status"></span></div>`;
+      box.appendChild(form);
+    }
+
+    // Saves the item, then a new conversion, then on/off; stops at the first
+    // refusal and shows the server's message.
+    async function saveSideItem(box) {
+      const form = box.querySelector('.side-item-form');
+      const f = name => form.querySelector(`[data-f="${name}"]`);
+      const msg = form.querySelector('.status-message');
+      const id = Number(box.dataset.id);
+      const send = async (method, url, body) => {
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || `Save failed (${res.status})`);
+      };
+      try {
+        const item = { name: f('name').value, main_unit: f('main_unit').value, how_bought: f('how_bought').value, active: f('item_on').checked };
+        if (f('cost')) item.cost_per_unit = f('cost').value;
+        await send('PUT', `/api/side-items/${id}`, item);
+        if (f('conv_unit').value.trim() || f('conv_per').value !== '') {
+          await send('POST', `/api/side-items/${id}/units`, { unit: f('conv_unit').value, per_main: f('conv_per').value });
+        }
+        await send('PUT', '/api/side-item-links', { sheet_id: sideSheetId, side_item_id: id, active: f('on').checked });
+        await loadSideItems();
+      } catch (err) {
+        msg.className = 'status-message error';
+        msg.textContent = err.message;
+      }
+    }
+
+    // Removes one conversion after a confirm (ADR-079); logged by the server.
+    async function removeSideUnit(box, unit) {
+      const msg = box.querySelector('.side-item-form .status-message');
+      if (!confirm(`Remove the "${unit}" conversion? Counts already saved keep their numbers.`)) return;
+      try {
+        const res = await fetch(`/api/side-items/${Number(box.dataset.id)}/units/${encodeURIComponent(unit)}`, { method: 'DELETE' });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || `Remove failed (${res.status})`);
+        await loadSideItems();
+      } catch (err) {
+        msg.className = 'status-message error';
+        msg.textContent = err.message;
+      }
+    }
+
+    sideSite.addEventListener('change', loadSideItems);
+    sideTabs.addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      sideSheetId = Number(btn.dataset.id);
+      renderSideItems();
+    });
+    sideList.addEventListener('click', e => {
+      const box = e.target.closest('.side-item');
+      if (!box) return;
+      if (e.target.closest('.side-item-head')) toggleSideItem(box);
+      else if (e.target.closest('[data-act="save"]')) saveSideItem(box);
+      else if (e.target.closest('[data-act="remove-unit"]')) removeSideUnit(box, e.target.closest('[data-act="remove-unit"]').dataset.unit);
+    });
+    loadSideSites();
   </script>
   <script src="command-panel.js"></script>
   <script src="commands/sync-batch-stock.js"></script>

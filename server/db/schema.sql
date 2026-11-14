@@ -611,6 +611,41 @@ CREATE TABLE IF NOT EXISTS sheet_definitions (
   UNIQUE (site_code, category)
 );
 
+-- 17. Side items (step side-items, ADR-062): one catalog, its unit
+-- conversions, and which SIDE sheets list each item. Filled by
+-- import-settings and fixed in Settings; never seeded. how_bought (NULL,
+-- SUPPLIER, BUYER, COMMI) and units are validated by engines/sideItems.js.
+-- Links are switched off (active = 0), never deleted.
+CREATE TABLE IF NOT EXISTS side_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  main_unit TEXT NOT NULL,        -- lowercased, trimmed
+  how_bought TEXT,
+  cost_per_unit REAL,             -- per main unit; NULL = not priced
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS side_item_units (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  side_item_id INTEGER NOT NULL,
+  unit TEXT NOT NULL,             -- lowercased, trimmed
+  per_main REAL NOT NULL CHECK (per_main > 0),  -- main units in one of this unit
+  UNIQUE (side_item_id, unit),
+  FOREIGN KEY (side_item_id) REFERENCES side_items(id)
+);
+
+CREATE TABLE IF NOT EXISTS side_item_sheets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sheet_id INTEGER NOT NULL,      -- a sheet_definitions row with engine_type SIDE
+  side_item_id INTEGER NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (sheet_id, side_item_id),
+  FOREIGN KEY (sheet_id) REFERENCES sheet_definitions(id),
+  FOREIGN KEY (side_item_id) REFERENCES side_items(id)
+);
+
 -- Seed a reasonable starting set of adjustment types (admin can add more
 -- via the UI later - this is just a sensible default, not a fixed list).
 INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requires_conversion_target) VALUES
