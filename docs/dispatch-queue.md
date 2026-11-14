@@ -108,6 +108,7 @@ overlaps schema.sql with 24d-i + users-roles -> sequence. Server-only, no click-
 spec: session-status.md -> "Step user-sites".
 
 ### 3j. Step import-identity - import-settings.js identity slice (Roles/Users/memberships)  [runnable: after 3u, shares seed.js]
+**CLOSED 2026-11-14, PR #65 (`19e285e`).**
 Touches: scripts/import-settings.js, server/db/seed.js, package.json
 **2026-10-13:** + the seed.js bootstrap guard (one super-admin). Shares seed.js with 3u -> sequence.
 Standalone importer (decision A), identity tabs only, UPSERT/idempotent, uses siteAccess.js to
