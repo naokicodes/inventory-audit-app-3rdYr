@@ -16,8 +16,8 @@ console.log('Loyverse Preview Route Tests (loyverse-preview-i)\n');
 
 const MAP = {
   accounts: [
-    { label: 'Silingan', key: 'silingan', tokenEnv: 'LOYVERSE_SILINGAN_TOKEN' },
-    { label: 'Likod', key: 'likod', tokenEnv: 'LOYVERSE_LIKOD_TOKEN' },
+    { label: 'Silingan', key: 'silingan', tokenEnv: 'LOYVERSE_SILINGAN_TOKEN', group: 'silingan-likod' },
+    { label: 'Likod', key: 'likod', tokenEnv: 'LOYVERSE_LIKOD_TOKEN', group: 'silingan-likod' },
   ],
   dishes: [
     { dish_code: 'D001', name: 'Meatball Pasta', silingan: 'Meatball Pasta', likod: 'Meatball Pasta', note: '' },
@@ -100,6 +100,79 @@ test('HTTP: router mounted under /api answers 400 for a malformed date', async (
   } finally {
     server.close();
   }
+});
+
+// --- Step loyverse-fc: ?pos= ---
+
+const MAP_FC = {
+  ...MAP,
+  accounts: [...MAP.accounts, { label: 'FC', key: 'fc', tokenEnv: 'LOYVERSE_FC_TOKEN', group: 'fc' }],
+};
+const SL_RECEIPTS = {
+  s: [{ receipt_date: '2026-10-03T03:00:00Z', receipt_type: 'SALE', cancelled_at: null,
+    line_items: [{ item_name: 'Meatball Pasta', quantity: 2, item_id: 'a', variant_id: 'b' }] }],
+  l: [],
+  f: [{ receipt_date: '2026-10-03T03:00:00Z', receipt_type: 'SALE', cancelled_at: null,
+    line_items: [{ item_name: 'Margherita', quantity: 4, item_id: 'm', variant_id: 'v', price: 450, total_money: 1800 }] }],
+};
+// Receipts as fetchServing; /items and /categories for FC's token only.
+function fetchFc(calls = []) {
+  const receipts = fetchServing(SL_RECEIPTS, calls);
+  return async (url, opts) => {
+    const u = new URL(url);
+    if (u.pathname.endsWith('/receipts')) return receipts(url, opts);
+    calls.push(u);
+    const body = u.pathname.endsWith('/items')
+      ? { items: [{ id: 'm', item_name: 'Margherita', category_id: 'p' }], cursor: null }
+      : { categories: [{ id: 'p', name: 'Pizza' }], cursor: null };
+    return { status: 200, text: async () => '', json: async () => body };
+  };
+}
+
+test('loyverse-fc: no pos and pos=silingan-likod return the same body as before FC, FC token set or not', async () => {
+  const before = await handlePreview({ date: '2026-10-03' }, {
+    nameMap: MAP, env: { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l' }, fetchImpl: fetchFc(),
+  });
+  for (const pos of [undefined, '', 'silingan-likod']) {
+    for (const env of [
+      { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l' },
+      { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l', LOYVERSE_FC_TOKEN: 'f' },
+    ]) {
+      const calls = [];
+      const r = await handlePreview({ date: '2026-10-03', pos }, { nameMap: MAP_FC, env, fetchImpl: fetchFc(calls) });
+      assert.strictEqual(r.status, 200);
+      assert.strictEqual(JSON.stringify(r.body), JSON.stringify(before.body), `pos=${pos}`);
+      assert.ok(calls.every(u => u.pathname.endsWith('/receipts')), 'catalog fetched for the dish preview');
+    }
+  }
+});
+
+test('loyverse-fc: pos=fc returns FC by category, no money field, token not in the body', async () => {
+  const r = await handlePreview({ date: '2026-10-03', pos: 'fc' }, {
+    nameMap: MAP_FC, env: { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l', LOYVERSE_FC_TOKEN: 'f' }, fetchImpl: fetchFc(),
+  });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.group, 'fc');
+  assert.deepStrictEqual(r.body.accounts.map(a => a.label), ['FC']);
+  assert.deepStrictEqual(r.body.categories, [{ name: 'Pizza', items: [{ name: 'Margherita', quantity: 4 }] }]);
+  assert.ok(!/price|total|money/i.test(JSON.stringify(r.body)), 'money field in FC body');
+});
+
+test('loyverse-fc: an unset FC token fails only FC; the left side is untouched', async () => {
+  const env = { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l' };
+  const fc = await handlePreview({ date: '2026-10-03', pos: 'fc' }, { nameMap: MAP_FC, env, fetchImpl: fetchFc() });
+  assert.strictEqual(fc.status, 200);
+  assert.deepStrictEqual(fc.body.accounts.map(a => [a.label, a.ok, a.error]), [['FC', false, 'token not set']]);
+  const left = await handlePreview({ date: '2026-10-03' }, { nameMap: MAP_FC, env, fetchImpl: fetchFc() });
+  assert.ok(left.body.accounts.every(a => a.ok));
+});
+
+test('loyverse-fc: pos=nope -> 400, nothing fetched', async () => {
+  const calls = [];
+  const r = await handlePreview({ date: '2026-10-03', pos: 'nope' }, { nameMap: MAP_FC, env: {}, fetchImpl: fetchFc(calls) });
+  assert.strictEqual(r.status, 400);
+  assert.deepStrictEqual(r.body, { error: 'pos must be one of: silingan-likod, fc' });
+  assert.strictEqual(calls.length, 0);
 });
 
 (async () => {
