@@ -10,7 +10,8 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
-const { parseCsv, loadTab, importSettings, formatReport, exportSettings } = require('../../scripts/import-settings.js');
+const { importTarget, parseCsv, loadTab, importSettings, formatReport, exportSettings } = require('../../scripts/import-settings.js');
+const { LIVE_DB_PATH } = require('./dbPath.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -588,6 +589,64 @@ try {
     } finally {
       db.close();
     }
+  });
+
+  // --- which database the command opens (ADR-081) ---
+
+  const envFile = text => {
+    const file = path.join(tmpRoot, `env${++dirCount}`);
+    fs.writeFileSync(file, text);
+    return file;
+  };
+  const fromEnvFile = path.join(tmpRoot, 'from-env-file.db');
+  const fromEnvironment = path.join(tmpRoot, 'from-environment.db');
+
+  test('importTarget: the environment wins over .env', () => {
+    const t = importTarget({ env: { DB_PATH: fromEnvironment }, envFile: envFile(`DB_PATH=${fromEnvFile}\n`) });
+    assert.deepStrictEqual(t, { value: fromEnvironment, dbPath: path.resolve(fromEnvironment), source: 'environment' });
+  });
+
+  test('importTarget: .env is used when the environment has no DB_PATH; other keys are ignored', () => {
+    const t = importTarget({ env: {}, envFile: envFile(`PORT=4000\nDB_PATH=${fromEnvFile}\n`) });
+    assert.deepStrictEqual(t, { value: fromEnvFile, dbPath: path.resolve(fromEnvFile), source: '.env' });
+  });
+
+  test('importTarget: an empty environment value falls through to .env', () => {
+    const t = importTarget({ env: { DB_PATH: '' }, envFile: envFile(`DB_PATH=${fromEnvFile}\n`) });
+    assert.strictEqual(t.source, '.env');
+    assert.strictEqual(t.dbPath, path.resolve(fromEnvFile));
+  });
+
+  test('importTarget: neither, a .env without DB_PATH, an empty one, or no .env -> the live path, unset', () => {
+    const unset = { value: null, dbPath: LIVE_DB_PATH, source: 'unset' };
+    assert.deepStrictEqual(importTarget({ env: {}, envFile: envFile('') }), unset);
+    assert.deepStrictEqual(importTarget({ env: {}, envFile: envFile('PORT=4000\n') }), unset);
+    assert.deepStrictEqual(importTarget({ env: {}, envFile: envFile('DB_PATH=\n') }), unset);
+    assert.deepStrictEqual(importTarget({ env: {}, envFile: path.join(tmpRoot, 'no-such.env') }), unset);
+  });
+
+  // DB_PATH is set in the child's environment, so the repo's own .env is never read.
+  const runImport = (dbPath, dir) => spawnSync(process.execPath, [path.join(__dirname, '..', '..', 'scripts', 'import-settings.js'), dir], {
+    cwd: path.join(__dirname, '..', '..'), env: { ...process.env, DB_PATH: dbPath }, encoding: 'utf8',
+  });
+
+  test('command: a DB_PATH that does not exist exits 1, names it, and creates nothing', () => {
+    const missing = path.join(tmpRoot, 'missing.db');
+    const r = runImport(missing, workbook({ Roles: ROLES_CSV }));
+    assert.strictEqual(r.status, 1, r.stdout);
+    assert.ok(r.stderr.includes(`${missing} does not exist - nothing done.`), r.stderr);
+    assert.strictEqual(fs.existsSync(missing), false);
+  });
+
+  test('command: a seeded DB_PATH imports and says which file first', () => {
+    const seeded = path.join(tmpRoot, 'import-command.db');
+    const seed = spawnSync(process.execPath, [path.join(__dirname, 'seed.js')], {
+      cwd: path.join(__dirname, '..', '..'), env: { ...process.env, DB_PATH: seeded }, encoding: 'utf8',
+    });
+    assert.strictEqual(seed.status, 0, seed.stderr);
+    const r = runImport(seeded, workbook({ Roles: ROLES_CSV }));
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.ok(r.stdout.startsWith(`Database: ${seeded} (DB_PATH from the environment)`), r.stdout);
   });
 } finally {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
