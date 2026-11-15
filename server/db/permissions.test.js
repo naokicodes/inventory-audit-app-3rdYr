@@ -13,7 +13,10 @@ const express = require('express');
 const { spawnSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
 
-const DB_FILE = path.join(os.tmpdir(), `permissions-test-${process.pid}.db`);
+// A fresh directory per run, so an interrupted run never leaves a database
+// the next run would reuse.
+const DB_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'permissions-test-'));
+const DB_FILE = path.join(DB_DIR, 'permissions.db');
 process.env.DB_PATH = DB_FILE;
 const db = require('./connection.js');
 const {
@@ -390,7 +393,7 @@ test('the seed is idempotent and never re-adds a removed switch', () => {
     }
   }
   db.close();
-  for (const f of [DB_FILE, `${DB_FILE}-wal`, `${DB_FILE}-shm`]) fs.rmSync(f, { force: true });
+  fs.rmSync(DB_DIR, { recursive: true, force: true });
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })();
