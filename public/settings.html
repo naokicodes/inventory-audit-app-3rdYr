@@ -1360,6 +1360,11 @@
       if (!res.ok) throw new Error(out.error || `Save failed (${res.status})`);
       return out;
     }
+    // A mistyped number reads as '' in the browser, which would save as "none": refuse it here.
+    const amount = (input, label) => {
+      if (input.validity.badInput) throw new Error(`${label} is not a number. Leave it blank for none.`);
+      return input.value;
+    };
 
     async function loadMealSites() {
       const rs = await fetch('/api/restaurants').then(r => r.json());
@@ -1400,7 +1405,7 @@
       try {
         await sendJson('PUT', `/api/settings/staff-meal-slots/${row.dataset.id}`, {
           sort_order: f('sort_order').value, name: f('name').value,
-          fixed_budget: f('fixed_budget').value, per_head_rate: f('per_head_rate').value, active: f('active').checked,
+          fixed_budget: amount(f('fixed_budget'), 'Fixed budget'), per_head_rate: amount(f('per_head_rate'), 'Per-head rate'), active: f('active').checked,
         });
         show(mealMsg, 'Saved.');
       } catch (err) {
@@ -1410,10 +1415,11 @@
     });
 
     document.getElementById('add-meal-slot').addEventListener('click', async () => {
-      const v = id => document.getElementById(id).value;
+      const el = id => document.getElementById(id);
       try {
         await sendJson('POST', '/api/settings/staff-meal-slots', {
-          site_code: mealSite.value, name: v('meal-slot-name'), fixed_budget: v('meal-slot-fixed'), per_head_rate: v('meal-slot-rate'),
+          site_code: mealSite.value, name: el('meal-slot-name').value,
+          fixed_budget: amount(el('meal-slot-fixed'), 'Fixed budget'), per_head_rate: amount(el('meal-slot-rate'), 'Per-head rate'),
         });
         ['meal-slot-name', 'meal-slot-fixed', 'meal-slot-rate'].forEach(id => { document.getElementById(id).value = ''; });
         show(mealMsg, 'Slot added.');

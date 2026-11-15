@@ -41,6 +41,7 @@ test('a slot name is unique per site, not across sites', () => {
   const db = freshDb();
   s.createSlot(db, { site_code: 'RA', name: 'Evening' }, actor);
   assert.strictEqual(status(() => s.createSlot(db, { site_code: 'RA', name: ' Evening ' }, actor)), 400);
+  assert.strictEqual(status(() => s.createSlot(db, { site_code: 'RA', name: 'evening' }, actor)), 400);
   s.createSlot(db, { site_code: 'FC', name: 'Evening' }, actor);
   const other = s.createSlot(db, { site_code: 'RA', name: 'Afternoon' }, actor);
   assert.strictEqual(status(() => s.updateSlot(db, other.id, { name: 'Evening' }, actor)), 400);

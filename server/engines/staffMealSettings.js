@@ -34,7 +34,7 @@ function cleanSlotFields(db, fields, siteCode, id = null) {
   if ('name' in fields) {
     out.name = String(fields.name ?? '').trim().replace(/\s+/g, ' ');
     if (!out.name) throw bad('A meal slot needs a name');
-    const other = db.prepare('SELECT id FROM staff_meal_slots WHERE site_code = ? AND name = ?').get(siteCode, out.name);
+    const other = db.prepare('SELECT id FROM staff_meal_slots WHERE site_code = ? AND LOWER(name) = LOWER(?)').get(siteCode, out.name);
     if (other && other.id !== id) throw bad(`This restaurant already has a slot called "${out.name}"`);
   }
   if ('sort_order' in fields) {
