@@ -7,6 +7,7 @@ const db = require('../db/connection.js');
 const { computeMeatAudit, computeMixedDailyAudit } = require('../engines/auditEngine.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
 const { isIsoDate, isBlocked, getMonthOpeningStatus, recordRecount, copyAll } = require('../engines/monthOpening.js');
+const { listSiteCodes } = require('../db/siteAccess.js');
 const { isBlind, canOrderRecount, blindView, saveCount, createRecountOrders, cancelRecountOrder, countHistory } = require('../engines/blindCount.js');
 
 const router = express.Router();
@@ -17,9 +18,14 @@ function siteCodeOf(restaurantId) {
   return row ? row.code : null;
 }
 
+// Step site-filter-ii (issue #81, ADR-091): every active restaurant, never
+// trimmed (the shipment page, the terminal and Settings use this list), each
+// with can_use for the requester - true on every row when logged out or for
+// a bypass role.
 router.get('/restaurants', (req, res) => {
   const restaurants = db.prepare(`SELECT id, name, code FROM restaurants WHERE active = 1 ORDER BY name`).all();
-  res.json(restaurants);
+  const codes = listSiteCodes(db, req.user);
+  res.json(restaurants.map(r => ({ ...r, can_use: codes === null || codes.includes(r.code) })));
 });
 
 // Shared by both GET routes below: looks up the existing ending_actual

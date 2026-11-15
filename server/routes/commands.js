@@ -7,6 +7,20 @@
 const express = require('express');
 const db = require('../db/connection.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
+const { isBypass } = require('../db/siteAccess.js');
+
+// Step site-filter-ii (ADR-040, ADR-041): both commands read or write every
+// site, so only bypass roles run them, and logged out never passes.
+function allowOnly(allowed, message) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Log in first' });
+    if (!allowed(req.user)) return res.status(403).json({ error: message });
+    next();
+  };
+}
+// The read: admin, super-admin, management. The write: admin, super-admin.
+const bypassOnly = allowOnly(isBypass, 'Only an admin or management can run this check');
+const adminOnly = allowOnly(user => user.can_admin === 1, 'Only an admin can run this command');
 
 const router = express.Router();
 
@@ -33,7 +47,7 @@ const router = express.Router();
 // Read-only - never writes anything, matching "surface as a WARNING,
 // not a hard block." Global, same reasoning as sync-batch-stock: the
 // panel is reachable from every page with no shared date context.
-router.get('/commands/oversold-check', (req, res) => {
+router.get('/commands/oversold-check', bypassOnly, (req, res) => {
   const { computeDishAudit } = require('../engines/auditEngine.js');
 
   const candidates = db.prepare(`
@@ -107,7 +121,7 @@ router.get('/commands/oversold-check', (req, res) => {
 // no shared date/restaurant context to draw from. Running it is always
 // safe to repeat - already-synced or already-manually-entered combos are
 // skipped, never overwritten.
-router.post('/commands/sync-batch-stock', (req, res) => {
+router.post('/commands/sync-batch-stock', adminOnly, (req, res) => {
   const candidates = db.prepare(`
     SELECT
       s.restaurant_id AS restaurant_id,

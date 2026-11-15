@@ -31,6 +31,7 @@
 const express = require('express');
 const db = require('../db/connection.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
+const { listSiteCodes, siteCodeIn } = require('../db/siteAccess.js');
 
 const router = express.Router();
 
@@ -69,6 +70,18 @@ router.get('/stock-receipts', (req, res) => {
   const params = [];
 
   if (restaurant_id) { clauses.push('sr.restaurant_id = ?'); params.push(Number(restaurant_id)); }
+  else {
+    // Step site-filter-ii (issue #60 Q3, ADR-091): no restaurant_id -> only
+    // the rows of the user's sites (logged out and bypass roles: every row).
+    // A receipt's site is its restaurant's, or with no restaurant its
+    // commissary meat's commissary's (ADR-074, siteAccess.js stock_receipt).
+    const codes = listSiteCodes(db, req.user);
+    if (codes !== null) {
+      const inCodes = siteCodeIn('CASE WHEN sr.restaurant_id IS NULL THEN c.code ELSE r.code END', codes);
+      clauses.push(inCodes.sql);
+      params.push(...inCodes.params);
+    }
+  }
   if (business_date) { clauses.push('sr.business_date = ?'); params.push(business_date); }
   if (source) { clauses.push('sr.source = ?'); params.push(source); }
   if (meat_id) { clauses.push('sr.meat_id = ?'); params.push(Number(meat_id)); }
@@ -83,6 +96,7 @@ router.get('/stock-receipts', (req, res) => {
     LEFT JOIN restaurants r ON r.id = sr.restaurant_id
     LEFT JOIN meats m ON m.id = sr.meat_id
     LEFT JOIN commissary_meats cm ON cm.id = sr.commissary_meat_id
+    LEFT JOIN commissaries c ON c.id = cm.commissary_id
     WHERE ${clauses.join(' AND ')}
     ORDER BY sr.created_at DESC, sr.id DESC
   `).all(...params);
