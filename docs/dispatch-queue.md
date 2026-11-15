@@ -436,6 +436,7 @@ edit_side_items (ADR-062). PUBLIC -> click-through. Full spec: session-status.md
 cost-guard".
 
 ### Step import-settings-env - the settings import uses the app's database and says which file  [runnable]
+**CLOSED 2026-11-15, PR #79 (`300c87a`).**
 Touches: scripts/import-settings.js, server/db/importSettings.test.js
 ADR-081: DB_PATH from the environment, else `.env`; prints the file; refuses one that does not
 exist. Server-only, no click-through. Full spec: session-status.md -> "Step import-settings-env".

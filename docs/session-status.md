@@ -4393,6 +4393,7 @@ Touches: public/settings.html. PUBLIC -> click-through before merge. One at a ti
 PR on settings.html (staff-meal-settings 3zw, side-items, sheet-close 3zd).
 
 ## Step import-settings-env - the settings import uses the app's database and says which file (A0)
+**CLOSED 2026-11-15, PR #79 (`300c87a`).**
 
 Decided 2026-11-15 (ADR-081). DEPENDS ON nothing. Runnable now. Server-only, no click-through.
 
