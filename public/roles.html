@@ -106,7 +106,14 @@
     }
 
     // Every change: send it, then reload the page's data (stale-proof).
-    async function act(method, url, body, done) {
+    // Changes run one at a time, in the order clicked, so two quick toggles
+    // can never land out of order.
+    let queue = Promise.resolve();
+    function act(method, url, body, done) {
+      queue = queue.then(() => send(method, url, body, done));
+      return queue;
+    }
+    async function send(method, url, body, done) {
       try {
         const res = await fetch(url, {
           method,

@@ -394,6 +394,19 @@ try {
     assert.deepStrictEqual(report.unknownRoles, [], 'not skipped');
   });
 
+  test('an existing person whose role matches two roles keeps their role; active and sites apply; it is listed and warned', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' }));
+    db.prepare("INSERT INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only) VALUES ('Admin', 0, 0, 0, 1)").run();
+    const report = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,admin,0,FC\n' }));
+    const ana = user(db, 'Ana');
+    assert.strictEqual(ana.role, 'checker');
+    assert.strictEqual(ana.active, 0);
+    assert.deepStrictEqual(sites(db, ana.id), ['FC']);
+    assert.deepStrictEqual(report.leftAsApp, ['Ana: sheet says admin, app has checker']);
+    assert.ok(report.problems.some(p => /role "admin" matches 2 roles .* - role left as the app has it/.test(p)), report.problems.join('; '));
+  });
+
   test("a new role and a new person import with the sheet's values", () => {
     const db = freshDb();
     const report = importSettings(db, workbook({

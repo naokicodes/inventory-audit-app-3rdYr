@@ -401,6 +401,7 @@ function importUsers(db, rows, report) {
         if (roles.length === 0) {
           report.leftAsApp.push(`${name}: sheet says ${sheetRole} - no such role`);
         } else if (roles.length > 1) {
+          report.leftAsApp.push(`${name}: sheet says ${row.default_role}, app has ${roleName(existing.default_role_id)}`);
           report.problems.push(`${where} "${name}": role "${row.default_role}" matches ${roles.length} roles (${roles.map(r => r.name).join(', ')}) - role left as the app has it`);
         } else if (role.id !== existing.default_role_id) {
           report.leftAsApp.push(`${name}: sheet says ${row.default_role}, app has ${roleName(existing.default_role_id)}`);

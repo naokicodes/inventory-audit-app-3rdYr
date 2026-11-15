@@ -248,6 +248,16 @@ test('an inactive role is listed greyed and cannot be assigned or made a base ro
   assert.strictEqual((await call('PUT', `/api/roles/${copyId}`, 'admin', { active: true })).body.role.active, 1);
 });
 
+test('a site_code that is not a code or null is a 400, not a crash', async () => {
+  for (const site_code of [true, ['RA'], 5, { code: 'RA' }]) {
+    for (const m of ['POST', 'DELETE']) {
+      const res = await call(m, `/api/users/${users.ben}/roles`, 'admin', { role_id: roleId.supervisor, site_code });
+      assert.deepStrictEqual(res, { status: 400, body: { error: 'site_code must be a site code or null.' } }, `${m} ${JSON.stringify(site_code)}`);
+    }
+  }
+  assert.deepStrictEqual((await call('GET', `/api/users/${users.ben}/roles`, 'admin')).body.assignments, []);
+});
+
 const server = app.listen(0, async () => {
   base = `http://127.0.0.1:${server.address().port}`;
   let passed = 0, failed = 0;

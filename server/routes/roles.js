@@ -31,6 +31,10 @@ function send(res, result) {
 
 const body = req => req.body || {};
 
+// site_code is a site's code, or null / left out for "all their sites".
+const badSite = code => code !== undefined && code !== null && typeof code !== 'string';
+const BAD_SITE = { status: 400, error: 'site_code must be a site code or null.' };
+
 // A person for the People list: base role, the sites "all their sites" means
 // for them (ADR-091), and their assignments.
 function personView(person) {
@@ -90,11 +94,13 @@ router.get('/users/:id/roles', (req, res) => {
 
 router.post('/users/:id/roles', (req, res) => {
   const { role_id, site_code, until_date } = body(req);
+  if (badSite(site_code)) return send(res, BAD_SITE);
   send(res, permissions.assignRole(db, { userId: req.params.id, roleId: role_id, siteCode: site_code, untilDate: until_date }, req.user));
 });
 
 router.delete('/users/:id/roles', (req, res) => {
   const { role_id, site_code } = body(req);
+  if (badSite(site_code)) return send(res, BAD_SITE);
   send(res, permissions.removeAssignment(db, { userId: req.params.id, roleId: role_id, siteCode: site_code }, req.user));
 });
 
