@@ -3073,6 +3073,7 @@ server/engines/loyversePreview.js. Server-only, no migration, no click-through. 
 another queued step.
 
 ## Step role-assignments - roles per site, role switches, the supervisor role (A6)
+**CLOSED 2026-11-15, PR #78 (`a9117fa`).**
 
 Decided 2026-11-01 (ADR-034, ADR-038). DEPENDS ON blind-count (3za: blindCount.js), site-filter (3m:
 canUseSite) and user-id-authorship (3l; one schema step at a time - sequence with

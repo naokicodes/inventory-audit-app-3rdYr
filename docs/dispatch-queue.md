@@ -301,6 +301,7 @@ mondayOf(). No behaviour change. Server-only, no click-through. Full spec: sessi
 "Step business-day".
 
 ### 3zj. Step role-assignments - roles per site, role switches, the supervisor role  [blocked: blind-count, site-filter, user-id-authorship]
+**CLOSED 2026-11-15, PR #78 (`a9117fa`).**
 Touches: server/db/schema.sql, server/db/permissions.js, server/db/permissions.test.js, server/db/siteAccess.js, server/engines/blindCount.js, server/routes/auth.js, server/db/seed.js, server/db/testAccounts.js, server/index.js
 ADR-034 / ADR-038: a base role plus role assignments at a site (or all), switches as rows, one
 can(); blind = no "sees expected" switch at that site; the supervisor role. Login unchanged.
