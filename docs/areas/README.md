@@ -41,7 +41,7 @@ money details live in the private notes (Claude project files), never here.
 | 12 | [Pizza stations](pizza.md) | Confirmed | None | Partly decided (dough in 12s) |
 | 13 | [Likod grill landing](likod-grill.md) | Confirmed | None | Decided (counts blind; appointed head chef) |
 | 14 | [FC scullery](fc-scullery.md) | Confirmed | None | Paper (ADR-065) |
-| 15 | [Commissary](commissary.md) | Confirmed | None | Built (Likod destination missing); commi access Specced (placement, pick, standing access) |
+| 15 | [Commissary](commissary.md) | Confirmed | Drafted | Built: yield, shipments; requests and staging Decided, not built (ADR-092); commi access Specced; Likod destination missing |
 | 16 | [Sales (Loyverse)](sales.md) | Confirmed | None | Built (Kitchen Sales preview); FC switch Specced |
 | 17 | [Management view](management-view.md) | Written | Drafted | Partly built; views as cards (ADR-089) |
 | 18 | [Money and operating expenses](money.md) | Told | None | Decided: charges recorded, payroll in Excel (ADR-088) |

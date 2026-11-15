@@ -83,7 +83,7 @@ flight. (ADR-001 explains the split.)
 | ADR-038 | Blind counting follows the site's roles; Likod counts blind | Accepted 2026-11-01 |
 | ADR-039 | Testing: Claude checks the logic, people check the looks; fake test accounts | Accepted 2026-11-02 |
 | ADR-040 | Logged-out visitors keep working until write-permission | Accepted 2026-11-02 |
-| ADR-041 | Site scoping: one owner site per request | Accepted 2026-11-02 |
+| ADR-041 | Site scoping: one owner site per request | Accepted 2026-11-02; superseded in part by ADR-091 (the site picker list) |
 | ADR-042 | Settings changes need an admin | Accepted 2026-11-02 |
 | ADR-043 | Catalog reads stay open | Accepted 2026-11-11; its cost question answered by ADR-060 |
 | ADR-044 | Staff rice is an estimate line, never in the meal budget | Accepted 2026-11-11 |
@@ -106,10 +106,10 @@ flight. (ADR-001 explains the split.)
 | ADR-061 | Queue steps are named, not numbered | Accepted 2026-11-14 |
 | ADR-062 | Side items: one imported catalog with units | Accepted 2026-11-14 |
 | ADR-063 | Side sheets show usage while counting | Accepted 2026-11-14 |
-| ADR-064 | Side waste: a prompt after endings | Accepted 2026-11-14 |
+| ADR-064 | Side waste: a prompt after endings | Accepted 2026-11-14; superseded in part by ADR-086 (waste any time; who checks) |
 | ADR-065 | FC: kitchen sheets in the app, the rest on paper | Accepted 2026-11-14 |
 | ADR-066 | FC on Loyverse; Kitchen Sales switches between POS groups | Accepted 2026-11-14 |
-| ADR-067 | How it's bought: from the commi; FC's direct meats | Accepted 2026-11-14 |
+| ADR-067 | How it's bought: from the commi; FC's direct meats | Accepted 2026-11-14; superseded in part by ADR-092 (where requests come from; not built) |
 | ADR-068 | Buyer runs: ticks and receipt photos | Accepted 2026-11-14 |
 | ADR-069 | Scope: every inventory sheet, not meat only | Accepted 2026-11-14 |
 | ADR-070 | Remote access through Tailscale | Accepted 2026-11-14 |
@@ -133,6 +133,9 @@ flight. (ADR-001 explains the split.)
 | ADR-088 | Charges are recorded in the app; payroll stays in Excel | Accepted 2026-11-15 |
 | ADR-089 | Views are built as cards; a dashboard builder comes later | Accepted 2026-11-15 |
 | ADR-090 | A roster board across sites | Accepted 2026-11-15 |
+| ADR-091 | Site lists stay open; each row says whether you can use it | Accepted 2026-11-15 |
+| ADR-092 | Meat requests: where they come from, and a quick request | Accepted 2026-11-15 |
+| ADR-093 | No browser pop-ups | Accepted 2026-11-15 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

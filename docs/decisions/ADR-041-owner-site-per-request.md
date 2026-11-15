@@ -1,6 +1,6 @@
 # ADR-041 Site scoping: one owner site per request
 
-- Status: Accepted 2026-11-02
+- Status: Accepted 2026-11-02; superseded in part by ADR-091 (the site picker list)
 - Decided by: Naoki
 - Supersedes: none (fills in site-filter's "enumerate which routes")
 

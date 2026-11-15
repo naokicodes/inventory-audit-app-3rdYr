@@ -1,6 +1,6 @@
 # ADR-064 Side waste: a prompt after endings
 
-- Status: Accepted 2026-11-14
+- Status: Accepted 2026-11-14; superseded in part by ADR-086 (waste any time; who checks)
 - Decided by: Naoki
 - Supersedes: ADR-026 in part (side waste is entered at count time; the sheets' WASTE column stays
   computed)

@@ -1,6 +1,6 @@
 # ADR-067 How it's bought: from the commi; FC's direct meats
 
-- Status: Accepted 2026-11-14
+- Status: Accepted 2026-11-14; superseded in part by ADR-092 (where requests come from; not built)
 - Decided by: Naoki
 - Supersedes: ADR-017 in part (FC's direct meats do not land on the commi first)
 
