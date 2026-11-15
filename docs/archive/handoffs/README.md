@@ -34,6 +34,7 @@ listing what changed after it.
 | `ARCHITECTURE-HANDOFF-2026-11-11` | `2812ffc` | 550 | A10 and triage decided (#60, #62, #30, #47; rice, logging and checking); its drop-in landed 11-12. |
 | `ARCHITECTURE-HANDOFF-2026-11-12` | `2812ffc` | 550 | The A10 + triage drop-in, built and dry-run (landed as `abd87b0`, 561 tests with 3zt): ADR-043 to ADR-046, steps 3zv to 3zz and table-scroll, ensureRoleDefaults; the runnable list. |
 | `ARCHITECTURE-HANDOFF-2026-11-12b` | `abd87b0` | 561 | A0 #66 (ADR-047) and A14a (ADR-048 to ADR-059), drop-in built and dry-run (landed as `1bd3b4b`). |
+| `ARCHITECTURE-HANDOFF-2026-11-14` | `af78da3` | 618 | End of 11-14: A0 (ADR-060, ADR-061, ADR-071 to ADR-080), A8 and A9 part 1 (ADR-062 to ADR-070); PRs #47 #59 #61 #63 #65 #69 #71 #72 #74 #75 #76 merged; the late cubic list left for the next chat. |
 
 Not here: the 2026-09-15 handoff and the dispatcher handoff (never committed),
 and `architect-notes-PRIVATE.md` (stays private). Decisions 1-94 from the 10-22 to

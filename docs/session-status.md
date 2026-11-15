@@ -132,9 +132,50 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-080; the index, and a map from handoff item numbers to records, is in
+to ADR-084; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-15 architect (A0) - decided (recorded: ADR-081 to ADR-084)
+
+- **The settings import uses the app's database (ADR-081).** The command takes DB_PATH from the
+  environment, else from `.env`; prints the file; refuses one that does not exist. seed.js and
+  seed:test stay environment-only. Step import-settings-env (beta-3).
+- **The Roles page owns roles (ADR-082).** Once a role or person exists, its switches and base role
+  change only on the Roles page; the workbook adds new roles and people and sets sites and active;
+  its report lists each value it left alone. Built in roles-page.
+- **Built-in roles keep their names (ADR-083).** The six seeded roles cannot be renamed; others
+  can (ADR-073's key check). Built in roles-page.
+- **A read-only login is refused every write (ADR-084),** in write-permission (3zr), not before
+  (logged out writes until then, ADR-040).
+- **Late cubic findings, first four sorted:** PR #59 siteAccess.js read_only bypass -> ADR-084; PR
+  #56 preview.ps1 PID reuse -> step preview-pid (Naoki's); PR #64 a dev.db symlink passing
+  testAccounts' guard -> nothing (the guard catches mistakes; a Windows symlink needs admin rights);
+  PR #61 unsigned cookie -> sign-the-cookie (3zv), already queued. The rest: see below.
+- **beta-2:** PR #78 (role-assignments) merged 11-15 (`a9117fa`). Tag main with this drop-in on
+  it, before any of Marble's PRs merge, once the smoke list passes on that commit. A beta-1
+  database upgrades cleanly through `edd5243` (checked 11-15: the supervisor role and the default
+  switches arrive at first start). At the PC the beta-2 people import still sets
+  `$env:DB_PATH="server/db/beta.db"` first.
+- **Order now:** Marble - staff-meal-settings (3zw) and site-filter-ii (3zs); roles-page (3zk)
+  after import-settings-env. Naoki - the beta-2 smoke list and tag, import-settings-env,
+  preview-pid.
+- **Late cubic findings, all sorted (qpr 11-15 14:02, 27 findings).** Work: PR #56's PID reuse, HTTP
+  port probe, foreign answer and timeout leftovers -> preview-pid; PR #47's launcher copy and
+  always-successful admin part -> step restaurant-pc-ii (Naoki's, at beta-3); PR #59's read_only
+  bypass -> ADR-084; PR #61's unsigned cookie and pick-any-id login -> sign-the-cookie (3zv) and
+  real passwords before Live. Already fixed on main: PR #78's schema comment; PR #47's .env check,
+  rollback name, port-before-backup, backup copy check and Private-network scope. Nothing (test
+  gaps, tidy-ups or accepted): PR #59's status-only 403 tests (the guard answers before the route
+  runs); PR #64's symlink, partial seed on a throwaway file, untested `Test ` guard and duplicated
+  samePath; PR #61's PATCH not in the test matrix (WRITES covers it); PR #56's other four (see
+  preview-pid); PR #52's LOWER() on English sheet names, inactive-commissary seed test and
+  missing-siteCode message (no caller yet); PR #47's other six (see restaurant-pc-ii).
+- **beta-2 at the PC:** close the app; `update beta-2`; then run
+  `%APPDIR%\inventory-audit-app-3rdYr\scripts\restaurant-pc.bat` once with no word. That refreshes
+  the desktop launcher copy and asks for the FC token if `.env` has no FC line; it never changes the
+  code or the data. Then start, and import the people workbook with `$env:DB_PATH` set (ADR-081
+  lands in beta-3).
 
 ### 2026-11-14 architect (A0, #77) - decided (recorded: ADR-080)
 
@@ -3211,6 +3252,34 @@ click-through before merge.
 role with that name already exists" }. Tests gain: "Admin" (next to "admin") and "Head  Chef" (next
 to "head chef") are refused on create and on rename.
 
+**Added 2026-11-15 (A0, ADR-082, ADR-083).**
+- **Built-in roles keep their names (ADR-083).** permissions.js exports BUILT_IN_ROLES =
+  super-admin, admin, management, head-chef, checker, supervisor. PUT /api/roles/:id with a name
+  whose key differs from a built-in role's own answers 400 { error: "A built-in role keeps its
+  name" } and changes nothing; the page shows their names without Rename. Other roles rename as
+  above. Tests: renaming head-chef is refused; renaming a role made on the page works.
+- **The Roles page owns roles (ADR-082).** scripts/import-settings.js changes:
+  - A role that already exists (by the key): its four flags in the Roles tab are compared, never
+    written.
+  - A person who already exists: the Users tab's default_role is compared, never written. An
+    unknown or ambiguous role name on their row no longer skips it: their sites and active still
+    apply.
+  - Every difference goes into a new report section, "Left as the app has them - change these on
+    the Roles page": `<role>: sheet says <flag> <0|1>, app has <0|1>`; `<person>: sheet says <role>,
+    app has <role>`; `<person>: sheet says <role> - no such role`.
+  - New roles and new people import exactly as today; the export is unchanged; the super-admin row
+    rule is unchanged. The Roles line of the report drops "updated" (nothing updates a role now).
+- The page says, under its heading: "Roles and who has which role are changed here. The people
+  workbook adds new people and roles and sets everyone's sites."
+- Tests (importSettings.test.js): an existing role's different flag is listed and not written; an
+  existing person's different default_role is listed and not written, and their sites cell still
+  applies; an existing person with an unknown role keeps their role, their sites apply, and the name
+  is listed; a new role and a new person import with the sheet's values; a second run changes
+  nothing. Tests that expected the import to change an existing role's flags or a person's role
+  now expect the listing.
+- Touches gains: scripts/import-settings.js, server/db/importSettings.test.js. After
+  import-settings-env (same file).
+
 ## Step roster-stations - stations as roster rows, and which sheets each opens (A6)
 
 Decided ADR-012 and ADR-037. DEPENDS ON sheets-tier1 (3u: sheet_definitions), import-identity (3j:
@@ -3554,6 +3623,18 @@ request with no logged-in user with 401 { error: "Log in first" } on every site-
 that call those routes logged out now log in (made-up users, as today). Click-through, Claude
 checks: logged out, a counting page shows "Log in first". Touches gains: the site-scoped route
 tests.
+
+**Added 2026-11-15 (A0, ADR-084; cubic on PR #59).** A read-only login is refused every write: a
+request under /api other than GET or HEAD, except /api/auth/*, from a logged-in user whose base role
+is read_only and who is not an admin, answers 403 { error: "Read-only: this login cannot change
+anything" } before the route runs. One small middleware, server/middleware/refuseReadOnly.js,
+mounted in server/index.js right after currentUser. Reading every site stays (ADR-010's management
+bypass in canUseSite). Correction to the list above: of the review-page actions, recount orders
+check a role (canOrderRecount); allocations and finalize check none today and are not changed here
+beyond this refusal. Tests: a management login gets 403 on a count save, a stock receipt, a sales
+edit and an allocation, and 200 on the reads; logging in and out still work. Touches gains:
+server/index.js, server/middleware/refuseReadOnly.js (new), server/middleware/refuseReadOnly.test.js
+(new).
 
 ## Step site-filter-ii - two-site requests and lists across sites (A0)
 
@@ -4310,3 +4391,127 @@ check the looks.
 
 Touches: public/settings.html. PUBLIC -> click-through before merge. One at a time with any open
 PR on settings.html (staff-meal-settings 3zw, side-items, sheet-close 3zd).
+
+## Step import-settings-env - the settings import uses the app's database and says which file (A0)
+
+Decided 2026-11-15 (ADR-081). DEPENDS ON nothing. Runnable now. Server-only, no click-through.
+
+Why: on the restaurant PC the app reads `DB_PATH=server/db/beta.db` from `.env` (restaurant-pc.bat
+writes it), but `npm run import:settings` reads only the environment. A people import without a
+typed `$env:DB_PATH` line opens, and creates, `server/db/inventory.db`, which the app never reads.
+
+- scripts/import-settings.js exports `importTarget({ env = process.env, envFile = <repo
+  root>/.env } = {})` -> `{ value, dbPath, source }`:
+  - `env.DB_PATH` set and not empty -> that value, source `'environment'`;
+  - else, when `envFile` exists, its DB_PATH (read with `util.parseEnv`; no other key is used and
+    nothing else reaches process.env) if not empty -> source `'.env'`;
+  - else value null, source `'unset'`.
+  - `dbPath = resolveDbPath(value || '')` from server/db/dbPath.js: the server's own resolution
+    (against the working folder; npm runs scripts from the repo root; unset = the live
+    inventory.db). Pass `''`, never `undefined`: resolveDbPath's default reads process.env.
+- main(), import and `--export` alike, after the usage and folder checks and BEFORE connection.js
+  is required:
+  - when the source is `'.env'`, set `process.env.DB_PATH` to the value, so connection.js opens the
+    same file;
+  - print `Database: <dbPath> (DB_PATH from the environment)`, `(DB_PATH from .env)` or `(DB_PATH
+    not set: the live inventory.db)`;
+  - if `dbPath` does not exist: print to stderr `import-settings: <dbPath> does not exist - nothing
+    done. Start the app once so it creates its database, or check DB_PATH (.env or the
+    environment).`, exit 1, and create nothing.
+- importSettings() and exportSettings() do not change. The header comment says the command reads
+  `.env` too.
+- Not changed (ADR-081, ADR-039): seed.js and seed-test-accounts.js keep reading the environment
+  only; server/index.js and loyverse-matches.js keep loading the whole `.env` as today.
+
+Edge states: failure - a missing database file refuses and creates nothing. Empty - an empty
+DB_PATH (environment or `.env`) counts as not set. Stale - n/a. Blocked - an import while the app
+runs waits up to 5 s for the lock (busy-timeout). Inactive - n/a. Two devices - n/a.
+
+Tests (server/db/importSettings.test.js):
+- importTarget with a temp `.env`: the environment wins over `.env`; `.env` is used when the
+  environment has none; neither -> the live path and `'unset'`; a `.env` with no DB_PATH line ->
+  `'unset'`; an empty environment value falls through to `.env`; a missing envFile -> `'unset'`.
+- The command (spawnSync from the repo root, a temp folder holding a Roles.csv, DB_PATH set in the
+  child's environment so the repo's own `.env` is never read): a DB_PATH that does not exist ->
+  exit 1, stderr names the path, and the file still does not exist; a DB_PATH made by seed.js (as
+  the existing seed test does) -> exit 0 and stdout starts with `Database: <that path> (DB_PATH
+  from the environment)`.
+
+Touches: scripts/import-settings.js, server/db/importSettings.test.js. Server-only. One at a time
+with roles-page (it changes the same file, ADR-082).
+
+## Step preview-pid - the preview script stops only its own server (A0, cubic on PR #56)
+
+Decided 2026-11-15 (a late cubic finding on PR #56). DEPENDS ON nothing. Naoki's own PR (like
+3ze): it needs Windows to check, so Marble's runs skip it. Runnable now.
+
+Why: scripts/preview.ps1 stops the previous preview by the number in `.run-queue-logs/preview.pid`
+and checks only that the process is node. After a restart Windows can give that number to another
+node program (`npm run dev`, Claude Code), and the next preview would stop it.
+
+- Stop the old process only if it is node AND it started no later than the pid file was last
+  written (`$old.StartTime -le (Get-Item $pidFile).LastWriteTime`). A reused number belongs to a
+  process that started after the file was written. If StartTime cannot be read, do not stop it.
+- Otherwise leave the process running, print `Old preview PID <n> is another program now - left it
+  running.`, and remove the stale pid file as today. The existing port check still refuses a port
+  that something else holds.
+
+Edge states: failure - a stop that fails throws as today. Stale - the case above. Everything else
+unchanged.
+
+Tests: none in CI (PowerShell). You check, on the laptop: run a preview of any PR twice (the second
+stops the first); then put the PID of a fresh `node -e "setInterval(()=>{},1000)"` (started after
+the pid file was written) into preview.pid and run a preview: that node keeps running and the line
+above prints.
+
+Touches: scripts/preview.ps1.
+
+**Added 2026-11-15 (later; cubic on PR #56, the rest of its findings).** Three more fixes in the same
+file:
+- The "port already in use" check asks Windows who listens (`Get-NetTCPConnection -LocalPort $Port
+  -State Listen`), not an HTTP request, so a program that is not a web server is caught too.
+- "Up" needs the preview's own process: the wait loop counts an answer only while `$proc` has not
+  exited and `$proc.Id` owns the listener on `$Port`. Another program answering on the port is not
+  a success.
+- On the 60 s timeout or any failure after the start, stop `$proc` if it is still running and
+  remove the pid file, so nothing is left behind.
+Not changed (sorted as nothing): `npm ci` runs the PR's code (only the owner's `preview` label
+starts a preview, doorbell.ps1 section 4); doorbell's call keeps the default `-Repo`; a `-Port`
+other than 3100 with AUTOPILOT_PREVIEW_URL set (nobody uses another port); `exit` inside
+preview.ps1 returns to doorbell.ps1 (it is called with `&`, not dot-sourced). You check gains: with
+something else already listening on 3100 (for example `npx http-server -p 3100`), a preview refuses
+with "port 3100 is already in use".
+
+## Step restaurant-pc-ii - update refreshes the launcher; the admin part reports failures (A0, cubic on PR #47)
+
+Decided 2026-11-15 (late cubic findings on PR #47). DEPENDS ON nothing. Naoki's own PR (like 3ze):
+it is checked at the restaurant PC, at the beta-3 update. Low priority.
+
+Why: the desktop file runs `%APPDIR%\restaurant-pc.bat`, a copy the setup makes. `update beta-N`
+moves the code but leaves that copy as it was, so a newer bat's start and update logic never reach
+the PC unless the setup is run again. And the elevated part (firewall rule, network profile, sleep
+off) always reports success, so "Port 3000 open to phones" can print after netsh failed.
+
+- `update`, after a good self-test and its "Done" lines: copy `%REPO%\scripts\restaurant-pc.bat`
+  over `%APPDIR%\restaurant-pc.bat`. That copy is usually the file running, and cmd reads a running
+  .bat from disk, so the copy goes on the LAST line, together with the pause and the exit: cmd reads
+  a whole line before running it and never reads the replaced file again. For example:
+  `copy /y "%REPO%\scripts\restaurant-pc.bat" "%APPDIR%\restaurant-pc.bat" >nul || echo  [!] The
+  desktop launcher is still the old copy - run scripts\restaurant-pc.bat once. & pause & exit /b 0`
+  (`||` binds tighter than `&`).
+- `:admin` returns a non-zero code when the netsh add rule or powercfg fails; the setup starts it
+  with `Start-Process ... -Verb RunAs -Wait -PassThru` and checks `.ExitCode`, printing `[!] The
+  firewall or power settings did not apply - run this file again and click Yes.` instead of the
+  "open to phones" line.
+Not changed (sorted as nothing, or already fixed on main): the .env check (`:checkenv` on start and
+update); rollback by the exact commit (`PREV`); the port check before a backup; a failed backup
+copy stops an update; only the default route's network becomes Private; the no-NODEEXE fallback
+(still port 3000 only, local subnet and Tailscale); deleting Windows' own "Node.js JavaScript
+Runtime" rules (on purpose: a block rule beats an allow); the CurrentUser execution policy; the
+token prompt showing what is typed (Naoki types it at the PC); retention errors.
+
+Tests: none in CI (cmd). You check at the beta-3 update: after `update beta-3`, the desktop file
+runs the new copy (its first lines match `scripts\restaurant-pc.bat`); with the UAC prompt refused,
+the setup prints the new `[!]` line.
+
+Touches: scripts/restaurant-pc.bat.

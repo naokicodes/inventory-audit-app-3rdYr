@@ -74,6 +74,11 @@ is. Read the step's own section in `session-status.md` before starting.
 > busy-timeout; 3l user-id-authorship; 3zj role-assignments; loyverse-fc, #63 (3zb) and
 > table-scroll together when Naoki can phone-check; 3zw staff-meal-settings; side-items; then
 > cost-guard, 3zx staff-meal-log, side-sheets, 3zs, 3zk, 3zd. Schema steps one at a time.
+> **2026-11-15 (A0):** PRs #76 (3l) and #78 (3zj) merged. Tag beta-2 now (smoke list first).
+> Runnable: Marble 3zw staff-meal-settings and 3zs site-filter-ii; Naoki import-settings-env and
+> preview-pid (no file shared with those). 3zk roles-page after import-settings-env (both change
+> scripts/import-settings.js, ADR-082). 3zr write-permission gains the read-only refusal
+> (ADR-084).
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -308,11 +313,12 @@ can(); blind = no "sees expected" switch at that site; the supervisor role. Logi
 Server-only, no click-through. Full spec: session-status.md -> "Step role-assignments".
 **2026-11-12:** + ensureRoleDefaults() at server start, because beta.db is never reseeded - see the spec.
 
-### 3zk. Step roles-page - switches per role, roles per person  [blocked: role-assignments]
-Touches: public/roles.html, public/index.html, server/routes/roles.js, server/routes/roles.test.js, server/index.js, server/db/permissions.js
+### 3zk. Step roles-page - switches per role, roles per person  [blocked: role-assignments, import-settings-env]
+Touches: public/roles.html, public/index.html, server/routes/roles.js, server/routes/roles.test.js, server/index.js, server/db/permissions.js, scripts/import-settings.js, server/db/importSettings.test.js
 The first cut of the Discord-style screen. PUBLIC -> click-through. Full spec: session-status.md ->
 "Step roles-page".
 **2026-11-14 (ADR-073):** create and rename refuse a name another role holds by the name key.
+**2026-11-15 (ADR-082, ADR-083):** built-in roles keep their names; the import stops changing an existing role's switches or person's base role and lists what it left alone. After import-settings-env (same file). See the spec.
 
 ### 3zl. Step roster-stations - stations as roster rows and the sheets they open  [blocked: sheets-tier1, import-identity, role-assignments]
 Touches: server/db/schema.sql, server/engines/stations.js, server/engines/stations.test.js, server/routes/staff.js, server/routes/staff.test.js, server/index.js, scripts/import-settings.js, public/staff.html, public/index.html
@@ -342,9 +348,10 @@ Touches: server/engines/tonightWork.js, server/engines/tonightWork.test.js, serv
 PUBLIC -> click-through. Full spec: session-status.md -> "Step login-tonight".
 
 ### 3zr. Step write-permission - only tonight's people write  [blocked: login-tonight, site-filter]
-Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/tonightWork.test.js, server/middleware/requireSiteAccess.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, the site-scoped route tests
+Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/tonightWork.test.js, server/middleware/requireSiteAccess.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, the site-scoped route tests, server/index.js, server/middleware/refuseReadOnly.js, server/middleware/refuseReadOnly.test.js
 ADR-011 enforced on the meat landing counts and the commissary writes; canUseSite widened. Click-
 through of the refusal message. Full spec: session-status.md -> "Step write-permission".
+**2026-11-15 (ADR-084):** + a read-only login is refused every write (cubic on PR #59). See the spec.
 
 ### 3zs. Step site-filter-ii - two-site requests and lists across sites  [blocked: site-filter, user-id-authorship]
 Touches: server/middleware/requireSiteAccess.js, server/db/siteAccess.js, server/routes/commissary.js, server/routes/allocations.js, server/routes/dailyAudit.js, server/routes/dashboard.js, server/routes/commands.js, server/routes/commissary.test.js, server/routes/allocations.test.js, server/routes/dailyAudit.test.js, server/routes/dashboard.test.js, server/routes/commands.test.js, server/routes/stockReceipts.js, server/routes/stockReceipts.test.js
@@ -427,6 +434,23 @@ Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/
 ADR-060: cost fields leave every read for anyone without see_costs, logged out included; adds
 edit_side_items (ADR-062). PUBLIC -> click-through. Full spec: session-status.md -> "Step
 cost-guard".
+
+### Step import-settings-env - the settings import uses the app's database and says which file  [runnable]
+Touches: scripts/import-settings.js, server/db/importSettings.test.js
+ADR-081: DB_PATH from the environment, else `.env`; prints the file; refuses one that does not
+exist. Server-only, no click-through. Full spec: session-status.md -> "Step import-settings-env".
+
+### Step preview-pid - the preview script stops only its own server  [Naoki's own PR]
+Touches: scripts/preview.ps1
+cubic on PR #56: stop the old PID only if it is node and started before the pid file was written.
+Needs Windows; You check only. Full spec: session-status.md -> "Step preview-pid".
+**2026-11-15 (later):** + the port check asks Windows who listens; "up" needs the preview's own process; a timeout cleans up. See the spec.
+
+### Step restaurant-pc-ii - update refreshes the launcher; the admin part reports failures  [Naoki's own PR]
+Touches: scripts/restaurant-pc.bat
+cubic on PR #47: `update` copies the new bat over the desktop launcher's copy; a failed firewall or
+power command shows `[!]`. Checked at the PC at beta-3. Full spec: session-status.md -> "Step
+restaurant-pc-ii".
 
 #### Sides (A8)
 
