@@ -3681,6 +3681,7 @@ server/index.js, server/middleware/refuseReadOnly.js (new), server/middleware/re
 (new).
 
 ## Step site-filter-ii - two-site requests and lists across sites (A0)
+**CLOSED 2026-11-15, PR #80 (`8a2d8fd`).**
 
 Decided 2026-11-02 (ADR-041, ADR-040). DEPENDS ON site-filter (3m: requireSiteAccess, canUseSite)
 and user-id-authorship (3l changes the same route files). One at a time with allocation-requests

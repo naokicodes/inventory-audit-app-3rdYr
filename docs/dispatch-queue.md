@@ -359,6 +359,7 @@ through of the refusal message. Full spec: session-status.md -> "Step write-perm
 **2026-11-15 (ADR-084):** + a read-only login is refused every write (cubic on PR #59). See the spec.
 
 ### 3zs. Step site-filter-ii - two-site requests and lists across sites  [blocked: site-filter, user-id-authorship]
+**CLOSED 2026-11-15, PR #80 (`8a2d8fd`).**
 Touches: server/middleware/requireSiteAccess.js, server/db/siteAccess.js, server/routes/commissary.js, server/routes/allocations.js, server/routes/dailyAudit.js, server/routes/dashboard.js, server/routes/commands.js, server/routes/commissary.test.js, server/routes/allocations.test.js, server/routes/dailyAudit.test.js, server/routes/dashboard.test.js, server/routes/commands.test.js, server/routes/stockReceipts.js, server/routes/stockReceipts.test.js
 ADR-041: each two-site request checks its owner site only; the picker and the rollup trim to the
 user's sites; admin commands need a bypass role. Server-only, no click-through. Full spec:
