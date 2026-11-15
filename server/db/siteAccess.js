@@ -37,25 +37,62 @@ function resolveSiteCode(db, siteCode) {
   return null;
 }
 
+// Bypass roles reach every site: can_admin (admin, super-admin) or
+// read_only (management).
+const isBypass = user => user.can_admin === 1 || user.read_only === 1;
+
+// The two ways a non-bypass user holds a site. canUseSite and usableSiteCodes
+// both read these, so the two cannot drift (ADR-091).
+const MEMBER_SITES_SQL = 'SELECT site_code FROM user_sites WHERE user_id = ?';
+// Step role-assignments: a live user_roles row at that site - an active role
+// whose until_date is NULL or on/after the business date.
+const LIVE_ROLE_SITES_SQL = `
+  SELECT ur.site_code FROM user_roles ur
+    JOIN roles r ON r.id = ur.role_id
+    JOIN users u ON u.id = ur.user_id
+   WHERE ur.user_id = ? AND ur.site_code IS NOT NULL AND r.active = 1 AND u.active = 1
+     AND (ur.until_date IS NULL OR ur.until_date >= ?)`;
+
+/**
+ * Step site-filter-ii (ADR-091): the site codes canUseSite would pass for a
+ * logged-in user on business date `date` (default today's), sorted. A bypass
+ * role gets every restaurant and commissary code.
+ */
+function usableSiteCodes(db, user, date) {
+  if (isBypass(user)) {
+    return db.prepare('SELECT code FROM restaurants UNION SELECT code FROM commissaries ORDER BY code')
+      .all().map(r => r.code);
+  }
+  return db.prepare(`${MEMBER_SITES_SQL} UNION ${LIVE_ROLE_SITES_SQL} ORDER BY site_code`)
+    .all(user.id, user.id, date || businessDate(new Date()))
+    .map(r => r.site_code);
+}
+
 /**
  * Step site-filter (A6): THE site check, for a logged-in user (the caller
- * handles a null user). Bypass roles reach every site: can_admin (admin,
- * super-admin) or read_only (management). Everyone else needs a user_sites
- * row, or (step role-assignments) a live user_roles row at that site: an
- * active role whose until_date is NULL or on/after `date` (a business date;
- * default today's). write-permission (3zr) widens this helper again without
- * touching the routes.
+ * handles a null user). Bypass roles reach every site; everyone else needs a
+ * user_sites row or a live user_roles row at that site (usableSiteCodes).
+ * write-permission (3zr) widens this helper again without touching the routes.
  */
 function canUseSite(db, user, siteCode, date) {
-  if (user.can_admin === 1 || user.read_only === 1) return true;
-  if (userHasSite(db, user.id, siteCode)) return true;
-  return db.prepare(`
-    SELECT 1 FROM user_roles ur
-      JOIN roles r ON r.id = ur.role_id
-      JOIN users u ON u.id = ur.user_id
-     WHERE ur.user_id = ? AND ur.site_code = ? AND r.active = 1 AND u.active = 1
-       AND (ur.until_date IS NULL OR ur.until_date >= ?)
-  `).get(user.id, siteCode, date || businessDate(new Date())) !== undefined;
+  if (isBypass(user)) return true;
+  return usableSiteCodes(db, user, date).includes(siteCode);
+}
+
+/**
+ * Step site-filter-ii: for a list read with no site id, the codes to narrow
+ * the rows to, or null for no narrowing - logged out (until write-permission,
+ * ADR-040) and bypass roles see every row.
+ */
+function listSiteCodes(db, user) {
+  return !user || isBypass(user) ? null : usableSiteCodes(db, user, null);
+}
+
+/** A WHERE clause keeping rows whose site code `expr` is one of `codes`; none -> no rows. */
+function siteCodeIn(expr, codes) {
+  return codes.length
+    ? { sql: `${expr} IN (${codes.map(() => '?').join(', ')})`, params: codes }
+    : { sql: '0', params: [] };
 }
 
 // Each kind of id -> the code of the site it belongs to, through
@@ -80,6 +117,13 @@ const SITE_CODE_SQL = {
   adjustment: `SELECT c.code FROM commissary_adjustments a
                  JOIN commissary_meats cm ON cm.id = a.commissary_meat_id
                  JOIN commissaries c ON c.id = cm.commissary_id WHERE a.id = ?`,
+  // Step site-filter-ii: a preset is its commissary meat's; a conversion
+  // standard is its restaurant's.
+  shipment_preset: `SELECT c.code FROM commissary_shipment_presets p
+                      JOIN commissary_meats cm ON cm.id = p.commissary_meat_id
+                      JOIN commissaries c ON c.id = cm.commissary_id WHERE p.id = ?`,
+  conversion_standard: `SELECT r.code FROM commissary_conversion_standards cs
+                          JOIN restaurants r ON r.id = cs.restaurant_id WHERE cs.id = ?`,
 };
 
 /**
@@ -98,4 +142,7 @@ function siteCodeFor(db, kind, id) {
   return site ? site.code : null;
 }
 
-module.exports = { getUserSiteCodes, userHasSite, resolveSiteCode, canUseSite, siteCodeFor, siteOfRow };
+module.exports = {
+  getUserSiteCodes, userHasSite, resolveSiteCode, isBypass, canUseSite, usableSiteCodes,
+  listSiteCodes, siteCodeIn, siteCodeFor, siteOfRow,
+};

@@ -122,9 +122,12 @@ test('a missing row id still gets 404, not 403', async () => {
   assert.strictEqual((await call('DELETE', '/api/commissary/yield-log/999999', { as: ana })).status, 404);
 });
 
-test('a two-site route (group c) is left open for site-filter-ii', async () => {
-  const res = await call('GET', `/api/commissary/adjustments/destinations?commissary_meat_id=${comMeat}`, { as: ana });
-  assert.strictEqual(res.status, 200);
+test('a two-site route (group c) checks its owner site (site-filter-ii)', async () => {
+  const url = `/api/commissary/adjustments/destinations?commissary_meat_id=${comMeat}`;
+  const res = await call('GET', url, { as: ana });
+  assert.strictEqual(res.status, 403);
+  assert.deepStrictEqual(await res.json(), { error: 'No access to site SFT-COM' });
+  assert.strictEqual((await call('GET', url, { as: cora })).status, 200);
 });
 
 test('every row-found kind maps to its site: yield log, adjustment, recount order', async () => {
