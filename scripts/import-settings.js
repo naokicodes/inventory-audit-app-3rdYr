@@ -1,5 +1,9 @@
 // Step import-identity: import the people workbook (identity tabs) into the
 // database selected by DB_PATH (unset = the live inventory.db, as everywhere).
+// Step import-settings-env (ADR-081): DB_PATH comes from the environment, else
+// from the repo's .env (only that key is read), so the command opens the same
+// file as the app. It prints which file and why, and refuses one that does
+// not exist rather than creating it.
 //
 //   npm run import:settings -- <folder of tab CSVs>           import Roles / Users / Sheets / SideItems .csv
 //   npm run import:settings -- --export <empty folder>        write them from the database
@@ -32,6 +36,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
+const { resolveDbPath } = require('../server/db/dbPath.js');
 const { resolveSiteCode } = require('../server/db/siteAccess.js');
 const { createSheetDefinition } = require('../server/engines/sheetDefinitions.js');
 const sideItems = require('../server/engines/sideItems.js');
@@ -680,7 +686,38 @@ function exportSettings(db, dir) {
   return { roles: roles.length, users: userRows.length, sheets: sheets.length, sideItems: sideRows.length, files };
 }
 
+// --- which database (ADR-081) ---
+
+const REPO_ENV_FILE = path.join(__dirname, '..', '.env');
+
+// Which DB_PATH this run uses and where it came from: the environment, else
+// the .env file's DB_PATH (no other key is read, nothing reaches process.env),
+// else unset. An empty value counts as not set. dbPath is the server's own
+// resolution; '' (never undefined) so resolveDbPath does not read process.env.
+function importTarget({ env = process.env, envFile = REPO_ENV_FILE } = {}) {
+  let value = null;
+  let source = 'unset';
+  if (env.DB_PATH) {
+    value = env.DB_PATH;
+    source = 'environment';
+  } else if (fs.existsSync(envFile)) {
+    const fromFile = util.parseEnv(fs.readFileSync(envFile, 'utf8')).DB_PATH;
+    if (fromFile) {
+      value = fromFile;
+      source = '.env';
+    }
+  }
+  return { value, dbPath: resolveDbPath(value || ''), source };
+}
+
+const SOURCE_LABELS = {
+  environment: 'DB_PATH from the environment',
+  '.env': 'DB_PATH from .env',
+  unset: 'DB_PATH not set: the live inventory.db',
+};
+
 module.exports = {
+  importTarget,
   parseCsv, loadTab, skippedTabs,
   importSettings, formatReport, exportSettings,
   ROLE_HEADERS, USER_HEADERS, SHEET_HEADERS, SIDE_ITEM_HEADERS,
@@ -702,6 +739,16 @@ function main(argv) {
   // migrates) the database.
   if (!exportMode && !(fs.existsSync(dir) && fs.statSync(dir).isDirectory())) {
     console.error(`import-settings: ${dir} is not a folder. Export each workbook tab as <TabName>.csv into one folder.`);
+    process.exit(1);
+  }
+
+  // Also before connection.js: it must open the file named here, and a
+  // missing file is refused instead of created.
+  const target = importTarget();
+  if (target.source === '.env') process.env.DB_PATH = target.value;
+  console.log(`Database: ${target.dbPath} (${SOURCE_LABELS[target.source]})`);
+  if (!fs.existsSync(target.dbPath)) {
+    console.error(`import-settings: ${target.dbPath} does not exist - nothing done. Start the app once so it creates its database, or check DB_PATH (.env or the environment).`);
     process.exit(1);
   }
 
