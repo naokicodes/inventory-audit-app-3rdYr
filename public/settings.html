@@ -54,6 +54,7 @@
     <button data-section="meat-types">Meat Types</button>
     <button data-section="commissary-meats">Commissary Meats</button>
     <button data-section="side-items">Side items</button>
+    <button data-section="staff-meals">Staff meals</button>
   </div>
 
   <section id="section-restaurants" class="section-panel active">
@@ -226,6 +227,35 @@
     </div>
     <div id="side-sheet-tabs" class="side-sheet-tabs"></div>
     <div id="side-items-list">Loading...</div>
+  </section>
+
+  <!-- Step staff-meal-settings (ADR-027, ADR-044): each restaurant's meal slots
+       and the group-wide rice rates. A blank amount means none. -->
+  <section id="section-staff-meals" class="section-panel">
+    <h2>Staff meals</h2>
+    <small class="hint">The fixed budget is the budget; head count x per-head rate is the maximum. Only a rate: the maximum is also the budget.</small>
+    <div class="add-form">
+      <label>Restaurant <select id="meal-site"></select></label>
+    </div>
+    <div id="meal-slots">Loading...</div>
+    <div class="add-form">
+      <label>Slot name <input id="meal-slot-name" placeholder="e.g. Evening"></label>
+      <label>Fixed budget <input id="meal-slot-fixed" type="number" step="any" min="0" inputmode="decimal" placeholder="none"></label>
+      <label>Per-head rate <input id="meal-slot-rate" type="number" step="any" min="0" inputmode="decimal" placeholder="none"></label>
+      <button id="add-meal-slot">Add slot</button>
+    </div>
+    <p id="meal-slot-msg" class="status-message" role="status"></p>
+
+    <h3>Rice rates (every restaurant)</h3>
+    <div id="rice-rates">Loading...</div>
+    <div class="add-form">
+      <label>Cups per head <input id="rice-cups" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label>Grams per cup <input id="rice-grams" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label>Price per kg <input id="rice-price" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label>From which day <input id="rice-from" type="date"></label>
+      <button id="add-rice-rate">Add rate</button>
+    </div>
+    <p id="rice-msg" class="status-message" role="status"></p>
   </section>
   <style>
     /* ADR-077: one row that scrolls sideways itself; the page never does. */
@@ -1318,6 +1348,109 @@
       else if (e.target.closest('[data-act="remove-unit"]')) removeSideUnit(box, e.target.closest('[data-act="remove-unit"]').dataset.unit);
     });
     loadSideSites();
+
+    // ---------- STAFF MEALS ----------
+    const mealSite = document.getElementById('meal-site');
+    const mealMsg = document.getElementById('meal-slot-msg');
+    const riceMsg = document.getElementById('rice-msg');
+    const show = (el, text, error) => { el.className = 'status-message ' + (error ? 'error' : 'success'); el.textContent = text; };
+    async function sendJson(method, url, body) {
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || `Save failed (${res.status})`);
+      return out;
+    }
+
+    async function loadMealSites() {
+      const rs = await fetch('/api/restaurants').then(r => r.json());
+      mealSite.innerHTML = rs.map(r => `<option value="${esc(r.code)}">${esc(r.name)} (${esc(r.code)})</option>`).join('');
+      loadMealSlots();
+      loadRiceRates();
+    }
+
+    // A restaurant switched while a load is in flight: only the newest renders.
+    let mealLoad = 0;
+    async function loadMealSlots() {
+      const mine = ++mealLoad;
+      const slots = await fetch(`/api/settings/staff-meal-slots?site=${encodeURIComponent(mealSite.value)}`).then(r => r.json());
+      if (mine !== mealLoad) return;
+      const box = document.getElementById('meal-slots');
+      if (!Array.isArray(slots) || slots.length === 0) { box.textContent = 'No meal slots yet'; return; }
+      box.innerHTML = `
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Order</th><th>Name</th><th>Fixed budget</th><th>Per-head rate</th><th>Active</th></tr></thead>
+          <tbody>${slots.map(x => `
+            <tr data-id="${x.id}">
+              <td><input data-f="sort_order" type="number" step="1" inputmode="numeric" value="${x.sort_order}" style="width: 4rem" aria-label="Order"></td>
+              <td><input data-f="name" value="${esc(x.name)}" aria-label="Name"></td>
+              <td><input data-f="fixed_budget" type="number" step="any" min="0" inputmode="decimal" value="${x.fixed_budget ?? ''}" placeholder="none" aria-label="Fixed budget"></td>
+              <td><input data-f="per_head_rate" type="number" step="any" min="0" inputmode="decimal" value="${x.per_head_rate ?? ''}" placeholder="none" aria-label="Per-head rate"></td>
+              <td><input data-f="active" type="checkbox" ${x.active ? 'checked' : ''} aria-label="Active"></td>
+            </tr>`).join('')}</tbody>
+        </table>
+        </div>`;
+    }
+
+    // Any change in a row saves that row; a refusal shows the reason and reloads.
+    document.getElementById('meal-slots').addEventListener('change', async e => {
+      const row = e.target.closest('tr[data-id]');
+      if (!row) return;
+      const f = name => row.querySelector(`[data-f="${name}"]`);
+      try {
+        await sendJson('PUT', `/api/settings/staff-meal-slots/${row.dataset.id}`, {
+          sort_order: f('sort_order').value, name: f('name').value,
+          fixed_budget: f('fixed_budget').value, per_head_rate: f('per_head_rate').value, active: f('active').checked,
+        });
+        show(mealMsg, 'Saved.');
+      } catch (err) {
+        show(mealMsg, err.message, true);
+      }
+      loadMealSlots();
+    });
+
+    document.getElementById('add-meal-slot').addEventListener('click', async () => {
+      const v = id => document.getElementById(id).value;
+      try {
+        await sendJson('POST', '/api/settings/staff-meal-slots', {
+          site_code: mealSite.value, name: v('meal-slot-name'), fixed_budget: v('meal-slot-fixed'), per_head_rate: v('meal-slot-rate'),
+        });
+        ['meal-slot-name', 'meal-slot-fixed', 'meal-slot-rate'].forEach(id => { document.getElementById(id).value = ''; });
+        show(mealMsg, 'Slot added.');
+        loadMealSlots();
+      } catch (err) {
+        show(mealMsg, err.message, true);
+      }
+    });
+
+    async function loadRiceRates() {
+      const rates = await fetch('/api/settings/staff-rice-rates').then(r => r.json());
+      const box = document.getElementById('rice-rates');
+      if (!Array.isArray(rates) || rates.length === 0) { box.textContent = 'Rice rate not set'; return; }
+      box.innerHTML = `
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>From</th><th>Cups per head</th><th>Grams per cup</th><th>Price per kg</th></tr></thead>
+          <tbody>${rates.map(r => `<tr><td>${esc(r.effective_from)}</td><td>${r.cups_per_head}</td><td>${r.grams_per_cup}</td><td>${r.price_per_kg}</td></tr>`).join('')}</tbody>
+        </table>
+        </div>`;
+    }
+
+    document.getElementById('add-rice-rate').addEventListener('click', async () => {
+      const ids = ['rice-cups', 'rice-grams', 'rice-price', 'rice-from'];
+      const [cups_per_head, grams_per_cup, price_per_kg, effective_from] = ids.map(id => document.getElementById(id).value);
+      try {
+        await sendJson('POST', '/api/settings/staff-rice-rates', { cups_per_head, grams_per_cup, price_per_kg, effective_from });
+        ids.forEach(id => { document.getElementById(id).value = ''; });
+        show(riceMsg, 'Rate added.');
+        loadRiceRates();
+      } catch (err) {
+        show(riceMsg, err.message, true);
+      }
+    });
+
+    mealSite.addEventListener('change', loadMealSlots);
+    loadMealSites();
   </script>
   <script src="command-panel.js"></script>
   <script src="commands/sync-batch-stock.js"></script>

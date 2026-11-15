@@ -253,6 +253,21 @@ console.log(`Users: ${userResult.changes} inserted (bootstrap super-admin)`);
 const { ensureDefaultSheets } = require('../engines/sheetDefinitions.js');
 console.log(`Sheet definitions: ${ensureDefaultSheets(db).inserted} inserted`);
 
+// 8. Staff meal slots (step staff-meal-settings): names only, for a restaurant
+// with no slots yet. No amounts and no rice rate - every value is entered in
+// Settings (ADR-027; the values are off-repo).
+const DEFAULT_SLOTS = { RA: ['Afternoon', 'Evening'], FC: ['Meal 1', 'Meal 2', 'Meal 3'] };
+let slotsInserted = 0;
+for (const [code, names] of Object.entries(DEFAULT_SLOTS)) {
+  if (!db.prepare('SELECT 1 FROM restaurants WHERE code = ?').get(code)) continue;
+  if (db.prepare('SELECT 1 FROM staff_meal_slots WHERE site_code = ?').get(code)) continue;
+  names.forEach((name, i) => {
+    db.prepare('INSERT INTO staff_meal_slots (site_code, name, sort_order) VALUES (?, ?, ?)').run(code, name, i + 1);
+    slotsInserted++;
+  });
+}
+console.log(`Staff meal slots: ${slotsInserted} inserted`);
+
 // A reset must end on a consistent file: any dangling reference means the
 // clear or the reseed went wrong, so fail loudly rather than hand Beta a
 // broken database.
