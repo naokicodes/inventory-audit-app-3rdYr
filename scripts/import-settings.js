@@ -22,6 +22,10 @@
 // IDENTITY tabs only - Roles and Users (with each user's site_memberships) -
 // into the tables users-roles and user-sites created. Catalog / par / sides,
 // Stations and Staff are later slices; their files are listed as skipped.
+// Step roles-page (ADR-082): the Roles page owns roles. An existing role's
+// flags and an existing person's base role are compared, never written; each
+// difference is listed under "Left as the app has them". New roles and new
+// people import as before.
 //
 // Every write is SELECT-then-INSERT/UPDATE by natural key (no sqlite-only
 // ON CONFLICT), so a second run is a no-op and the script survives a MySQL
@@ -134,7 +138,7 @@ function skippedTabs(dir) {
 
 function newReport() {
   return {
-    rolesInserted: 0, rolesUpdated: 0,
+    rolesInserted: 0,
     usersInserted: 0, usersUpdated: 0,
     membershipsAdded: 0, membershipsRemoved: 0,
     tabsRead: [], tabsSkipped: [],
@@ -144,6 +148,8 @@ function newReport() {
     spellingUpdated: [],    // "<old> -> <new>"
     removalsSkipped: [],    // "<user>: ..." - an unresolved code blocked removals
     problems: [],           // anything else that made a row skip
+    // ADR-082: the Roles page owns roles - differences the import left alone
+    leftAsApp: [],          // "<role>: sheet says <flag> <v>, app has <v>", "<person>: sheet says <role>, app has <role>"
     // Sheets / SideItems (step side-items)
     sheetsAdded: 0, sheetsSwitched: 0,
     itemsAdded: 0, itemsUpdated: 0, linksAdded: 0, linksSwitchedOff: 0,
@@ -202,9 +208,6 @@ function importRoles(db, rows, report) {
   const insertRole = db.prepare(
     `INSERT INTO roles (name, ${ROLE_FLAGS.join(', ')}, active) VALUES (?, ?, ?, ?, ?, 1)`
   );
-  const updateRole = db.prepare(
-    `UPDATE roles SET ${ROLE_FLAGS.map(f => `${f} = ?`).join(', ')} WHERE id = ?`
-  );
   const duplicated = findDuplicates(rows, 'Roles', report);
 
   rows.forEach((row, i) => {
@@ -236,10 +239,14 @@ function importRoles(db, rows, report) {
     if (!existing) {
       insertRole.run(name, ...flags);
       report.rolesInserted++;
-    } else if (ROLE_FLAGS.some((f, k) => existing[f] !== flags[k])) {
-      // A role is never renamed: code looks roles up by name.
-      updateRole.run(...flags, existing.id);
-      report.rolesUpdated++;
+    } else {
+      // ADR-082: an existing role's flags are the Roles page's - compared,
+      // never written. A role is never renamed: code looks roles up by name.
+      ROLE_FLAGS.forEach((f, k) => {
+        if (existing[f] !== flags[k]) {
+          report.leftAsApp.push(`${existing.name}: sheet says ${f} ${flags[k]}, app has ${existing[f]}`);
+        }
+      });
     }
     // Roles absent from the sheet are never deleted.
   });
@@ -296,7 +303,8 @@ function importUsers(db, rows, report) {
   const allRoles = db.prepare('SELECT id, name FROM roles');
   const allUsers = db.prepare('SELECT id, name, default_role_id, active FROM users');
   const insertUser = db.prepare('INSERT INTO users (name, default_role_id, active) VALUES (?, ?, ?)');
-  const updateUser = db.prepare('UPDATE users SET default_role_id = ?, active = ? WHERE id = ?');
+  const updateActive = db.prepare('UPDATE users SET active = ? WHERE id = ?');
+  const roleName = id => allRoles.all().find(r => r.id === id).name;
   const renameUser = db.prepare('UPDATE users SET name = ? WHERE id = ?');
 
   const superRole = roleByName.get(SUPER_ADMIN_ROLE);
@@ -316,21 +324,24 @@ function importUsers(db, rows, report) {
     if (duplicated.has(key)) return;
 
     const roles = byKey(allRoles, nameKey(row.default_role));
-    if (roles.length === 0) { report.unknownRoles.push(`${name}: ${row.default_role || '(blank)'}`); return; }
-    if (roles.length > 1) {
-      report.problems.push(`${where} "${name}": role "${row.default_role}" matches ${roles.length} roles (${roles.map(r => r.name).join(', ')}) - skipped`);
-      return;
-    }
-    const role = roles[0];
-
-    const active = parseBit(row.active);
-    if (active === null) {
-      report.problems.push(`${where} "${name}": active must be 0 or 1 - skipped`);
-      return;
-    }
+    const role = roles.length === 1 ? roles[0] : null;
+    const sheetRole = row.default_role || '(blank)';
+    // A role name the app does not know (or knows twice): it skips a new
+    // person, but no longer an existing one (ADR-082).
+    const roleUnusable = () => {
+      if (roles.length === 0) report.unknownRoles.push(`${name}: ${sheetRole}`);
+      else report.problems.push(`${where} "${name}": role "${row.default_role}" matches ${roles.length} roles (${roles.map(r => r.name).join(', ')}) - skipped`);
+    };
+    const parseActive = () => {
+      const value = parseBit(row.active);
+      if (value === null) report.problems.push(`${where} "${name}": active must be 0 or 1 - skipped`);
+      return value;
+    };
 
     let userId;
-    if (role.id === superRoleId) {
+    if (role && role.id === superRoleId) {
+      const active = parseActive();
+      if (active === null) return;
       // #22: the workbook's super-admin row renames the ONE seeded
       // super-admin; it never inserts a second one.
       if (superRowSeen) {
@@ -364,7 +375,12 @@ function importUsers(db, rows, report) {
         return;
       }
       const existing = matches[0];
-      if (existing && existing.default_role_id === superRoleId) {
+      const isSuperPerson = existing && existing.default_role_id === superRoleId;
+      // The super-admin row rule is unchanged: its person keeps the old checks.
+      if ((!existing || isSuperPerson) && !role) { roleUnusable(); return; }
+      const active = parseActive();
+      if (active === null) return;
+      if (isSuperPerson) {
         // Changing the super-admin's role here would leave none.
         report.problems.push(`${where} "${name}": is the super-admin - its role cannot change to ${row.default_role}, skipped`);
         return;
@@ -380,8 +396,17 @@ function importUsers(db, rows, report) {
           renameUser.run(name, existing.id);
           report.spellingUpdated.push(`${existing.name} -> ${name}`);
         }
-        if (existing.default_role_id !== role.id || existing.active !== active) {
-          updateUser.run(role.id, active, existing.id);
+        // ADR-082: an existing person's base role is the Roles page's -
+        // compared, never written. Their active and sites still apply.
+        if (roles.length === 0) {
+          report.leftAsApp.push(`${name}: sheet says ${sheetRole} - no such role`);
+        } else if (roles.length > 1) {
+          report.problems.push(`${where} "${name}": role "${row.default_role}" matches ${roles.length} roles (${roles.map(r => r.name).join(', ')}) - role left as the app has it`);
+        } else if (role.id !== existing.default_role_id) {
+          report.leftAsApp.push(`${name}: sheet says ${row.default_role}, app has ${roleName(existing.default_role_id)}`);
+        }
+        if (existing.active !== active) {
+          updateActive.run(active, existing.id);
           report.usersUpdated++;
         }
       }
@@ -611,7 +636,7 @@ function formatReport(report) {
   const lines = [
     `Tabs read: ${report.tabsRead.join(', ') || `(none - no ${KNOWN_TABS.map(t => `${t}.csv`).join(', ')} found)`}`,
     `Tabs skipped (not part of this slice): ${report.tabsSkipped.join(', ') || '(none)'}`,
-    `Roles: ${report.rolesInserted} inserted, ${report.rolesUpdated} updated`,
+    `Roles: ${report.rolesInserted} inserted`,
     `Users: ${report.usersInserted} inserted, ${report.usersUpdated} updated`,
     `Site memberships: ${report.membershipsAdded} added, ${report.membershipsRemoved} removed`,
     `Side sheets: ${report.sheetsAdded} added, ${report.sheetsSwitched} switched on or off`,
@@ -622,6 +647,7 @@ function formatReport(report) {
     if (items.length === 0) return;
     lines.push('', `${title} (${items.length}):`, ...items.map(s => `  - ${s}`));
   };
+  section('Left as the app has them - change these on the Roles page', report.leftAsApp);
   section('Spelling updated (matched an existing user)', report.spellingUpdated);
   section('WARNING unknown role names - user skipped', report.unknownRoles);
   section('WARNING unresolved site codes - membership skipped', report.unresolvedSites);

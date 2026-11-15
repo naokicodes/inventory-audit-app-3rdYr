@@ -218,6 +218,180 @@ function setRoleCapability(db, { roleId, capability, on }, actor) {
   return { ok: true, changed };
 }
 
+// --- Step roles-page (ADR-034, ADR-073, ADR-083) ---
+
+// ADR-083: code finds these by name, so they never get a new one. A built-in
+// role added later joins this list in the step that seeds it.
+const BUILT_IN_ROLES = ['super-admin', 'admin', 'management', 'head-chef', 'checker', 'supervisor'];
+
+// The one name key (ADR-047): lowercase, trimmed, inner spaces collapsed.
+const nameKey = name => String(name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+const NAME_TAKEN = { status: 409, error: 'A role with that name already exists' };
+
+// Another role (not `exceptId`) whose name has this key?
+function nameTaken(db, name, exceptId) {
+  const key = nameKey(name);
+  return db.prepare('SELECT id, name FROM roles').all().some(r => r.id !== exceptId && nameKey(r.name) === key);
+}
+
+// A role as the Roles page shows it: flags, active, and its switches on.
+function roleSnapshot(db, roleId) {
+  const row = db.prepare(
+    'SELECT id, name, can_enter_counts, can_finalize, can_admin, read_only, active FROM roles WHERE id = ?'
+  ).get(Number(roleId));
+  if (!row) return null;
+  const on = db.prepare('SELECT capability FROM role_capabilities WHERE role_id = ? ORDER BY capability')
+    .all(row.id).map(r => r.capability);
+  return { ...row, switches: SWITCHES.filter(s => on.includes(s)) };
+}
+
+/**
+ * Add a role named `name`, starting as a copy of role `copyFrom`'s four
+ * flags and switches (none given -> everything off). Admin only. Returns
+ * { ok, role } or { status, error }. The role, its switch rows and the
+ * activity_log row are one transaction.
+ */
+function createRole(db, { name, copyFrom }, actor) {
+  if (!isAdmin(db, actor)) return FORBIDDEN;
+  const clean = typeof name === 'string' ? name.trim() : '';
+  if (!clean) return { status: 400, error: 'A role needs a name.' };
+  if (nameTaken(db, clean, null)) return NAME_TAKEN;
+  let source = null;
+  if (copyFrom !== undefined && copyFrom !== null && copyFrom !== '') {
+    source = roleSnapshot(db, copyFrom);
+    if (!source) return { status: 400, error: 'Unknown role to copy.' };
+  }
+  const flags = source
+    ? [source.can_enter_counts, source.can_finalize, source.can_admin, source.read_only]
+    : [0, 0, 0, 0];
+
+  const id = withTransaction(db, () => {
+    const newId = Number(db.prepare(`
+      INSERT INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only, active)
+      VALUES (?, ?, ?, ?, ?, 1)
+    `).run(clean, ...flags).lastInsertRowid);
+    const insert = db.prepare('INSERT INTO role_capabilities (role_id, capability) VALUES (?, ?)');
+    for (const capability of source ? source.switches : []) insert.run(newId, capability);
+    logActivity(db, {
+      actor: actor.name, entityType: 'roles', entityId: newId, action: 'CREATE',
+      before: null, after: roleSnapshot(db, newId), source: 'MANUAL',
+    });
+    return newId;
+  });
+  return { ok: true, role: roleSnapshot(db, id) };
+}
+
+/**
+ * Rename a role and/or switch it on or off (`name`, `active`; either may be
+ * left out). Admin only; never super-admin; a built-in role keeps its name
+ * (ADR-083). Sending the current values is a no-op. Returns
+ * { ok, changed, role } or { status, error }.
+ */
+function updateRole(db, { roleId, name, active }, actor) {
+  if (!isAdmin(db, actor)) return FORBIDDEN;
+  const before = roleSnapshot(db, roleId);
+  if (!before) return { status: 404, error: 'Unknown role.' };
+  if (before.name === SUPER_ADMIN) return { status: 400, error: 'The super-admin role is never edited.' };
+
+  let newName = before.name;
+  if (name !== undefined) {
+    const clean = typeof name === 'string' ? name.trim() : '';
+    if (!clean) return { status: 400, error: 'A role needs a name.' };
+    if (clean !== before.name) {
+      if (BUILT_IN_ROLES.includes(before.name)) return { status: 400, error: 'A built-in role keeps its name' };
+      if (nameTaken(db, clean, before.id)) return NAME_TAKEN;
+      newName = clean;
+    }
+  }
+  let newActive = before.active;
+  if (active !== undefined) {
+    if (active !== true && active !== false) return { status: 400, error: 'active must be true or false.' };
+    newActive = active ? 1 : 0;
+  }
+  if (newName === before.name && newActive === before.active) return { ok: true, changed: false, role: before };
+
+  withTransaction(db, () => {
+    db.prepare('UPDATE roles SET name = ?, active = ? WHERE id = ?').run(newName, newActive, before.id);
+    logActivity(db, {
+      actor: actor.name, entityType: 'roles', entityId: before.id, action: 'UPDATE',
+      before, after: roleSnapshot(db, before.id), source: 'MANUAL',
+    });
+  });
+  return { ok: true, changed: true, role: roleSnapshot(db, before.id) };
+}
+
+/**
+ * Turn one of a role's toggles on or off: a legacy flag updates its roles
+ * column, a switch goes through setRoleCapability. Admin only; never
+ * super-admin. Toggling to the current state is a no-op. Returns
+ * { ok, changed, role } or { status, error }.
+ */
+function setRoleToggle(db, { roleId, capability, on }, actor) {
+  if (!isAdmin(db, actor)) return FORBIDDEN;
+  if (!CAPABILITIES.includes(capability)) return { status: 400, error: 'Unknown switch.' };
+  const before = roleSnapshot(db, roleId);
+  if (!before) return { status: 404, error: 'Unknown role.' };
+
+  if (SWITCHES.includes(capability)) {
+    const result = setRoleCapability(db, { roleId: before.id, capability, on }, actor);
+    return result.ok ? { ...result, role: roleSnapshot(db, before.id) } : result;
+  }
+  if (before.name === SUPER_ADMIN) return { status: 400, error: 'The super-admin role is never edited.' };
+  if (on !== true && on !== false) return { status: 400, error: 'on must be true or false.' };
+  const column = LEGACY[capability];
+  const value = on ? 1 : 0;
+  if (before[column] === value) return { ok: true, changed: false, role: before };
+
+  withTransaction(db, () => {
+    db.prepare(`UPDATE roles SET ${column} = ? WHERE id = ?`).run(value, before.id);
+    logActivity(db, {
+      actor: actor.name, entityType: 'roles', entityId: before.id, action: 'UPDATE',
+      before, after: roleSnapshot(db, before.id), source: 'MANUAL',
+    });
+  });
+  return { ok: true, changed: true, role: roleSnapshot(db, before.id) };
+}
+
+/**
+ * Change a person's base role (users.default_role_id). Admin only; the
+ * super-admin person and the super-admin role are never part of it; the role
+ * must be active. Applies from the person's next request. Returns
+ * { ok, changed } or { status, error }.
+ */
+function setBaseRole(db, { userId, roleId }, actor) {
+  if (!isAdmin(db, actor)) return FORBIDDEN;
+  const person = db.prepare(`
+    SELECT u.id, u.name, u.default_role_id, r.name AS role
+      FROM users u JOIN roles r ON r.id = u.default_role_id WHERE u.id = ?
+  `).get(Number(userId));
+  if (!person) return { status: 404, error: 'Unknown person.' };
+  if (person.role === SUPER_ADMIN) return { status: 400, error: "The super-admin's role never changes." };
+  const role = roleById(db, roleId);
+  if (!role) return { status: 400, error: 'Unknown role.' };
+  if (role.name === SUPER_ADMIN) return { status: 400, error: 'The super-admin role is never assigned.' };
+  if (role.active !== 1) return { status: 400, error: 'That role is inactive.' };
+  if (role.id === person.default_role_id) return { ok: true, changed: false };
+
+  withTransaction(db, () => {
+    db.prepare('UPDATE users SET default_role_id = ? WHERE id = ?').run(role.id, person.id);
+    logActivity(db, {
+      actor: actor.name, entityType: 'users', entityId: person.id, action: 'UPDATE',
+      before: { default_role_id: person.default_role_id }, after: { default_role_id: role.id }, source: 'MANUAL',
+    });
+  });
+  return { ok: true, changed: true };
+}
+
+/** A person's assignments, for the Roles page: role name and whether it is active. */
+function assignmentsOf(db, userId) {
+  return db.prepare(`
+    SELECT ur.id, ur.role_id, r.name AS role, r.active AS role_active, ur.site_code, ur.until_date
+      FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+     WHERE ur.user_id = ? ORDER BY r.name, ur.site_code
+  `).all(Number(userId)).map(row => ({ ...row }));
+}
+
 /**
  * Server start and seed.js: add the supervisor role if missing (ADR-010:
  * never counts), then apply each named default set that is not yet recorded
@@ -266,4 +440,13 @@ module.exports = {
   removeAssignment,
   setRoleCapability,
   ensureRoleDefaults,
+  BUILT_IN_ROLES,
+  nameKey,
+  isAdmin,
+  roleSnapshot,
+  createRole,
+  updateRole,
+  setRoleToggle,
+  setBaseRole,
+  assignmentsOf,
 };

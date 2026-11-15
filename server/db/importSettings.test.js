@@ -77,7 +77,7 @@ const counts = db => ({
 
 const ROLES_CSV = [
   'name,can_enter_counts,can_finalize,can_admin,read_only',
-  'checker,1,1,0,0',          // changes a seeded role's flags
+  'checker,1,1,0,0',          // differs from a seeded role's flags: listed, not written (ADR-082)
   'bills-only,0,0,0,1',       // a role the seed does not have
 ].join('\r\n') + '\r\n';
 
@@ -105,14 +105,17 @@ try {
 
   // --- roles ---
 
-  test('upserts role flags: updates a seeded role, inserts a new one, deletes none', () => {
+  test("an existing role's different flag is listed and not written; a new role inserts; none deleted (ADR-082)", () => {
     const db = freshDb();
     const report = importSettings(db, workbook({ Roles: ROLES_CSV }));
-    assert.deepStrictEqual({ ...role(db, 'checker') }, { can_enter_counts: 1, can_finalize: 1, can_admin: 0, read_only: 0 });
+    assert.deepStrictEqual({ ...role(db, 'checker') }, { can_enter_counts: 1, can_finalize: 0, can_admin: 0, read_only: 0 }, 'checker unchanged');
     assert.deepStrictEqual({ ...role(db, 'bills-only') }, { can_enter_counts: 0, can_finalize: 0, can_admin: 0, read_only: 1 });
     assert.ok(role(db, 'management'), 'a role absent from the sheet is kept');
     assert.strictEqual(report.rolesInserted, 1);
-    assert.strictEqual(report.rolesUpdated, 1);
+    assert.deepStrictEqual(report.leftAsApp, ['checker: sheet says can_finalize 1, app has 0']);
+    const text = formatReport(report);
+    assert.match(text, /Left as the app has them - change these on the Roles page \(1\):/);
+    assert.match(text, /^Roles: 1 inserted$/m, 'the Roles line has no "updated"');
   });
 
   test("never changes super-admin's flags; a bad flag skips only that row", () => {
@@ -198,7 +201,7 @@ try {
     const after1 = counts(db);
     const report = importSettings(db, dir);
     assert.deepStrictEqual(counts(db), after1);
-    for (const k of ['rolesInserted', 'rolesUpdated', 'usersInserted', 'usersUpdated', 'membershipsAdded', 'membershipsRemoved']) {
+    for (const k of ['rolesInserted', 'usersInserted', 'usersUpdated', 'membershipsAdded', 'membershipsRemoved']) {
       assert.strictEqual(report[k], 0, `${k} on the second run`);
     }
     assert.deepStrictEqual(report.spellingUpdated, []);
@@ -240,7 +243,7 @@ try {
     assert.match(formatReport(report), /duplicate names - all rows skipped, fix the sheet/);
   });
 
-  test('"kim" in the sheet updates an existing "Kim": one user, the sheet\'s spelling', () => {
+  test('"kim" in the sheet matches an existing "Kim": one user, the sheet\'s spelling, the app\'s role', () => {
     const db = freshDb();
     importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nKim,checker,1,RA\n' }));
     const id = user(db, 'Kim').id;
@@ -251,7 +254,8 @@ try {
     assert.strictEqual(counts(db).users, before, 'no second user');
     assert.strictEqual(user(db, 'Kim'), undefined);
     assert.strictEqual(user(db, 'kim').id, id, 'same user_id, renamed');
-    assert.strictEqual(user(db, 'kim').role, 'head-chef', 'default_role matched by the key');
+    assert.strictEqual(user(db, 'kim').role, 'checker', 'base role compared, not written (ADR-082)');
+    assert.deepStrictEqual(report.leftAsApp, ['kim: sheet says HEAD-CHEF, app has checker']);
     assert.deepStrictEqual(report.spellingUpdated, ['Kim -> kim']);
     assert.match(formatReport(report), /Spelling updated/);
     // And the next run with the same spelling changes nothing.
@@ -285,7 +289,7 @@ try {
     assert.deepStrictEqual({ ...flagsOf('admin') }, before.admin);
     assert.deepStrictEqual({ ...flagsOf('Admin') }, before.Admin);
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM roles').get().n, rolesBefore);
-    assert.strictEqual(report.rolesInserted + report.rolesUpdated, 0);
+    assert.strictEqual(report.rolesInserted, 0);
     assert.ok(report.problems.some(p => /Roles row .*matches 2 existing roles/.test(p)), report.problems.join('; '));
     // Users row whose default_role matches both: the user is not added.
     assert.strictEqual(user(db, 'Noor'), undefined);
@@ -364,6 +368,73 @@ try {
     assert.deepStrictEqual(report.tabsSkipped, ['Staff', 'Stations']);
   });
 
+  // --- the Roles page owns roles (ADR-082) ---
+
+  test("an existing person's different default_role is listed, not written; their sites cell still applies", () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' }));
+    const report = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,admin,0,"FC, COM-A"\n' }));
+    const ana = user(db, 'Ana');
+    assert.strictEqual(ana.role, 'checker');
+    assert.strictEqual(ana.active, 0, 'active still applies');
+    assert.deepStrictEqual(sites(db, ana.id), ['COM-A', 'FC']);
+    assert.deepStrictEqual(report.leftAsApp, ['Ana: sheet says admin, app has checker']);
+    assert.strictEqual(report.usersUpdated, 1, 'the active change');
+    assert.match(formatReport(report), /Left as the app has them - change these on the Roles page \(1\):\n  - Ana: sheet says admin, app has checker/);
+  });
+
+  test('an existing person with an unknown role keeps their role, their sites apply, and the name is listed', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nBo,head-chef,1,RA\n' }));
+    const report = importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nBo,cashier,1,"RA, FC"\n' }));
+    const bo = user(db, 'Bo');
+    assert.strictEqual(bo.role, 'head-chef');
+    assert.deepStrictEqual(sites(db, bo.id), ['FC', 'RA']);
+    assert.deepStrictEqual(report.leftAsApp, ['Bo: sheet says cashier - no such role']);
+    assert.deepStrictEqual(report.unknownRoles, [], 'not skipped');
+  });
+
+  test("a new role and a new person import with the sheet's values", () => {
+    const db = freshDb();
+    const report = importSettings(db, workbook({
+      Roles: 'name,can_enter_counts,can_finalize,can_admin,read_only\nbuyer,0,1,0,1\n',
+      Users: 'name,default_role,active,site_memberships\nCy,buyer,0,FC\n',
+    }));
+    assert.deepStrictEqual({ ...role(db, 'buyer') }, { can_enter_counts: 0, can_finalize: 1, can_admin: 0, read_only: 1 });
+    const cy = user(db, 'Cy');
+    assert.strictEqual(cy.role, 'buyer');
+    assert.strictEqual(cy.active, 0);
+    assert.deepStrictEqual(sites(db, cy.id), ['FC']);
+    assert.deepStrictEqual(report.leftAsApp, []);
+  });
+
+  test('a second run with differences changes nothing and lists them again', () => {
+    const db = freshDb();
+    importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' }));
+    const dir = workbook({
+      Roles: 'name,can_enter_counts,can_finalize,can_admin,read_only\nhead-chef,0,0,0,0\n',
+      Users: 'name,default_role,active,site_memberships\nAna,admin,1,RA\n',
+    });
+    const first = importSettings(db, dir);
+    const snapshot = () => JSON.stringify([
+      db.prepare('SELECT * FROM roles ORDER BY id').all(),
+      db.prepare('SELECT id, name, default_role_id, active FROM users ORDER BY id').all(),
+      db.prepare('SELECT * FROM user_sites ORDER BY user_id, site_code').all(),
+    ]);
+    const before = snapshot();
+    const second = importSettings(db, dir);
+    assert.strictEqual(snapshot(), before);
+    assert.deepStrictEqual(second.leftAsApp, first.leftAsApp);
+    assert.deepStrictEqual(first.leftAsApp, [
+      'head-chef: sheet says can_enter_counts 0, app has 1',
+      'head-chef: sheet says can_finalize 0, app has 1',
+      'Ana: sheet says admin, app has checker',
+    ]);
+    for (const k of ['rolesInserted', 'usersInserted', 'usersUpdated', 'membershipsAdded', 'membershipsRemoved']) {
+      assert.strictEqual(second[k], 0, k);
+    }
+  });
+
   // --- export ---
 
   test('export -> import round-trips into an identical database, without Test accounts', () => {
@@ -376,10 +447,11 @@ try {
     assert.ok(!fs.readFileSync(path.join(out, 'Users.csv'), 'utf8').includes('Test '));
 
     const again = importSettings(db, out);
-    for (const k of ['rolesInserted', 'rolesUpdated', 'usersInserted', 'usersUpdated', 'membershipsAdded']) {
+    for (const k of ['rolesInserted', 'usersInserted', 'usersUpdated', 'membershipsAdded']) {
       assert.strictEqual(again[k], 0, `${k} re-importing the export`);
     }
     assert.strictEqual(again.problems.length, 1, 'only the fixed super-admin role row is reported');
+    assert.deepStrictEqual(again.leftAsApp, [], 'the export matches the app');
     assert.strictEqual(loadTab(out, 'Users').find(r => r.name === 'Ana Cruz').site_memberships, 'COM-A, RA');
   });
 
