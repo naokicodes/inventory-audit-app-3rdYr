@@ -132,9 +132,29 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-090; the index, and a map from handoff item numbers to records, is in
+to ADR-093; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-15 architect (commissary and POs) - decided (recorded: ADR-092, ADR-093)
+
+- **Meat requests (ADR-092).** Decided 09-28 but never built (the docs said built: corrected). A
+  request record (meat, quantity, when, who asked); any count sheet's PO line for an item bought
+  from the commi becomes one (Silingan's kitchen meat sheet, FC's landing); a "Request meat" button
+  for sudden requests; the commi fills by shipment, the receiver taps Received. No "I took it":
+  rest days are covered by the placement, the head chef's pick, and the head chefs' standing access.
+  The commi stays on paper in Beta: planned, specced later.
+- **POs on the floor (Naoki, 2026-11-15):** the cold-station head chef rewrites every PO onto the
+  landing; the landing's PO (MEATS too) is photographed and sent to the suppliers; meat arrives in
+  the morning (so the commi can back it up); veggies are bought at 7-8am and fetched by the
+  purchaser of the day; each supplier has a group chat where out-of-stock items are reported, and
+  those go on the purchaser's list (one tap in buyer-list); misc buys go on the cashier's other
+  expenses. The COO's money; the head chef decides what is on the PO.
+- **No browser pop-ups (ADR-093).** Step no-popups after cost-guard and supply-tags.
+- **supply-tags specced** (meats only: side items already carry how it's bought). After
+  staff-meal-settings and cost-guard (settings files); a schema step.
+- One person holds several roles (a purchaser who also assists as supervisor): base role plus
+  assignments (ADR-034), as built.
 
 ### 2026-11-15 architect (A8 part 2) - decided (recorded: ADR-085 to ADR-090)
 
@@ -3721,6 +3741,20 @@ click-through.
   standard, an admin passes, and the checker still loads both.
 - Touches gains: server/routes/stockReceipts.js, server/routes/stockReceipts.test.js.
 
+**Added 2026-11-15 (issue #81, ADR-091).** Replaces the picker trim above.
+- GET /restaurants returns every active restaurant as today, each row with `can_use` (true or
+  false) for the requester; logged out and bypass roles get true on every row. Nothing is trimmed:
+  the shipment page, the terminal and Settings use the same list.
+- siteAccess.js gains `usableSiteCodes(db, user, date)`: the site codes canUseSite would pass for
+  that user and business date (membership, a live user_roles row at that site, or a bypass role),
+  built on the same queries so the two cannot drift. Every list filter above that used
+  getUserSiteCodes uses it instead, and `can_use` comes from it.
+- History: unchanged here (planned step blind-history).
+- Tests gain: a commi-only user gets every restaurant with `can_use` false and still ships to RA; a
+  user with a role assignment at FC but no FC membership gets FC rows in the unfiltered lists and
+  `can_use` true for FC; management gets `can_use` true everywhere; logged out gets true.
+- Not here: trimming the count pages' pickers and showing a 403 message (planned step site-picker).
+
 ## Step test-accounts - fake tester accounts for previews and dev databases (A0)
 **CLOSED 2026-11-12, PR #64 (`5e50ddd`).**
 
@@ -4540,3 +4574,41 @@ runs the new copy (its first lines match `scripts\restaurant-pc.bat`); with the 
 the setup prints the new `[!]` line.
 
 Touches: scripts/restaurant-pc.bat.
+
+## Step supply-tags - how each restaurant meat is bought (A9)
+
+Decided 2026-11-14 (ADR-067), specced 2026-11-15. DEPENDS ON staff-meal-settings and cost-guard
+(both change settings.js and settings.html). Schema step: one migration in flight at a time.
+
+Why: supplier-orders needs to know, for every PO line, whether it goes to a supplier, the buyer or
+the commi. Side items already carry it (side-items: how_bought, values SUPPLIER, BUYER, COMMI);
+restaurant meats do not.
+
+- meats gains `how_bought TEXT NOT NULL DEFAULT 'COMMI' CHECK (how_bought IN ('SUPPLIER', 'BUYER',
+  'COMMI'))`: in schema.sql for new databases, and an idempotent migrate.js helper
+  migrateMeatsHowBoughtColumn (follow migrateLocationsActiveColumn) wired into connection.js, so an
+  existing database (beta.db) gets the column and every row reads COMMI.
+- Parsing reuses sideItems.parseHowBought (case-insensitive; blank means not given). POST
+  /settings/meats: blank -> COMMI. PUT /settings/meats/:id: blank or missing -> unchanged. GET lists
+  return how_bought.
+- Settings -> Meats: a "How it's bought" select (Supplier / Buyer / Commi) on add and on edit, the
+  same labels as the Side items tab.
+- Not changed: no seed change (an admin sets FC's four direct meats - sirloin, pork chops, tuna
+  cubes, tuna steaks - to Supplier on the PC, ADR-067); there is no Meats tab in the settings
+  workbook; nothing reads the tag yet (supplier-orders will); requireAdmin as today.
+
+Edge states: failure - an unknown value -> 400 { error: "How it is bought must be supplier, buyer,
+commi or blank" }, nothing saved. Empty - blank on create = Commi. Stale, two devices - the last
+save wins, as today. Blocked - non-admin 403 as today.
+
+Tests: the migration adds the column once (run it twice) and existing rows read COMMI; POST with
+"buyer" stores BUYER; POST blank stores COMMI; PUT with an unknown value -> 400 and the row is
+unchanged; PUT without how_bought keeps it; GET returns it; a non-admin still gets 403.
+
+Click-through (ADR-039): Claude checks, as Test Admin at 390px: set an FC meat to Supplier, reload,
+it stays; add a meat with no choice, it reads Commi. You check: the select reads well beside the
+other fields.
+
+Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js,
+server/db/migrate.test.js, server/routes/settings.js, server/routes/settings.test.js,
+public/settings.html.

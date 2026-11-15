@@ -15,6 +15,7 @@ Status: IRL Confirmed - FLOW Drafted - APP Built (blind count + recount Specced)
    - The counter fills END; QTY is their first PO quantity for the item,
      which the head chef reviews. The counter never sees an expected
      number: blind counting already happens on paper.
+   - 2026-11-15: QTY is also the meat request the commi reads (ADR-092).
    - Endings like "12+6" are later additions: paper cannot be erased, so staff
      add with "+". In the app this is simply an edit.
    - Remarks carry the OJT meals (dish and grams of jowl).

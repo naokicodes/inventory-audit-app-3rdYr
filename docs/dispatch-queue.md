@@ -82,6 +82,8 @@ is. Read the step's own section in `session-status.md` before starting.
 > **2026-11-15 (A8 part 2):** ADR-085 to ADR-090. side-waste, bar-links, bar-check, bar-shorts and
 > roster-board are planned (see "Planned - sides and supply"), specced as side-sheets and
 > roster-day-status land.
+> **2026-11-15 (commissary and POs):** ADR-092, ADR-093. supply-tags specced (Queue -> Supply; after
+> 3zw and cost-guard). meat-request and no-popups planned.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -361,6 +363,7 @@ Touches: server/middleware/requireSiteAccess.js, server/db/siteAccess.js, server
 ADR-041: each two-site request checks its owner site only; the picker and the rollup trim to the
 user's sites; admin commands need a bypass role. Server-only, no click-through. Full spec:
 session-status.md -> "Step site-filter-ii".
+**2026-11-15 (issue #81, ADR-091):** the restaurant list stays whole with `can_use` per row; "your sites" follow the site guard (role assignments too); History unchanged. See the spec.
 **2026-11-11:** + lists with no site id narrow to the user's sites; saving presets and conversion standards needs an admin (issues #60, #62). Also after 3zu (requireAdmin). See the spec.
 
 ### 3zt. Step test-accounts - fake tester accounts for previews and dev databases  [blocked: autopilot-preview]
@@ -470,6 +473,14 @@ side-items".
 Touches: server/db/schema.sql, server/engines/sideCounts.js, server/engines/sideCounts.test.js, server/routes/sideSheets.js, server/routes/sideSheets.test.js, server/index.js, public/side-sheets.html, public/index.html
 ADR-063: ending in any unit, out of stock, remark, PO; Used = yesterday + received - ending as you
 type. PUBLIC -> click-through. Full spec: session-status.md -> "Step side-sheets".
+
+#### Supply (A9)
+
+### Step supply-tags - how each restaurant meat is bought  [blocked: staff-meal-settings, cost-guard]
+Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js, server/db/migrate.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
+ADR-067: meats gain how_bought (Supplier / Buyer / Commi, default Commi; side items already have
+it); Settings -> Meats gets the select. Schema step. Full spec: session-status.md -> "Step
+supply-tags".
 
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
@@ -627,15 +638,24 @@ lands, so it is written against the code it builds on. Roughly in order:
   deal drinks entered at closing, each bar against its own Loyverse account); bar-shorts (ADR-087,
   ADR-088: the supervisor's list of differences, explanation or charge); fc-dish-map (FC's Loyverse
   items to FC's dishes, after FC's dish list is refreshed). Full specs once side-sheets lands.
+- **Sites (ADR-091):** site-picker (the count pages' pickers show only `can_use` sites; a 403 shows
+  its message instead of "Loading..."); blind-history (a blind viewer's History hides the numbers
+  the count screen hides; Q15).
 - **Roster (ADR-090, not A8):** roster-board (read-only Mon-Sun across the viewer's sites, for
   supervisors and management; the first card, ADR-089), after roster-day-status.
-- **Supply:** supply-tags (how it's bought on side items and meats, ADR-067); suppliers;
+- **Supply:** supply-tags (specced: in the Queue under Supply); suppliers;
   supplier-orders (the landing's consolidation with history, picture plus text, estimated cost
-  behind see_costs); buyer-list (ticks, "not found" to tomorrow, receipt photos, ADR-068); arrivals
+  behind see_costs); buyer-list (ticks, "not found" to tomorrow, receipt photos, ADR-068; a line a
+  supplier reports out of stock moves to the buyer's list in one tap); arrivals
   (the receiver's check, including the podium's name-and-quantity log and Misc; moving a line to
   the other restaurant; FC's direct meats onto FC's landing; fills the side sheets' Received);
-  bills (the bills-only cashier role, ADR-020, ADR-059); commi-meat-lines (the landing's meat lines
-  into the built internal request); sides-valuation (pesos used, wasted and on hand, ADR-057).
+  bills (the bills-only cashier role, ADR-020, ADR-059); meat-request (ADR-092: the request record;
+  from-the-commi PO lines on any count sheet and a "Request meat" button; filled by a shipment,
+  Received by the receiver; the commi stays on paper in Beta); sides-valuation (pesos used, wasted
+  and on hand, ADR-057).
+- **Pages (ADR-093):** no-popups (in-page messages and an in-page "Are you sure?" instead of
+  alert / confirm; settings.html 27, commissary.html 5, stock-receipts.html 5, sales.html 1), after
+  cost-guard and supply-tags.
 - Later: an in-app alert for supervisors when a buyer marks a line "not found"; phone
   notifications once the PC has an HTTPS name (ADR-070).
 

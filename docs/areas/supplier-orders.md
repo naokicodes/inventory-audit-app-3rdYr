@@ -10,8 +10,9 @@ Status: IRL Written - FLOW Drafted - APP Decided
 - The Silingan landing PO has blocks: MEATS (with REM = on hand), PIZZA, BAR,
   GROCERIES (with REM), VEGGIES (with REM), DINING (office supplies), plus
   "extra" lines added at the end (source: photo 2026-10-24).
-- Meat comes from the commi through a separate meat request form
-  (see commissary.md).
+- Meat comes from the commi: at Silingan the kitchen meat sheet's QTY column is the request the
+  commi reads (sudden requests in the day go by word); at FC the landing's meat lines. The
+  landing's PO, its MEATS block included, is for suppliers (2026-11-15, ADR-092).
 - About 30% of buying is supplier delivery: the PO table is sent to the
   supplier by Messenger after closing; they read it in the morning. Meat has
   one supplier, veggies one or two.
@@ -20,6 +21,13 @@ Status: IRL Written - FLOW Drafted - APP Decided
 - When something runs short or is urgent, it is added to the buyer's list, or
   another staff member runs out to buy it and hands the receipt to the cashier.
 - Sources: chat 2026-10-22/24; landing photo 2026-10-24.
+- 2026-11-15 (Naoki): the cold-station head chef rewrites everyone's PO onto the landing; the
+  landing's PO part is photographed, cropped and sent to all suppliers. Meat suppliers deliver in
+  the morning. Veggies are bought at 7-8am and fetched by the purchaser of the day, because the
+  supplier delivers too late. Each supplier has its own group chat and says there when an item is
+  out of stock; the purchasers put those items on their list. Misc buys go on the cashier's "other
+  expenses". The money is the COO's, lent until the takings come in and returned after service; the
+  head chef decides what goes on the PO.
 
 ## FLOW - how they will use the app (drafted)
 1. Counters add PO lines for their items while counting.
@@ -28,6 +36,8 @@ Status: IRL Written - FLOW Drafted - APP Decided
 3. Supplier lines go out as one picture + text per supplier (no prices).
 4. Buyer lines become one shopping list on the buyer's phone: items and
    quantities only.
+5. A supplier reports an item out of stock in its group chat: the landing person or the
+   purchaser moves that line to the buyer's list in one tap (2026-11-15).
 
 ## APP
 - Decided: PO change history and cost visibility (10); each item tagged by how
@@ -38,7 +48,7 @@ Status: IRL Written - FLOW Drafted - APP Decided
 - Decided (handoff 56): an admin sets each item's "how it is bought" tag in
   Settings; the landing person can suggest a change.
 - Decided 2026-11-14: how it's bought has three values (supplier delivery, buyer run, from the
-  commi); the landing's meat lines become the built internal meat request; FC buys sirloin, pork
+  commi); from-the-commi lines become meat requests (ADR-092: decided, not built); FC buys sirloin, pork
   chops, tuna cubes and tuna steaks direct (ADR-067). The buyer can tick lines bought or "not
   found" (rolls to tomorrow) and attaches receipt photos (ADR-068). Later: an in-app alert for
   supervisors on "not found". Planned (A9).

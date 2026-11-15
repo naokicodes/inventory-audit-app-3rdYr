@@ -71,4 +71,6 @@ acknowledgment, sides) are known. Add to it; don't wait for it to be complete.
   and any dense grid that isn't the daily-audit sheet) sits in a horizontal-scroll container
   (overflow-x:auto) below 768px so the page body never scrolls sideways. Do not card-ify it -
   the Review/Enter card treatment is the daily-audit sheet's only.
-
+- **No browser pop-ups (ADR-093).** Never alert, confirm or prompt. Saves and errors show as a
+  message line in the page; a delete asks "Are you sure?" with Yes / No in the page. (A pop-up
+  also stops Claude in Chrome until someone clicks it.)
