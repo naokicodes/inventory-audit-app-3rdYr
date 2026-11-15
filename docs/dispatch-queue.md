@@ -79,6 +79,9 @@ is. Read the step's own section in `session-status.md` before starting.
 > preview-pid (no file shared with those). 3zk roles-page after import-settings-env (both change
 > scripts/import-settings.js, ADR-082). 3zr write-permission gains the read-only refusal
 > (ADR-084).
+> **2026-11-15 (A8 part 2):** ADR-085 to ADR-090. side-waste, bar-links, bar-check, bar-shorts and
+> roster-board are planned (see "Planned - sides and supply"), specced as side-sheets and
+> roster-day-status land.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -617,10 +620,15 @@ Family, roughly in order:
 
 Decided in ADR-062 to ADR-068. Each gets its full spec in session-status as the step before it
 lands, so it is written against the code it builds on. Roughly in order:
-- **Sides:** side-waste (ADR-064: the "Waste today?" screen after endings); bar-check (ADR-025,
-  ADR-065: bottles, cans and dessert slices against each bar's own Loyverse account; FC's drinks;
-  the boodle's four free drinks and the panalo upgrade); fc-dish-map (FC's Loyverse items to FC's
-  dishes, after FC's dish list is refreshed).
+- **Sides:** side-waste (ADR-064, ADR-086: "Log waste" any time plus the "Waste today?" catch-all;
+  check_kitchen / check_bar ticks; charges, ADR-088); bar-links (ADR-087: the settings workbook's
+  sales links - Loyverse item, side item, amount per sale - and deals with their free drinks);
+  bar-check (ADR-025, ADR-065, ADR-087: expected and the difference for items sold as they are,
+  deal drinks entered at closing, each bar against its own Loyverse account); bar-shorts (ADR-087,
+  ADR-088: the supervisor's list of differences, explanation or charge); fc-dish-map (FC's Loyverse
+  items to FC's dishes, after FC's dish list is refreshed). Full specs once side-sheets lands.
+- **Roster (ADR-090, not A8):** roster-board (read-only Mon-Sun across the viewer's sites, for
+  supervisors and management; the first card, ADR-089), after roster-day-status.
 - **Supply:** supply-tags (how it's bought on side items and meats, ADR-067); suppliers;
   supplier-orders (the landing's consolidation with history, picture plus text, estimated cost
   behind see_costs); buyer-list (ticks, "not found" to tomorrow, receipt photos, ADR-068); arrivals

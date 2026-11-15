@@ -127,6 +127,12 @@ flight. (ADR-001 explains the split.)
 | ADR-082 | Roles are changed on the Roles page; the people workbook adds people and sets sites | Accepted 2026-11-15 |
 | ADR-083 | Built-in roles keep their names | Accepted 2026-11-15 |
 | ADR-084 | A read-only login is refused every write, from write-permission | Accepted 2026-11-15 |
+| ADR-085 | New restaurants follow Silingan's setup by default | Accepted 2026-11-15 |
+| ADR-086 | Side waste is logged any time; the sheet's checker ticks it | Accepted 2026-11-15 |
+| ADR-087 | How a bar is checked | Accepted 2026-11-15 |
+| ADR-088 | Charges are recorded in the app; payroll stays in Excel | Accepted 2026-11-15 |
+| ADR-089 | Views are built as cards; a dashboard builder comes later | Accepted 2026-11-15 |
+| ADR-090 | A roster board across sites | Accepted 2026-11-15 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

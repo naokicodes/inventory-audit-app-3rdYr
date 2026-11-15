@@ -132,9 +132,33 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-084; the index, and a map from handoff item numbers to records, is in
+to ADR-090; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-15 architect (A8 part 2) - decided (recorded: ADR-085 to ADR-090)
+
+- **New restaurants follow Silingan (ADR-085).** Specs design for Silingan's full setup; FC stays
+  the exception (ADR-065).
+- **Side waste any time (ADR-086).** "Log waste" for anyone who counts at the site; "Waste today?"
+  after endings stays as the catch-all; the head chef ticks kitchen sheets, a supervisor the bar
+  (switches check_kitchen, check_bar). A broken full bottle is Damaged and normally charged; an
+  empty one is trash. Supersedes ADR-064 in part.
+- **How a bar is checked (ADR-087).** Sellable or raw by section; sellables get expected =
+  yesterday + received - sold - waste - deal drinks; sales links per Loyverse item (a whole cake = 8
+  slices); deal drinks entered by the bar person from the staff's note; a supervisor checks the
+  differences, an explanation or a charge.
+- **Charges recorded, payroll in Excel (ADR-088).** The checker marks who pays (one person or a
+  split); the main supervisor's payroll stays in Excel; a Sunday export of days and charges later
+  (A13).
+- **Views are cards (ADR-089);** a builder later (architect item A15).
+- **Roster board (ADR-090):** read-only Mon-Sun across the viewer's sites, for supervisors and
+  management; the first card; after roster-day-status.
+- **Also:** supervisors work on site; management (the owners) only reads (ADR-010). The
+  management-view area line about "approving the weekly roster" was stale and is fixed.
+- **Steps:** side-waste, bar-links, bar-check, bar-shorts and roster-board are planned (names in
+  dispatch-queue); full specs when side-sheets (and roster-day-status for roster-board) land, per
+  "spec just ahead of the build".
 
 ### 2026-11-15 architect (A0) - decided (recorded: ADR-081 to ADR-084)
 

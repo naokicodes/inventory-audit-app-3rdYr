@@ -39,6 +39,10 @@ the 2026-10-28 architect chat; transcribed here so the photos are not needed aga
 - Weekly edits (swapping rest days, cancelling one for lack of people) are ordinary daily changes.
   FC changes least; Silingan and Likod change often (absences, sudden quits, medical).
 - Sunday evening is weekly reports and the weekly wage.
+- 2026-11-15 (Naoki): a Silingan supervisor makes Silingan's roster; the main supervisor (the
+  highest) runs FC's and Likod's schedules and lends Silingan people to them, and makes the
+  payroll (money.md). The 10-28 note above has one supervisor making all three: asked whether that
+  changed.
 - OJT are not on the roster.
 
 ## FLOW - how they will use the app (drafted)
@@ -64,6 +68,8 @@ the 2026-10-28 architect chat; transcribed here so the photos are not needed aga
 - Stations and staff are data (the workbook import and the Staff page); nothing about real people
   is in the repo.
 - Likod's roster starts when Likod becomes a site (A12); the same features apply.
+- 2026-11-15 (ADR-090): a read-only roster board across sites (Mon-Sun, who is off or away) for
+  supervisors and management. Planned: roster-board, after roster-day-status.
 
 ## Open questions
 

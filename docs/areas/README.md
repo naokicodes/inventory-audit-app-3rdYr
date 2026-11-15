@@ -31,8 +31,8 @@ money details live in the private notes (Claude project files), never here.
 | 2 | [Meat landing (Silingan, FC)](meat-landing.md) | Confirmed | Drafted | Built; blind count + recount Specced |
 | 3 | [Kitchen veggies](veggies.md) | Confirmed (Silingan, FC) | Drafted | Specced (side-items, side-sheets) |
 | 4 | [Pantry](pantry.md) | Confirmed (Silingan, FC) | Drafted | Specced (side-items, side-sheets) |
-| 5 | [Bar](bar.md) | Confirmed (all three) | None | Decided; exact sales check for bottles, cans, desserts; FC drinks only |
-| 6 | [Roster](roster.md) | Confirmed (Silingan); Written (Likod, FC) | Drafted | Specced |
+| 5 | [Bar](bar.md) | Confirmed (all three) | Drafted | Decided (ADR-087): sellables against Loyverse, raws side-style, deal drinks, supervisor checks; FC drinks only |
+| 6 | [Roster](roster.md) | Confirmed (Silingan); Written (Likod, FC) | Drafted | Specced; roster board Decided (ADR-090) |
 | 7 | [Supplier orders and buying](supplier-orders.md) | Written | Drafted | Decided |
 | 8 | [Arrivals and bills](arrivals-and-bills.md) | Written | Drafted | Decided |
 | 9 | [Staff meals and in-house](staff-meals.md) | Confirmed | Drafted | Specced (3zw-3zz) |
@@ -43,9 +43,9 @@ money details live in the private notes (Claude project files), never here.
 | 14 | [FC scullery](fc-scullery.md) | Confirmed | None | Paper (ADR-065) |
 | 15 | [Commissary](commissary.md) | Confirmed | None | Built (Likod destination missing); commi access Specced (placement, pick, standing access) |
 | 16 | [Sales (Loyverse)](sales.md) | Confirmed | None | Built (Kitchen Sales preview); FC switch Specced |
-| 17 | [Management view](management-view.md) | Written | Drafted | Partly built |
-| 18 | [Money and operating expenses](money.md) | Told | None | None |
-| 19 | [Waste](waste.md) | Written | Drafted | Meat: Built (adjustment types); sides: Decided (prompt after endings) |
+| 17 | [Management view](management-view.md) | Written | Drafted | Partly built; views as cards (ADR-089) |
+| 18 | [Money and operating expenses](money.md) | Told | None | Decided: charges recorded, payroll in Excel (ADR-088) |
+| 19 | [Waste](waste.md) | Written | Drafted | Meat: Built (adjustment types); sides: Decided (any time + a catch-all after endings, ADR-086) |
 
 Gaps to read off the map: IRL Confirmed + APP None is safe backlog (pizza,
 Likod grill). APP ahead of IRL is a warning. IRL Told is knowledge that lives
