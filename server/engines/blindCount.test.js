@@ -18,6 +18,7 @@ const dailyAudit = require('../routes/dailyAudit.js');
 const { recordRecount } = require('./monthOpening.js');
 const { computeMixedDailyAudit } = require('./auditEngine.js');
 const { isBlind, canOrderRecount, saveCount } = require('./blindCount.js');
+const { ensureRoleDefaults } = require('../db/permissions.js');
 
 let passed = 0, failed = 0;
 const tests = [];
@@ -44,6 +45,9 @@ const userId = (name, role, active = 1) => {
 const checker = roleId('checker', [1, 0, 0, 0]);
 const headChef = roleId('head-chef', [1, 1, 0, 0]);
 const management = roleId('management', [0, 0, 0, 1]);
+// Step role-assignments: blind = no sees_expected switch, so the test roles
+// get the default switch rows, exactly as server start gives a real database.
+ensureRoleDefaults(db);
 const cara = userId('Cara', checker);
 const dee = userId('Dee', checker);
 const hugo = userId('Hugo', headChef);
@@ -75,15 +79,23 @@ const BLIND_KEYS = ['count', 'item_id', 'name', 'recount_open', 'remark', 'type'
 const MIXED = `/api/daily-audit/mixed?restaurant_id=1&date=${DATE}`;
 
 test('isBlind / canOrderRecount: checker and no user are blind; head chef and admin order; management sees, never orders', () => {
-  const flags = (f, c, a, r) => ({ id: 1, can_enter_counts: f, can_finalize: c, can_admin: a, read_only: r });
+  // Step role-assignments: the answer comes from the person's role rows, so
+  // these are real users (as req.user carries them), not bare flag objects.
+  const asUser = (id, f, c, a, r) => ({ id, can_enter_counts: f, can_finalize: c, can_admin: a, read_only: r });
+  const adminRole = roleId('admin', [1, 1, 1, 0]);
+  const ada = Number(db.prepare('INSERT INTO users (name, default_role_id) VALUES (?, ?)').run('Ada', adminRole).lastInsertRowid);
+  const checkerUser = asUser(cara, 1, 0, 0, 0);
+  const chefUser = asUser(hugo, 1, 1, 0, 0);
+  const adminUser = asUser(ada, 1, 1, 1, 0);
+  const managementUser = asUser(mona, 0, 0, 0, 1);
   assert.strictEqual(isBlind(null, 'A'), true);
-  assert.strictEqual(isBlind(flags(1, 0, 0, 0), 'A'), true);
-  for (const u of [flags(1, 1, 0, 0), flags(1, 1, 1, 0), flags(0, 0, 0, 1)]) assert.strictEqual(isBlind(u, 'A'), false);
+  assert.strictEqual(isBlind(checkerUser, 'A'), true);
+  for (const u of [chefUser, adminUser, managementUser]) assert.strictEqual(isBlind(u, 'A'), false);
   assert.strictEqual(canOrderRecount(null, 'A'), false);
-  assert.strictEqual(canOrderRecount(flags(1, 0, 0, 0), 'A'), false);
-  assert.strictEqual(canOrderRecount(flags(0, 0, 0, 1), 'A'), false);
-  assert.strictEqual(canOrderRecount(flags(1, 1, 0, 0), 'A'), true);
-  assert.strictEqual(canOrderRecount(flags(1, 1, 1, 0), 'A'), true);
+  assert.strictEqual(canOrderRecount(checkerUser, 'A'), false);
+  assert.strictEqual(canOrderRecount(managementUser, 'A'), false);
+  assert.strictEqual(canOrderRecount(chefUser, 'A'), true);
+  assert.strictEqual(canOrderRecount(adminUser, 'A'), true);
 });
 
 test('a blind response (checker, and no user) has only ids, name, unit, count, remark, recount flag - meat and portion rows, both GET routes', async () => {

@@ -656,6 +656,44 @@ CREATE TABLE IF NOT EXISTS side_item_sheets (
   FOREIGN KEY (side_item_id) REFERENCES side_items(id)
 );
 
+-- 18. Role switches and role assignments (step role-assignments, ADR-034 /
+-- ADR-038). server/db/permissions.js is the only writer and answers every
+-- capability question; canUseSite in server/db/siteAccess.js also reads
+-- user_roles (a live assignment at a site opens that site).
+-- role_capabilities: one row per switch a role has on. Capability names are
+-- validated by permissions.js, not a CHECK, so a new switch needs no rebuild.
+CREATE TABLE IF NOT EXISTS role_capabilities (
+  role_id INTEGER NOT NULL,
+  capability TEXT NOT NULL,
+  PRIMARY KEY (role_id, capability),
+  FOREIGN KEY (role_id) REFERENCES roles(id)
+);
+
+-- user_roles: a role a person holds on top of their base role
+-- (users.default_role_id). No FK on site_code (model B): permissions.js
+-- validates it with resolveSiteCode. A duplicate (user, role, site) is refused
+-- by the module - a UNIQUE would let two NULL sites through.
+CREATE TABLE IF NOT EXISTS user_roles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  role_id INTEGER NOT NULL,
+  site_code TEXT,                 -- NULL = at every site the person can use
+  until_date TEXT,                -- business date, inclusive; NULL = no end
+  created_by_user_id INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (role_id) REFERENCES roles(id),
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+);
+
+-- defaults_applied: a named set of default rows (e.g. 'role-switches') is
+-- applied once per database, then recorded here, so an admin's later removal
+-- is never undone by a restart or a reseed.
+CREATE TABLE IF NOT EXISTS defaults_applied (
+  name TEXT PRIMARY KEY,
+  applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Seed a reasonable starting set of adjustment types (admin can add more
 -- via the UI later - this is just a sensible default, not a fixed list).
 INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requires_conversion_target) VALUES

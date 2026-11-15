@@ -16,7 +16,11 @@ const ENV_PATH = path.join(__dirname, '..', '.env');
 if (fs.existsSync(ENV_PATH)) process.loadEnvFile(ENV_PATH);
 
 // Touching the db connection here just to confirm it opens without error.
-require('./db/connection.js');
+const db = require('./db/connection.js');
+
+// Step role-assignments: beta.db is never reseeded, so the supervisor role and
+// the default role switches are applied here, once per database.
+require('./db/permissions.js').ensureRoleDefaults(db);
 
 const dailyAuditRoutes = require('./routes/dailyAudit.js');
 const settingsRoutes = require('./routes/settings.js');

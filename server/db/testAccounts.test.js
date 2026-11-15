@@ -66,7 +66,7 @@ function freshDb(restaurantCodes = ['RA', 'FC']) {
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
   const roleId = {};
-  for (const name of ['super-admin', 'admin', 'management', 'head-chef', 'checker']) {
+  for (const name of ['super-admin', 'admin', 'management', 'head-chef', 'checker', 'supervisor']) {
     roleId[name] = db.prepare('INSERT INTO roles (name) VALUES (?)').run(name).lastInsertRowid;
   }
   for (const code of restaurantCodes) {
@@ -96,8 +96,8 @@ test('creates every account with its role and sites', () => {
     assert.strictEqual(row.active, 1, `${account.name} active`);
     assert.deepStrictEqual(siteCodes(db, row.id), [...account.sites].sort(), `${account.name} sites`);
   }
-  // 7 memberships: RA, FC, RA, FC, COM-A, (RA+FC) across the sited accounts.
-  assert.strictEqual(result.memberships, 7);
+  // 8 memberships: RA, FC, RA, FC, COM-A, (RA+FC), RA (Test Supervisor RA).
+  assert.strictEqual(result.memberships, 8);
 });
 
 test('a second run adds nothing (idempotent)', () => {
