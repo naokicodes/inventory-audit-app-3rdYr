@@ -23,7 +23,7 @@ money details live in the private notes (Claude project files), never here.
 3. A paper-sheet photo is sent once; its structure is copied into the IRL
    section, which then stands in for the photo.
 
-## Map (2026-11-15)
+## Map (2026-11-16)
 
 | # | Area | IRL | FLOW | APP |
 |---|---|---|---|---|
@@ -32,7 +32,7 @@ money details live in the private notes (Claude project files), never here.
 | 3 | [Kitchen veggies](veggies.md) | Confirmed (Silingan, FC) | Drafted | Specced (side-items, side-sheets) |
 | 4 | [Pantry](pantry.md) | Confirmed (Silingan, FC) | Drafted | Specced (side-items, side-sheets) |
 | 5 | [Bar](bar.md) | Confirmed (all three) | Drafted | Decided (ADR-087): sellables against Loyverse, raws side-style, deal drinks, supervisor checks; FC drinks only |
-| 6 | [Roster](roster.md) | Confirmed (Silingan, Nov 16-22 sheet); Written (Likod, FC) | Drafted (redrafting around Fill) | Specced, on hold (shift rows, Fill); roster board Decided (ADR-090) |
+| 6 | [Roster](roster.md) | Confirmed (Silingan, Nov 16-22 sheet); Written (Likod, FC) | Drafted (Fill) | Specced: shift rows and Fill (ADR-096); roster board Decided (ADR-090) |
 | 7 | [Supplier orders and buying](supplier-orders.md) | Written | Drafted | Decided |
 | 8 | [Arrivals and bills](arrivals-and-bills.md) | Written | Drafted | Decided |
 | 9 | [Staff meals and in-house](staff-meals.md) | Confirmed | Drafted | Specced (3zw-3zz) |

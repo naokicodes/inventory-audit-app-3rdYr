@@ -1,6 +1,6 @@
 # ADR-013 The roster
 
-- Status: Accepted 2026-10-28
+- Status: Accepted 2026-10-28; superseded in part by ADR-096 (a week starts with day offs only; two placements a day)
 - Decided by: Naoki
 - Supersedes: the unrecorded 10-24 "CEO approves the roster", 10-22 "FC uses the template only" and 10-25 "lent staff on both rosters"
 

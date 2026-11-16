@@ -1,154 +1,84 @@
-# Scope — what this app IS and IS NOT
+# Scope - what this app is and is not
 
-Read this before implementing anything. If a feature isn't listed under
-"In scope," don't build it without checking first — even if it seems like
-an obvious/helpful addition. Small scale, deliberately.
+Rewritten 2026-11-16 (A5). The decisions themselves live in `docs/decisions/` (one ADR each); this
+file is the short version to read before building anything. If a feature is not under "In scope",
+check before building it - even when it looks like an obvious, helpful addition. Small, working and
+boring beats large and half-finished.
 
-## Governing principle (NaokiiVT, 2026-09-23)
+## Governing principle (Naoki, 2026-09-23)
 
-The app replaces the paper sheets and does the same job, but it **assists the
-workflow — it is not the workflow.** Tags and labels that help people read a
-number are welcome; enforcing process is not. The one deliberate exception is
-the month-start recount block (Step 26a-ii), which the restaurant asked for.
+The app replaces the paper sheets and does the same job, but it **assists the workflow - it is not
+the workflow.** Tags and labels that help people read a number are welcome; enforcing process is
+not. The deliberate exception is the month-start recount block (step 26a-ii), which the restaurant
+asked for. Warnings, never blocks: a rule the restaurant keeps by habit (who opens after closing,
+what a PO should hold) shows as a warning the person can save past.
 
-If a step would make the app dictate how staff work — a new block, a required
-field, a forced order of steps — that is a restaurant question, not a code
-question: open a `needs-architect` issue rather than deciding it.
+If a step would make the app dictate how staff work - a new block, a required field, a forced order
+of steps - that is a restaurant question, not a code question: open a `needs-architect` issue
+instead of deciding it.
 
-## What this app IS
-- A **meat-cost audit tool** for the restaurant group's checkers, on one
-  shared PC, covering the restaurants and the commissary (multi-user is in
-  progress — see below).
-- Tracks, per restaurant per day: stock received (from a unified log — see
-  below), actual physical ending count, sales (auto-synced), prep
-  quantities (for batch-cooked dishes), and optional adjustments (waste,
-  transfers, staff meals, etc.).
-- **Tracks a single commissary's meat-processing yield** (raw weight in vs.
-  backed/processed weight out, checked against an allowed loss % per meat)
-  and feeds shipments from the commissary into the same unified stock
-  receipts log restaurants use for direct deliveries — added 2026-08-27,
-  see `data-model.md` section 10 and `commissary-and-stock-receipts.md`.
-- Calculates automatically: beginning stock (carried from yesterday),
-  theoretical usage (from sales/prep × recipe), expected ending, and
-  variance (shortage/surplus) vs. the physical count.
-- **Logs every change to stock receipts and commissary yield entries**
-  (create/edit/soft-delete, with before/after values) to a single
-  admin-visible activity log — added 2026-08-27, see
-  `commissary-and-stock-receipts.md`.
-- Runs **locally**, on one shared PC, backed by a single SQLite file.
-- Code lives in a **public** GitHub repo — no secrets and no business data are
-  ever committed. Business data (counts, photos) never leaves the local machine
-  unless deliberately exported.
+## Who it is for
 
-## What this app is NOT
-- **No longer meat only (ADR-069, 2026-11-14).** The app covers every inventory sheet a site keeps
-  in it - meat, veggies, pantry and bar (pizza later; FC keeps some sheets on paper, ADR-065) - and
-  the supply around them: supplier orders, arrivals and bills. Still out: money in (sales, revenue,
-  payments; ADR-057), recipe costing and menu engineering. The full rewrite of this file is A5.
-- **Multi-user with role-based access (in progress).** Moving from the original
-  single-user local tool to a multi-user system: multiple concurrent checkers on
-  one shared database on one PC serving co-located sites, with configurable roles
-  and permissions. Authorization (roles/perms) is being built now; authentication
-  (passwords) is deferred to a stub — pick-your-name-from-a-list, no password —
-  until the recycled auth system is available. Identity moves from the activity
-  log's free-text "actor" to a thin `users` table that `created_by` references.
-  Design and reasoning: `docs/session-status.md`, "Things NOT to re-litigate" >
-  "2026-09-15 multi-user scoping".
-- **Not cloud-hosted (for now).** No server to maintain, no monthly hosting
-  bill, no uptime to worry about.
-- **Not a POS.** Sales numbers come FROM the existing Loyverse setup via the
-  already-built sync logic — this app never records a sale directly.
-- **Not doing recipe costing, food-cost percentage, menu engineering,** or
-  any other restaurant-management features beyond meat variance auditing.
-- **Not a general audit/compliance system.** The activity log covers stock
-  receipts and commissary yield entries only for now — extending it to
-  every other input table is real, valid future work, not built yet (see
-  `commissary-and-stock-receipts.md`, Part 3, scope boundary note).
-- **Not reconciling Commissary's raw meat against FC's portioned stock
-  items — yet.** Confirmed 2026-08-29: FC's `Bagnet`, `Sisig`,
-  `Sinigang`, and `DNG` meat rows aren't raw cuts — they're all
-  Commissary's Jowl, pre-portioned before shipping to FC (one raw input,
-  four named outputs). `commissaryYieldEngine.js` only models one input
-  → one output, so this isn't a small extension of it. FC's own daily
-  audit doesn't need this to work: its `Recipe_BOM` already links these
-  four items to dishes exactly like Restaurant A links Jowl-the-raw-cut
-  to its own dishes (a stock item consumed in varying quantities by
-  several dishes), so Restaurant B onboarding (step 19) should treat
-  them as FC's own local stock items, full stop — no attempt to remap
-  them to Commissary `MeatID`s during onboarding. A real
-  Commissary-Jowl-reconciles-against-FC's-four-portions check is valid
-  future work, its own step, not bundled into onboarding.
+- One restaurant group: Silingan; Likod, the backyard restaurant at the same place (its own site
+  from A12); FC; and the commissary at Silingan that supplies them. A later branch is set up like
+  Silingan, with its own commissary (ADR-085).
+- Staff on their phones: counters and cooks, the landing (the head-chef role at a site, ADR-035),
+  the commissary person, buyers, the podium, the bar. Supervisors and the main supervisor on a phone
+  or a computer. Admins. Management (the owners) read only (ADR-084).
+- Looked after by an admin who does not code (ADR-097): what a restaurant changes is data in
+  Settings, the Roles and Staff pages or the people workbook; install, update and backups run from
+  the restaurant PC's launcher.
 
-  **2026-08-29 follow-up, confirmed by the project owner**:
-  - `Ground Beef → Burger Patty` was **wrong on two counts** — Ground
-    Beef is for Ragu/Bolognese, not Burger Patty, and FC sources its own
-    Ground Beef independently (not a Commissary-yield output at all;
-    Commissary separately stocks its own Ground Beef too, which it
-    distributes onward to other outlets — "Likod" and "Silingan" — not
-    modeled in this app yet). Removed as a candidate fan-out entirely.
-  - `Whole Chicken → Quarter Chicken + Chicken Fillet` is **confirmed
-    real**, same shape as Jowl: one Whole Chicken processes into 2
-    Chicken Skewers portions (breast) + 2 Quarter Chicken portions (leg
-    quarters) — a genuine one-input/multi-output fan-out, not a single
-    conversion. Chicken Fillet apparently uses "the same formula...atm"
-    per the project owner's own wording — worth reading as possibly
-    provisional/changeable, not a fixed constant, which matters for
-    whatever eventually models this (see below).
-  - `Burger Patty` is a blend of multiple meats, not a single-input
-    yield at all — explicitly out of scope for now per the project
-    owner ("let's not dive into that").
-  - **Direction requested for how to eventually model all of this**:
-    not hardcoded per-case logic, but a settings-configurable
-    conversion/yield system the project owner can adjust without a
-    developer — see `session-status.md`'s step 20 (draft schema
-    proposal, updated 2026-08-29 after checking a second real
-    spreadsheet and confirming a concrete schema gap in
-    `commissary_meat_map`) for the concrete shape under discussion.
+## In scope
 
-## The worker-facing surface should stay small
-The auditor's actual daily task is transcribing numbers from staff photos
-into a small number of short forms — no dropdowns into recipes, no
-restaurant configuration, no math visible anywhere. Recipe/dish/meat
-management and the commissary yield log are separate admin/occasional-use
-areas, not part of the daily entry screens.
+- **Every inventory sheet a site keeps in the app (ADR-069):** the meat landing (counted blind,
+  ADR-015), the commissary (yield, shipments, meat requests and staging, ADR-092), kitchen veggies,
+  pantry and the bar (sellables checked against Loyverse, ADR-087). FC keeps some sheets on paper
+  (ADR-065); pizza joins with A11.
+- **The numbers around a count:** beginning carried from yesterday, new stock, sales read from
+  Loyverse, prep, adjustments (waste, transfers, conversions, staff meals), expected and variance.
+  Stock is in quantities; the app prices stock and losses itself (D3), behind see_costs (ADR-060).
+- **Supply (A9):** POs from the counts; supplier orders sent as a picture; buyer runs with ticks and
+  receipt photos (ADR-068); arrivals and bills.
+- **People:** the roster with Fill (ADR-013, ADR-096); who counts tonight (ADR-011, ADR-035); staff
+  meals and in-house (ADR-027, ADR-044); charges and a weekly export for the payroll (ADR-088).
+- **Reading the day:** Kitchen Sales (ADR-066, ADR-094); views as cards for supervisors and
+  management (ADR-089); the roster board (ADR-090).
+- **Roles as switches per site** (ADR-034, ADR-082): who may do what is data, Discord-style, never
+  a hard-coded role check. Changes to stock and settings are kept in an activity log.
+- **Where it runs:** the restaurant PC on the restaurant network, phones over Wi-Fi, Tailscale for
+  remote checks (ADR-070); a hosted server later, behind real logins before Live.
+- **Code in a public repo:** no prices, costs, budgets, credentials or staff details are ever
+  committed. Staff are named by role in the repo; names and the owners' figures live in private
+  notes.
 
-## Explicitly deferred (valid future ideas, not now)
-- Portion-level (finished dish) physical counts — confirmed IN scope now,
-  see `data-model.md`, but keep the UI for it minimal.
-- Multi-computer / multi-location networked access.
-- AI-generated daily/weekly summary reports (planned, but after the core
-  audit engine is solid and tested with real data).
-- Receipt/photo OCR (auto-reading numbers off the photo instead of manual
-  typing) — interesting later, not now.
-- Any inventory category beyond meat.
-- Extending soft-delete + activity logging to `ending_actual`,
-  `adjustments`, `sales`, `prepped`, `commissary_stock_receipts`, and
-  `portion_ending_actual` — deliberately scoped out of the 2026-08-27
-  change to keep it reviewable; a real next step, not forgotten.
-  `sales` added to this list 2026-08-29 when step 16 introduced its
-  first real manual-edit path (`PATCH /api/sales`) — same open
-  question as the others, worth revisiting once there's a second
-  editable table with this need, not decided under step 16's own time
-  budget. `commissary_stock_receipts` added 2026-08-29 when step 20a
-  flagged it rather than assuming either way — **same call as
-  `sales`**, not logged for now. **Narrow exception added 2026-08-29
-  for step 15**:
-  the "Sync batch stock" command's own writes to `prepped` (and only
-  those — it's the sole write path into that table right now, there's no
-  manual edit UI for it yet) log a `CREATE`/`SYSTEM` row to
-  `activity_log`, since a system-inferred number is exactly the case
-  that most needs a trail of where it came from. This does not reopen
-  soft-delete or general audit logging for `prepped` — that's still
-  deferred until a real edit UI exists for it.
-- ~~A second/third commissary, or commissary-to-commissary transfers~~ —
-  **un-shelved 2026-08-30**, no longer assumed one-commissary-forever.
-  Design resolved (option B: separate `commissaries`, each with its own
-  independent meat catalog, restaurants can receive from more than one)
-  — see `session-status.md`'s "Round 2 findings" / item 3 for the full
-  design. Not built yet — schema doesn't exist, this line stays until
-  it does.
+## Not in scope
+
+- **Money in:** sales, revenue, payments and the POS stay in Loyverse (later SPOS, a separate app;
+  D3, ADR-057). Kitchen Sales only reads.
+- **Payroll itself:** it stays in the main supervisor's Excel; the app gives her days and charges
+  (ADR-088).
+- **Approvals, clock-in, hours:** none (ADR-013). Shift rows carry times only as text (ADR-096).
+- **Recipe costing, food-cost percentages, menu engineering.**
+- **Native phone apps:** the web app runs on phones; an Android app comes only after the SPOS work.
+- **Process enforcement** beyond the month-start recount (see the governing principle).
+
+## Parked (valid, not now)
+
+- Pizza station (A11), Likod as a site (A12), operating expenses (A13), a dashboard builder (A15).
+- Per-person permission overrides; the real Loyverse port (nightly sync); the Loyverse name map in
+  Settings (name-map-settings, ADR-097); receipt OCR; AI summaries.
+- The commissary's jowl reconciled against FC's portion lines; burger-patty blends.
+- An activity log on every table (today: stock receipts, yield, settings, roles, roster and the
+  other tables their steps name).
+
+## The worker-facing surface stays small
+
+Staff type counts and tick lines on short phone screens: no recipes, configuration or arithmetic on
+the daily screens. Settings, recipes, roles, stations and the roster's Fill are admin and supervisor
+screens.
 
 ## When in doubt
-If a Claude Code suggestion or an implementation detail would expand scope
-beyond this document, stop and ask before building it. Small, working, and
-boring beats large and half-finished.
+
+If a Claude Code suggestion or an implementation detail would grow the scope beyond this file, stop
+and ask before building it.

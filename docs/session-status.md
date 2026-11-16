@@ -132,9 +132,32 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-095; the index, and a map from handoff item numbers to records, is in
+to ADR-097; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-16 architect (roster Fill, A5 scope, runs without a coder) - decided (recorded: ADR-096, ADR-097)
+
+- **Roster (ADR-096).** Shift rows per station (a name with the times as text, a kind - opener,
+  mid, closer or none - and a minimum); two placements a day; a break as text; a week starts with
+  last week's day offs only; leave as from-to dates; **Fill** places the week (closers never open
+  the next day, minimums first, covers from sub-stations, shorts in red, Undo Fill); the week view
+  looks like the paper on a computer and prints. People without a login are staff with no login,
+  added from the Roster page. The 11-15 holds on roster-stations to roster-day-status are lifted:
+  each spec has a 2026-11-16 decision block. New step **roster-fill** after roster-day-status. For
+  the builders the roster goes first: business-day (runnable, no shared file), then roster-stations,
+  roster-staff, roster-week, roster-day-status, roster-fill; cost-guard, side-sheets and supply-tags
+  after it. landing-sales and restaurant-pc-ii stay Naoki's, for beta-3.
+- **Runs without a coder (ADR-097).** What a restaurant changes is data an admin edits; install,
+  update and backups from the launcher; plain messages. Planned: name-map-settings (the Loyverse name
+  map into Settings).
+- **A5 done:** docs/scope.md rewritten (what the app is and is not, today).
+- **Also recorded:** the in-house order slip (staff-meals.md); the purchaser's receipts and the
+  evening change check (supplier-orders.md, arrivals-and-bills.md, with open questions for A9).
+  Recs accepted for the 11-16 question list: Present, Day offs, Leave and Head count are counted;
+  operating expenses, per-person overrides, the #40 labels, the real Loyverse port, pizza and Likod
+  stay parked; Marble gets Tailscale after the beta-3 install; the restaurant PC installs fresh at
+  beta-3 (auto-start at boot added to restaurant-pc-ii; its update check moves to beta-4).
 
 ### 2026-11-15 architect (A0 #84, FC landing map, beta-3, roster IRL) - decided (recorded: ADR-094, ADR-095)
 
@@ -3371,7 +3394,7 @@ to "head chef") are refused on create and on rename.
 - PR #83 changes to match; then the phone check (ADR-039).
 
 ## Step roster-stations - stations as roster rows, and which sheets each opens (A6)
-**ON HOLD 2026-11-15:** the roster gains shift rows, two placements a day, breaks and Fill (Silingan's supervisor's flow, docs/areas/roster.md). This spec changes before it runs: do not start it.
+**Hold lifted 2026-11-16 (ADR-096):** see the decision block at the end of this step.
 
 Decided ADR-012 and ADR-037. DEPENDS ON sheets-tier1 (3u: sheet_definitions), import-identity (3j:
 import-settings.js) and role-assignments (3zj: can()).
@@ -3434,8 +3457,28 @@ Touches: server/db/schema.sql, server/engines/stations.js (new), server/engines/
 scripts/import-settings.js, public/staff.html (new), public/index.html. PUBLIC -> click-through
 before merge.
 
+**Decisions 2026-11-16 (ADR-096).** These override any reading of the text above.
+- Schema: stations gains min_people INTEGER NOT NULL DEFAULT 1 (used when the station has no shift
+  rows). New table station_shifts: id, station_id (FK stations), name TEXT NOT NULL (the row's name
+  as on paper, times included, e.g. "Opener 9AM-8PM"), kind TEXT NOT NULL DEFAULT 'NONE' (OPENER,
+  MID, CLOSER or NONE, module-validated), min_people INTEGER NOT NULL DEFAULT 1, sort_order INTEGER
+  NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at. A name is unique per station,
+  ignoring capitals (module). min_people is a whole number, 0 or more.
+- stations.js: createShift, updateShift (name, kind, min_people, sort_order, active),
+  listShifts(stationId); listStations returns each station with its active rows in order.
+- Import: a Shifts tab - site_code, station, name, kind (opener / mid / closer / blank = none),
+  min_people, sort_order. Upsert by (site_code, station, name), ignoring capitals; an unknown station
+  is warned and the row skipped; a second run is a no-op. The Stations tab gains min_people.
+- Routes: POST /api/stations/:id/shifts, PUT /api/stations/:id/shifts/:shiftId (manage_staff).
+- Page: each station lists its rows (name, kind, minimum) with add, rename, kind, minimum, move up /
+  down, deactivate; a station with no rows shows its minimum.
+- Tests add: rows per station in order; kind validated; a duplicate row name on the same station
+  refused (another station may reuse it); min_people below 0 refused; the Shifts tab upserts, warns
+  and is idempotent.
+- Times are text only: nothing reads a time out of a name (ADR-013, ADR-096).
+
 ## Step roster-staff - the staff list: main station, sub-stations, standing access, login link (A6)
-**ON HOLD 2026-11-15:** see roster-stations.
+**Hold lifted 2026-11-16 (ADR-096):** see the decision block at the end of this step.
 
 Decided ADR-013 (a staff table separate from users) and ADR-037. DEPENDS ON roster-stations.
 
@@ -3483,8 +3526,21 @@ Touches: server/db/schema.sql, server/engines/staff.js (new), server/engines/sta
 server/routes/staff.js, server/routes/staff.test.js, scripts/import-settings.js, public/staff.html.
 PUBLIC -> click-through before merge.
 
+**Decisions 2026-11-16 (ADR-096).** These override any reading of the text above.
+- staff gains usual_break TEXT (free text, e.g. "1-2PM"; optional) and also_shift_id INTEGER (FK
+  station_shifts, nullable): a regular second job, such as the commissary person also closing in
+  the kitchen. Its row must be active and at a station other than the main station.
+- Import: the Staff tab gains usual_break and also_works (site:station:row name). An unknown row is
+  warned and that field skipped.
+- The Roster page's "Add person" (roster-week) uses the same create: name and main station, no
+  login, manage_staff at that site. People like waiters are staff with no login until they need
+  one.
+- Page: usual break and "Also works" on the person's edit form.
+- Tests add: usual_break stored and returned; also_shift_id at the main station refused; the import
+  reads both and warns on an unknown row.
+
 ## Step roster-week - the weekly roster: placements, rest days, copy last week (A6)
-**ON HOLD 2026-11-15:** see roster-stations.
+**Hold lifted 2026-11-16 (ADR-096):** see the decision block at the end of this step.
 
 Decided ADR-013 and ADR-037. DEPENDS ON roster-staff and business-day.
 
@@ -3549,8 +3605,34 @@ Touches: server/db/schema.sql, server/engines/roster.js (new), server/engines/ro
 server/routes/roster.js (new), server/routes/roster.test.js (new), server/index.js,
 public/roster.html (new), public/index.html. PUBLIC -> click-through before merge.
 
+**Decisions 2026-11-16 (ADR-096).** These override any reading of the text above.
+- roster_entries: slot INTEGER NOT NULL DEFAULT 1 (1 or 2) and UNIQUE (business_date, staff_id,
+  slot) instead of UNIQUE (business_date, staff_id). Slot 2 only when slot 1 is ON_DUTY, and itself
+  ON_DUTY at another row or station; deleting slot 1 deletes slot 2. New columns: station_shift_id
+  (FK station_shifts, nullable; it must belong to station_id, and is required when that station has
+  active rows), break_text TEXT, note TEXT (a part day, "9-12NN"), filled INTEGER NOT NULL DEFAULT 0
+  (1 = made by Fill and not changed since; any hand change sets 0).
+- copyWeek becomes **Start the week** (POST /api/roster/start-week): it copies only last week's
+  REST_DAY days (same weekday) for the site's active people. Refused when the week already has
+  entries. Fill (roster-fill) does the placing.
+- The person sheet: station, then its row (when it has rows), the break prefilled from usual_break,
+  a note; "Add a second job" for slot 2. Saving an OPENER row for someone who had a CLOSER row the
+  day before (Monday: last Sunday) shows "Closed yesterday" and saves anyway.
+- **Day offs:** under each day, "Day off: ..." with "+" to pick people of the site (REST_DAY).
+- **"Add person"** (manage_staff): name and main station, no login (roster-staff's create).
+- **Week view** at 1024px and wider: the paper's grid - stations and their rows in order down the
+  side (row names as on paper), Monday to Sunday across, each cell the people with their breaks;
+  a cover marked "covering <name>"; then the Day off, Leave and Floater blocks (FLOATER entries,
+  entries with a note, people working at another site) and the totals. Under 1024px: the day tabs
+  as specced. A print style (A4 landscape) prints the grid.
+- getWeek returns the rows per station and both slots, and a closed_yesterday flag per entry.
+- Tests add: a second placement allowed only ON_DUTY on ON_DUTY at another row, a third refused;
+  station_shift_id must belong to the station and is required where rows exist; Start the week
+  copies only rest days; a hand edit clears filled; closed_yesterday across a week boundary.
+- Touches unchanged.
+
 ## Step roster-day-status - leave, sick, absent, floater, covering; the day's totals and head count (A6)
-**ON HOLD 2026-11-15:** see roster-stations.
+**Hold lifted 2026-11-16 (ADR-096):** see the decision block at the end of this step.
 
 Decided ADR-013, ADR-027 and ADR-037. DEPENDS ON roster-week.
 
@@ -3583,6 +3665,93 @@ server/routes/roster.test.js, public/roster.html. PUBLIC -> click-through before
 **Added 2026-11-12 (A10).** The staff-meal page (staff-meal-log, 3zx) types its head count until
 headCount() exists. Whichever of this step and 3zx lands second prefills the meal's head count from
 present (editable, ADR-027); "Roster not set for this day" leaves it empty.
+
+**Decisions 2026-11-16 (ADR-096).** These override any reading of the text above.
+- Leave: from the person sheet or a "Leave" button - person, from and to dates (default the day),
+  type Leave or Sick leave, note (required for Leave, as before). One entry per day in one
+  transaction; a day that had placements is replaced (both slots), with activity_log rows.
+- Totals: Present counts a person once a day, even with two placements; the grid's last rows are
+  the paper's: Present, Day offs (REST_DAY), Leave (LEAVE + SICK_LEAVE) and Head count (Present +
+  Day offs + Leave: everyone on the roster that day, as the paper's formula adds them). headCount()
+  counts people, not entries; the staff-meal prefill stays Present (ADR-027).
+- Tests add: a three-day leave writes three entries and replaces their placements; a person with
+  two placements counts once.
+
+## Step roster-fill - Fill places the week (A6)
+
+Decided 2026-11-16 (ADR-096). DEPENDS ON roster-day-status (leave must exist before Fill reads it).
+Shares roster.js and roster.html with roster-day-status and tonight-picks: after the first, before
+the second.
+
+What the supervisor sees: on the Roster page, after setting day offs and leave, "Fill the week"
+(roster_all at the site). It places everyone the week still needs and says "Placed 168, 3 short".
+Short rows show red in the grid with how many are missing ("-1"). "Undo Fill" removes what Fill
+made that nobody has changed since. Pressing Fill again after changes only fills what is still
+empty.
+
+Engine, in server/engines/roster.js: fillWeek(siteCode, monday, actor) -> { placed, shorts } and
+undoFill(siteCode, monday, actor) -> { removed }.
+- People: active staff whose home site is siteCode. Stations: the site's active stations in order,
+  each with its active rows (a station without rows is one row: the station, its min_people, kind
+  NONE).
+- Fill only writes a person-day that has no entry. Any existing entry - a day off, leave, a
+  placement the supervisor set - is never changed, and Fill never adds a slot 2 over an existing
+  slot 2.
+- "Closed yesterday" = any placement (either slot) on a CLOSER row the day before; for Monday, the
+  previous Sunday.
+- For each day, Monday to Sunday:
+  1. Free people: active, no entry that day.
+  2. Home: each free person goes to their main station. At a station with rows, the row is chosen
+     by: never an OPENER row when they closed yesterday; first, yesterday's kind at this station
+     (if such a row exists and is allowed); otherwise the allowed row furthest below its minimum,
+     then the row with the fewest people, then row order. People are taken in this order: those
+     keeping yesterday's kind first, then by name.
+  3. Also works: a person with also_shift_id gets slot 2 on that row, when slot 1 is ON_DUTY and
+     the rest rule allows it.
+  4. Balance: a row below its minimum takes a Fill-placed person from another row of the same
+     station that is above its minimum, if the rest rule allows (yesterday's closer never moves to
+     an opener row).
+  5. Covers: a row still below its minimum, in station order, takes a Fill-placed person from a row
+     above its minimum at another station who lists this station as a sub-station and passes the
+     rest rule. Their entry moves there, ON_DUTY with covering_staff_id = the covered station's
+     main person who is off that day (the first by name), or null.
+  6. Shorts: every row still below its minimum -> { date, station, row, missing }.
+- The same input always gives the same result (no randomness).
+- One transaction. Each written entry has filled = 1 and an activity_log row (action FILL).
+  undoFill deletes the week's filled = 1 entries of the site's people, with activity_log rows.
+- Permission: roster_all at the site.
+
+Routes (server/routes/roster.js): POST /api/roster/fill (site, monday) -> { placed, shorts }; POST
+/api/roster/undo-fill (site, monday) -> { removed }; GET /api/roster/week gains shorts (rows below
+their minimum per day, computed on read).
+
+Page public/roster.html: "Fill the week" and "Undo Fill" beside the week bar (roster_all only); red
+cells for shorts; a short message with the counts. The flow on the page: Start the week (day offs
+from last week) -> Day offs -> Leave -> Fill -> edit by hand.
+
+Edge states: Failure - one transaction, nothing half-written; the message says nothing changed.
+Empty - no stations or staff at the site: "Add stations and staff first" with a link to Staff.
+Partial - shorts in red. Stale - the week reloads after Fill and after Undo Fill. Blocked - without
+roster_all the buttons are hidden; 403. Inactive - inactive people, stations and rows are skipped.
+Two devices - each Fill runs in one transaction; a second Fill treats the first one's entries as
+taken.
+
+Tests (made-up names): yesterday's closer is never placed on an opener row, and on Monday the check
+reads last Sunday; after a day off a closer may open; yesterday's kind is kept when allowed;
+minimums are filled before extras; extras go to the thinnest row; a one-person station whose person
+is off is covered by a sub-station person from a row above its minimum, with covering set; nobody is
+moved below their own row's minimum; an existing entry is never changed; also_shift_id gives slot 2;
+a short is reported; the same input twice gives the same entries; Undo Fill removes only untouched
+filled entries; 403 without roster_all.
+
+Click-through (1024px and 390px): import sample Stations, Shifts and Staff CSVs (made-up names);
+Start the week, set day offs and a leave, Fill; see the shorts in red; change one placement, Undo
+Fill keeps it; the print preview shows the grid.
+
+Touches: server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js,
+server/routes/roster.test.js, public/roster.html. PUBLIC -> click-through before merge.
+
+Not in scope: break planning; hours; rules for one site only; Likod (A12).
 
 ## Step tonight-picks - tonight's kitchen counter and other picks, with reassignment (A6)
 
@@ -4716,6 +4885,14 @@ runs the new copy (its first lines match `scripts\restaurant-pc.bat`); with the 
 the setup prints the new `[!]` line.
 
 Touches: scripts/restaurant-pc.bat.
+
+**Decisions 2026-11-16 (Naoki, recs).** These override any reading of the text above.
+- Auto-start: the setup also puts a shortcut in the Windows Startup folder (shell:startup) that
+  runs the launcher's start, so the app comes up when the PC signs in. Running the setup again
+  replaces it, never adds a second one.
+- The restaurant PC installs fresh at beta-3 (nothing was ever installed there), so the "after
+  update" check moves to the beta-4 update; the refused-prompt check and the auto-start are
+  checked at the beta-3 install (restart the PC once: the app window opens by itself).
 
 ## Step supply-tags - how each restaurant meat is bought (A9)
 

@@ -55,7 +55,7 @@ flight. (ADR-001 explains the split.)
 | ADR-010 | Roles and site scope | Accepted 2026-10-28 |
 | ADR-011 | Write permission is enforced; process is not | Accepted 2026-10-22 |
 | ADR-012 | Stations and sheets | Accepted 2026-10-22 |
-| ADR-013 | The roster | Accepted 2026-10-28 |
+| ADR-013 | The roster | Accepted 2026-10-28; superseded in part by ADR-096 (week start, two placements a day) |
 | ADR-014 | Kitchen dispatch and tonight's kitchen counter | Accepted 2026-10-28; landing line superseded by ADR-035 |
 | ADR-015 | Blind counting and the quiet recount | Accepted 2026-10-28; derivation and Likod lines superseded by ADR-038 |
 | ADR-016 | One unit per meat on the landing | Accepted 2026-10-28 |
@@ -138,6 +138,8 @@ flight. (ADR-001 explains the split.)
 | ADR-093 | No browser pop-ups | Accepted 2026-11-15 |
 | ADR-094 | FC's sales follow its landing sheet | Accepted 2026-11-15 |
 | ADR-095 | Roles page: switch wording, removing extra roles, the copy default | Accepted 2026-11-15 |
+| ADR-096 | Roster: shift rows, day offs first, and Fill | Accepted 2026-11-16 |
+| ADR-097 | The app runs without a coder | Accepted 2026-11-16 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

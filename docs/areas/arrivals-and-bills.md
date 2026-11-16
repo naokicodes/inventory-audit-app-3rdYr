@@ -13,6 +13,10 @@ Status: IRL Written - FLOW Drafted - APP Decided
 - Silingan and Likod share a location, so a delivery sometimes lands at the
   wrong restaurant.
 - Sources: chat 2026-10-22/24.
+- 2026-11-16 (Naoki): receipts reach the main supervisor in the evening for the change check, then
+  their restaurant; the podium rechecks a receipt's quantities against what arrived, in pesos
+  (supplier-orders.md). This differs from the note above (receipts to each cashier on arrival):
+  asked.
 
 ## FLOW - how they will use the app (drafted)
 1. The receiver checks the arrival against the PO: quantities only, receipt
@@ -33,3 +37,11 @@ Status: IRL Written - FLOW Drafted - APP Decided
 - Decided 2026-11-14 (ADR-068): the buyer photographs buyer-run receipts, the receiver supplier
   receipts; photos are files next to the database on the restaurant PC. FC's direct meats arrive
   on FC's landing (ADR-067). The podium logs name and quantity (podium.md). Planned (A9).
+
+## Open questions
+- (A9) Do only the purchaser's shop-run receipts go to the main supervisor, while supplier delivery
+  receipts still go to the cashier on arrival, or does everything go through her now?
+- (A9) The arrival check compares against the receipt, not the PO (rec: yes; the PO stays the
+  order list)?
+- (A9) Help the evening change check: the purchaser types each receipt's total and the app shows
+  cash given minus receipts = change (rec: yes, inside the buyer run; not now)?

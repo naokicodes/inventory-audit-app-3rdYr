@@ -28,6 +28,15 @@ Status: IRL Written - FLOW Drafted - APP Decided
   out of stock; the purchasers put those items on their list. Misc buys go on the cashier's "other
   expenses". The money is the COO's, lent until the takings come in and returned after service; the
   head chef decides what goes on the PO.
+- 2026-11-16 (Naoki): the purchaser of the day collects the items and their receipts. All he needs
+  is the quantities and each receipt's total, so his change comes out right. In the evening, right
+  after service, the main supervisor checks all the receipts' totals against the change. The
+  receipts then go to their restaurant (Silingan, Likod, FC), where the podium usually rechecks a
+  receipt's quantities against what arrived: a short or over counts in pesos. A difference between
+  the PO and what arrived matters little. One day's receipts (11-16) came from about ten places:
+  the main supplier, the meat supplier, dry goods, greens, the water station, a supermarket (whole
+  chickens), a wholesaler, a mall grocery and a hardware shop. Supplier names and prices: private
+  notes.
 
 ## FLOW - how they will use the app (drafted)
 1. Counters add PO lines for their items while counting.

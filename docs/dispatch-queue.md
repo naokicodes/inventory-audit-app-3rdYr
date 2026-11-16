@@ -90,6 +90,12 @@ is. Read the step's own section in `session-status.md` before starting.
 > and the smoke list passes; the restaurant PC installs fresh then (nothing is installed there
 > yet). Marble: 3zw staff-meal-settings as planned. **On hold:** 3zl to 3zo (shift rows, two
 > placements a day, breaks, Fill: the next drop-in).
+> **2026-11-16 (roster, ADR-096, ADR-097; A5):** the roster holds are lifted. Builders, roster first:
+> 3zi business-day (runnable, no shared file) any time; then 3zl roster-stations -> 3zm roster-staff
+> -> 3zn roster-week (also needs 3zi) -> 3zo roster-day-status -> roster-fill -> 3zp tonight-picks.
+> One schema step at a time (3zl, 3zm and 3zn each change schema.sql). cost-guard, side-sheets
+> and supply-tags wait until roster-fill. Naoki: landing-sales, restaurant-pc-ii (now with
+> auto-start at boot), preview-pid; beta-3 after them.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -334,29 +340,35 @@ The first cut of the Discord-style screen. PUBLIC -> click-through. Full spec: s
 **2026-11-15 (#84, ADR-095):** the four switch lines stay; Remove works on an inactive role's assignment; Add role copies checker by default. PR #83 changes to match. See the spec.
 
 ### 3zl. Step roster-stations - stations as roster rows and the sheets they open  [blocked: sheets-tier1, import-identity, role-assignments]
-**ON HOLD 2026-11-15:** shift rows, two placements a day, breaks and Fill change 3zl to 3zo before they run (the next drop-in). Do not start.
+**2026-11-16 (ADR-096):** hold lifted. Shift rows (name, kind, minimum) per station, a Shifts import tab. See the spec's decision block.
 Touches: server/db/schema.sql, server/engines/stations.js, server/engines/stations.test.js, server/routes/staff.js, server/routes/staff.test.js, server/index.js, scripts/import-settings.js, public/staff.html, public/index.html
 Stations per site (data, never seeded), a kitchen flag, links to sheets (also at another site), a
 Stations import tab and the Staff page's Stations section. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step roster-stations".
 
 ### 3zm. Step roster-staff - main station, sub-stations, standing access, login link  [blocked: roster-stations]
-**ON HOLD 2026-11-15:** see 3zl.
+**2026-11-16 (ADR-096):** hold lifted. Usual break and "also works". See the spec's decision block.
 Touches: server/db/schema.sql, server/engines/staff.js, server/engines/staff.test.js, server/routes/staff.js, server/routes/staff.test.js, scripts/import-settings.js, public/staff.html
 PUBLIC -> click-through. Full spec: session-status.md -> "Step roster-staff".
 
 ### 3zn. Step roster-week - placements, rest days, copy last week  [blocked: roster-staff, business-day]
-**ON HOLD 2026-11-15:** see 3zl.
+**2026-11-16 (ADR-096):** hold lifted. Two placements a day, shift rows, breaks, Start the week (day offs only), "Add person", the paper-like week view. See the spec's decision block.
 Touches: server/db/schema.sql, server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js, server/routes/roster.test.js, server/index.js, public/roster.html, public/index.html
 PUBLIC -> click-through. Full spec: session-status.md -> "Step roster-week".
 
 ### 3zo. Step roster-day-status - leave, sick, absent, floater, covering; totals and head count  [blocked: roster-week]
-**ON HOLD 2026-11-15:** see 3zl.
+**2026-11-16 (ADR-096):** hold lifted. Leave as from-to dates; a person counts once. See the spec's decision block.
 Touches: server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js, server/routes/roster.test.js, public/roster.html
 Provides the staff-meal head-count prefill (A10 uses it). PUBLIC -> click-through. Full spec:
 session-status.md -> "Step roster-day-status".
 
-### 3zp. Step tonight-picks - tonight's kitchen counter and other picks  [blocked: roster-day-status]
+### Step roster-fill - Fill places the week  [blocked: roster-day-status]
+Touches: server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js, server/routes/roster.test.js, public/roster.html
+ADR-096: places everyone not off by main station and shift (closers never open the next day),
+minimums first, covers from sub-stations, shorts in red, Undo Fill. Before tonight-picks (same
+files). PUBLIC -> click-through. Full spec: session-status.md -> "Step roster-fill".
+
+### 3zp. Step tonight-picks - tonight's kitchen counter and other picks  [blocked: roster-fill]
 Touches: server/db/schema.sql, server/engines/tonightPicks.js, server/engines/tonightPicks.test.js, server/routes/roster.js, server/routes/roster.test.js, public/roster.html
 PUBLIC -> click-through. Full spec: session-status.md -> "Step tonight-picks".
 
@@ -678,6 +690,8 @@ lands, so it is written against the code it builds on. Roughly in order:
 - **Pages (ADR-093):** no-popups (in-page messages and an in-page "Are you sure?" instead of
   alert / confirm; settings.html 27, commissary.html 5, stock-receipts.html 5, sales.html 1), after
   cost-guard and supply-tags.
+- **Admin (ADR-097):** name-map-settings (the Loyverse name map - Silingan's dish names, FC's landing
+  map, the pizza categories - edited in Settings instead of a repo file).
 - Later: an in-app alert for supervisors when a buyer marks a line "not found"; phone
   notifications once the PC has an HTTPS name (ADR-070).
 

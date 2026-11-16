@@ -1,6 +1,6 @@
 # Roster
 
-Status: IRL Confirmed (Silingan, the Nov 16-22 sheet), Written (Likod, FC) - FLOW Drafted (being redrafted around Fill) - APP Specced, on hold (shift rows, Fill)
+Status: IRL Confirmed (Silingan, the Nov 16-22 sheet), Written (Likod, FC) - FLOW Drafted (Fill, 2026-11-16) - APP Specced (ADR-096, roster-fill)
 
 ## IRL - how it works today
 
@@ -77,19 +77,22 @@ People without a login (waiters, for now) still go on the roster.
 
 ## FLOW - how they will use the app (drafted)
 
-Being redrafted (2026-11-15) around Fill: day offs first, then leave, then the app places people
-(see Open questions). The steps below are the 11-01 draft.
+Redrafted 2026-11-16 (ADR-096); it replaces the 11-01 draft.
 
-1. On the weekend, a supervisor opens next week and taps "Copy last week": rest days and stations
-   carry over; last week's one-offs (leave, sick, covers, days at another restaurant) go back to
-   normal.
-2. The head chef sets her kitchen people's days; the supervisor edits everything else.
-3. Each day, changes as they happen: a rest day swapped, absent (the supervisor's arrival check),
-   sick, leave with a reason, someone covering a station, someone working at another restaurant.
-4. Any time before closing (preferably in the morning), the head chef or a supervisor picks
+1. Before Monday, the supervisor opens next week: "Start the week" copies last week's day offs.
+2. Day offs: he changes who is off each day (usually Monday to Thursday).
+3. Leave: from the slips already handed in - person, from and to, leave or sick.
+4. Fill: the app places everyone else by main station and shift (never an opener the day after a
+   closer), covers short rows with people who cover those stations, and shows what is still short
+   in red.
+5. He fixes the rest by hand; the head chef edits her kitchen people's days. On a computer the
+   week looks like his sheet, and it prints.
+6. Each day, changes as they happen: a day off swapped, absent (the supervisor's arrival check),
+   sick, leave, a cover, a day at another restaurant, a part day.
+7. Any time before closing (preferably in the morning), the head chef or a supervisor picks
    tonight's kitchen counter and anyone doing commi work (see who-does-what.md).
-5. At count time, people pick their name; tonight's people are listed first.
-6. The day's Present count prefills the staff-meal head count.
+8. At count time, people pick their name; tonight's people are listed first.
+9. The day's Present count prefills the staff-meal head count.
 
 ## APP
 
@@ -103,12 +106,13 @@ Being redrafted (2026-11-15) around Fill: day offs first, then leave, then the a
 - Likod's roster starts when Likod becomes a site (A12); the same features apply.
 - 2026-11-15 (ADR-090): a read-only roster board across sites (Mon-Sun, who is off or away) for
   supervisors and management. Planned: roster-board, after roster-day-status.
-- On hold 2026-11-15: roster-stations to roster-day-status, until their specs gain shift rows, two
-  placements a day, breaks and Fill.
+- Specced 2026-11-16 (ADR-096): shift rows and minimums per station, usual break and "also works",
+  two placements a day, Start the week (day offs only), leave as from-to dates, the paper-like week
+  view, and Fill (step roster-fill). FC gets the same; Likod waits for A12.
 
 ## Open questions
 
-- Asked 2026-11-15 (answers pending): times only inside shift-row names, never hours (keeps
-  ADR-013's "no shift times"); a break as text on each placement; two placements a day (the
-  commissary person, "opener-closer"); one minimum per shift row; the roster steps ahead of
-  cost-guard, side-sheets and supply-tags; a week view like the paper on a computer.
+- How the supervisor shares the roster today (printed, a photo in a group chat, or both): the week
+  view prints either way.
+- Silingan's stations, rows, minimums and people are drafted from his sheet in the private notes
+  (2026-11-16) for the people workbook: confirm them with him before the import.

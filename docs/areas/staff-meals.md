@@ -24,6 +24,10 @@ Status: IRL Confirmed - FLOW Drafted - APP Specced
   separately.
 - In-house = staff meals + staff orders. Staff orders go through Loyverse;
   in-house and cash-advance slips are settled at the weekly payroll.
+- The in-house order slip (photo 2026-11-16): name, date, order no., department; lines of
+  quantity, item, unit, amount and remarks; a total amount; signed by the employee, "approved by"
+  and "released by". Asked: whether the same order is also rung up in Loyverse, and where the name
+  goes there.
 - Leftovers are not weighed and are out of scope.
 - Sources: photo of the staff-meal log; chat 2026-10-22/24.
 
