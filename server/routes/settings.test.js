@@ -494,10 +494,12 @@ const WRITES = [
   ['POST', '/api/settings/meats'], ['POST', '/api/settings/dishes'],
   ['POST', '/api/settings/recipes'], ['DELETE', '/api/settings/recipes/1'],
   ['PUT', '/api/settings/adjustment-types/1'], ['POST', '/api/settings/locations'],
+  ['POST', '/api/settings/staff-meal-slots'], ['PUT', '/api/settings/staff-meal-slots/1'],
+  ['POST', '/api/settings/staff-rice-rates'],
 ];
 const READS = ['restaurants', 'commissaries', 'meat-types', 'commissary-meats?commissary_id=1',
   'meats?restaurant_id=1', 'dishes?restaurant_id=1', 'recipes?restaurant_id=1', 'adjustment-types',
-  'locations'].map(r => `/api/settings/${r}`);
+  'locations', 'staff-meal-slots?site=RA', 'staff-rice-rates'].map(r => `/api/settings/${r}`);
 
 const httpTests = [];
 const httpTest = (name, fn) => httpTests.push({ name, fn });

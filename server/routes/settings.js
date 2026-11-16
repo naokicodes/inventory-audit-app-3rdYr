@@ -429,4 +429,40 @@ router.put('/settings/locations/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- STAFF MEALS ----------
+// Step staff-meal-settings (ADR-027, ADR-044): slots per restaurant and the
+// group-wide rice rates. The engine owns the checks, the transaction and the
+// activity_log row; the guard above makes every write admin-only.
+const staffMeals = require('../engines/staffMealSettings.js');
+const SLOT_FIELDS = ['site_code', 'name', 'sort_order', 'fixed_budget', 'per_head_rate', 'active'];
+const pick = (body, keys) => Object.fromEntries(keys.filter(k => k in (body || {})).map(k => [k, body[k]]));
+function answer(res, fn) {
+  try {
+    res.json({ ok: true, ...fn() });
+  } catch (err) {
+    if (!err.status) throw err;
+    res.status(err.status).json({ error: err.message });
+  }
+}
+
+router.get('/settings/staff-meal-slots', (req, res) => {
+  if (!req.query.site) return res.status(400).json({ error: 'site is required' });
+  res.json(staffMeals.listSlots(db, String(req.query.site)));
+});
+
+router.post('/settings/staff-meal-slots', (req, res) => answer(res, () => ({
+  slot: staffMeals.createSlot(db, pick(req.body, SLOT_FIELDS), req.user),
+})));
+
+router.put('/settings/staff-meal-slots/:id', (req, res) => answer(res, () =>
+  staffMeals.updateSlot(db, Number(req.params.id), pick(req.body, SLOT_FIELDS.filter(k => k !== 'site_code')), req.user)));
+
+router.get('/settings/staff-rice-rates', (req, res) => {
+  res.json(staffMeals.listRiceRates(db));
+});
+
+router.post('/settings/staff-rice-rates', (req, res) => answer(res, () => ({
+  rate: staffMeals.addRiceRate(db, pick(req.body, ['effective_from', 'cups_per_head', 'grams_per_cup', 'price_per_kg']), req.user),
+})));
+
 module.exports = router;

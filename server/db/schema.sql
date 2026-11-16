@@ -694,6 +694,33 @@ CREATE TABLE IF NOT EXISTS defaults_applied (
   applied_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Step staff-meal-settings (ADR-027, ADR-044): each restaurant's staff meal
+-- slots. No FK on site_code (model B): the engine checks it with
+-- resolveSiteCode and refuses a commissary. NULL amount = none.
+CREATE TABLE IF NOT EXISTS staff_meal_slots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  fixed_budget REAL,
+  per_head_rate REAL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (site_code, name)
+);
+
+-- staff_rice_rates: one group-wide set of dated rice rates. A day uses the
+-- row with the latest effective_from not after it (the newest row on a tie).
+CREATE TABLE IF NOT EXISTS staff_rice_rates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  effective_from TEXT NOT NULL,   -- business date
+  cups_per_head REAL NOT NULL,
+  grams_per_cup REAL NOT NULL,
+  price_per_kg REAL NOT NULL,
+  created_by_user_id INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Seed a reasonable starting set of adjustment types (admin can add more
 -- via the UI later - this is just a sensible default, not a fixed list).
 INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requires_conversion_target) VALUES
