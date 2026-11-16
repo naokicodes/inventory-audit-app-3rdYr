@@ -23,16 +23,16 @@ money details live in the private notes (Claude project files), never here.
 3. A paper-sheet photo is sent once; its structure is copied into the IRL
    section, which then stands in for the photo.
 
-## Map (2026-11-14)
+## Map (2026-11-15)
 
 | # | Area | IRL | FLOW | APP |
 |---|---|---|---|---|
 | 1 | [Who does what tonight](who-does-what.md) | Confirmed | Drafted | Specced (picks, login list, write permission); pick-your-name login Built |
-| 2 | [Meat landing (Silingan, FC)](meat-landing.md) | Confirmed | Drafted | Built; blind count + recount Specced |
+| 2 | [Meat landing (Silingan, FC)](meat-landing.md) | Confirmed | Drafted | Built; blind count + recount Specced; FC's sales map Decided (ADR-094) |
 | 3 | [Kitchen veggies](veggies.md) | Confirmed (Silingan, FC) | Drafted | Specced (side-items, side-sheets) |
 | 4 | [Pantry](pantry.md) | Confirmed (Silingan, FC) | Drafted | Specced (side-items, side-sheets) |
 | 5 | [Bar](bar.md) | Confirmed (all three) | Drafted | Decided (ADR-087): sellables against Loyverse, raws side-style, deal drinks, supervisor checks; FC drinks only |
-| 6 | [Roster](roster.md) | Confirmed (Silingan); Written (Likod, FC) | Drafted | Specced; roster board Decided (ADR-090) |
+| 6 | [Roster](roster.md) | Confirmed (Silingan, Nov 16-22 sheet); Written (Likod, FC) | Drafted (redrafting around Fill) | Specced, on hold (shift rows, Fill); roster board Decided (ADR-090) |
 | 7 | [Supplier orders and buying](supplier-orders.md) | Written | Drafted | Decided |
 | 8 | [Arrivals and bills](arrivals-and-bills.md) | Written | Drafted | Decided |
 | 9 | [Staff meals and in-house](staff-meals.md) | Confirmed | Drafted | Specced (3zw-3zz) |
@@ -42,9 +42,9 @@ money details live in the private notes (Claude project files), never here.
 | 13 | [Likod grill landing](likod-grill.md) | Confirmed | None | Decided (counts blind; appointed head chef) |
 | 14 | [FC scullery](fc-scullery.md) | Confirmed | None | Paper (ADR-065) |
 | 15 | [Commissary](commissary.md) | Confirmed | Drafted | Built: yield, shipments; requests and staging Decided, not built (ADR-092); commi access Specced; Likod destination missing |
-| 16 | [Sales (Loyverse)](sales.md) | Confirmed | None | Built (Kitchen Sales preview); FC switch Specced |
+| 16 | [Sales (Loyverse)](sales.md) | Confirmed | None | Built (Kitchen Sales, FC switch); landing-sales Specced (ADR-094) |
 | 17 | [Management view](management-view.md) | Written | Drafted | Partly built; views as cards (ADR-089) |
-| 18 | [Money and operating expenses](money.md) | Told | None | Decided: charges recorded, payroll in Excel (ADR-088) |
+| 18 | [Money and operating expenses](money.md) | Written (payroll template) | None | Decided: charges recorded, payroll in Excel (ADR-088) |
 | 19 | [Waste](waste.md) | Written | Drafted | Meat: Built (adjustment types); sides: Decided (any time + a catch-all after endings, ADR-086) |
 
 Gaps to read off the map: IRL Confirmed + APP None is safe backlog (pizza,

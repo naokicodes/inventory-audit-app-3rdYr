@@ -39,6 +39,71 @@ ITEM NAME, BEG, NEW S., POS, INHOUSE, OVR/SHRT, END, RAW, REMARKS.
 - The bottom is FC's consolidated PO: kitchen (with REM), pizza, bar,
   veg / dry, and scullery items.
 
+**FC, 2026-11-15** (sources: the 11-14 sheet photo and FC's Loyverse item list, names only, sent
+in the 2026-11-15 architect chat):
+- The lines, in the sheet's order. Block 1: Pork Jowl, Paella, Baglaw Tuna, Tuna Tinola, Tuna
+  Steak, Skewers, Pork Chops, Beef Tapa, Garlic Beef. Block 2: Bagnet, Laing, ASG, CPA, Sisig,
+  Sinigang, Dinuguan, Salpicao, Tinola, Pancit, Daing, Arrabiatta, Burger Patty, Chicken Brgr,
+  Burger Buns. Block 3: Whole Chicken, Half, Quarter.
+- POS is in portions, worked out by hand from Loyverse: a platter is more portions of its solo dish
+  (generally 2; the Pork Bagnet platter 3).
+- Laing, CPA, Salpicao, Tinola, Pancit and Half keep no stock: their dishes take from other lines,
+  and the paper notes it in the remarks (11-14: "3 portions to bagnet: 1 Baglaw, 2 Laing", next to
+  Sinigang). Forgotten remarks are much of FC's shorts.
+- Pork Jowl is raw jowl, kept just in case since the time the commissary did not work well; no dish
+  sells it.
+- Arrabiatta arrives in kg (the shrimp) and is portioned; Tuna Tinola and Daing are counted in
+  packs. Grams per dish and servings per pack are not known yet, and need not be strict: what matters
+  is the usage rate and remembering allocations.
+- The commissary ships FC only whole and quarter chicken; a half is a whole cut in two.
+- The bottom PO: kitchen (with REM), pizza (FC sells pizza; on paper, ADR-065), bar, veg / dry.
+
+**FC's map (ADR-094)** - the Loyverse items (exact names) each line counts, with portions per item
+sold, then what other dishes take. Step landing-sales copies this into loyverse-name-map.json.
+
+| Line | Counted from (portions per item) |
+|---|---|
+| PORK JOWL | (none) |
+| PAELLA | `PAELLA NEGRA` 1 |
+| BAGLAW TUNA | `BAGLAW` 1 |
+| TUNA TINOLA | `TUNA TINOLA` 1 |
+| TUNA STEAK | `PAN GRILLED TUNA STEAK` 1 |
+| SKEWERS | `GARLIC PARMA CHICKEN SKEWERS` 1 |
+| PORK CHOPS | `PAN SEARED HERBED PORK CHOP` 1 |
+| BEEF TAPA | `BEEF TAPA` 1 |
+| GARLIC BEEF | `GARLIC PEPPER BEEF` 1 |
+| BAGNET | `PORK BAGNET - SOLO` 1, `BAGNET EXPRESS - SOLO` 1, `BAGNET BINAGOONGAN - SOLO` 1, `PLATTER - PORK BAGNET` 3, `PLATTER - BAGNET EXPRESS` 2, `PLATTER - BAGNET BINAGOONGAN` 2 |
+| LAING | `LAING PORK - SOLO` 1, `PLATTER - LAING PORK` 2 |
+| ASG | `ADOBO SA GINAMOS - SOLO` 1, `PLATTER - ADOBO SA GINAMOS` 2 |
+| CPA | `CHICKEN PORK ADOBO - SOLO` 1, `PLATTER - CHICKEN PORK ADOBO` 2 |
+| SISIG | `SISIG SOLO` 1, `SISIG PLATTER` 2 |
+| SINIGANG | `BAGNET SINIGANG` 1 |
+| DINUGUAN | `DINUGUAN - SOLO` 1, `PLATTER - DINUGUAN` 2 |
+| SALPICAO | `CHICKEN SALPICAO` 1 |
+| TINOLA | `TINOLA SA UPO` 1 |
+| PANCIT | `CANTON GUISADO` 1, `PANCIT de ORO` 1 |
+| DAING | `DAING NA SUNGAB` 1 |
+| ARRABIATTA | `SHRIMP ARRABBIATA` 1 |
+| BURGER PATTY | `HOMEMADE BURGER` 1 |
+| CHICKEN BRGR | `CHICKEN BURGER` 1 |
+| BURGER BUNS | `HOMEMADE BURGER` 1, `CHICKEN BURGER` 1 |
+| WHOLE CHICKEN | `REGULAR - Whole Chicken` 1, `LARGE- Whole Chicken` 1, `EXTRA LARGE- Whole Chicken` 1, `JUMBO - Whole Chicken` 1, `REG BOODLE(4 SWAKTO)` 1, `LARGE-BOODLE ( 4 SWAKTO)` 1, `XL -BOODLE (4 SWAKTO)` 1, `JUMBO-BOODLE (4 SWAKTO)` 1, `FREE WHOLE CHICKEN` 1 |
+| HALF | `HALF CHICKEN` 1 |
+| QUARTER | `SOLO QUARTER` 1, `SOLO QUARTER UNLI` 1 |
+
+Takes (shown as "also taken" on the line taken from):
+- `LAING PORK - SOLO`: Bagnet 1/2. `PLATTER - LAING PORK`: Bagnet 1.
+- `CHICKEN PORK ADOBO - SOLO`: Bagnet 1/2, Quarter 1. `PLATTER - CHICKEN PORK ADOBO`: Bagnet 1,
+  Quarter 1 (a bigger quarter).
+- `CHICKEN SALPICAO`, `TINOLA SA UPO`, `CANTON GUISADO`, `PANCIT de ORO`: Quarter 1. A pork pancit
+  takes Bagnet 1 instead: a remark until its Loyverse item is known.
+- `BAGLAW`: Bagnet 1.
+- `HALF CHICKEN`: Whole Chicken 1/2.
+
+Not on the landing: the boodle upgrades (the boodle already counts its chicken), trays and "Old
+Price" items, pastas other than Arrabbiata, rice, sauces, drinks, boxes, the veggie dishes, Law-oy,
+and pizza (its own table).
+
 ## FLOW - how they will use the app (drafted)
 1. Tonight's kitchen counter (the Kitchen Window dispatcher, picked by the head
    chef) opens the endings-only sheet and enters END for
@@ -70,6 +135,8 @@ ITEM NAME, BEG, NEW S., POS, INHOUSE, OVR/SHRT, END, RAW, REMARKS.
   The landing is the head-chef role at the site, appointed people included
   (ADR-035). Blind follows the site's roles (ADR-038; role-assignments, 3zj).
 - QTY (the counter's PO line) belongs to the supply family (A9).
+- Decided 2026-11-15 (ADR-094): Kitchen Sales' FC side follows FC's landing (step landing-sales,
+  the map above); the landing's expected values use the same takes later (fc-dish-map).
 
 ## Open questions
 - None open. (Pieces AND weight: closed 2026-10-28 - one unit per meat.)
