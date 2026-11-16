@@ -61,6 +61,10 @@ then start the app on it. Real people reach the restaurant PC only through the p
 Before tagging a new `beta-N`, Claude in Chrome runs this on the commit to be tagged, on a
 throwaway database with the test accounts. Skip a line whose step is not merged yet.
 
+On a freshly reseeded database, open the month first (as Test Admin) before line 1. For line 5,
+start the server with the three Loyverse tokens set empty (`LOYVERSE_SILINGAN_TOKEN=`,
+`LOYVERSE_LIKOD_TOKEN=`, `LOYVERSE_FC_TOKEN=`).
+
 1. Test Counter RA, Daily Audit, RA, today: enter an ending and a remark, Save Day, refresh. The
    values stay. Beginning, new stock, sales, expected and variance never show, on screen or in
    the network response.

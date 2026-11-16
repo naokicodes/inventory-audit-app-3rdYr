@@ -108,7 +108,7 @@ flight. (ADR-001 explains the split.)
 | ADR-063 | Side sheets show usage while counting | Accepted 2026-11-14 |
 | ADR-064 | Side waste: a prompt after endings | Accepted 2026-11-14; superseded in part by ADR-086 (waste any time; who checks) |
 | ADR-065 | FC: kitchen sheets in the app, the rest on paper | Accepted 2026-11-14 |
-| ADR-066 | FC on Loyverse; Kitchen Sales switches between POS groups | Accepted 2026-11-14 |
+| ADR-066 | FC on Loyverse; Kitchen Sales switches between POS groups | Accepted 2026-11-14; superseded in part by ADR-094 (FC's side follows its landing) |
 | ADR-067 | How it's bought: from the commi; FC's direct meats | Accepted 2026-11-14; superseded in part by ADR-092 (where requests come from; not built) |
 | ADR-068 | Buyer runs: ticks and receipt photos | Accepted 2026-11-14 |
 | ADR-069 | Scope: every inventory sheet, not meat only | Accepted 2026-11-14 |
@@ -136,6 +136,8 @@ flight. (ADR-001 explains the split.)
 | ADR-091 | Site lists stay open; each row says whether you can use it | Accepted 2026-11-15 |
 | ADR-092 | Meat requests: where they come from, and a quick request | Accepted 2026-11-15 |
 | ADR-093 | No browser pop-ups | Accepted 2026-11-15 |
+| ADR-094 | FC's sales follow its landing sheet | Accepted 2026-11-15 |
+| ADR-095 | Roles page: switch wording, removing extra roles, the copy default | Accepted 2026-11-15 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

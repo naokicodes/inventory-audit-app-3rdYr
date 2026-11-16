@@ -132,9 +132,42 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-093; the index, and a map from handoff item numbers to records, is in
+to ADR-095; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-15 architect (A0 #84, FC landing map, beta-3, roster IRL) - decided (recorded: ADR-094, ADR-095)
+
+- **FC's sales follow its landing (ADR-094).** Kitchen Sales' FC side becomes one table of FC's
+  landing lines in portions (platters folded in: 2, the Pork Bagnet platter 3); a line opens to its
+  items and to what other dishes took from it; a Pizza table on both sides (every pizza, unsold
+  greyed: Silingan | Likod | Total, and FC's count); the rest of FC's items in a closed "Not on the
+  landing" list. The map is item names only, in loyverse-name-map.json; the full list is in
+  docs/areas/meat-landing.md. Step **landing-sales**, runnable. fc-dish-map stays planned (FC's
+  dishes and recipes in the database, for the landing's expected values).
+- **Roles page (ADR-095, issue #84).** The four switch lines stay; an extra role can always be
+  removed, its role on or off; "Add role" copies checker by default. PR #83 changes to match, then
+  the phone check.
+- **beta-3 (Naoki, 2026-11-15).** Nothing was ever installed on the restaurant PC (the 11-14 and
+  11-15 "still on beta-1" was wrong). It installs fresh at beta-3, not beta-2. Tag beta-3 once #83
+  (roles-page), landing-sales and restaurant-pc-ii are merged and the smoke list passes. At the PC:
+  `git clone` the repo to a temporary folder and run its `scripts\restaurant-pc.bat` (a .bat
+  downloaded from GitHub's raw view has LF endings, which cmd can misread around its labels; git
+  checks it out with CRLF); the Deco app reserves the PC's address (More -> Advanced -> Address
+  Reservation); the PC and the counting phones use the cashier network, never a guest network
+  (a guest network keeps its devices off the main network); then the people import.
+- **Roster (A6 reopened, Naoki 2026-11-15).** Silingan's supervisor makes Silingan's roster; the
+  main supervisor makes FC's and Likod's (the 10-28 "one supervisor for all three" is replaced). His
+  weekly flow: day offs first, then the leave slips, then placing people by their main station and
+  the stations they cover; shifts opener / mid / closer, and nobody opens the day after closing (a
+  closer keeps closing until a day off, then can open). The roster takes him a long time: the app
+  should place people for him (Fill). Waiters and others without a login are staff with no login.
+  Silingan's sheet is transcribed in docs/areas/roster.md. **roster-stations to roster-day-status
+  (3zl to 3zo) are on hold** until their specs gain shift rows, two placements a day, breaks and
+  Fill (the next drop-in). Likod (A12) and pizza (A11) are parked.
+- **Also:** money.md records the payroll template's structure (A13). The login tests
+  (auth.test.js) failed once on unchanged code before #83 and passed after: if they fail again, open
+  an issue with the output.
 
 ### 2026-11-15 architect (commissary and POs) - decided (recorded: ADR-092, ADR-093)
 
@@ -3324,7 +3357,20 @@ to "head chef") are refused on create and on rename.
 - Touches gains: scripts/import-settings.js, server/db/importSettings.test.js. After
   import-settings-env (same file).
 
+**Decisions 2026-11-15 (issue #84, Naoki; ADR-095).** These override any reading of the text above.
+- The four older switches keep PR #83's lines: "Enters counts", "Finalizes the day", "Admin:
+  changes settings and roles everywhere", "Sees every site, changes nothing".
+- Removing an extra role works whether its role is on or off: permissions.js removeAssignment drops
+  its "That role is inactive." refusal; roles.html shows Remove on "(inactive role)" lines too.
+  Adding a switched-off role stays refused. Test: an assignment of a role switched off after it was
+  given is removed (200), writes activity_log, and the person's /api/auth/me is unchanged (an
+  inactive role granted nothing anyway).
+- "Add role"'s copy-from list starts on checker (roles.html). POST /api/roles still takes any
+  copy_from.
+- PR #83 changes to match; then the phone check (ADR-039).
+
 ## Step roster-stations - stations as roster rows, and which sheets each opens (A6)
+**ON HOLD 2026-11-15:** the roster gains shift rows, two placements a day, breaks and Fill (Silingan's supervisor's flow, docs/areas/roster.md). This spec changes before it runs: do not start it.
 
 Decided ADR-012 and ADR-037. DEPENDS ON sheets-tier1 (3u: sheet_definitions), import-identity (3j:
 import-settings.js) and role-assignments (3zj: can()).
@@ -3388,6 +3434,7 @@ scripts/import-settings.js, public/staff.html (new), public/index.html. PUBLIC -
 before merge.
 
 ## Step roster-staff - the staff list: main station, sub-stations, standing access, login link (A6)
+**ON HOLD 2026-11-15:** see roster-stations.
 
 Decided ADR-013 (a staff table separate from users) and ADR-037. DEPENDS ON roster-stations.
 
@@ -3436,6 +3483,7 @@ server/routes/staff.js, server/routes/staff.test.js, scripts/import-settings.js,
 PUBLIC -> click-through before merge.
 
 ## Step roster-week - the weekly roster: placements, rest days, copy last week (A6)
+**ON HOLD 2026-11-15:** see roster-stations.
 
 Decided ADR-013 and ADR-037. DEPENDS ON roster-staff and business-day.
 
@@ -3501,6 +3549,7 @@ server/routes/roster.js (new), server/routes/roster.test.js (new), server/index.
 public/roster.html (new), public/index.html. PUBLIC -> click-through before merge.
 
 ## Step roster-day-status - leave, sick, absent, floater, covering; the day's totals and head count (A6)
+**ON HOLD 2026-11-15:** see roster-stations.
 
 Decided ADR-013, ADR-027 and ADR-037. DEPENDS ON roster-week.
 
@@ -4211,6 +4260,96 @@ planned: FC's menu has changed since the app's FC dish list); FC's bar check (ba
   today until the real Loyverse port, which subtracts refunds too.
 - Q2 (Reading A): `/items` is read with `show_deleted=true`; a deleted item keeps its old category.
 - Rows are by item name; FC sells no variants today. PR #71 is complete as built.
+
+## Step landing-sales - Kitchen Sales: FC by landing line, a Pizza table on both sides (A0)
+
+Decided 2026-11-15 (ADR-094; supersedes ADR-066's FC category cards). DEPENDS ON nothing open
+(loyverse-fc is closed). Runnable now. Part of beta-3.
+
+What the kitchen sees:
+- **FC side.** One table, "Landing": FC's landing lines in the sheet's order and names, each with
+  the portions sold that business date - the number FC's landing writes in its POS column. Platters
+  count more portions (2; the Pork Bagnet platter 3). A line at 0 is greyed, like the left side's
+  zero rows, and stays listed (the sheet needs its zeros). A line other dishes took from shows "+N
+  taken" beside its number (Bagnet: Laing, CPA, Baglaw; Quarter: CPA, Salpicao, Tinola, Pancit;
+  Whole Chicken: Half). Tapping a line opens it under the row: each item counted there with its
+  quantity, plus "x3 = 6" when its portions are not 1; then "Also taken": each dish, its quantity
+  and the amount ("Laing Pork - Solo 2 x 1/2 = 1"). Tapping again closes it. Below: "Pizza" -
+  every item on FC's pizza list, sold or not, unsold greyed. Last: "Not on the landing", closed by
+  default - everything else FC sold that day, biggest first, so a new dish never disappears unseen.
+  The category cards go.
+- **Silingan + Likod side.** The dish table is unchanged. Below it, "Pizza": every item on the two
+  accounts' pizza lists, one row per name, with Silingan, Likod and Total columns, unsold greyed.
+- The Pizza tables are temporary: Naoki picks the pizzas in effect later.
+
+Server:
+- server/db/loyverse-name-map.json gains (and `_about` gains a sentence on each):
+  - `fcLanding`: `{ "lines": [ ...27 line names in the sheet's order... ], "items": [ { "name":
+    "<Loyverse item name>", "pos": { "<line>": <portions> }, "takes": { "<line>": <amount> } } ] }`.
+    `name` follows the dish cells' rules (exact ignoring capitals and extra spaces, `*` wildcard,
+    `|` for an old and a new name); `takes` is optional. Content: docs/areas/meat-landing.md ->
+    "FC's map (ADR-094)", copied exactly.
+  - `pizza`: `{ "silingan": { "categories": ["PIZZA"] }, "likod": { "categories": ["PIZZA"] },
+    "fc": { "categories": ["PIZZA", "ADD-ONS PIZZA"], "items": ["FREE * PIZZA"] } }`. Category names
+    match ignoring capitals and extra spaces; `items` follow the dish cells' rules.
+- server/engines/loyversePreview.js:
+  - FC (`pos=fc`): the same receipt pass as categoryAccount (window, cancelled skipped, business
+    date, a REFUND's lines subtract, per-account failure, never a money field; ADR-076). Each line's
+    item_name resolves first against fcLanding.items (buildResolver's rules: exact, then the first
+    wildcard in file order), then against the pizza list, else "other".
+  - FC body: `{ date, group: 'fc', accounts: [status], landing: [ { line, sold, taken, items: [ {
+    name, quantity, portions } ], takenBy: [ { name, quantity, amount } ] } ], pizza: { columns:
+    ['fc'], rows: [ { name, fc, total } ] } | null, other: [ { name, quantity } ] }`. `landing` has
+    every line in `lines` order, 0s included. sold = sum of quantity x portions; taken = sum of
+    quantity x amount (plain numbers; the page formats halves). `items`, `takenBy` and `other` list
+    only names with a non-zero net quantity, biggest first, then by name.
+  - Pizza rows: every item (not deleted) of the account's /items in a listed category or matching a
+    listed item name, plus any deleted one sold that day; 0 when unsold; sorted by name. /items and
+    /categories as loyverse-fc reads them.
+  - The left body (no `pos`, or `pos=silingan-likod`) is today's plus `pizza: { columns:
+    ['silingan', 'likod'], rows: [ { name, silingan, likod, total } ] } | null`. Rows join the two
+    accounts by normalized name; a failed account's cell is null; total follows dishTotal's rule
+    (null only when every account listing the item failed). Refunds subtract in the pizza table; the
+    dish table keeps today's counting. This adds /items and /categories reads for Silingan and Likod.
+  - An account whose /items or /categories fails: its pizza part is null with catalogError in its
+    status, as today. On the FC side the landing still counts (it needs names only) and FC's pizza
+    sales fall into `other`.
+  - computeCategories goes if nothing else uses it.
+- A test reads the real map file: every `pos` and `takes` key is one of `lines`; every portion and
+  amount is a positive number; no item name (normalized) appears twice; every line name is unique.
+- server/routes/loyverse.js: `pos=fc` returns the FC body above; the rest unchanged.
+
+Page public/kitchen-sales.html: the FC side renders Landing, Pizza and Not on the landing; the left
+side adds Pizza under the dish table. A line opens with a button (aria-expanded), 44px tall; no
+sideways scroll at 390px. Halves show as "1/2" (1.5 as "1 1/2"). The copy button's text gains the
+landing lines with sold and taken, non-zero only.
+
+Edge states: Failure - an account down or a wrong token: that side's banner, as today. Empty - no
+FC sales: every landing line at 0 (greyed), the Pizza table greyed, Not on the landing empty.
+Partial - a pizza list failed: "Couldn't load the pizza list" under that Pizza heading; FC's pizza
+sales go to Not on the landing. Stale - Sync, as today. Blocked - none (ADR-041: Kitchen Sales
+stays open; no stock, no money). Two devices - read-only.
+
+Tests: a Pork Bagnet platter adds 3 to BAGNET and lists as portions 3; Laing Pork - Solo x2 gives
+LAING 2 and BAGNET taken 1; a burger counts on its patty line and on Burger Buns; a refund subtracts
+from sold and taken; a cancelled receipt counts nothing; an unknown item lands in other; Pork Jowl
+is listed at 0; lines keep the file's order; an unsold pizza is listed at 0; "FREE * PIZZA" matches
+"FREE CHEESE PIZZA"; the left Pizza table puts one name's Silingan and Likod counts on one row;
+Likod failing gives null in its column and Silingan's count as the total; the map-file test; no
+price or total field in either body; the token never in an error.
+
+Click-through (390px): Claude checks, on a preview with stubbed receipts or real tokens: BAGNET opens
+to its items and "Also taken"; zero lines greyed; Not on the landing opens; the left Pizza table's
+three columns; the missing-token states as before. You check the looks and, with real tokens, one
+day against FC's paper POS column.
+
+Touches: server/db/loyverse-name-map.json, server/engines/loyversePreview.js,
+server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js,
+public/kitchen-sales.html. PUBLIC -> click-through before merge.
+
+Not in scope: FC's dishes and recipes in the database and the landing's expected values
+(fc-dish-map); pizza dough and counts (A11); the pork pancit (a remark until its Loyverse item is
+known).
 
 ## Step cost-guard - unit costs need the see_costs switch (A0)
 
