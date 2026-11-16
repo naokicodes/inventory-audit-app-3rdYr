@@ -189,8 +189,8 @@
         if (role.name === 'super-admin') continue;
         from.append(el('option', { value: role.id, textContent: `Copy of ${role.name}` }));
       }
-      const supervisor = roles.find(r => r.name === 'supervisor');
-      if (supervisor) from.value = String(supervisor.id);
+      const checker = roles.find(r => r.name === 'checker');
+      if (checker) from.value = String(checker.id);
       return el('div', { className: 'box', id: 'add-role' },
         el('h3', { textContent: 'Add role' }),
         el('div', { className: 'row-form' }, name, from,
@@ -228,7 +228,7 @@
         const where = a.site_code === null ? 'at all their sites' : `at ${a.site_code}`;
         const text = `${a.role} ${where}${a.until_date ? ' until ' + untilText(a.until_date) : ''}${a.role_active ? '' : ' (inactive role)'}`;
         const item = el('li', { className: a.role_active ? '' : 'inactive' }, el('span', { textContent: text }));
-        if (canEdit && a.role_active) {
+        if (canEdit) {
           const slot = el('span');
           const remove = button('Remove', () => {
             slot.replaceChildren(el('span', { className: 'confirm' }, 'Are you sure?',

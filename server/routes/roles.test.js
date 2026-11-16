@@ -248,6 +248,21 @@ test('an inactive role is listed greyed and cannot be assigned or made a base ro
   assert.strictEqual((await call('PUT', `/api/roles/${copyId}`, 'admin', { active: true })).body.role.active, 1);
 });
 
+test('an assignment of a role switched off after it was given is removed, logged; /api/auth/me unchanged (ADR-095)', async () => {
+  assert.strictEqual((await call('POST', `/api/users/${users.ben}/roles`, 'admin', { role_id: copyId, site_code: 'RA' })).status, 200);
+  assert.strictEqual((await call('PUT', `/api/roles/${copyId}`, 'admin', { active: false })).status, 200);
+  const meBefore = (await call('GET', '/api/auth/me', 'ben')).body;
+  const logs = logCount();
+  const removed = await call('DELETE', `/api/users/${users.ben}/roles`, 'admin', { role_id: copyId, site_code: 'RA' });
+  assert.strictEqual(removed.status, 200, JSON.stringify(removed.body));
+  assert.strictEqual(logCount(), logs + 1);
+  const log = db.prepare('SELECT actor, entity_type, action FROM activity_log ORDER BY id DESC LIMIT 1').get();
+  assert.deepStrictEqual({ ...log }, { actor: 'U admin', entity_type: 'user_roles', action: 'DELETE' });
+  assert.deepStrictEqual((await call('GET', `/api/users/${users.ben}/roles`, 'admin')).body.assignments, []);
+  assert.deepStrictEqual((await call('GET', '/api/auth/me', 'ben')).body, meBefore);
+  assert.strictEqual((await call('PUT', `/api/roles/${copyId}`, 'admin', { active: true })).status, 200);
+});
+
 test('a site_code that is not a code or null is a 400, not a crash', async () => {
   for (const site_code of [true, ['RA'], 5, { code: 'RA' }]) {
     for (const m of ['POST', 'DELETE']) {
