@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roles - Inventory Audit App</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .intro { color: var(--ink2); }
+    .role-card, .person-card { padding: 0.75rem 1rem; margin: 0 0 0.75rem; }
+    .role-card.inactive .role-name, .role-card.inactive .toggles { color: var(--ink3); }
+    .card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .role-name, .person-name { font-weight: 600; }
+    .tag { font-size: 0.85rem; color: var(--ink2); border: 1px solid var(--line2); border-radius: 20px; padding: 0.05rem 0.5rem; margin-left: 0.35rem; font-weight: 400; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .actions button, .row-form button, .assignments button { padding: 0.35rem 0.8rem; font-size: 0.9rem; }
+    .toggles { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+    .toggles li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.3rem 0; border-top: 1px solid var(--line); }
+    .toggles input[type="checkbox"] { width: 1.25rem; height: 1.25rem; flex: none; }
+    .toggles .state { color: var(--ink2); font-size: 0.9rem; flex: none; }
+    .muted { color: var(--ink2); }
+    .row-form { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
+    .row-form input, .row-form select { font: inherit; padding: 0.3rem 0.4rem; border: 1px solid var(--line2); border-radius: 7px; background: var(--card); color: var(--ink); max-width: 100%; }
+    .row-form input[type="text"] { flex: 1 1 10rem; min-width: 0; }
+    .assignments { list-style: none; margin: 0.4rem 0 0; padding: 0; }
+    .assignments li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0; border-top: 1px solid var(--line); }
+    .assignments li.inactive { color: var(--ink3); }
+    .confirm { display: inline-flex; align-items: center; gap: 0.4rem; }
+    #add-role { padding: 0.75rem 1rem; margin: 0 0 0.75rem; }
+    #add-role h3 { margin: 0; font-size: 1rem; }
+    #status { min-height: 1.4em; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="daily-audit.html">Landing</a>
+    <a href="stock-receipts.html">Stock Receipts</a>
+    <a href="commissary.html">Commissary</a>
+    <a href="commissary-shipments.html">Shipments</a>
+    <a href="sales.html">Sales</a>
+    <a href="terminal.html">Terminal</a>
+    <a href="allocations.html">Allocations</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="settings.html">Settings</a>
+    <a href="history.html">History</a>
+  </nav>
+  <!-- Step roles-page (ADR-034, ADR-082, ADR-083): switches per role, roles
+       per person. Anyone signed in may look; only admins get buttons; the
+       server checks every change. -->
+  <h1>Roles</h1>
+  <p class="intro">Roles and who has which role are changed here. The people workbook adds new people and roles and sets everyone's sites.</p>
+  <p id="status" class="status-message" role="status"></p>
+
+  <h2>Roles</h2>
+  <div id="roles"></div>
+
+  <h2>People</h2>
+  <div id="people"></div>
+
+  <script>
+    // One line of meaning per toggle: the four role flags, then the switches.
+    const TOGGLES = [
+      ['enter_counts', 'can_enter_counts', 'Enters counts'],
+      ['finalize', 'can_finalize', 'Finalizes the day'],
+      ['admin', 'can_admin', 'Admin: changes settings and roles everywhere'],
+      ['read_only', 'read_only', 'Sees every site, changes nothing'],
+      ['sees_expected', null, 'Sees expected and variance'],
+      ['roster_all', null, 'Edits the whole roster'],
+      ['roster_kitchen', null, "Edits kitchen staff's days"],
+      ['pick_tonight', null, "Picks tonight's people"],
+      ['manage_staff', null, 'Adds and edits stations and staff'],
+    ];
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const statusEl = document.getElementById('status');
+    const rolesEl = document.getElementById('roles');
+    const peopleEl = document.getElementById('people');
+    let data = null;
+
+    // A tiny element builder: el('p', { className: 'x' }, 'text', child).
+    function el(tag, props, ...children) {
+      const node = document.createElement(tag);
+      Object.assign(node, props || {});
+      for (const child of children) {
+        if (child === null || child === undefined || child === false) continue;
+        node.append(child);
+      }
+      return node;
+    }
+    function button(text, onClick) {
+      const b = el('button', { type: 'button', textContent: text });
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    function say(text, kind) {
+      statusEl.textContent = text;
+      statusEl.className = 'status-message' + (kind ? ' ' + kind : '');
+    }
+
+    function untilText(date) {
+      const [y, m, d] = date.split('-').map(Number);
+      const thisYear = new Date().getFullYear();
+      return `${MONTHS[m - 1]} ${d}${y === thisYear ? '' : ', ' + y}`;
+    }
+
+    // Every change: send it, then reload the page's data (stale-proof).
+    // Changes run one at a time, in the order clicked, so two quick toggles
+    // can never land out of order.
+    let queue = Promise.resolve();
+    function act(method, url, body, done) {
+      queue = queue.then(() => send(method, url, body, done));
+      return queue;
+    }
+    async function send(method, url, body, done) {
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          say(json.error || `Could not save (${res.status}).`, 'error');
+        } else {
+          say(done, 'success');
+        }
+      } catch (err) {
+        say('Could not reach the server.', 'error');
+      }
+      await load();
+    }
+
+    function roleCard(role, canEdit) {
+      const isSuper = role.name === 'super-admin';
+      const card = el('div', { className: 'box role-card' + (role.active ? '' : ' inactive') });
+      const name = el('span', { className: 'role-name', textContent: role.name },
+        role.active ? null : el('span', { className: 'tag', textContent: 'inactive' }));
+      const actions = el('div', { className: 'actions' });
+      card.append(el('div', { className: 'card-head' }, name, actions));
+
+      if (isSuper) {
+        card.append(el('p', { className: 'muted', textContent: 'Has everything' }));
+        return card;
+      }
+
+      const list = el('ul', { className: 'toggles' });
+      for (const [key, column, meaning] of TOGGLES) {
+        const on = column ? role[column] === 1 : role.switches.includes(key);
+        const item = el('li', {}, el('span', { textContent: meaning }));
+        if (canEdit) {
+          const box = el('input', { type: 'checkbox', checked: on });
+          box.setAttribute('aria-label', `${role.name}: ${meaning}`);
+          box.addEventListener('change', () => act('PUT', `/api/roles/${role.id}/capabilities`,
+            { capability: key, on: box.checked }, `${role.name}: "${meaning}" turned ${box.checked ? 'on' : 'off'}.`));
+          item.append(box);
+        } else {
+          item.append(el('span', { className: 'state', textContent: on ? 'On' : 'Off' }));
+        }
+        list.append(item);
+      }
+      card.append(list);
+
+      if (canEdit) {
+        if (!role.built_in) {
+          actions.append(button('Rename', () => {
+            const input = el('input', { type: 'text', value: role.name });
+            input.setAttribute('aria-label', 'New name');
+            const form = el('div', { className: 'row-form' }, input,
+              button('Save', () => act('PUT', `/api/roles/${role.id}`, { name: input.value }, 'Role renamed.')),
+              button('Cancel', () => form.remove()));
+            card.append(form);
+            input.focus();
+          }));
+        }
+        actions.append(button(role.active ? 'Deactivate' : 'Activate', () => act('PUT', `/api/roles/${role.id}`,
+          { active: !role.active }, `${role.name} ${role.active ? 'deactivated' : 'activated'}.`)));
+      }
+      return card;
+    }
+
+    function addRoleForm(roles) {
+      const name = el('input', { type: 'text', placeholder: 'Name' });
+      name.setAttribute('aria-label', 'New role name');
+      const from = el('select');
+      from.setAttribute('aria-label', 'Copy switches from');
+      for (const role of roles) {
+        if (role.name === 'super-admin') continue;
+        from.append(el('option', { value: role.id, textContent: `Copy of ${role.name}` }));
+      }
+      const checker = roles.find(r => r.name === 'checker');
+      if (checker) from.value = String(checker.id);
+      return el('div', { className: 'box', id: 'add-role' },
+        el('h3', { textContent: 'Add role' }),
+        el('div', { className: 'row-form' }, name, from,
+          button('Add role', () => act('POST', '/api/roles', { name: name.value, copy_from: Number(from.value) }, 'Role added.'))));
+    }
+
+    function personCard(person, roles, canEdit) {
+      const card = el('div', { className: 'box person-card' });
+      const isSuper = person.base_role === 'super-admin';
+      const usable = roles.filter(r => r.active && r.name !== 'super-admin');
+
+      let base;
+      if (canEdit && !isSuper) {
+        base = el('select');
+        base.setAttribute('aria-label', `${person.name}: base role`);
+        for (const role of usable) base.append(el('option', { value: role.id, textContent: role.name }));
+        if (!usable.some(r => r.id === person.base_role_id)) {
+          base.prepend(el('option', { value: person.base_role_id, textContent: `${person.base_role} (inactive)`, disabled: true }));
+        }
+        base.value = String(person.base_role_id);
+        base.addEventListener('change', () => act('PUT', `/api/users/${person.id}/base-role`,
+          { role_id: Number(base.value) }, `${person.name}'s base role changed.`));
+      } else {
+        base = el('span', { textContent: person.base_role });
+      }
+      card.append(el('div', { className: 'card-head' },
+        el('span', { className: 'person-name', textContent: person.name }),
+        el('span', { className: 'muted' }, 'Base role: ', base)));
+
+      const list = el('ul', { className: 'assignments' });
+      if (person.assignments.length === 0) {
+        list.append(el('li', { className: 'muted', textContent: 'No extra roles' }));
+      }
+      for (const a of person.assignments) {
+        const where = a.site_code === null ? 'at all their sites' : `at ${a.site_code}`;
+        const text = `${a.role} ${where}${a.until_date ? ' until ' + untilText(a.until_date) : ''}${a.role_active ? '' : ' (inactive role)'}`;
+        const item = el('li', { className: a.role_active ? '' : 'inactive' }, el('span', { textContent: text }));
+        if (canEdit) {
+          const slot = el('span');
+          const remove = button('Remove', () => {
+            slot.replaceChildren(el('span', { className: 'confirm' }, 'Are you sure?',
+              button('Yes', () => act('DELETE', `/api/users/${person.id}/roles`,
+                { role_id: a.role_id, site_code: a.site_code }, `${a.role} removed from ${person.name}.`)),
+              button('No', () => slot.replaceChildren(remove))));
+          });
+          slot.append(remove);
+          item.append(slot);
+        }
+        list.append(item);
+      }
+      card.append(list);
+
+      if (canEdit && !isSuper) {
+        const role = el('select');
+        role.setAttribute('aria-label', `${person.name}: role to add`);
+        for (const r of usable) role.append(el('option', { value: r.id, textContent: r.name }));
+        const site = el('select');
+        site.setAttribute('aria-label', `${person.name}: where`);
+        site.append(el('option', { value: '', textContent: 'All their sites' }));
+        for (const code of person.sites) site.append(el('option', { value: code, textContent: code }));
+        const until = el('input', { type: 'date' });
+        until.setAttribute('aria-label', `${person.name}: until (optional)`);
+        card.append(el('div', { className: 'row-form' }, role, site,
+          el('label', { className: 'muted' }, 'until ', until),
+          button('Add', () => act('POST', `/api/users/${person.id}/roles`, {
+            role_id: Number(role.value),
+            site_code: site.value === '' ? null : site.value,
+            until_date: until.value === '' ? null : until.value,
+          }, `Role added for ${person.name}.`))));
+      }
+      return card;
+    }
+
+    function render() {
+      const canEdit = data.can_edit === true;
+      rolesEl.replaceChildren(...data.roles.map(r => roleCard(r, canEdit)));
+      if (canEdit) rolesEl.append(addRoleForm(data.roles));
+      peopleEl.replaceChildren(...data.people.map(p => personCard(p, data.roles, canEdit)));
+    }
+
+    async function load() {
+      try {
+        const res = await fetch('/api/roles');
+        if (res.status === 401) {
+          rolesEl.replaceChildren(el('p', {}, 'Log in first: ', el('a', { href: 'login.html', textContent: 'Log in' })));
+          peopleEl.replaceChildren();
+          return;
+        }
+        if (!res.ok) throw new Error(String(res.status));
+        data = await res.json();
+        render();
+      } catch (err) {
+        say('Could not load roles.', 'error');
+      }
+    }
+
+    load();
+  </script>
+  <script src="command-panel.js"></script>
+</body>
+</html>

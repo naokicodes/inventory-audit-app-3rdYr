@@ -3287,6 +3287,7 @@ management would turn blind (no sees_expected) the day this step lands. So:
   removed stays removed after a restart. Touches gains: server/index.js.
 
 ## Step roles-page - the Roles page: switches per role, roles per person (A6)
+**CLOSED 2026-11-16, PR #83 (`26b0522`).**
 
 Decided 2026-11-01 (ADR-034). DEPENDS ON role-assignments. The first cut of the Discord-style
 screen.
