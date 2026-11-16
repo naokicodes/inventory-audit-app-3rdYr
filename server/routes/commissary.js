@@ -13,6 +13,8 @@ const { computeYieldRow } = require('../engines/commissaryYieldEngine.js');
 const { computeCommissaryDailyAudit } = require('../engines/commissaryAuditEngine.js');
 const { withTransaction, logActivity } = require('../db/activityLog.js');
 const { isIsoDate, isBlocked, getMonthOpeningStatus, recordRecount, copyAll } = require('../engines/monthOpening.js');
+const { listSiteCodes, siteCodeIn } = require('../db/siteAccess.js');
+const requireAdmin = require('../middleware/requireAdmin.js');
 
 const router = express.Router();
 
@@ -22,6 +24,17 @@ function getYieldLogRow(id) {
 
 function getStockReceiptRow(id) {
   return db.prepare('SELECT * FROM stock_receipts WHERE id = ?').get(id);
+}
+
+// Step site-filter-ii (issue #60 Q3, ADR-091): a list read with no
+// commissary_id keeps only the rows of the user's sites; logged out and
+// bypass roles keep every row. `cm` is the joined commissary_meats row.
+function narrowToUsersCommissaries(req, clauses, params) {
+  const codes = listSiteCodes(db, req.user);
+  if (codes === null) return;
+  const inCodes = siteCodeIn('code', codes);
+  clauses.push(`cm.commissary_id IN (SELECT id FROM commissaries WHERE ${inCodes.sql})`);
+  params.push(...inCodes.params);
 }
 
 function getShipmentWithLines(shipmentId) {
@@ -91,6 +104,7 @@ router.get('/commissary/yield-log', (req, res) => {
   if (business_date) { clauses.push('cyl.business_date = ?'); params.push(business_date); }
   if (commissary_meat_id) { clauses.push('cyl.commissary_meat_id = ?'); params.push(Number(commissary_meat_id)); }
   if (commissary_id) { clauses.push('cm.commissary_id = ?'); params.push(Number(commissary_id)); }
+  else narrowToUsersCommissaries(req, clauses, params);
 
   const ids = db.prepare(`
     SELECT cyl.id
@@ -151,7 +165,18 @@ router.get('/commissary/daily-audit', (req, res) => {
 
   const commissaryMeatId = req.query.commissary_meat_id ? Number(req.query.commissary_meat_id) : null;
   const commissaryId = req.query.commissary_id ? Number(req.query.commissary_id) : null;
-  const rows = computeCommissaryDailyAudit(db, date, commissaryMeatId, commissaryId);
+  let rows = computeCommissaryDailyAudit(db, date, commissaryMeatId, commissaryId);
+  if (!commissaryId) {
+    // Step site-filter-ii: same narrowing as the yield log and adjustments lists.
+    const clauses = [];
+    const params = [];
+    narrowToUsersCommissaries(req, clauses, params);
+    if (clauses.length) {
+      const usable = new Set(db.prepare(`SELECT cm.id FROM commissary_meats cm WHERE ${clauses.join(' AND ')}`)
+        .all(...params).map(r => r.id));
+      rows = rows.filter(r => usable.has(r.commissary_meat_id));
+    }
+  }
   res.json(rows);
 });
 
@@ -422,7 +447,11 @@ router.post('/commissary/shipments', (req, res) => {
 // neighborhood, so it lives here rather than in settings.js.
 //
 // Pure autofill: loading a preset on the shipment form never locks or
-// validates against it (see commissary-shipments.html). Not in rule 9's
+// validates against it (see commissary-shipments.html).
+//
+// Step site-filter-ii (issue #62): saving a preset or a conversion standard
+// needs an admin (requireAdmin, settings-guard); the GETs keep the owner-site
+// rule in requireSiteAccess.js. The shipment form still takes any numbers. Not in rule 9's
 // activity_log scope - same treatment commissary_shipment_lines and
 // commissary_stock_receipts already got.
 
@@ -460,7 +489,7 @@ router.get('/commissary/shipment-presets', (req, res) => {
 // restaurant, every line's meat belongs to that restaurant and is
 // active) so a preset can never point at something the shipment form
 // itself wouldn't allow.
-router.post('/commissary/shipment-presets', (req, res) => {
+router.post('/commissary/shipment-presets', requireAdmin, (req, res) => {
   const { commissary_meat_id, restaurant_id, name, lines } = req.body;
 
   if (!commissary_meat_id || !restaurant_id || !name) {
@@ -523,7 +552,7 @@ router.post('/commissary/shipment-presets', (req, res) => {
 // version against, and this is settings data, not an audited log.
 // Omitting `lines` leaves the existing lines untouched (e.g. a
 // deactivate-only call).
-router.put('/commissary/shipment-presets/:id', (req, res) => {
+router.put('/commissary/shipment-presets/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   const { name, active, lines } = req.body;
 
@@ -624,7 +653,7 @@ router.get('/commissary/conversion-standards', (req, res) => {
 // Standard" admin form still posts commissary_meat_id - it will fail this
 // route's validation until 23c adds a meat-type-aware picker. GET (above)
 // and PUT (below) are unaffected since their own contracts didn't change.
-router.post('/commissary/conversion-standards', (req, res) => {
+router.post('/commissary/conversion-standards', requireAdmin, (req, res) => {
   const { meat_type_id, restaurant_id, meat_id, ratio_per_unit, notes } = req.body;
 
   if (!meat_type_id || !restaurant_id || !meat_id
@@ -667,7 +696,7 @@ router.post('/commissary/conversion-standards', (req, res) => {
 // new one), same reasoning shipment-presets already uses for its own
 // non-editable identifying fields. Unaffected by step 23b's rekey -
 // this route never touched the key fields either way.
-router.put('/commissary/conversion-standards/:id', (req, res) => {
+router.put('/commissary/conversion-standards/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   const { ratio_per_unit, notes, active } = req.body;
 
@@ -951,6 +980,7 @@ router.get('/commissary/adjustments', (req, res) => {
   if (business_date) { clauses.push('ca.business_date = ?'); params.push(business_date); }
   if (commissary_meat_id) { clauses.push('ca.commissary_meat_id = ?'); params.push(Number(commissary_meat_id)); }
   if (commissary_id) { clauses.push('cm.commissary_id = ?'); params.push(Number(commissary_id)); }
+  else narrowToUsersCommissaries(req, clauses, params);
   if (kind) { clauses.push('ca.kind = ?'); params.push(kind); }
 
   const rows = db.prepare(`

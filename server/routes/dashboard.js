@@ -12,6 +12,7 @@ const express = require('express');
 const db = require('../db/connection.js');
 const { computeMeatAudit } = require('../engines/auditEngine.js');
 const { computeCommissaryMeatAudit } = require('../engines/commissaryAuditEngine.js');
+const { listSiteCodes, siteCodeFor } = require('../db/siteAccess.js');
 
 const router = express.Router();
 
@@ -92,9 +93,18 @@ router.get('/dashboard/stock-rollup', (req, res) => {
     return res.status(400).json({ error: 'date is required' });
   }
 
-  const restaurants = restaurant_ids
+  let restaurants = restaurant_ids
     ? restaurant_ids.split(',').map(Number).map(id => db.prepare('SELECT id, name FROM restaurants WHERE id = ? AND active = 1').get(id)).filter(Boolean)
     : db.prepare('SELECT id, name FROM restaurants WHERE active = 1 ORDER BY name').all();
+
+  // Step site-filter-ii (ADR-041): restaurants the user may not use are
+  // dropped; none left -> an empty result, not an error. Logged out and
+  // bypass roles keep every restaurant.
+  const codes = listSiteCodes(db, req.user);
+  if (codes !== null) {
+    restaurants = restaurants.filter(r => codes.includes(siteCodeFor(db, 'restaurant', r.id)));
+    if (restaurants.length === 0) return res.json({ date, restaurants: [], rows: [] });
+  }
 
   // LEFT JOIN, not INNER - SQLite doesn't enforce FKs unless
   // PRAGMA foreign_keys=ON, so a dangling commissary_id is reachable; an

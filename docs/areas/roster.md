@@ -1,6 +1,6 @@
 # Roster
 
-Status: IRL Confirmed (Silingan), Written (Likod, FC) - FLOW Drafted - APP Specced
+Status: IRL Confirmed (Silingan, the Nov 16-22 sheet), Written (Likod, FC) - FLOW Drafted (being redrafted around Fill) - APP Specced, on hold (shift rows, Fill)
 
 ## IRL - how it works today
 
@@ -41,11 +41,44 @@ the 2026-10-28 architect chat; transcribed here so the photos are not needed aga
 - Sunday evening is weekly reports and the weekly wage.
 - 2026-11-15 (Naoki): a Silingan supervisor makes Silingan's roster; the main supervisor (the
   highest) runs FC's and Likod's schedules and lends Silingan people to them, and makes the
-  payroll (money.md). The 10-28 note above has one supervisor making all three: asked whether that
-  changed.
+  payroll (money.md). Confirmed 2026-11-15: two people; this replaces the 10-28 note above
+  that one supervisor makes all three.
 - OJT are not on the roster.
 
+**Silingan's sheet now** (source: Silingan's supervisor's Excel roster, four weekly tabs from Oct 19
+to Nov 22, sent in the 2026-11-15 architect chat; the week of Nov 16-22 transcribed here, people by
+role only):
+- One tab per week, Monday to Sunday; tabs are reused, so a tab's name can be an older week.
+- Rows, with times in some labels: Jr. Supervisor; App. Supervisor; Cashier; Head Chef/Disp
+  9AM-10PM; Cold Station 12-11PM; Kitchen, split into shift rows - Opener 9AM-8PM, Mid-shift
+  11AM-10PM, Mid-shift 1PM-11PM, Closer 2PM-12MN (three closers, the commissary person one of them);
+  Kitchen Scullery 12NN; Pizza/Bread; Bar; Dining - Opener 9AM-8PM, Mid 12NN-9PM, Closer 3PM-10PM;
+  Function; Podium; Food Server; Commissary 9AM-3PM; Bus - Opener 10AM-8PM, Mid-shift 12NN-9PM,
+  Closer 3PM-11PM; Scullery 10AM, 11AM and 1PM.
+- Each cell: a person and their break ("BRK 1-2PM"), mostly the same all week; Break Time rows sit
+  between the stations.
+- Day offs fall only Monday to Thursday (5 to 9 people a day, in a Day Off block at the bottom).
+  Friday to Sunday everyone works, so those rows hold more people, and the three days are the same.
+- A cover shows in the person's own slot with the station ("(BAR)", "(PODIUM)"), or in red at the
+  station covered. On the head chef's day off the cold-station head chef works "opener-closer", and
+  the other way round.
+- The commissary person works the commissary and is also a kitchen closer the same day; whoever
+  covers his day off does both.
+- Bottom rows: Day Off, Leave ("LEAVE: <name>"), Floater (a part day, "9-12NN"; someone at Likod
+  that day), then Present, Day-offs, Leave and Head count, typed by hand.
+- The October tabs had no kitchen shift rows (one kitchen person per row); the shift rows are new in
+  the latest week.
+
+**How he builds it** (Naoki, 2026-11-15): day offs first - who is off each day of the week - then the
+leave slips already handed in, then placing everyone by their main station and the stations they
+cover. Shifts are opener, mid or closer; nobody opens the day after closing: a closer keeps closing
+until a day off, then can open. It takes him a long time; the app should place people for him.
+People without a login (waiters, for now) still go on the roster.
+
 ## FLOW - how they will use the app (drafted)
+
+Being redrafted (2026-11-15) around Fill: day offs first, then leave, then the app places people
+(see Open questions). The steps below are the 11-01 draft.
 
 1. On the weekend, a supervisor opens next week and taps "Copy last week": rest days and stations
    carry over; last week's one-offs (leave, sick, covers, days at another restaurant) go back to
@@ -70,7 +103,12 @@ the 2026-10-28 architect chat; transcribed here so the photos are not needed aga
 - Likod's roster starts when Likod becomes a site (A12); the same features apply.
 - 2026-11-15 (ADR-090): a read-only roster board across sites (Mon-Sun, who is off or away) for
   supervisors and management. Planned: roster-board, after roster-day-status.
+- On hold 2026-11-15: roster-stations to roster-day-status, until their specs gain shift rows, two
+  placements a day, breaks and Fill.
 
 ## Open questions
 
-- None from A6.
+- Asked 2026-11-15 (answers pending): times only inside shift-row names, never hours (keeps
+  ADR-013's "no shift times"); a break as text on each placement; two placements a day (the
+  commissary person, "opener-closer"); one minimum per shift row; the roster steps ahead of
+  cost-guard, side-sheets and supply-tags; a week view like the paper on a computer.

@@ -1,6 +1,6 @@
 # ADR-066 FC on Loyverse; Kitchen Sales switches between POS groups
 
-- Status: Accepted 2026-11-14
+- Status: Accepted 2026-11-14; superseded in part by ADR-094 (FC's side follows its landing, not its categories)
 - Decided by: Naoki
 - Supersedes: -
 

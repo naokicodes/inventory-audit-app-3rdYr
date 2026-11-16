@@ -5,8 +5,9 @@
 // below finds its site, then canUseSite (siteAccess.js) decides.
 // Decisions 2026-11-02 (issue #54; ADR-040, ADR-041):
 // - Logged out (req.user null) passes: scoping is for logged-in users.
-// - Only groups (a) and (b) are scoped here. Two-site routes and cross-site
-//   lists go to site-filter-ii (3zs); Settings to settings-guard (3zu).
+// - Groups (a) and (b) are scoped here, and (c) below since site-filter-ii.
+//   Cross-site lists narrow their own rows (siteAccess.js listSiteCodes);
+//   Settings is settings-guard's (3zu).
 // - A well-formed id that finds no row passes through, so the route answers
 //   404 exactly as it does today.
 // Decisions 2026-11-11 (issue #60; ADR-043):
@@ -110,5 +111,21 @@ router.delete('/commissary/yield-log/:id', byRow('yield_log'));
 router.patch('/commissary/adjustments/:id', byRow('adjustment'));
 router.delete('/commissary/adjustments/:id', byRow('adjustment'));
 router.post('/daily-audit/recount-orders/:id/cancel', byRow('recount_order'));
+
+// (c) Step site-filter-ii (ADR-041): a request naming two sites checks ONE
+// owner site, the site of the people who do the work - never both.
+// The commissary ships and keeps the presets (through the commissary meat):
+router.post('/commissary/shipments', commissaryMeat);
+router.get('/commissary/shipment-presets', commissaryMeat);
+router.post('/commissary/shipment-presets', commissaryMeat);
+router.put('/commissary/shipment-presets/:id', byRow('shipment_preset'));
+router.get('/commissary/adjustments/destinations', commissaryMeat);
+// Ratio conversion is the restaurant's:
+router.get('/commissary/conversion-standards', restaurant);
+router.post('/commissary/conversion-standards', restaurant);
+router.put('/commissary/conversion-standards/:id', byRow('conversion_standard'));
+// An allocation is its entry's restaurant's:
+router.get('/allocations', restaurant);
+router.post(['/allocations', '/allocations/conversion'], restaurant);
 
 module.exports = router;

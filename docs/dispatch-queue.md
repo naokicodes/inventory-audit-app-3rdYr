@@ -84,6 +84,12 @@ is. Read the step's own section in `session-status.md` before starting.
 > roster-day-status land.
 > **2026-11-15 (commissary and POs):** ADR-092, ADR-093. supply-tags specced (Queue -> Supply; after
 > 3zw and cost-guard). meat-request and no-popups planned.
+> **2026-11-15 (A0 #84, FC map, beta-3):** ADR-094, ADR-095. Naoki: PR #83 (3zk) changes to match
+> ADR-095, then its phone check; landing-sales (runnable: no file shared with an open PR);
+> restaurant-pc-ii; preview-pid. Tag beta-3 once #83, landing-sales and restaurant-pc-ii are merged
+> and the smoke list passes; the restaurant PC installs fresh then (nothing is installed there
+> yet). Marble: 3zw staff-meal-settings as planned. **On hold:** 3zl to 3zo (shift rows, two
+> placements a day, breaks, Fill: the next drop-in).
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -324,22 +330,27 @@ The first cut of the Discord-style screen. PUBLIC -> click-through. Full spec: s
 "Step roles-page".
 **2026-11-14 (ADR-073):** create and rename refuse a name another role holds by the name key.
 **2026-11-15 (ADR-082, ADR-083):** built-in roles keep their names; the import stops changing an existing role's switches or person's base role and lists what it left alone. After import-settings-env (same file). See the spec.
+**2026-11-15 (#84, ADR-095):** the four switch lines stay; Remove works on an inactive role's assignment; Add role copies checker by default. PR #83 changes to match. See the spec.
 
 ### 3zl. Step roster-stations - stations as roster rows and the sheets they open  [blocked: sheets-tier1, import-identity, role-assignments]
+**ON HOLD 2026-11-15:** shift rows, two placements a day, breaks and Fill change 3zl to 3zo before they run (the next drop-in). Do not start.
 Touches: server/db/schema.sql, server/engines/stations.js, server/engines/stations.test.js, server/routes/staff.js, server/routes/staff.test.js, server/index.js, scripts/import-settings.js, public/staff.html, public/index.html
 Stations per site (data, never seeded), a kitchen flag, links to sheets (also at another site), a
 Stations import tab and the Staff page's Stations section. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step roster-stations".
 
 ### 3zm. Step roster-staff - main station, sub-stations, standing access, login link  [blocked: roster-stations]
+**ON HOLD 2026-11-15:** see 3zl.
 Touches: server/db/schema.sql, server/engines/staff.js, server/engines/staff.test.js, server/routes/staff.js, server/routes/staff.test.js, scripts/import-settings.js, public/staff.html
 PUBLIC -> click-through. Full spec: session-status.md -> "Step roster-staff".
 
 ### 3zn. Step roster-week - placements, rest days, copy last week  [blocked: roster-staff, business-day]
+**ON HOLD 2026-11-15:** see 3zl.
 Touches: server/db/schema.sql, server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js, server/routes/roster.test.js, server/index.js, public/roster.html, public/index.html
 PUBLIC -> click-through. Full spec: session-status.md -> "Step roster-week".
 
 ### 3zo. Step roster-day-status - leave, sick, absent, floater, covering; totals and head count  [blocked: roster-week]
+**ON HOLD 2026-11-15:** see 3zl.
 Touches: server/engines/roster.js, server/engines/roster.test.js, server/routes/roster.js, server/routes/roster.test.js, public/roster.html
 Provides the staff-meal head-count prefill (A10 uses it). PUBLIC -> click-through. Full spec:
 session-status.md -> "Step roster-day-status".
@@ -352,13 +363,14 @@ PUBLIC -> click-through. Full spec: session-status.md -> "Step tonight-picks".
 Touches: server/engines/tonightWork.js, server/engines/tonightWork.test.js, server/routes/auth.js, server/routes/auth.test.js, server/routes/roster.js, public/login.html, public/index.html
 PUBLIC -> click-through. Full spec: session-status.md -> "Step login-tonight".
 
-### 3zr. Step write-permission - only tonight's people write  [blocked: login-tonight, site-filter]
+### 3zr. Step write-permission - only tonight's people write  [blocked: login-tonight]
 Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/tonightWork.test.js, server/middleware/requireSiteAccess.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, the site-scoped route tests, server/index.js, server/middleware/refuseReadOnly.js, server/middleware/refuseReadOnly.test.js
 ADR-011 enforced on the meat landing counts and the commissary writes; canUseSite widened. Click-
 through of the refusal message. Full spec: session-status.md -> "Step write-permission".
 **2026-11-15 (ADR-084):** + a read-only login is refused every write (cubic on PR #59). See the spec.
 
 ### 3zs. Step site-filter-ii - two-site requests and lists across sites  [blocked: site-filter, user-id-authorship]
+**CLOSED 2026-11-15, PR #80 (`8a2d8fd`).**
 Touches: server/middleware/requireSiteAccess.js, server/db/siteAccess.js, server/routes/commissary.js, server/routes/allocations.js, server/routes/dailyAudit.js, server/routes/dashboard.js, server/routes/commands.js, server/routes/commissary.test.js, server/routes/allocations.test.js, server/routes/dailyAudit.test.js, server/routes/dashboard.test.js, server/routes/commands.test.js, server/routes/stockReceipts.js, server/routes/stockReceipts.test.js
 ADR-041: each two-site request checks its owner site only; the picker and the rollup trim to the
 user's sites; admin commands need a bypass role. Server-only, no click-through. Full spec:
@@ -434,6 +446,13 @@ ADR-066: FC is the third Loyverse account; Kitchen Sales switches between Siling
 FC's side grouped by FC's own categories (the pizzaman reads Pizza there). PUBLIC ->
 click-through. Full spec: session-status.md -> "Step loyverse-fc".
 **2026-11-14:** issue #73 answered (ADR-076): refunds subtract on FC's side, deleted items keep their category; PR #71 complete as built.
+
+### Step landing-sales - Kitchen Sales: FC by landing line, a Pizza table on both sides  [runnable]
+Touches: server/db/loyverse-name-map.json, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, public/kitchen-sales.html
+ADR-094: FC's side is one table of its landing lines in portions (platters folded in), each line
+opening to its items and to what other dishes took; a Pizza table on both sides; the rest in "Not
+on the landing". Part of beta-3. PUBLIC -> click-through. Full spec: session-status.md -> "Step
+landing-sales".
 
 ### Step cost-guard - unit costs need the see_costs switch  [blocked: role-assignments]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
@@ -636,8 +655,9 @@ lands, so it is written against the code it builds on. Roughly in order:
   sales links - Loyverse item, side item, amount per sale - and deals with their free drinks);
   bar-check (ADR-025, ADR-065, ADR-087: expected and the difference for items sold as they are,
   deal drinks entered at closing, each bar against its own Loyverse account); bar-shorts (ADR-087,
-  ADR-088: the supervisor's list of differences, explanation or charge); fc-dish-map (FC's Loyverse
-  items to FC's dishes, after FC's dish list is refreshed). Full specs once side-sheets lands.
+  ADR-088: the supervisor's list of differences, explanation or charge); fc-dish-map (FC's dishes
+  and recipes in the database for the landing's expected values, from ADR-094's map and takes in
+  meat-landing.md; Kitchen Sales' FC side is landing-sales). Full specs once side-sheets lands.
 - **Sites (ADR-091):** site-picker (the count pages' pickers show only `can_use` sites; a 403 shows
   its message instead of "Loading..."); blind-history (a blind viewer's History hides the numbers
   the count screen hides; Q15).
