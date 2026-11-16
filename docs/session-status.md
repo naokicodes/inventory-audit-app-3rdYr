@@ -3947,7 +3947,7 @@ Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example. Server
 click-through.
 
 ## Step staff-meal-settings - meal slots, budgets and the rice rates in Settings (A10)
-$L
+**CLOSED 2026-11-16, PR #82 (`f49e5f4`).**
 
 Decided 2026-10-28 and 2026-11-11 (ADR-027, ADR-044). DEPENDS ON settings-guard (3zu: requireAdmin
 on /api/settings). Schema step: one at a time with the other schema.sql steps.
