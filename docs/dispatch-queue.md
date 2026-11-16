@@ -325,6 +325,7 @@ Server-only, no click-through. Full spec: session-status.md -> "Step role-assign
 **2026-11-12:** + ensureRoleDefaults() at server start, because beta.db is never reseeded - see the spec.
 
 ### 3zk. Step roles-page - switches per role, roles per person  [blocked: role-assignments, import-settings-env]
+**CLOSED 2026-11-16, PR #83 (`26b0522`).**
 Touches: public/roles.html, public/index.html, server/routes/roles.js, server/routes/roles.test.js, server/index.js, server/db/permissions.js, scripts/import-settings.js, server/db/importSettings.test.js
 The first cut of the Discord-style screen. PUBLIC -> click-through. Full spec: session-status.md ->
 "Step roles-page".
