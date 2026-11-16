@@ -413,6 +413,7 @@ cubic's P1 on PR #61: an HMAC on the user_id cookie (node:crypto, COOKIE_SECRET 
 dependency). Server-only, no click-through. Full spec: session-status.md -> "Step sign-the-cookie".
 
 ### 3zw. Step staff-meal-settings - meal slots, budgets and rice rates in Settings  [blocked: settings-guard]
+$L
 Touches: server/db/schema.sql, server/db/seed.js, server/engines/staffMealSettings.js, server/engines/staffMealSettings.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
 ADR-027, ADR-044: slots per restaurant with a fixed budget and/or a per-head rate; dated rice
 rates. Admin-only writes. PUBLIC -> click-through. Full spec: session-status.md -> "Step
