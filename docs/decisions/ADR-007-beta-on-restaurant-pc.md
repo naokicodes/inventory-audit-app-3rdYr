@@ -1,6 +1,6 @@
 # ADR-007 Beta runs on the restaurant PC, pinned to tags
 
-- Status: Accepted 2026-10-28
+- Status: Accepted 2026-10-28; superseded in part by ADR-105 (backups)
 - Decided by: Naoki
 - Supersedes: the unrecorded 2026-10-24 laptop-server plan
 

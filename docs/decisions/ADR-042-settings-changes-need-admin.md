@@ -1,6 +1,6 @@
 # ADR-042 Settings changes need an admin
 
-- Status: Accepted 2026-11-02
+- Status: Accepted 2026-11-02; superseded in part by ADR-099 (the admin check stays on the base role)
 - Decided by: Naoki
 - Supersedes: none
 

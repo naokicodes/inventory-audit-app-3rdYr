@@ -3,7 +3,8 @@
 - Status: Accepted 2026-10-28
 - Decided by: Naoki
 - Supersedes: none
-- Superseded by: ADR-038 (the derivation line and the Likod line only)
+- Superseded by: ADR-038 (the derivation line and the Likod line only); ADR-101 in part (what a
+  counter sees: beginning and new stock are shown)
 
 ## Context
 

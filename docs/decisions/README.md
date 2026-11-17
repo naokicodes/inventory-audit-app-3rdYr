@@ -49,7 +49,7 @@ flight. (ADR-001 explains the split.)
 | ADR-004 | SPOS ownership while Prince is busy | Accepted 2026-10-20 |
 | ADR-005 | SPOS moves into this repo after Beta | Accepted 2026-10-21 |
 | ADR-006 | /naoki-qs merge policy: gates replace human code review | Accepted 2026-10-21 |
-| ADR-007 | Beta runs on the restaurant PC, pinned to tags | Accepted 2026-10-28 |
+| ADR-007 | Beta runs on the restaurant PC, pinned to tags | Accepted 2026-10-28; backups line superseded by ADR-105 |
 | ADR-008 | How architect work runs: area docs, a queue, Edge states, ask first | Accepted 2026-10-24 |
 | ADR-009 | Public repo, private details | Accepted 2026-10-24 |
 | ADR-010 | Roles and site scope | Accepted 2026-10-28 |
@@ -57,7 +57,7 @@ flight. (ADR-001 explains the split.)
 | ADR-012 | Stations and sheets | Accepted 2026-10-22 |
 | ADR-013 | The roster | Accepted 2026-10-28; superseded in part by ADR-096 (week start, two placements a day) |
 | ADR-014 | Kitchen dispatch and tonight's kitchen counter | Accepted 2026-10-28; landing line superseded by ADR-035 |
-| ADR-015 | Blind counting and the quiet recount | Accepted 2026-10-28; derivation and Likod lines superseded by ADR-038 |
+| ADR-015 | Blind counting and the quiet recount | Accepted 2026-10-28; derivation and Likod lines superseded by ADR-038; what a counter sees superseded by ADR-101 |
 | ADR-016 | One unit per meat on the landing | Accepted 2026-10-28 |
 | ADR-017 | Commi access, not a sub-commi | Accepted 2026-10-28; superseded in part by ADR-067 (FC's direct meats) |
 | ADR-018 | Counted-meat costing and miscut as stock | Accepted 2026-10-28 |
@@ -76,7 +76,7 @@ flight. (ADR-001 explains the split.)
 | ADR-031 | Pizza: dough first (partly decided) | Accepted 2026-10-25 |
 | ADR-032 | Grouped navigation, after table-scroll | Accepted 2026-10-21 |
 | ADR-033 | The sales day turns at 8am | Accepted 2026-10-30; scope widened by ADR-036 |
-| ADR-034 | Roles per site and role switches | Accepted 2026-11-01 |
+| ADR-034 | Roles per site and role switches | Accepted 2026-11-01; superseded in part by ADR-099 (admin and read-only only as base roles) |
 | ADR-035 | The landing belongs to the head-chef role at that site | Accepted 2026-11-01 |
 | ADR-036 | The business day turns at 8am everywhere | Accepted 2026-11-01 |
 | ADR-037 | Roster placements, copying, picks and access | Accepted 2026-11-01 |
@@ -84,7 +84,7 @@ flight. (ADR-001 explains the split.)
 | ADR-039 | Testing: Claude checks the logic, people check the looks; fake test accounts | Accepted 2026-11-02 |
 | ADR-040 | Logged-out visitors keep working until write-permission | Accepted 2026-11-02 |
 | ADR-041 | Site scoping: one owner site per request | Accepted 2026-11-02; superseded in part by ADR-091 (the site picker list) |
-| ADR-042 | Settings changes need an admin | Accepted 2026-11-02 |
+| ADR-042 | Settings changes need an admin | Accepted 2026-11-02; superseded in part by ADR-099 (the admin check stays on the base role) |
 | ADR-043 | Catalog reads stay open | Accepted 2026-11-11; its cost question answered by ADR-060 |
 | ADR-044 | Staff rice is an estimate line, never in the meal budget | Accepted 2026-11-11 |
 | ADR-045 | Staff meals: any cook logs, the head chef checks | Accepted 2026-11-11 |
@@ -126,7 +126,7 @@ flight. (ADR-001 explains the split.)
 | ADR-081 | The settings import uses the app's database and says which file | Accepted 2026-11-15 |
 | ADR-082 | Roles are changed on the Roles page; the people workbook adds people and sets sites | Accepted 2026-11-15 |
 | ADR-083 | Built-in roles keep their names | Accepted 2026-11-15 |
-| ADR-084 | A read-only login is refused every write, from write-permission | Accepted 2026-11-15 |
+| ADR-084 | A read-only login is refused every write, from write-permission | Accepted 2026-11-15; superseded in part by ADR-102 (the refusal lands with write-switches) |
 | ADR-085 | New restaurants follow Silingan's setup by default | Accepted 2026-11-15 |
 | ADR-086 | Side waste is logged any time; the sheet's checker ticks it | Accepted 2026-11-15 |
 | ADR-087 | How a bar is checked | Accepted 2026-11-15 |
@@ -140,6 +140,14 @@ flight. (ADR-001 explains the split.)
 | ADR-095 | Roles page: switch wording, removing extra roles, the copy default | Accepted 2026-11-15 |
 | ADR-096 | Roster: shift rows, day offs first, and Fill | Accepted 2026-11-16 |
 | ADR-097 | The app runs without a coder | Accepted 2026-11-16 |
+| ADR-098 | Sign the cookie now; one shared password for admin accounts | Accepted 2026-11-17 |
+| ADR-099 | Admin and management are base roles only | Accepted 2026-11-17 |
+| ADR-100 | Staff-meal budgets and rates: on the cook's page, behind see_costs in Settings, never logged out | Accepted 2026-11-17 |
+| ADR-101 | Blind counting follows the paper: Beginning and New stock are shown | Accepted 2026-11-17 |
+| ADR-102 | Which switch allows which write | Accepted 2026-11-17 |
+| ADR-103 | Tailscale counts as inside the restaurant for ADR-040 | Accepted 2026-11-17 |
+| ADR-104 | A row nobody touched never saves | Accepted 2026-11-17 |
+| ADR-105 | Beta's database: one-file backups, a restore, a copy off the PC, its name | Accepted 2026-11-17 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

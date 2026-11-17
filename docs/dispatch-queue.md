@@ -96,6 +96,29 @@ is. Read the step's own section in `session-status.md` before starting.
 > One schema step at a time (3zl, 3zm and 3zn each change schema.sql). cost-guard, side-sheets
 > and supply-tags wait until roster-fill. Naoki: landing-sales, restaurant-pc-ii (now with
 > auto-start at boot), preview-pid; beta-3 after them.
+> **2026-11-17 (Fable fixes; ADR-098 to ADR-105) - Order now. This note replaces the order in the
+> notes above.** Nothing was built overnight; business-day had closed on 11-02 (PR #55). The Fable
+> P0/P1 fixes go ahead of the roster; session-status' 2026-11-17 block places every finding.
+> **Before beta-3.** Marble: stale-saves (runnable) -> sign-the-cookie (widened, ADR-098) ->
+> roles-guard -> save-safety -> cost-guard (widened, ADR-100). Naoki: preview-pid -> landing-sales
+> -> npm-audit -> db-start -> backup-restore -> restaurant-pc-ii (respecced). Each spec lands one
+> step ahead of its build (see "Planned - Fable fixes"). Tag beta-3 when all of these are merged and
+> the smoke list passes.
+> **After beta-3.** Marble: roster-stations -> roster-staff -> roster-week -> roster-day-status ->
+> roster-fill -> tonight-picks (each spec's 2026-11-17 block first). Naoki: stock-math ->
+> settings-safety. blind-reads and write-switches in whichever lane is free (no file shared with
+> the roster steps). The P2 Fable steps go between roster steps. Parked until after roster-fill:
+> allocation-requests, sheet-close, staff-meal-log to staff-meal-view, side-sheets, supply-tags.
+> One schema step at a time (db-start adds indexes to schema.sql).
+
+#### Fable fixes (2026-11-17)
+
+### Step stale-saves - a row nobody touched never saves  [runnable]
+Touches: server/engines/blindCount.js, server/engines/blindCount.test.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/commands.test.js, public/daily-audit.html, public/commissary.html
+ADR-104 (Fable I-01 = F2 = U-01, U-04, I-02 = U-03): a phone's Save no longer puts back numbers its
+person never typed - landing counts, portions and prepped, and the commissary count, which also
+keeps and shows its notes. No schema change. PUBLIC -> click-through. Full spec:
+session-status.md -> "Step stale-saves".
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -276,11 +299,11 @@ Touches: public/style.css, public/fonts/
 Pages stop waiting on Google Fonts over the restaurant Wi-Fi. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step self-host-font".
 
-### 3zc. Step allocation-requests - counters ask, the head chef confirms  [blocked: user-id-authorship]
+### 3zc. Step allocation-requests - counters ask, the head chef confirms  [parked: after roster-fill (2026-11-17 note)]
 Touches: server/db/schema.sql, server/engines/allocationRequests.js, server/engines/allocationRequests.test.js, server/routes/allocations.js, public/daily-audit.html
 PUBLIC -> click-through. Full spec: session-status.md -> "Step allocation-requests".
 
-### 3zd. Step sheet-close - admins close a sheet  [blocked: sheets-tier1]
+### 3zd. Step sheet-close - admins close a sheet  [parked: after roster-fill (2026-11-17 note)]
 Touches: server/engines/sheetDefinitions.js, server/engines/sheetDefinitions.test.js, server/routes/settings.js, public/settings.html, server/index.js
 PUBLIC -> click-through. Full spec: session-status.md -> "Step sheet-close".
 
@@ -339,7 +362,7 @@ The first cut of the Discord-style screen. PUBLIC -> click-through. Full spec: s
 **2026-11-15 (ADR-082, ADR-083):** built-in roles keep their names; the import stops changing an existing role's switches or person's base role and lists what it left alone. After import-settings-env (same file). See the spec.
 **2026-11-15 (#84, ADR-095):** the four switch lines stay; Remove works on an inactive role's assignment; Add role copies checker by default. PR #83 changes to match. See the spec.
 
-### 3zl. Step roster-stations - stations as roster rows and the sheets they open  [blocked: sheets-tier1, import-identity, role-assignments]
+### 3zl. Step roster-stations - stations as roster rows and the sheets they open  [blocked: beta-3, then its 2026-11-17 block]
 **2026-11-16 (ADR-096):** hold lifted. Shift rows (name, kind, minimum) per station, a Shifts import tab. See the spec's decision block.
 Touches: server/db/schema.sql, server/engines/stations.js, server/engines/stations.test.js, server/routes/staff.js, server/routes/staff.test.js, server/index.js, scripts/import-settings.js, public/staff.html, public/index.html
 Stations per site (data, never seeded), a kitchen flag, links to sheets (also at another site), a
@@ -381,6 +404,9 @@ Touches: server/db/siteAccess.js, server/engines/tonightWork.js, server/engines/
 ADR-011 enforced on the meat landing counts and the commissary writes; canUseSite widened. Click-
 through of the refusal message. Full spec: session-status.md -> "Step write-permission".
 **2026-11-15 (ADR-084):** + a read-only login is refused every write (cubic on PR #59). See the spec.
+**2026-11-17 (ADR-102):** the read-only refusal and the per-write switches move forward to step
+write-switches (Planned - Fable fixes); this step keeps "only tonight's people write", and also
+guards the side-sheet save (C-11).
 
 ### 3zs. Step site-filter-ii - two-site requests and lists across sites  [blocked: site-filter, user-id-authorship]
 **CLOSED 2026-11-15, PR #80 (`8a2d8fd`).**
@@ -419,7 +445,7 @@ Touches: public/settings.html
 Issue #70 (ADR-077): `.tabs` becomes one row that swipes sideways; the page stays still. Style
 only, page-local. PUBLIC -> click-through. Full spec: session-status.md -> "Step settings-tabs".
 
-### 3zv. Step sign-the-cookie - the login cookie carries a signature  [blocked: write-permission]
+### 3zv. Step sign-the-cookie - the login cookie carries a signature  [blocked: stale-saves, then its 2026-11-17 block (ADR-098)]
 Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example
 cubic's P1 on PR #61: an HMAC on the user_id cookie (node:crypto, COOKIE_SECRET in .env, no
 dependency). Server-only, no click-through. Full spec: session-status.md -> "Step sign-the-cookie".
@@ -431,7 +457,7 @@ ADR-027, ADR-044: slots per restaurant with a fixed budget and/or a per-head rat
 rates. Admin-only writes. PUBLIC -> click-through. Full spec: session-status.md -> "Step
 staff-meal-settings".
 
-### 3zx. Step staff-meal-log - the Staff meals page: log today's meals  [blocked: staff-meal-settings, role-assignments]
+### 3zx. Step staff-meal-log - the Staff meals page: log today's meals  [parked: after roster-fill (2026-11-17 note)]
 Touches: server/db/schema.sql, server/db/permissions.js, server/db/permissions.test.js, server/engines/staffMeals.js, server/engines/staffMeals.test.js, server/routes/staffMeals.js, server/routes/staffMeals.test.js, server/index.js, public/staff-meals.html, public/index.html
 ADR-045, ADR-046: one meal per site, day and slot; any cook logs; meat posts through allocations;
 typed non-meat lines. PUBLIC -> click-through. Full spec: session-status.md -> "Step
@@ -461,14 +487,14 @@ FC's side grouped by FC's own categories (the pizzaman reads Pizza there). PUBLI
 click-through. Full spec: session-status.md -> "Step loyverse-fc".
 **2026-11-14:** issue #73 answered (ADR-076): refunds subtract on FC's side, deleted items keep their category; PR #71 complete as built.
 
-### Step landing-sales - Kitchen Sales: FC by landing line, a Pizza table on both sides  [runnable]
+### Step landing-sales - Kitchen Sales: FC by landing line, a Pizza table on both sides  [Naoki's own PR]
 Touches: server/db/loyverse-name-map.json, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, public/kitchen-sales.html
 ADR-094: FC's side is one table of its landing lines in portions (platters folded in), each line
 opening to its items and to what other dishes took; a Pizza table on both sides; the rest in "Not
 on the landing". Part of beta-3. PUBLIC -> click-through. Full spec: session-status.md -> "Step
 landing-sales".
 
-### Step cost-guard - unit costs need the see_costs switch  [blocked: role-assignments]
+### Step cost-guard - unit costs need the see_costs switch  [blocked: save-safety, then its 2026-11-17 block (ADR-100)]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
 ADR-060: cost fields leave every read for anyone without see_costs, logged out included; adds
 edit_side_items (ADR-062). PUBLIC -> click-through. Full spec: session-status.md -> "Step
@@ -491,6 +517,8 @@ Touches: scripts/restaurant-pc.bat
 cubic on PR #47: `update` copies the new bat over the desktop launcher's copy; a failed firewall or
 power command shows `[!]`. Checked at the PC at beta-3. Full spec: session-status.md -> "Step
 restaurant-pc-ii".
+**2026-11-17:** respecced before it runs (U-20 to U-23, auto-start after db-start; see Planned -
+Fable fixes): do not start.
 
 #### Sides (A8)
 
@@ -502,7 +530,7 @@ Settings fixes single items. PUBLIC -> click-through. Full spec: session-status.
 side-items".
 **2026-11-14:** PR #74's review questions answered (ADR-078): skipped rows change nothing, conflicts are held, item on / off, main unit fixed once it has conversions. PR #74 changes to match.
 
-### Step side-sheets - count a side sheet; usage shows as you type  [blocked: side-items, site-filter]
+### Step side-sheets - count a side sheet; usage shows as you type  [parked: after roster-fill (2026-11-17 note)]
 Touches: server/db/schema.sql, server/engines/sideCounts.js, server/engines/sideCounts.test.js, server/routes/sideSheets.js, server/routes/sideSheets.test.js, server/index.js, public/side-sheets.html, public/index.html
 ADR-063: ending in any unit, out of stock, remark, PO; Used = yesterday + received - ending as you
 type. PUBLIC -> click-through. Full spec: session-status.md -> "Step side-sheets".
@@ -594,6 +622,58 @@ port, sheets, sides, PO, staging) into this queue. The rule underneath stands: o
 adds a step, and an idle assistant costs far less than an invented one.
 
 ---
+
+## Planned - Fable fixes (2026-11-17; each specced one step ahead of its build)
+
+From the five Fable reports (docs/reviews/). Order: the 2026-11-17 note at the top of the Queue.
+Every finding's place: session-status, 2026-11-17 block.
+
+Before beta-3:
+- **sign-the-cookie** (3zv, widened; Marble): the signed cookie now, and one shared password for
+  admin accounts (ADR-098); the login reads whole-number ids only. PERM-07.
+- **roles-guard** (Marble): the built-in admin role cannot be switched off or lose admin; admin and
+  read-only only as base roles (ADR-099); role names too close to a built-in one are refused.
+  U-17 = PERM-10, PERM-09 = C-14, PERM-14.
+- **save-safety** (Marble): one Save = one transaction; the lock wait works (BEGIN IMMEDIATE); a
+  JSON error handler, never a stack trace; counts, receipts and shipments refuse bad numbers, every
+  write refuses a bad business date, naming the row; body ids must be numbers. I-08 = F5, F3,
+  PERM-12, I-07 = U-08, I-09, run 1's `{}` lead.
+- **cost-guard** (queued; Marble; widened by ADR-100): plus History, the rice price and the two
+  staff-meal Settings reads; a missing key keeps the stored value (cost, meat type, active); cost
+  inputs disabled without see_costs. PERM-06 = C-03 = C-04 = U-11, U-12, I-11 item 4.
+- **npm-audit** (Naoki): `npm audit fix`, lockfile only. N-1.
+- **db-start** (Naoki): five indexes; DB_PATH resolved from the app folder and a missing database
+  refused; the reseed and seed:test guards compare the file, and reseed refuses beta.db (ADR-105);
+  sheet definitions made at server start; a schema version. F1, F10, PERM-18, I-15, B1 note 3,
+  PR #64's leftovers.
+- **backup-restore** (Naoki): one-file backups, a `restore` word, kept by age, an optional copy
+  folder (ADR-105). F4 (P0), B1 note 2.
+- **restaurant-pc-ii** (queued; Naoki; respecced): the desktop launcher becomes a one-line call of
+  the repo's copy; an "update unfinished" marker; no `npm ci` when the lockfile is unchanged; every
+  message names a first step; auto-start, after db-start. U-20 to U-23, run 4's D7, PR #47's
+  leftovers.
+
+After beta-3:
+- **blind-reads**: ADR-101 on every page; takes over blind-history. PERM-03 = C-13 = U-10,
+  PERM-01, PERM-02.
+- **write-switches**: ADR-102's switches; the read-only refusal; opening changes logged. PERM-05,
+  PERM-04, U-14 (management writes).
+- **stock-math** (Naoki): a yield's input count on a kg meat; shipped receipts locked on Stock
+  Receipts; a transfer inside one restaurant refused; the opening day in the covered window; "Sync
+  batch stock" follows sales changes; an item must belong to the restaurant; conversion ids
+  compared as numbers. I-03, I-05, I-06, I-10, I-12, PERM-17, I-14.
+- **settings-safety** (Naoki, after cost-guard): a recipe edit no longer counts twice on its day; a
+  meat's unit locked once used; a duplicate recipe line refused; Settings changes logged; seeded
+  adjustment types pinned; seeded recipes dated early. I-04, I-11, PERM-16 = C-09, I-14.
+
+P2, between roster steps: **page-errors** (U-05, U-09, U-06, U-07, U-13, U-14's name and Log out on
+two pages), **page-dates** (F7 = U-15), **list-limits** (F6), **actor-from-login** (PERM-08 = I-13),
+**import-report** (U-18, U-19, PERM-11), **loyverse-guard** (Naoki, after landing-sales: PERM-15,
+F8, I-14's unused name-map keys).
+
+Planned steps widened: name-map-settings also holds the POS accounts (F9); no-popups (U-16);
+grouped navigation (U-14); site-picker (U-02); the shipment void goes with ADR-092's Received
+(I-05); write-permission also guards the side-sheet save (C-11).
 
 ## Planned — multi-user surface (architect-defined, NOT yet specified)
 

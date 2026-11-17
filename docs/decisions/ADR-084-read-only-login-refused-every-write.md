@@ -1,6 +1,7 @@
 # ADR-084 A read-only login is refused every write, from write-permission
 
-- Status: Accepted 2026-11-15
+- Status: Accepted 2026-11-15; superseded in part by ADR-102 (the refusal lands with write-switches,
+  before write-permission)
 - Decided by: Naoki
 - Supersedes: none (it places ADR-010's "management: read-only, with no exception")
 

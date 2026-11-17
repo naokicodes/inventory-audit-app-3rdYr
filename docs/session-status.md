@@ -132,9 +132,61 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-097; the index, and a map from handoff item numbers to records, is in
+to ADR-105; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-17 architect (Fable reports sorted, the beta-3 line) - decided (recorded: ADR-098 to ADR-105)
+
+- **The Fable reports** (docs/reviews/, five read-only runs on `2cb16ee`): all 91 findings hold
+  against the code; none is rejected. Severities changed: U-17 = PERM-10 is P1 (one visible tap,
+  no confirm); PERM-07 stays P0 and is fixed now (ADR-098); F7 is real only for a phone with the
+  wrong date (U-15). Where each finding went:
+
+| Step or record | Findings | Lane, when |
+|---|---|---|
+| stale-saves (specced below) | I-01 = F2 = U-01, U-04, I-02 = U-03 | Marble, before beta-3 |
+| sign-the-cookie, widened | PERM-07 | Marble, before beta-3 (ADR-098) |
+| roles-guard | U-17 = PERM-10, PERM-09 = C-14, PERM-14 | Marble, before beta-3 (ADR-099) |
+| save-safety | I-08 = F5, F3, PERM-12, I-07 = U-08, I-09; run 1's `{}` lead | Marble, before beta-3 |
+| cost-guard, widened | PERM-06 = C-03 = C-04 = U-11, U-12, I-11 item 4 | Marble, before beta-3 (ADR-100) |
+| npm-audit | N-1 | Naoki, before beta-3 |
+| db-start | F1, F10, PERM-18, I-15, B1 note 3; PR #64's leftover cubic items | Naoki, before beta-3 (ADR-105) |
+| backup-restore | F4, B1 note 2 | Naoki, before beta-3 (ADR-105) |
+| restaurant-pc-ii, respecced | U-20 to U-23, run 4's D7; PR #47's leftover cubic items | Naoki, before beta-3 |
+| blind-reads | PERM-03 = C-13 = U-10, PERM-01, PERM-02; takes over blind-history | after beta-3 (ADR-101) |
+| write-switches | PERM-05, PERM-04, U-14 (management writes) | after beta-3 (ADR-102) |
+| stock-math | I-03, I-05 (shipped receipts locked), I-06, I-10, I-12, PERM-17, I-14 (conversion ids) | Naoki, after beta-3 |
+| settings-safety | I-04, I-11, PERM-16 = C-09, I-14 (seeded types, seed dates) | Naoki, after beta-3 and cost-guard |
+| page-errors | U-05, U-09, U-06, U-07, U-13, U-14 (name and Log out on two pages) | P2, between roster steps |
+| page-dates | F7 = U-15 | P2 |
+| list-limits | F6 | P2 |
+| actor-from-login | PERM-08 = I-13 | P2 |
+| import-report | U-18, U-19, PERM-11 | P2 |
+| loyverse-guard | PERM-15, F8, I-14 (unused name-map keys) | Naoki, P2, after landing-sales |
+| planned steps, widened | F9 -> name-map-settings (POS accounts); U-16 -> no-popups; U-14 nav -> grouped navigation; U-02 -> site-picker; I-05's shipment void -> with ADR-092's Received; C-11 -> write-permission also guards the side-sheet save | - |
+| docs (next drop-ins) | C-01, C-02 (this drop-in), C-05, C-07, C-08, C-09 wording, C-11, C-12, C-15, C-16, C-17, C-19, C-20, C-21, C-25; run 2's notes on side-sheets, side-waste and cost-guard | architect |
+| A14b clean-up | C-10, C-22, C-23, C-24; run 4's D2 to D7 | architect |
+
+- **The reports' "Not done" lists.** Run 1's `{}` lead (an empty object as the first SQL value
+  shifts the rest) goes into save-safety: body ids must be numbers or number strings. The two-phone
+  case for dish rows and recounts runs through `saveCount`, so stale-saves covers it. For the beta-3
+  install checklist: run 4's `fsync.js` on the restaurant PC, a real iPhone, Kitchen Sales with the
+  real tokens, the 30 Nov -> 1 Dec turn at 07:59. Loyverse's real rate limits wait for the real
+  port; SPOS and a full security pass wait for Live.
+- **Decided:** ADR-098 (sign the cookie now; one shared password for admin accounts), ADR-099
+  (admin and management are base roles only), ADR-100 (staff-meal budgets and rates behind
+  see_costs in Settings, never logged out), ADR-101 (blind counting follows the paper: Beginning and
+  New stock shown; never sales, adjustments, expected or variance, on any page), ADR-102 (which
+  switch allows which write), ADR-103 (Tailscale counts as inside, once ADR-098 lands), ADR-104 (a
+  row nobody touched never saves), ADR-105 (one-file backups, restore, a copy off the PC, the name
+  beta.db, reseed refuses it).
+- **Also accepted, recorded with their steps in the next drop-ins:** staff-meal-log may pick a side
+  item with an approximate quantity (C-17, ends ADR-046's typed-only period); the roster spec
+  answers as run 3 suggested (C-12, C-15, C-16; on paper the person covering the commissary
+  person's day off does both of his jobs, roster.md).
+- **Order:** dispatch-queue's 2026-11-17 note. Nothing was built overnight; business-day had closed
+  on 11-02 (PR #55).
 
 ### 2026-11-16 architect (roster Fill, A5 scope, runs without a coder) - decided (recorded: ADR-096, ADR-097)
 
@@ -516,6 +568,8 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
 - **Concurrency is optimistic** (a version / `updated_at` column + "changed under
   you — reload"), paired with `busy_timeout` and one-owner-per-sheet. NOT
   last-write-wins, NOT a waitlist.
+  **Superseded 2026-11-17 by ADR-104:** last save wins for what a person typed; a row nobody
+  touched never saves; no version column.
 - **Sales ingestion is source-agnostic** (business_date, product_id, quantity,
   source), Loyverse-first, custom POS a later adapter; map by explicit
   product_id, never by name; quantities only.
@@ -4931,3 +4985,81 @@ other fields.
 Touches: server/db/schema.sql, server/db/migrate.js, server/db/connection.js,
 server/db/migrate.test.js, server/routes/settings.js, server/routes/settings.test.js,
 public/settings.html.
+
+## Step stale-saves - a row nobody touched never saves (A0, Fable 2026-11-17)
+
+Decided ADR-104 (2026-11-17), with ADR-015 and ADR-080. Fixes Fable I-01 = F2 = U-01, U-04 and
+I-02 = U-03 (docs/reviews/fable-2026-11-17-2-integrity.md, -4-scale.md, -5-pages-updates.md hold
+the repros). No schema change. Marble's lane, before beta-3.
+
+What staff see: two phones on one sheet no longer undo each other. Save writes only what the person
+on that phone typed; a newer count saved from another phone stays. "Saved N meat row(s)" counts the
+rows really written. On the commissary page the Notes box shows the note already saved for each
+meat, a later save keeps it, and the logged-in person is the one named as the counter.
+
+Server:
+1. `saveCount` (server/engines/blindCount.js): after `current` is read, a row not marked touched
+   never replaces a stored value: `if (!touched && current) return null;`. With nothing stored, an
+   untouched row is still written (a first count from a client that sends no touched flag). This
+   covers meat endings and portion counts (both routes call saveCount) and recounts: the first
+   counter's stale phone can no longer undo a recount.
+2. `POST /api/daily-audit`: `saved` counts only the rows saveCount wrote (it returns the entry type,
+   or null).
+3. `POST /api/daily-audit/portions`: prepped is written only for a row marked touched (a new row or a
+   change). The page shows 0 for "no prepped row" and posts it back; today that stores 0 for every
+   dish and makes "Sync batch stock" skip them all (U-04). `saved` counts a row only when prepped
+   was written or saveCount wrote.
+4. `POST /api/commissary/daily-audit` (server/routes/commissary.js): each row may carry `touched`. A
+   row not marked touched is skipped when a count is already stored for that meat and day (a first
+   count is still written, as in 1). `notes`: an absent key keeps the stored note; a sent value
+   replaces it (empty or blank clears it). `created_by` is the logged-in person's name, the posted
+   `actor` only when logged out (ADR-040). `saved` counts the rows written.
+5. `GET /api/commissary/daily-audit`: each row gains `notes`, the stored note for that meat and day
+   (null when none).
+
+Pages:
+- public/commissary.html: the Notes box shows the stored note (escaped like the page's other text).
+  Typing in a row's count or note marks the row touched (a Set, as on the landing); Save posts
+  `touched` on every row. The message stays "Saved.", or reads "Nothing new to save." when no row
+  was written and none refused.
+- public/daily-audit.html: when both requests report 0 rows written and nothing was refused, the
+  message reads "Nothing new to save." instead of "Saved 0 meat row(s)."
+
+Edge states: Failure - unchanged (one transaction per Save comes with save-safety). Partial - a
+refused (month-blocked) row is named as today. Empty - nothing typed: "Nothing new to save.", no
+write, no history row. Stale - a phone loaded before another phone's save writes only what its
+person typed; every other row keeps the newer stored value. Blocked - the month block refuses as
+today. Inactive - unchanged. Two devices - for an item both people typed, the last save wins and
+both stay in history (ADR-015); an item only one of them typed keeps that person's number.
+
+Tests (made-up names; the reports' repros as tests):
+- Meat: A saves 40, A corrects to 47, B posts 40 untouched plus another item touched -> the stored
+  count is 47, count_entries has no entry by B for that item, and B's typed item is saved.
+- The same for a PORTION row, and for a recount: the first counter's untouched repost after the
+  recount leaves the recount.
+- An untouched row with nothing stored still creates the count.
+- The landing's `saved`: 11 rows posted, one typed -> 1.
+- Portions: an untouched dish row with prepped "0" and no prepped row writes no prepped row and no
+  activity_log row, and `POST /api/commands/sync-batch-stock` then fills it from sales (the U-04
+  chain). An untouched row whose prepped differs from the stored one leaves it; a touched one writes
+  it. Existing prepped tests send `touched: true` where they expect a write.
+- Commissary: A saves 60, A corrects to 66 with a note, B posts 60 untouched plus another meat
+  touched -> 66 and the note stay; a second save with nothing touched keeps the note; a touched row
+  with notes "" clears it; a touched row without the notes key keeps it; a logged-in save stamps the
+  logged-in name, not the posted actor; the GET returns notes.
+
+Click-through (390px; ADR-039 split). Claude checks: two browser tabs as Test Counter RA and Test
+Head Chef RA on one landing date - the counter saves an item, the head chef's tab loads, the counter
+corrects it, the head chef types a different item and saves; after a reload the correction stands.
+On the commissary page as Test Commi: save a count with a note, reload, the note shows; save again
+with nothing typed, reload, the note is still there. You check: the Notes box reads cleanly at 390px.
+
+Touches: server/engines/blindCount.js, server/engines/blindCount.test.js,
+server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js,
+server/routes/commissary.test.js, server/routes/commands.test.js, public/daily-audit.html,
+public/commissary.html. PUBLIC -> click-through before merge.
+
+Not in scope: commissary count history (count_entries is keyed by restaurant; later); one
+transaction per Save and the error messages (save-safety); the "Your name" box and History's actor
+(actor-from-login); a commissary draft and drafts per person (page-errors); "Sync batch stock"
+following later sales changes (stock-math, I-12); a "changed under you" warning (ADR-104: none).

@@ -1,6 +1,6 @@
 # ADR-034 Roles per site and role switches
 
-- Status: Accepted 2026-11-01
+- Status: Accepted 2026-11-01; superseded in part by ADR-099 (admin and read-only only as base roles)
 - Decided by: Naoki
 - Supersedes: the stub-login decision "per-site / per-shift roles are not modelled" (issue #34,
   Q2, 2026-10-22); refines ADR-010
