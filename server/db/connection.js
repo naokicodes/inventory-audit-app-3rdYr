@@ -20,7 +20,23 @@ const { migrateStockReceiptsNullableDestination, migrateLocationsActiveColumn, m
 const DB_PATH = resolveDbPath();
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
+// Step db-start (B1 note 3): the schema version this code leaves a database
+// at, kept in PRAGMA user_version. Raise it in a step that changes or drops
+// something (not one that only adds), together with that step's migration.
+// A database at a higher version was opened by newer code: an older app must
+// not run on it.
+const SCHEMA_VERSION = 1;
+
 const db = new DatabaseSync(DB_PATH);
+
+// Checked before anything below writes to the file.
+const openedVersion = db.prepare('PRAGMA user_version').get().user_version;
+if (openedVersion > SCHEMA_VERSION) {
+  db.close();
+  const err = new Error('This database was opened by a newer version of the app. Update the app (restaurant-pc.bat update) instead of going back.');
+  err.code = 'DB_SCHEMA_TOO_NEW';
+  throw err;
+}
 
 // A couple of pragmas for a shared, multi-user local SQLite file:
 db.exec('PRAGMA journal_mode = WAL');   // better crash-safety, minimal downside here
@@ -101,5 +117,12 @@ migrateCreatedByUserIdColumns(db);
 // or duplicates existing data.
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
 db.exec(schema);
+
+// Step db-start: after the migrations and schema.sql, the file is at
+// SCHEMA_VERSION. Written only when it differs (a database from before this
+// step reads 0).
+if (openedVersion !== SCHEMA_VERSION) {
+  db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
 
 module.exports = db;
