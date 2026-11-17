@@ -110,6 +110,9 @@ is. Read the step's own section in `session-status.md` before starting.
 > the roster steps). The P2 Fable steps go between roster steps. Parked until after roster-fill:
 > allocation-requests, sheet-close, staff-meal-log to staff-meal-view, side-sheets, supply-tags.
 > One schema step at a time (db-start adds indexes to schema.sql).
+> **2026-11-18:** npm-audit and db-start are runnable now: the overnight runner (scripts/run-queue.ps1,
+> started on Naoki's laptop) may build them, after stale-saves and before preview-pid and
+> landing-sales (no shared files). Naoki reviews and merges.
 
 #### Fable fixes (2026-11-17)
 
@@ -120,17 +123,19 @@ person never typed - landing counts, portions and prepped, and the commissary co
 keeps and shows its notes. No schema change. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step stale-saves".
 
-### Step npm-audit - npm audit fix, lockfile only  [Naoki's own PR]
+### Step npm-audit - npm audit fix, lockfile only  [runnable]
 Touches: package-lock.json
 Fable N-1: three advisories under express (proxy-addr, body-parser, qs); `npm audit fix` changes the
 lockfile only. Server-only. Full spec: session-status.md -> "Step npm-audit".
+**2026-11-18:** runnable for the overnight runner; Naoki reviews and merges.
 
-### Step db-start - the database at start: indexes, the right file, safer guards  [Naoki's own PR]
+### Step db-start - the database at start: indexes, the right file, safer guards  [runnable]
 Touches: server/db/schema.sql, server/db/dbPath.js, server/db/testAccounts.js, server/db/connection.js, server/db/seed.js, scripts/seed-test-accounts.js, server/index.js, server/db/reseed.test.js, server/db/testAccounts.test.js, server/db/connection.test.js
 ADR-105, Fable F1, F10, PERM-18, I-15: five indexes (the first thing to slow down), DB_PATH read from
 the repo root and a missing file refused, both seed guards check the real file and reseed refuses
 beta.db, sheet definitions at start, a schema version. Schema step (indexes). Server-only. Full
 spec: session-status.md -> "Step db-start".
+**2026-11-18:** runnable for the overnight runner; Naoki reviews and merges.
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
