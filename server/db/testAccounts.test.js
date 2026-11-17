@@ -35,7 +35,10 @@ test('testAccountsRefusal: refuses when DB_PATH is unset or empty', () => {
 
 test('testAccountsRefusal: refuses the live inventory.db by any path shape', () => {
   assert.match(testAccountsRefusal(LIVE_DB_PATH), /live database/);
-  assert.match(testAccountsRefusal(path.relative(process.cwd(), LIVE_DB_PATH)), /live database/);
+  // Step db-start: a relative DB_PATH is resolved against the repo root.
+  assert.match(testAccountsRefusal(path.relative(path.join(__dirname, '..', '..'), LIVE_DB_PATH)), /live database/);
+  assert.match(testAccountsRefusal('server/db/inventory.db.'), /live database/);
+  assert.match(testAccountsRefusal('server/db/inventory.db '), /live database/);
   const roundabout = path.join(path.dirname(LIVE_DB_PATH), '..', 'db', 'inventory.db');
   assert.match(testAccountsRefusal(roundabout), /live database/);
 });
@@ -48,6 +51,16 @@ test('testAccountsRefusal: refuses beta.db in any folder and any letter case', (
   assert.match(testAccountsRefusal('server/db/beta.db'), /beta\.db/i);
   assert.match(testAccountsRefusal('/some/other/dir/beta.db'), /beta\.db/i);
   assert.match(testAccountsRefusal('server/db/BETA.DB'), /beta\.db/i);
+});
+
+test('testAccountsRefusal: refuses beta.db with a trailing full stop or space', () => {
+  assert.match(testAccountsRefusal('server/db/beta.db.'), /beta\.db/i);
+  assert.match(testAccountsRefusal('server/db/beta.db '), /beta\.db/i);
+  assert.match(testAccountsRefusal('/some/other/dir/Beta.DB.'), /beta\.db/i);
+});
+
+test('testAccountsRefusal: refuses a ":" after the drive letter (a Windows file stream)', () => {
+  assert.match(testAccountsRefusal('server/db/preview.db:stream'), /":" after the drive letter/);
 });
 
 test('testAccountsRefusal: allows a disposable file such as preview.db or dev.db', () => {
@@ -149,6 +162,32 @@ test('the super-admin user is untouched', () => {
   assert.strictEqual(after.default_role_id, roleId['super-admin']);
 });
 
+test('an account whose name does not start with "Test " is skipped with a warning, never created', () => {
+  const { db, roleId } = freshDb();
+  const intruders = [
+    { name: 'ana', role: 'admin', sites: ['RA'] },        // a real person's row
+    { name: 'Tester Bob', role: 'admin', sites: [] },     // "Test" without the space
+  ];
+  TEST_ACCOUNTS.push(...intruders);
+  const warnings = [];
+  const realWarn = console.warn;
+  console.warn = msg => warnings.push(String(msg));
+  let result;
+  try {
+    result = ensureTestAccounts(db);
+  } finally {
+    console.warn = realWarn;
+    TEST_ACCOUNTS.splice(TEST_ACCOUNTS.length - intruders.length, intruders.length);
+  }
+  assert.strictEqual(result.users, TEST_ACCOUNTS.length, 'only the Test accounts were created');
+  assert.ok(warnings.some(w => w.includes('"ana"') && /skipped/.test(w)), 'warned about ana');
+  assert.ok(warnings.some(w => w.includes('"Tester Bob"') && /skipped/.test(w)), 'warned about Tester Bob');
+  assert.strictEqual(userRow(db, 'Tester Bob'), undefined);
+  const ana = userRow(db, 'ana');
+  assert.strictEqual(ana.default_role_id, roleId['checker'], 'ana keeps the checker role');
+  assert.deepStrictEqual(siteCodes(db, ana.id), [], 'ana gains no site');
+});
+
 test('a deactivated Test user is reactivated on the next run (upsert)', () => {
   const { db } = freshDb();
   ensureTestAccounts(db);
@@ -157,6 +196,38 @@ test('a deactivated Test user is reactivated on the next run (upsert)', () => {
   ensureTestAccounts(db);
   assert.strictEqual(userRow(db, 'Test Admin').active, 1);
 });
+
+// --- the script, the way preview.ps1 runs it (scratch files only) ---
+
+{
+  const os = require('os');
+  const { spawnSync } = require('child_process');
+  const ROOT = path.join(__dirname, '..', '..');
+  const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-accounts-'));
+  const run = (file, args, dbPath) => spawnSync(process.execPath, [file, ...args], {
+    cwd: ROOT, env: { ...process.env, DB_PATH: dbPath }, encoding: 'utf8',
+  });
+  const SEED_TEST = path.join(ROOT, 'scripts', 'seed-test-accounts.js');
+
+  test('seed:test after a reseed: creates the accounts on a scratch preview.db', () => {
+    const preview = path.join(scratchDir, 'preview.db');
+    const reseed = run(path.join(__dirname, 'seed.js'), ['--reset'], preview);
+    assert.strictEqual(reseed.status, 0, reseed.stderr);
+    const r = run(SEED_TEST, [], preview);
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.match(r.stdout, new RegExp(`Test accounts: ${TEST_ACCOUNTS.length} user\\(s\\) created`));
+  });
+
+  test('seed:test refuses a beta.db with a trailing full stop and creates no file', () => {
+    const beta = path.join(scratchDir, 'beta.db.');
+    const r = run(SEED_TEST, [], beta);
+    assert.strictEqual(r.status, 1);
+    assert.match(r.stderr, /seed:test refused: DB_PATH points at beta\.db/);
+    assert.deepStrictEqual(fs.readdirSync(scratchDir).filter(f => /^beta/i.test(f)), []);
+  });
+
+  fs.rmSync(scratchDir, { recursive: true, force: true });
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

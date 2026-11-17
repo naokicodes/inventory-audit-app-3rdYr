@@ -19,16 +19,18 @@
 //
 // Step reseed-beta-db (2026-09-27): `--reset` (npm run reseed) first clears
 // every app table in SQL, then re-runs schema.sql and this seed - a clean
-// reset for the disposable Beta database. It REFUSES unless DB_PATH is set
-// and resolves to something other than the live inventory.db (#12). No file
-// is ever deleted. The live wipe at the Beta->Live gate is a separate step.
+// reset for a disposable database. It REFUSES unless DB_PATH is set and
+// resolves to something other than the live inventory.db (#12) - and, since
+// step db-start (ADR-105), other than any beta.db: Beta's data lives there.
+// No file is ever deleted. The live wipe at the Beta->Live gate is a
+// separate step.
 //
-// Run with: DB_PATH=server/db/beta.db npm run reseed
+// Run with: DB_PATH=server/db/dev.db npm run reseed
 
 const fs = require('fs');
 const path = require('path');
 
-const { reseedRefusal } = require('./dbPath.js');
+const { reseedRefusal, openedFileRefusal } = require('./dbPath.js');
 
 const RESET = process.argv.includes('--reset');
 
@@ -43,6 +45,17 @@ if (RESET) {
 }
 
 const db = require('./connection.js');
+
+// Step db-start: the path check above cannot see every spelling of a file.
+// Once it is open and before the reset's first write, compare the file SQLite
+// actually opened with the live inventory.db and beta.db by identity.
+if (RESET) {
+  const refusal = openedFileRefusal(db, 'reseed');
+  if (refusal) {
+    console.error(refusal);
+    process.exit(1);
+  }
+}
 
 // Clears every app table, FK-safe, then re-runs schema.sql so its own
 // INSERT OR IGNORE reference rows come back. Migrations already ran when
@@ -269,7 +282,7 @@ for (const [code, names] of Object.entries(DEFAULT_SLOTS)) {
 console.log(`Staff meal slots: ${slotsInserted} inserted`);
 
 // A reset must end on a consistent file: any dangling reference means the
-// clear or the reseed went wrong, so fail loudly rather than hand Beta a
+// clear or the reseed went wrong, so fail loudly rather than hand on a
 // broken database.
 if (RESET) {
   const dangling = db.prepare('PRAGMA foreign_key_check').all();
