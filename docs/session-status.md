@@ -4612,7 +4612,11 @@ known).
   (docs/areas/meat-landing.md, FC's map). It is on no line: its map entry has `"pos": {}` and its
   `takes`. It shows only under "Also taken" on the Bagnet line, and is not listed in "Not on the
   landing".
-- The pizza categories stay `PIZZA` for Silingan and Likod, as above.
+- **Likod's pizza category is `Likod Pizza`, not `PIZZA`** (checked against Likod's Loyverse item
+  export, 2026-11-17): the map's `likod` entry is `{ "categories": ["Likod Pizza"] }`. Silingan's
+  stays `PIZZA`; it also holds the pizza/bread station's breads, dough and pizza add-ons, and the
+  Pizza table shows them all, as above. FC's entry is right as written, and every name in FC's map
+  is an item in FC's export.
 - Tests add: an add-on with `"pos": {}` adds to the line it takes from and to no line of its own.
 
 ## Step cost-guard - unit costs need the see_costs switch (A0)
