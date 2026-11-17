@@ -4169,6 +4169,37 @@ a signature of the wrong length does not throw.
 Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example. Server-only, no
 click-through.
 
+**Decisions 2026-11-17 (ADR-098; Fable PERM-07).** These override any reading of the text above.
+- DEPENDS ON stale-saves only (queue order), not write-permission. The first paragraph's reason is
+  out of date: Settings, the Roles page and the admin commands already depend on who you are, and a
+  typed `user_id=1` passes them today.
+- **One shared admin password.** `.env` gains `ADMIN_PASSWORD` (`.env.example` gets the line, empty).
+  `POST /api/auth/login` takes `{ user_id, password }`. When the picked user's base role grants
+  admin (loadUser's `can_admin` is 1: admin, super-admin), `password` must equal ADMIN_PASSWORD
+  (compare SHA-256 digests with crypto.timingSafeEqual); otherwise, after a one-second pause, 401
+  "Wrong admin password." and no cookie. Other users' logins ignore `password`. When ADMIN_PASSWORD
+  is not set, admin logins pass without one and the server prints one warning at start
+  ("ADMIN_PASSWORD is not set: anyone can log in as an admin. Add it to .env."); the restaurant PC's
+  setup asks for it (restaurant-pc-ii).
+- `GET /api/auth/users` gains `needs_password` (true for those users only). public/login.html:
+  tapping such a name shows an "Admin password" box and a Log in button; a refusal shows the
+  server's message under the box. Every other name logs in on one tap, as today.
+- The login takes `user_id` only as a whole number (a number, or a string of digits); anything else
+  is 400 "Pick an active user." (`true`, `[1]`, `1.0` and `"0x2"` are refused). The cookie parser
+  keeps its digits-only id, and the first well-formed signed `user_id` cookie wins.
+- Edge states add: Blocked - a wrong or missing admin password: 401, the message under the box, no
+  cookie. Inactive - a switched-off admin role grants no admin, so no password is asked and nothing
+  is granted.
+- Tests add: an admin login with no password, a wrong one and the right one (401, 401, 200 with a
+  signed cookie); a checker logs in with no password; ADMIN_PASSWORD unset: an admin login passes
+  and the warning prints once; `needs_password` is true only for admin base roles; `user_id` of
+  `true`, `[1]`, `1.0` or `"0x2"` -> 400; a typed unsigned `Cookie: user_id=1` reads as logged out.
+- Touches add: public/login.html. PUBLIC -> click-through (390px). Claude checks: Test Admin is
+  asked for the password, a wrong one is refused with the message, the right one logs in; Test
+  Counter RA logs in on one tap. You check the looks.
+- Not in scope: cookie expiry (changing COOKIE_SECRET logs everyone out: the way to end every
+  session); per-person passwords (before Live, ADR-011).
+
 ## Step staff-meal-settings - meal slots, budgets and the rice rates in Settings (A10)
 **CLOSED 2026-11-16, PR #82 (`f49e5f4`).**
 
@@ -4575,6 +4606,14 @@ public/kitchen-sales.html. PUBLIC -> click-through before merge.
 Not in scope: FC's dishes and recipes in the database and the landing's expected values
 (fc-dish-map); pizza dough and counts (A11); the pork pancit (a remark until its Loyverse item is
 known).
+
+**Decisions 2026-11-17 (Naoki).** These override any reading of the text above.
+- FC's `PORK 150grms (Add ons)` is the pork for a pork pancit: it takes Bagnet 1
+  (docs/areas/meat-landing.md, FC's map). It is on no line: its map entry has `"pos": {}` and its
+  `takes`. It shows only under "Also taken" on the Bagnet line, and is not listed in "Not on the
+  landing".
+- The pizza categories stay `PIZZA` for Silingan and Likod, as above.
+- Tests add: an add-on with `"pos": {}` adds to the line it takes from and to no line of its own.
 
 ## Step cost-guard - unit costs need the see_costs switch (A0)
 
@@ -5063,3 +5102,90 @@ Not in scope: commissary count history (count_entries is keyed by restaurant; la
 transaction per Save and the error messages (save-safety); the "Your name" box and History's actor
 (actor-from-login); a commissary draft and drafts per person (page-errors); "Sync batch stock"
 following later sales changes (stock-math, I-12); a "changed under you" warning (ADR-104: none).
+
+## Step npm-audit - the three npm advisories, lockfile only (A0, Fable N-1)
+
+Decided 2026-11-17 (Fable run 1, N-1). Naoki's lane, before beta-3: the restaurant PC installs fresh
+at beta-3, so a lockfile change costs nothing there.
+
+- Run `npm audit fix`, never `--force`. Expected: only package-lock.json changes, moving proxy-addr,
+  body-parser and qs to fixed versions inside express 4's own ranges. If package.json changes, a
+  major version moves, or `npm audit` still lists an advisory afterwards, stop and ask.
+- Then `npm ci` and `npm run verify`. The PR body shows `npm audit` before and after.
+
+Edge states: none apply (no behaviour, data or page changes).
+
+Tests: none new; the suite stays green.
+
+Touches: package-lock.json. Server-only, no click-through.
+
+Not in scope: upgrading express itself; any other dependency.
+
+## Step db-start - the database at server start: indexes, the right file, safer guards (A0, Fable)
+
+Decided 2026-11-17 (ADR-105; Fable F1, F10, PERM-18, I-15, B1 note 3). Naoki's lane, before beta-3
+and before restaurant-pc-ii (its auto-start needs item 2). One schema step at a time: this one adds
+indexes to schema.sql.
+
+What staff and the admin see: nothing, while things are right. The count page stays fast as history
+grows; the app never quietly opens an empty database; the two seed commands cannot be pointed at a
+real database by a stray character.
+
+1. **Indexes (F1).** schema.sql ends with:
+   `CREATE INDEX IF NOT EXISTS idx_sales_lookup ON sales (restaurant_id, dish_id, business_date);`
+   `CREATE INDEX IF NOT EXISTS idx_stock_receipts_lookup ON stock_receipts (restaurant_id, meat_id, business_date);`
+   `CREATE INDEX IF NOT EXISTS idx_adjustments_lookup ON adjustments (restaurant_id, meat_id, business_date);`
+   `CREATE INDEX IF NOT EXISTS idx_count_entries_lookup ON count_entries (restaurant_id, business_date, kind, item_id);`
+   `CREATE INDEX IF NOT EXISTS idx_recount_orders_lookup ON recount_orders (restaurant_id, business_date);`
+   and one index each for the commissary tables its engine reads by meat and day
+   (commissary_shipments, commissary_yield_log, commissary_adjustments), after checking each query
+   with EXPLAIN QUERY PLAN. schema.sql runs at every start, so beta.db gets them at the next update.
+2. **The right file (F10).** resolveDbPath resolves a relative DB_PATH against the repo root
+   (`path.resolve(__dirname, '..', '..', DB_PATH)`), not the working directory: the same `.env`
+   line means the same file wherever the app is started from (the Startup shortcut, a scheduled
+   task). In server/index.js, before the database opens: when DB_PATH is set and its file does not
+   exist, print "The database file <path> is missing. Nothing was started. On a new install, run
+   the setup again; otherwise check DB_PATH in .env." and exit 1. An unset DB_PATH (dev's
+   inventory.db) is unchanged, and seed.js still creates a new file (the setup's first run).
+3. **Safer guards (PERM-18, ADR-105).** One `samePath`, in dbPath.js, used by both guards
+   (testAccounts.js's copy goes). Before comparing, it drops full stops and spaces from the end of
+   the resolved path; a `:` after the drive letter is refused. reseedRefusal also refuses beta.db
+   in any folder and any case ("Reseed never runs on beta.db: Beta's data lives there."), and its
+   examples name dev.db. Then, in `seed.js --reset` and scripts/seed-test-accounts.js, once the
+   database is open and before the first write: read the opened file from `PRAGMA database_list`
+   and compare its identity (`fs.statSync(file, { bigint: true })`, dev and ino) with the live
+   inventory.db's and server/db/beta.db's (whichever exist); refuse on a match.
+4. **Sheet definitions at start (I-15).** server/index.js calls `ensureDefaultSheets(db)` next to
+   `ensureRoleDefaults(db)`. It inserts only what is missing, so a site added in Settings and a
+   never-reseeded beta.db get their Landing / Commi sheet.
+5. **A schema version (B1 note 3).** connection.js sets `PRAGMA user_version` to `SCHEMA_VERSION`
+   (1, a constant beside the migrations) after the migrations and schema.sql. A database whose
+   user_version is above SCHEMA_VERSION stops the server: "This database was opened by a newer
+   version of the app. Update the app (restaurant-pc.bat update) instead of going back." A later
+   step that changes or drops something, not only adds, raises SCHEMA_VERSION.
+6. **PR #64's tidy-ups** (the 2026-11-15 cubic list): the duplicate samePath goes (item 3); a test
+   for testAccounts' `Test ` name guard.
+
+Edge states: Failure - a missing database file or a newer database stops the server with its
+message, before anything is written. Partial - none: every index is IF NOT EXISTS and a re-run adds
+nothing. Empty - a fresh seed gets the indexes, its sheets and version 1 at the first start. Stale -
+beta.db (version 0) gets the indexes, any missing sheet and version 1 at the first start after the
+update. Blocked - a guard's refusal prints and exits before any write. Inactive - an inactive site
+gets no sheet, as today. Two devices - do not apply.
+
+Tests: EXPLAIN QUERY PLAN for the landing's sales, receipts, adjustments, count_entries and recount
+lookups uses the new indexes (no SCAN); a relative DB_PATH resolves to the same file from the repo
+root and from another folder; the server refuses a missing DB_PATH file and creates nothing (a child
+process started from a temp folder); reseedRefusal refuses `inventory.db.`, `inventory.db ` and
+`beta.db` in any case and with a trailing full stop or space, and allows `dev.db`;
+testAccountsRefusal refuses `beta.db.`; the identity check refuses a scratch file opened under
+another spelling of its own name; a restaurant created after seeding gets its Landing at the next
+start; user_version is 1 after start, and a database at 2 stops the server with the message.
+
+Touches: server/db/schema.sql, server/db/dbPath.js, server/db/testAccounts.js,
+server/db/connection.js, server/db/seed.js, scripts/seed-test-accounts.js, server/index.js,
+server/db/reseed.test.js, server/db/testAccounts.test.js, server/db/connection.test.js. Server-only,
+no click-through. You check (at the beta-3 install): the server starts on beta.db as before.
+
+Not in scope: the backup and restore (backup-restore); the launcher (restaurant-pc-ii); indexes on
+other tables.

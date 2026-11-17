@@ -120,6 +120,18 @@ person never typed - landing counts, portions and prepped, and the commissary co
 keeps and shows its notes. No schema change. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step stale-saves".
 
+### Step npm-audit - npm audit fix, lockfile only  [Naoki's own PR]
+Touches: package-lock.json
+Fable N-1: three advisories under express (proxy-addr, body-parser, qs); `npm audit fix` changes the
+lockfile only. Server-only. Full spec: session-status.md -> "Step npm-audit".
+
+### Step db-start - the database at start: indexes, the right file, safer guards  [Naoki's own PR]
+Touches: server/db/schema.sql, server/db/dbPath.js, server/db/testAccounts.js, server/db/connection.js, server/db/seed.js, scripts/seed-test-accounts.js, server/index.js, server/db/reseed.test.js, server/db/testAccounts.test.js, server/db/connection.test.js
+ADR-105, Fable F1, F10, PERM-18, I-15: five indexes (the first thing to slow down), DB_PATH read from
+the repo root and a missing file refused, both seed guards check the real file and reseed refuses
+beta.db, sheet definitions at start, a schema version. Schema step (indexes). Server-only. Full
+spec: session-status.md -> "Step db-start".
+
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
 ### 1. Step 25d-ii — CLOSED 2026-09-22, PR #5 (`6c21238`).
@@ -445,10 +457,13 @@ Touches: public/settings.html
 Issue #70 (ADR-077): `.tabs` becomes one row that swipes sideways; the page stays still. Style
 only, page-local. PUBLIC -> click-through. Full spec: session-status.md -> "Step settings-tabs".
 
-### 3zv. Step sign-the-cookie - the login cookie carries a signature  [blocked: stale-saves, then its 2026-11-17 block (ADR-098)]
-Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example
+### 3zv. Step sign-the-cookie - the login cookie carries a signature  [blocked: stale-saves]
+Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example, public/login.html
 cubic's P1 on PR #61: an HMAC on the user_id cookie (node:crypto, COOKIE_SECRET in .env, no
 dependency). Server-only, no click-through. Full spec: session-status.md -> "Step sign-the-cookie".
+**2026-11-17 (ADR-098):** runs now, after stale-saves; + one shared admin password (ADMIN_PASSWORD in
+.env) for accounts whose base role has admin, and whole-number ids only. PUBLIC -> click-through
+(the login page). See the spec's 2026-11-17 block.
 
 ### 3zw. Step staff-meal-settings - meal slots, budgets and rice rates in Settings  [blocked: settings-guard]
 **CLOSED 2026-11-16, PR #82 (`f49e5f4`).**
@@ -493,6 +508,8 @@ ADR-094: FC's side is one table of its landing lines in portions (platters folde
 opening to its items and to what other dishes took; a Pizza table on both sides; the rest in "Not
 on the landing". Part of beta-3. PUBLIC -> click-through. Full spec: session-status.md -> "Step
 landing-sales".
+**2026-11-17:** + FC's `PORK 150grms (Add ons)` takes Bagnet 1 (an item on no line). See the spec's
+2026-11-17 block.
 
 ### Step cost-guard - unit costs need the see_costs switch  [blocked: save-safety, then its 2026-11-17 block (ADR-100)]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
@@ -628,9 +645,9 @@ adds a step, and an idle assistant costs far less than an invented one.
 From the five Fable reports (docs/reviews/). Order: the 2026-11-17 note at the top of the Queue.
 Every finding's place: session-status, 2026-11-17 block.
 
+Specced and in the Queue: stale-saves, sign-the-cookie (3zv), npm-audit, db-start.
+
 Before beta-3:
-- **sign-the-cookie** (3zv, widened; Marble): the signed cookie now, and one shared password for
-  admin accounts (ADR-098); the login reads whole-number ids only. PERM-07.
 - **roles-guard** (Marble): the built-in admin role cannot be switched off or lose admin; admin and
   read-only only as base roles (ADR-099); role names too close to a built-in one are refused.
   U-17 = PERM-10, PERM-09 = C-14, PERM-14.
@@ -641,11 +658,6 @@ Before beta-3:
 - **cost-guard** (queued; Marble; widened by ADR-100): plus History, the rice price and the two
   staff-meal Settings reads; a missing key keeps the stored value (cost, meat type, active); cost
   inputs disabled without see_costs. PERM-06 = C-03 = C-04 = U-11, U-12, I-11 item 4.
-- **npm-audit** (Naoki): `npm audit fix`, lockfile only. N-1.
-- **db-start** (Naoki): five indexes; DB_PATH resolved from the app folder and a missing database
-  refused; the reseed and seed:test guards compare the file, and reseed refuses beta.db (ADR-105);
-  sheet definitions made at server start; a schema version. F1, F10, PERM-18, I-15, B1 note 3,
-  PR #64's leftovers.
 - **backup-restore** (Naoki): one-file backups, a `restore` word, kept by age, an optional copy
   folder (ADR-105). F4 (P0), B1 note 2.
 - **restaurant-pc-ii** (queued; Naoki; respecced): the desktop launcher becomes a one-line call of

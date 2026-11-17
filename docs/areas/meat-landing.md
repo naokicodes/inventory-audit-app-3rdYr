@@ -95,8 +95,9 @@ Takes (shown as "also taken" on the line taken from):
 - `LAING PORK - SOLO`: Bagnet 1/2. `PLATTER - LAING PORK`: Bagnet 1.
 - `CHICKEN PORK ADOBO - SOLO`: Bagnet 1/2, Quarter 1. `PLATTER - CHICKEN PORK ADOBO`: Bagnet 1,
   Quarter 1 (a bigger quarter).
-- `CHICKEN SALPICAO`, `TINOLA SA UPO`, `CANTON GUISADO`, `PANCIT de ORO`: Quarter 1. A pork pancit
-  takes Bagnet 1 instead: a remark until its Loyverse item is known.
+- `CHICKEN SALPICAO`, `TINOLA SA UPO`, `CANTON GUISADO`, `PANCIT de ORO`: Quarter 1.
+- `PORK 150grms (Add ons)`: Bagnet 1 - the pork for a pork pancit, on no line of its own (Naoki,
+  2026-11-17).
 - `BAGLAW`: Bagnet 1.
 - `HALF CHICKEN`: Whole Chicken 1/2.
 
