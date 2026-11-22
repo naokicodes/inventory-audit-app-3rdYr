@@ -199,6 +199,7 @@ ADR-112: the server keeps each Kitchen Sales result in memory (today 2 minutes, 
 click-through. Full spec: session-status.md -> "Step sales-cache".
 
 ### Step ui-shell - one top bar, a grouped menu, a Home of big buttons, the app icon  [blocked: sales-cache (order)]
+**CLOSED 2026-11-22, PR #93 (`e29cc0f`).**
 Touches: public/shell.js, public/manifest.webmanifest, public/icons/, public/style.css, public/command-panel.js, public/allocations.html, public/commissary-shipments.html, public/commissary.html, public/daily-audit.html, public/dashboard.html, public/history.html, public/index.html, public/kitchen-sales.html, public/login.html, public/roles.html, public/sales.html, public/settings.html, public/stock-receipts.html, public/terminal.html, server/uiShell.test.js
 ADR-111: one shared script builds the top bar (who you are, or a big Log in) and a four-group
 menu on every page; Home becomes big buttons; the login page shows this phone's recent names and

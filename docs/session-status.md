@@ -5813,6 +5813,7 @@ Not in scope: storing sales in the database (the Loyverse sync before Live); a b
 the dish map.
 
 ## Step ui-shell - one top bar, a grouped menu, a Home of big buttons, the app icon (A0, 2026-11-22)
+**CLOSED 2026-11-22, PR #93 (`e29cc0f`).**
 
 Decided 2026-11-22 (ADR-111; Naoki, recs). Naoki's lane, after sales-cache (both change
 kitchen-sales.html), in beta-3.1, before sign-the-cookie (both change login.html). No server code
