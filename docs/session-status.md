@@ -132,9 +132,45 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-110; the index, and a map from handoff item numbers to records, is in
+to ADR-113; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-22 architect, late (beta-3 at the PC; ui-shell and sales-cache as beta-3.1) - decided (recorded: ADR-111 to ADR-113)
+
+- **beta-3 is on the restaurant PC** (Naoki, 21:15 to 21:30): `update beta-3` passed (814 tests,
+  AUDIT CLEAN); the old beta.db, -wal and -shm moved together into
+  `InventoryApp\old-beta-db-2026-11-22`; the setup ran again and made a fresh beta.db; Kitchen Sales
+  syncs all three Loyverse accounts, FC's side by landing line (checked on an 11.5-inch tablet at
+  21:24). Still to confirm: the people import and Tailscale. An extra `npm install` after the
+  update changed no tracked file (`git status` clean). Correction to the evening block: the PC was
+  first set up on 10-28 (beta.db dated 10-28 10:34, like `restaurant-pc-old`); 11-13 re-ran the
+  setup over it.
+- **The tablet showed the shell's gaps.** Kitchen Sales is linked only from Home (the menu's
+  "Sales" is the typed page nobody uses in Beta); Home still reads "Setup OK"; above 768px the link
+  row never wraps, so its last links and the login link spill past the bar; most pages are capped
+  at 700px, half of a tablet. **ui-shell** (ADR-111) fixes these in the front end only: one top bar
+  with who you are or a big Log in, a grouped menu built from one list, a Home of big buttons, an
+  easier login page (this phone's recent names, find your name), two widths, and the Silingan icon
+  for Add to Home screen. Everyone sees every link for now (Naoki: it builds habits, and the
+  accounts are not ready); following each person's roles comes with login-tonight. The typed sales
+  page becomes "Typed sales" under Admin. The full visual pass waits for the roster and login
+  steps.
+- **No tab-free app window yet.** Chrome installs a web app only over HTTPS (or on the device
+  itself), and the PC serves plain http. Add to Home screen gives the icon; the tab-free window
+  comes with HTTPS, decided with hosting.
+- **sales-cache** (ADR-112). Kitchen Sales re-paged Loyverse on every day or side switch. The
+  server keeps each result in memory (today 2 minutes, the 7 days before 30 minutes, older until a
+  restart); Sync always fetches fresh; "Synced" shows the fetch time; nothing is stored.
+- **A login lasts one business day** (ADR-113): until the next 8 AM or Log out, so a shared tablet
+  never carries yesterday's person. Built in sign-the-cookie (its 2026-11-22 block).
+- **beta-3.1 before beta-4** (Naoki): sales-cache, then ui-shell, Naoki's lane. Tag beta-3.1 once
+  both are merged and the smoke list's lines 1-8, 10 and 11 pass with ui-shell's click-through; at
+  the PC, `update beta-3.1` and the setup once (docs/official/running-the-app.md). beta-4's order
+  is unchanged after it; sign-the-cookie builds on ui-shell's login page.
+- **The icon** comes from the Silingan round logo (Naoki's file); the architect made the five icon
+  files (`Desktop\Naoki\AuditApp-Assets\photos\brand\icons`). The restaurant's own logo sits in the
+  public repo.
 
 ### 2026-11-22 architect, evening (A0 #91, A16's install part, the restaurant PC) - decided (recorded: ADR-110)
 
@@ -143,8 +179,8 @@ disagree, that is a bug: ask Naoki and fix both the same day.
   (the map) and the landing in the seed's spelling: the same lines in the same order, left as is.
   beta-3 is tagged on main (with this drop-in, docs only on top of `55423ca`) once the smoke list's
   lines 1-8, 10 and 11 pass.
-- **The restaurant PC was not empty (corrects the 11-15 line).** Naoki installed it on 11-13 with PR
-  #47's 11-12 file and started it once on 11-18; nobody entered data there. So it runs beta-1 (the
+- **The restaurant PC was not empty (corrects the 11-15 line).** Naoki set it up on 10-28 and re-ran
+  the setup on 11-13 with PR #47's 11-12 file and started it once on 11-18; nobody entered data there. So it runs beta-1 (the
   newest tag on 11-13; its Version line confirms), its beta.db holds beta-1's starting data (FC's
   old lines and dishes), its firewall rule has no Tailscale range (added 11-14) and its `.env` has
   no FC token line. Git 2.56.0, Node 24.22.1. The 11-15 plan (clone to a temporary folder and run
@@ -4397,6 +4433,18 @@ click-through.
 - Not in scope: cookie expiry (changing COOKIE_SECRET logs everyone out: the way to end every
   session); per-person passwords (before Live, ADR-011).
 
+**Decisions 2026-11-22, late (ADR-113; Naoki).** These override the "Not in scope: cookie expiry"
+line above.
+- A login lasts until the next 8 AM business-day turn (ADR-036) or Log out. The cookie value becomes
+  `<user_id>.<business_date>.<signature>`, the HMAC covering both; login sets `Max-Age` to the
+  seconds left until the next 8 AM Manila.
+- The server reads a cookie whose business date is not today's business date as logged out, so a
+  phone with a wrong clock still ends at 8 AM.
+- After ui-shell (beta-3.1): it builds on ui-shell's login page.
+- Tests add: a cookie from the previous business date reads as logged out; Max-Age is the seconds to
+  the next 8 AM (an injected now at 21:00 gives 11 hours, at 07:59 gives 60 seconds); a changed
+  business date with the old signature is refused.
+
 ## Step staff-meal-settings - meal slots, budgets and the rice rates in Settings (A10)
 **CLOSED 2026-11-16, PR #82 (`f49e5f4`).**
 
@@ -5714,6 +5762,137 @@ install: FC's landing shows the 27 lines in the paper's order; Silingan's landin
 meat"; Settings -> Staff meals shows two slots per site.
 
 Not in scope: FC's dishes and recipes (fc-dish-map); the commi's own meats; prices.
+
+## Step sales-cache - Kitchen Sales keeps what it fetched for a short time (A0, 2026-11-22)
+
+Decided 2026-11-22 (ADR-112; Naoki). Naoki's lane, first in beta-3.1. No schema change; nothing is
+written to the database.
+
+What staff see: a day Kitchen Sales has already shown opens at once. Switching between Silingan +
+Likod and FC, or back to a day, no longer waits for Loyverse. **Sync with Loyverse** always fetches
+fresh. "Synced 9:24 PM" is the time the numbers were fetched from Loyverse, which can be a few
+minutes before the page opened.
+
+- server/routes/loyverse.js: handlePreview keeps each result in a Map in the server's memory, keyed
+  by `<pos>|<date>` (pos `silingan-likod` or `fc`), with the time it was fetched. A request reuses
+  a kept result while it is fresh enough:
+  - the current business date (`businessDate(now)`): 2 minutes;
+  - the 7 business dates before it (LOOKBACK_DAYS: a POS that was offline uploads a day's receipts
+    late): 30 minutes;
+  - older dates: until the server restarts.
+- A request with `fresh=1` never reuses: it fetches and replaces the kept result.
+- A result in which any account failed (`accounts[].ok` false) is returned but never kept, so the
+  next request tries again.
+- Two requests for the same key while a fetch runs share that fetch (one promise per key, dropped
+  when it settles, kept or not).
+- At most 120 results are kept; the oldest fetch goes first.
+- Every response gains `fetchedAt` (the ISO time of the Loyverse fetch), from memory or fresh.
+- `deps` gains `cache` (a fresh one per test); `deps.now` already exists.
+- public/kitchen-sales.html: the Sync button's load sends `&fresh=1`; date and side switches do not.
+  syncedText uses `data.fetchedAt` (now, if missing). Nothing else on the page changes here.
+
+Edge states: Failure - a failed account shows as today and is never kept. Partial - one account
+failed: not kept. Stale - a kept result shows its fetch time; Sync replaces it; a restart clears
+everything. Empty - a day with no receipts is kept like any other. Two devices - they share kept
+results; one Sync refreshes it for everyone. Blocked, Inactive - none.
+
+Tests (server/routes/loyverse.test.js, a counting stub fetch and an injected now): a second request
+for the same side and today within 2 minutes makes no Loyverse call, and one after 2 minutes does; a
+date 3 days back is reused within 30 minutes and fetched after; a date 10 days back is reused after
+an hour; `fresh=1` always calls and replaces; a result with a failed account is never kept; FC and
+Silingan + Likod are kept apart; `fetchedAt` is the time of the call, also on a reused result; two
+requests at once make one set of calls; the 121st result drops the oldest; the 400s are unchanged.
+
+Touches: server/routes/loyverse.js, server/routes/loyverse.test.js, public/kitchen-sales.html.
+PUBLIC -> click-through. Claude checks: FC, then Silingan + Likod, then FC again - the third open
+makes no long wait (network) and keeps its first "Synced" time; Sync changes the time. You check:
+on the tablet, switching feels instant.
+
+Not in scope: storing sales in the database (the Loyverse sync before Live); a browser-side cache;
+the dish map.
+
+## Step ui-shell - one top bar, a grouped menu, a Home of big buttons, the app icon (A0, 2026-11-22)
+
+Decided 2026-11-22 (ADR-111; Naoki, recs). Naoki's lane, after sales-cache (both change
+kitchen-sales.html), in beta-3.1, before sign-the-cookie (both change login.html). No server code
+changes: front end and static files only.
+
+What staff see:
+- **One top bar on every page:** the Silingan logo and "Inventory" on the left (tap: Home); on the
+  right, your name (tap it: Log out) or a big **Log in** button. On a phone a **Menu** button sits
+  beside it.
+- **One menu, four groups,** the current page marked: **Kitchen** - Landing, Kitchen Sales,
+  Allocations, Stock Receipts; **Commissary** - Commissary, Shipments, Terminal; **Management** -
+  Dashboard; **Admin** - Settings, Roles, History, Typed sales. Below 768px, Menu opens a full-width
+  list over the page; a link, Menu again, Escape or a tap outside closes it. At 768px and wider,
+  the groups sit in a bar under the top bar and wrap inside it, never past it.
+- **Everyone sees every link for now** (ADR-111). Following each person's roles comes with
+  login-tonight; the server's refusals are unchanged (blind-reads stays the step that keeps sales
+  from counters).
+- **Home:** "Setup OK" goes. Logged out: a big "Log in - pick your name" button first. Logged in:
+  "Logged in as <name>" and Log out. Then the four groups as big buttons, built from the same list
+  as the menu (three a row when wide, one a row on a narrow phone). An empty `<section
+  id="tonight">` stays at the top for login-tonight's Tonight card.
+- **Login:** the top bar with the logo only (no menu, no name). "On this phone": the last three
+  names that logged in on this device, newest first (`recentLogins` in localStorage, written on a
+  successful login; a name no longer in the list is skipped). A "Find your name" box filters the
+  full list as you type, ignoring capitals and extra spaces. Then everyone, A to Z. A tap logs in
+  and opens Home, as today.
+- **Widths:** the login page and Home stay narrow (700px); every other page is wide (1200px). The
+  pages' own `<body style="max-width: ...">` go. Kitchen Sales' tables fill the column.
+- **Names:** the typed sales page reads "Typed sales" (title and heading) and sits under Admin;
+  Kitchen Sales joins the menu under Kitchen.
+- **The icon:** Chrome's menu -> Add to Home screen puts the Silingan icon and "Inventory" on the
+  home screen. Over the PC's plain http it still opens in a browser tab (a tab-free window needs
+  HTTPS: with hosting).
+
+Build:
+- public/shell.js (new), loaded by every page: the one link list (groups, labels, hrefs), also
+  exposed as `window.AppShell.groups` for Home; it builds the top bar and the menu into the page's
+  `<nav>` (each page keeps an empty `<nav></nav>`; the hand-written links go); `<body
+  data-shell="login">` gets the logo only. It fetches `/api/auth/me` once for the name; if that
+  fails, the bar shows Log in.
+- public/command-panel.js: renderNavUser goes (shell.js does it); the command panel is unchanged.
+- public/style.css: the bar, the menu (the phone list and the wide wrap), Home's buttons, the two
+  widths (`.page-wide` 1200px; 700px stays the default). Issue #13's rule holds: at 390px no page
+  scrolls sideways.
+- Every page's `<head>`: `<link rel="manifest" href="manifest.webmanifest">`, `<link rel="icon"
+  href="icons/favicon-32.png">`, `<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">`,
+  `<meta name="theme-color" content="#222121">`.
+- public/manifest.webmanifest (new): name "Silingan Inventory", short_name "Inventory", start_url
+  "/index.html", display "standalone", background_color and theme_color "#222121"; icons
+  icon-192.png and icon-512.png (purpose "any") and icon-maskable-512.png (purpose "maskable").
+- public/icons/ (new): the five files in `Desktop\Naoki\AuditApp-Assets\photos\brand\icons\`, copied
+  as they are (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png 180px,
+  favicon-32.png).
+- No browser pop-ups (ADR-093).
+
+Edge states: Failure - `/api/auth/me` fails: the bar shows Log in and the page works. Empty - no
+recent names on a phone: "On this phone" is not shown; nobody active: the list reads "No people yet
+- ask the admin to add people." Stale - a recent name now inactive or gone is skipped. Blocked -
+unchanged (the server refuses as today). Inactive - inactive people are not listed, as today.
+Partial, Two devices - none (recent names are per device).
+
+Tests (server/uiShell.test.js, a static check like selfHostFont.test.js): every page in public/ has
+an empty `<nav></nav>` and loads shell.js, and none keeps the old hand-written link list; every
+href in shell.js's list is a file in public/; every page has the manifest, icon, apple-touch-icon
+and theme-color lines; no page keeps an inline body max-width; the manifest parses, names the three
+icons, and each icon file exists at its stated size (read from the PNG header); command-panel.js no
+longer fetches `/api/auth/me`; the server serves manifest.webmanifest as application/manifest+json.
+
+Touches: public/shell.js (new), public/manifest.webmanifest (new), public/icons/ (five new files),
+public/style.css, public/command-panel.js, every public/*.html (14), server/uiShell.test.js (new).
+PUBLIC -> click-through at 390px and 1366px. Claude checks: at 390px no page scrolls sideways; Menu
+opens the four groups with the current page marked and closes on a link, Escape and an outside
+tap; logged out the bar shows Log in and Home shows the Log in button first; as Test Counter RA the
+bar shows the name and Log out works; after that logout "On this phone" lists Test Counter RA;
+typing "admin" in Find leaves Test Admin; at 1366px the groups wrap inside the bar, Landing and
+Kitchen Sales use the wide column, Kitchen Sales is in the menu and Typed sales under Admin; the
+manifest loads (200, application/manifest+json). You check: the 11.5-inch tablet both ways and a
+phone - the looks, and the icon after Add to Home screen.
+
+Not in scope: hiding links by role (with login-tonight); HTTPS and a tab-free window (with
+hosting); the visual pass from the mockups (after the roster and login steps); offline use.
 
 ## Step roles-guard - no admin lockout; admin and read-only as base roles only; look-alike names (A0, Fable)
 

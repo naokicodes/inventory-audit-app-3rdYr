@@ -27,7 +27,7 @@ money details live in the private notes (Claude project files), never here.
 
 | # | Area | IRL | FLOW | APP |
 |---|---|---|---|---|
-| 1 | [Who does what tonight](who-does-what.md) | Confirmed | Drafted | Built: pick-your-name login, roles per site, the Roles page (PRs #33, #78, #83); Specced: picks, login list, write permission |
+| 1 | [Who does what tonight](who-does-what.md) | Confirmed | Drafted | Built: pick-your-name login, roles per site, the Roles page (PRs #33, #78, #83); Specced: picks, login list, write permission; an easier login page and the menu (ui-shell) |
 | 2 | [Meat landing (Silingan, FC)](meat-landing.md) | Confirmed | Drafted | Built: counts, blind count and recount (PR #51, by site role since #78); Built: FC's sales map and FC's 27 lines (PRs #90, #91), on the restaurant PC from beta-3 |
 | 3 | [Kitchen veggies](veggies.md) | Confirmed (Silingan, FC) | Drafted | Built: side items (PR #74); side-sheets Specced (parked until roster-fill) |
 | 4 | [Pantry](pantry.md) | Confirmed (Silingan, FC) | Drafted | Built: side items (PR #74); side-sheets Specced (parked until roster-fill) |
@@ -42,7 +42,7 @@ money details live in the private notes (Claude project files), never here.
 | 13 | [Likod grill landing](likod-grill.md) | Confirmed | None | Decided (counts blind; appointed head chef) |
 | 14 | [FC scullery](fc-scullery.md) | Confirmed | None | Paper (ADR-065) |
 | 15 | [Commissary](commissary.md) | Confirmed | Drafted | Built: yield, shipments; requests and staging Decided, not built (ADR-092); Stock In from suppliers missing (A9); Likod destination missing |
-| 16 | [Sales (Loyverse)](sales.md) | Confirmed | None | Built (Kitchen Sales, FC switch; FC by landing line and the Pizza tables, PR #90, Kare-Kare included) |
+| 16 | [Sales (Loyverse)](sales.md) | Confirmed | None | Built (Kitchen Sales, FC switch; FC by landing line and the Pizza tables, PR #90, Kare-Kare included); a short-lived cache Specced (sales-cache, ADR-112) |
 | 17 | [Management view](management-view.md) | Written | Drafted | Built: a stock rollup in quantities (no pesos yet); views as cards (ADR-089) |
 | 18 | [Money and operating expenses](money.md) | Written (payroll template, the purchaser's logbook, the cashier's tally) | None | Decided: charges recorded, payroll in Excel (ADR-088) |
 | 19 | [Waste](waste.md) | Written | Drafted | Meat: Built (adjustment types); sides: Decided (any time + a catch-all after endings, ADR-086) |

@@ -27,7 +27,24 @@ acknowledgment, sides) are known. Add to it; don't wait for it to be complete.
   change.
 - **A fuller mobile nav** (grouping or a collapse/menu) is deferred until the new
   pages (login, roles admin, PO-request, acknowledgment, sides) land and the
-  top-level set is known.
+  top-level set is known. (Decided 2026-11-22: the shell below.)
+
+## The shell (2026-11-22, ADR-111, step ui-shell)
+
+- **One list, one script.** public/shell.js holds the menu's groups and builds the top bar and the
+  menu into every page's empty `<nav>`; a new page adds one line there, never its own links.
+- **Top bar:** the logo and the app's name (Home) on the left; the person's name (Log out) or a big
+  Log in on the right; below 768px a Menu button.
+- **Menu:** four groups - Kitchen, Commissary, Management, Admin. Below 768px it opens as a
+  full-width list over the page; at 768px and wider the groups wrap inside their own bar. The
+  no-sideways-scroll rules above still hold.
+- **Everyone sees every link** until login-tonight; hiding by role then follows the switches.
+- **Home:** big buttons from the same list; the top slot is login-tonight's.
+
+## Widths (2026-11-22, ADR-111)
+
+- Narrow (700px): the login page and Home. Wide (1200px, `.page-wide`): every other page.
+- No page sets its own body width.
 
 ## Daily audit (and any Review/Enter sheet)
 

@@ -153,6 +153,9 @@ flight. (ADR-001 explains the split.)
 | ADR-108 | Sheet finalization is not planned | Accepted 2026-11-17 (recorded 2026-11-22) |
 | ADR-109 | Staff-meal lines may name a side item, with an approximate quantity | Accepted 2026-11-17 (recorded 2026-11-22) |
 | ADR-110 | A device away from the restaurant gets the restaurant PC as a Tailscale share | Accepted 2026-11-22 |
+| ADR-111 | One shell for every page: a top bar, one grouped menu, a Home of big buttons, the icon | Accepted 2026-11-22 |
+| ADR-112 | Kitchen Sales keeps what it fetched from Loyverse for a short time | Accepted 2026-11-22 |
+| ADR-113 | A login lasts one business day | Accepted 2026-11-22 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

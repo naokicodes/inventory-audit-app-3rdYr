@@ -137,6 +137,11 @@ is. Read the step's own section in `session-status.md` before starting.
 > from 11-13) gets it by `update beta-3` with a fresh beta.db, the old one kept aside
 > (`docs/official/running-the-app.md`). FC's device gets the PC as a Tailscale share, not an
 > invite (ADR-110). beta-4's order is unchanged.
+> **2026-11-22 (late) - beta-3 is on the PC; beta-3.1 first.** Naoki's lane: sales-cache, then
+> ui-shell (both change kitchen-sales.html). Tag beta-3.1 once both are merged and the smoke
+> list's lines 1-8, 10 and 11 pass with ui-shell's click-through; at the PC, `update beta-3.1` and
+> the setup once. Then beta-4's order, unchanged; sign-the-cookie gains ADR-113 (a login lasts
+> one business day) and builds on ui-shell's login page.
 
 #### Fable fixes (2026-11-17)
 
@@ -184,6 +189,22 @@ pieces; the six lines that keep no stock included, counted as 0); FC's old dishe
 leave the seed until fc-dish-map; FC gets two meal slots like Silingan; Silingan gets a placeholder
 meat for Kare-Kare and the dish D044. Data only; reaches the PC through beta-3's fresh install.
 After landing-sales. Full spec: session-status.md -> "Step fc-landing-lines".
+
+### Step sales-cache - Kitchen Sales keeps what it fetched for a short time  [runnable]
+Touches: server/routes/loyverse.js, server/routes/loyverse.test.js, public/kitchen-sales.html
+ADR-112: the server keeps each Kitchen Sales result in memory (today 2 minutes, the 7 days before
+30 minutes, older until a restart); Sync sends `fresh=1`; a failed account is never kept;
+`fetchedAt` shows on the page. Nothing stored. Naoki's lane, first in beta-3.1. PUBLIC ->
+click-through. Full spec: session-status.md -> "Step sales-cache".
+
+### Step ui-shell - one top bar, a grouped menu, a Home of big buttons, the app icon  [blocked: sales-cache (order)]
+Touches: public/shell.js, public/manifest.webmanifest, public/icons/, public/style.css, public/command-panel.js, public/allocations.html, public/commissary-shipments.html, public/commissary.html, public/daily-audit.html, public/dashboard.html, public/history.html, public/index.html, public/kitchen-sales.html, public/login.html, public/roles.html, public/sales.html, public/settings.html, public/stock-receipts.html, public/terminal.html, server/uiShell.test.js
+ADR-111: one shared script builds the top bar (who you are, or a big Log in) and a four-group
+menu on every page; Home becomes big buttons; the login page shows this phone's recent names and
+a find box; two widths; Typed sales under Admin; the Silingan icon and a manifest (the five icon
+files from AuditApp-Assets). Everyone sees every link for now. Front end only. Naoki's lane,
+after sales-cache, before sign-the-cookie. PUBLIC -> click-through (390px and 1366px). Full
+spec: session-status.md -> "Step ui-shell".
 
 ### Step roles-guard - no admin lockout; admin and read-only as base roles only  [blocked: sign-the-cookie (order)]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/roles.js, server/routes/roles.test.js, server/index.js, scripts/import-settings.js, server/db/importSettings.test.js, public/roles.html
@@ -531,6 +552,8 @@ dependency). Server-only, no click-through. Full spec: session-status.md -> "Ste
 **2026-11-17 (ADR-098):** runs now, after stale-saves; + one shared admin password (ADMIN_PASSWORD in
 .env) for accounts whose base role has admin, and whole-number ids only. PUBLIC -> click-through
 (the login page). See the spec's 2026-11-17 block.
+**2026-11-22 (ADR-113):** a login lasts until the next 8 AM (the cookie carries its business
+date); after ui-shell (beta-3.1), on its login page. See the spec's 2026-11-22 block.
 
 ### 3zw. Step staff-meal-settings - meal slots, budgets and rice rates in Settings  [blocked: settings-guard]
 **CLOSED 2026-11-16, PR #82 (`f49e5f4`).**
