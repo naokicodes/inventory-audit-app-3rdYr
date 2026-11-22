@@ -5,27 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inventory Audit App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#222121">
 </head>
 <body>
-  <nav>
-    <a href="index.html">Home</a>
-    <a href="daily-audit.html">Landing</a>
-    <a href="stock-receipts.html">Stock Receipts</a>
-    <a href="commissary.html">Commissary</a>
-    <a href="commissary-shipments.html">Shipments</a>
-    <a href="sales.html">Sales</a>
-    <a href="terminal.html">Terminal</a>
-    <a href="allocations.html">Allocations</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="settings.html">Settings</a>
-    <a href="history.html">History</a>
-  </nav>
-  <div class="box">
-    <h1>Inventory Audit App</h1>
-    <p>Setup OK - server, static files, and database connection are all working.</p>
-    <p><a href="kitchen-sales.html">Kitchen Sales (Loyverse preview)</a></p>
-    <p><a href="roles.html">Roles</a></p>
-  </div>
+  <nav></nav>
+  <script src="shell.js"></script>
+  <!-- Step ui-shell (ADR-111): Home is big buttons, built from shell.js's
+       list. #tonight stays empty for login-tonight's Tonight card. -->
+  <section id="tonight"></section>
+  <div id="home-who" class="home-who"></div>
+  <div id="home-groups"></div>
+  <script>
+    (function () {
+      const who = document.getElementById('home-who');
+      AppShell.me.then((user) => {
+        if (user) {
+          const line = document.createElement('p');
+          line.className = 'home-who-line';
+          line.textContent = `Logged in as ${user.name}`;
+          const out = document.createElement('button');
+          out.type = 'button';
+          out.textContent = 'Log out';
+          out.addEventListener('click', AppShell.logOut);
+          who.append(line, out);
+        } else {
+          const login = document.createElement('a');
+          login.className = 'home-login';
+          login.href = 'login.html';
+          login.textContent = 'Log in - pick your name';
+          who.appendChild(login);
+        }
+      });
+
+      const groupsEl = document.getElementById('home-groups');
+      for (const group of AppShell.groups) {
+        const section = document.createElement('section');
+        section.className = 'home-group';
+        const h2 = document.createElement('h2');
+        h2.textContent = group.name;
+        const grid = document.createElement('div');
+        grid.className = 'home-grid';
+        for (const link of group.links) {
+          const a = document.createElement('a');
+          a.className = 'home-btn';
+          a.href = link.href;
+          a.textContent = link.label;
+          grid.appendChild(a);
+        }
+        section.append(h2, grid);
+        groupsEl.appendChild(section);
+      }
+    })();
+  </script>
   <script src="command-panel.js"></script>
   <script src="commands/sync-batch-stock.js"></script>
   <script src="commands/oversold-check.js"></script>
