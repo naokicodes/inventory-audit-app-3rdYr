@@ -5325,6 +5325,7 @@ server/db/migrate.test.js, server/routes/settings.js, server/routes/settings.tes
 public/settings.html.
 
 ## Step stale-saves - a row nobody touched never saves (A0, Fable 2026-11-17)
+**CLOSED 2026-11-22, PR #88 (`d2cfe97`).**
 
 Decided ADR-104 (2026-11-17), with ADR-015 and ADR-080. Fixes Fable I-01 = F2 = U-01, U-04 and
 I-02 = U-03 (docs/reviews/fable-2026-11-17-2-integrity.md, -4-scale.md, -5-pages-updates.md hold

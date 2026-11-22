@@ -136,6 +136,7 @@ is. Read the step's own section in `session-status.md` before starting.
 #### Fable fixes (2026-11-17)
 
 ### Step stale-saves - a row nobody touched never saves  [runnable]
+**CLOSED 2026-11-22, PR #88 (`d2cfe97`).**
 Touches: server/engines/blindCount.js, server/engines/blindCount.test.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/commands.test.js, server/routes/authorship.test.js, public/daily-audit.html, public/commissary.html
 **2026-11-22 (issue #89):** server/routes/authorship.test.js joins Touches - two of its tests now
 send `touched: true`, as the spec says for existing tests that expect a write. PR #88.
