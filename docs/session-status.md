@@ -146,6 +146,12 @@ disagree, that is a bug: ask Naoki and fix both the same day.
   stale-saves -> sign-the-cookie -> landing-sales -> fc-landing-lines -> backup-restore ->
   restaurant-pc-ii -> roles-guard -> save-safety -> cost-guard -> preview-pid (dispatch-queue's
   2026-11-22 note). Tag beta-3 when all are merged and the smoke list passes, as before.
+- **FC first (later on 11-22; replaces the beta-3 line above).** FC's counter is to test FC's sales
+  at FC soon, so beta-3 is stale-saves (PR #88), landing-sales and fc-landing-lines, installed with
+  today's launcher; the rest of the lane follows as beta-4 by update (dispatch-queue's later
+  2026-11-22 note). Until beta-4: admin logins without a password, the old two-file backups, and
+  after `update beta-4` the repo's bat is run once with no word. FC's device joins the tailnet
+  (ADR-070, ADR-103).
 - **Specced today.** backup-restore (ADR-105: one file per backup at every start and at 3 PM and 3
   AM by Task Scheduler - the restaurant PC stays on overnight and is restarted on some days; kept 14
   days plus the first of each month; a copy folder in `.env`, on E: at the install, the Drive folder

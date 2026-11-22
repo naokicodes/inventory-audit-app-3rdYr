@@ -122,6 +122,16 @@ is. Read the step's own section in `session-status.md` before starting.
 > answered. The specs for backup-restore, restaurant-pc-ii, roles-guard, save-safety and
 > cost-guard's block land in today's drop-ins, each before its build. Marble picks up wherever the
 > lane stands when he is back.
+> **2026-11-22 (later) - FC first; beta-3 is smaller.** Naoki: FC's counter tests FC's sales at FC
+> soon. **beta-3** = stale-saves (PR #88), landing-sales, fc-landing-lines; tag it once those are
+> merged and the smoke list's lines 1-8, 10 and 11 pass, and install with the launcher as it is
+> (its setup asks the three Loyverse tokens). **beta-4**, by `update beta-4` and then
+> `scripts\restaurant-pc.bat` run once with no word (beta-3 has no stub launcher yet), in this
+> order: sign-the-cookie -> backup-restore -> restaurant-pc-ii -> roles-guard -> save-safety ->
+> cost-guard -> preview-pid. Accepted for those few days: admin logins without a password (as in
+> all of Beta so far) and the old two-file backups (made at every start; nobody restores by
+> hand). FC's device reaches the PC through Tailscale (ADR-070) as an invited restaurant device
+> (ADR-103).
 
 #### Fable fixes (2026-11-17)
 
