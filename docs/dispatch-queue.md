@@ -132,6 +132,7 @@ keeps and shows its notes. No schema change. PUBLIC -> click-through. Full spec:
 session-status.md -> "Step stale-saves".
 
 ### Step npm-audit - npm audit fix, lockfile only  [runnable]
+**CLOSED 2026-11-22, PR #85 (`cd7054c`).**
 Touches: package-lock.json
 Fable N-1: three advisories under express (proxy-addr, body-parser, qs); `npm audit fix` changes the
 lockfile only. Server-only. Full spec: session-status.md -> "Step npm-audit".

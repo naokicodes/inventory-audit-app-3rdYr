@@ -5108,6 +5108,7 @@ transaction per Save and the error messages (save-safety); the "Your name" box a
 following later sales changes (stock-math, I-12); a "changed under you" warning (ADR-104: none).
 
 ## Step npm-audit - the three npm advisories, lockfile only (A0, Fable N-1)
+**CLOSED 2026-11-22, PR #85 (`cd7054c`).**
 
 Decided 2026-11-17 (Fable run 1, N-1). Naoki's lane, before beta-3: the restaurant PC installs fresh
 at beta-3, so a lockfile change costs nothing there.
