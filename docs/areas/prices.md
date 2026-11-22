@@ -17,3 +17,8 @@ Status: IRL Written - FLOW None - APP Decided
   shrinkage pesos = batch x (raw - backed) / raw; portions and miscut share one
   cost per kg = batch / (backed kg + miscut kg), which is batch / backed kg when
   there is no miscut (ADR-018). No schema change.
+- Specced 2026-11-15/22: cost-guard (costs, budgets and the rice price behind see_costs, ADR-060,
+  ADR-100). The side-items import already carries a cost column.
+
+## Open questions
+- The prices workbook (Naoki, gathering the real prices).

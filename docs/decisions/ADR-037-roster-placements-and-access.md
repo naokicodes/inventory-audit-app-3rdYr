@@ -1,6 +1,7 @@
 # ADR-037 Roster placements, copying, picks and access
 
-- Status: Accepted 2026-11-01
+- Status: Accepted 2026-11-01; superseded in part by ADR-096 (copy last week; one placement a day)
+  and ADR-107 (who edits a kitchen person's entries)
 - Decided by: Naoki
 - Supersedes: none (refines ADR-011, ADR-012, ADR-013, ADR-014, ADR-017)
 

@@ -1,6 +1,6 @@
 # Meat landing (Silingan, FC)
 
-Status: IRL Confirmed - FLOW Drafted - APP Built (blind count + recount Specced)
+Status: IRL Confirmed - FLOW Drafted - APP Built (blind count + recount, PR #51); FC's lines Specced
 
 ## IRL - how it works today
 
@@ -127,6 +127,8 @@ and are ignored (Naoki, 2026-11-17).
 ## APP
 - Built: daily audit (meat + portion counts, allocations, month opening and
   recount, dashboard), count drafts kept on the phone (PR #31).
+- Built 2026-11-01 (blind-count, PR #51); blind by the site's roles since role-assignments (PR #78,
+  ADR-038). The 10-28 lines below are the spec's history.
 - Specced 2026-10-28: step blind-count (queue 3za). Blind = the checker role
   (derived from role flags until the supervisor role adds a flag); the server
   never sends beginning, new stock, sales, in-house, expected or variance to a
@@ -146,6 +148,10 @@ and are ignored (Naoki, 2026-11-17).
 - QTY (the counter's PO line) belongs to the supply family (A9).
 - Decided 2026-11-15 (ADR-094): Kitchen Sales' FC side follows FC's landing (step landing-sales,
   the map above); the landing's expected values use the same takes later (fc-dish-map).
+- Decided 2026-11-22 (Naoki): FC's count sheet in the app is the paper's 27 lines in the paper's
+  order, the six that keep no stock included (counted as 0: the landing person copies the paper one
+  to one); Pork Jowl in kg, every other line in pieces; FC's old dishes leave the starting data
+  until fc-dish-map (step fc-landing-lines, before beta-3).
 
 ## Open questions
 - None open. (Pieces AND weight: closed 2026-10-28 - one unit per meat.)

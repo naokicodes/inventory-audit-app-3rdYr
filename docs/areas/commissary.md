@@ -47,6 +47,8 @@ Sheet "Commissary Inventory" (source: photos 2026-10-23 and 2026-10-24).
 - Decided, not built (until 2026-11-15 this line said built): commi staging (staged -> released),
   and the internal request (ADR-092; planned step meat-request).
 - Missing: Likod as a third destination (8). Queue item A12.
+- Missing: Stock In from suppliers (raw meat arriving at the commi). It was step 25a; it is now part
+  of arrivals (A9). (Fable C-25.)
 - The request's Received (planned) replaces the empty signature columns.
 - Decided 2026-10-28 (ADR-017): one commi, more people. All raw meat lands on
   commi stock first; whoever backs up meat asks for it, then records the yield

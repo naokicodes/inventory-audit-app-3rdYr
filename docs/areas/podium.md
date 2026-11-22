@@ -7,6 +7,8 @@ Status: IRL Written - FLOW None - APP Decided
 - It keeps a logbook of items and quantities for pantry and miscellaneous
   things that are on no inventory sheet.
 - The logbook holds the product name and the quantity, nothing else (Naoki, 2026-11-14).
+- The podium staff count deliveries on arrival and borrow the receipts from the cashier to check
+  them against their count (Naoki, 2026-11-17).
 - Sources: chat 2026-10-24.
 
 ## APP

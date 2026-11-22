@@ -81,3 +81,15 @@ start the server with the three Loyverse tokens set empty (`LOYVERSE_SILINGAN_TO
 7. Settings (after settings-guard): Test Counter RA saving a change sees "Only an admin can change
    settings"; Test Admin saves.
 8. Logged out (until write-permission): a counting page still works and stays blind.
+9. Login (after sign-the-cookie): Test Admin is asked for the admin password and a wrong one is
+   refused; Test Counter RA logs in on one tap; a typed `user_id=1` cookie reads as logged out.
+10. Two tabs (after stale-saves): Test Counter RA saves an item; Test Head Chef RA's tab, loaded
+    before that, saves a different item; after a reload the first item keeps the counter's number.
+11. Kitchen Sales, FC side (after landing-sales): FC's landing lines in portions; Bagnet opens to its
+    items and "Also taken"; both Pizza tables show.
+12. Roles (after roles-guard): the admin role shows no Deactivate; a new role named "super admin" is
+    refused with its message.
+13. A bad number (after save-safety): a count of "1,5" is refused naming the item, and nothing else
+    in that Save is saved.
+14. Costs (after cost-guard): as Test Counter RA, Settings shows no cost, budget or rice price, and
+    History shows no cost field.

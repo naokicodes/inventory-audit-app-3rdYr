@@ -1,6 +1,6 @@
 # Roster
 
-Status: IRL Confirmed (Silingan, the Nov 16-22 sheet), Written (Likod, FC) - FLOW Drafted (Fill, 2026-11-16) - APP Specced (ADR-096, roster-fill)
+Status: IRL Confirmed (Silingan, the Nov 16-22 sheet and the 11-17 message), Written (Likod, FC) - FLOW Drafted (Fill, 2026-11-16) - APP Specced (ADR-096, roster-fill)
 
 ## IRL - how it works today
 
@@ -75,6 +75,29 @@ cover. Shifts are opener, mid or closer; nobody opens the day after closing: a c
 until a day off, then can open. It takes him a long time; the app should place people for him.
 People without a login (waiters, for now) still go on the roster.
 
+**The daily roster message** (source: Silingan's message for 2026-11-17, sent by Naoki on 11-17;
+a private copy is in his assets folder, staff names only there). The supervisor shares the roster as
+a text message to the staff every day:
+- The date and day; then each station with its people, the shift times (opener, mid-shift, closer,
+  with the hours) and each person's break; a take-over during a break is written with it (someone
+  takes the cashier or the bar during that person's break).
+- The function jobs are written like stations: Podium, Food Server, Purchaser (8am-2pm),
+  Commissary (9am-3pm). Function (the separate function building) can be empty.
+- The uniform for the day; the rest days; then Total Present, Total Day-off, Leave and Head Count
+  (Present + Day-off + Leave; that day 21 + 8 = 29, every person on the roster).
+- That day: the person covering the commissary person's day off did both his jobs (the commissary
+  in the morning and a kitchen closer later, with shorter hours); the cold-station head chef worked
+  opener-closer on the head chef's day off; one person held three jobs (assistant supervisor,
+  purchaser in the morning, food server in the evening); a waiter opened Dining and also held the
+  Podium.
+- The names and times differ a little from the Excel sheet: "Expo / Cold" and "Head Chef /
+  Dispatch"; Dining 9am-8:30pm, 12-9:30pm and 3pm-11pm; the Bus closer 2pm-11pm. Breaks change from
+  day to day.
+- 2026-11-17 (Naoki): Silingan's supervisor sets everything on Silingan's roster, the kitchen's day
+  offs included; the head chef's list (10-28) is a recommendation. Function normally has one
+  person for prep, backed by the waiters during service when it is full; there is no official
+  person for it.
+
 ## FLOW - how they will use the app (drafted)
 
 Redrafted 2026-11-16 (ADR-096); it replaces the 11-01 draft.
@@ -85,8 +108,9 @@ Redrafted 2026-11-16 (ADR-096); it replaces the 11-01 draft.
 4. Fill: the app places everyone else by main station and shift (never an opener the day after a
    closer), covers short rows with people who cover those stations, and shows what is still short
    in red.
-5. He fixes the rest by hand; the head chef edits her kitchen people's days. On a computer the
-   week looks like his sheet, and it prints.
+5. He fixes the rest by hand (a person can hold any number of jobs that day); a head chef given the
+   kitchen switch can edit her kitchen people's days. A note for the day (the uniform) goes at the
+   top. On a computer the week looks like his sheet, and it prints.
 6. Each day, changes as they happen: a day off swapped, absent (the supervisor's arrival check),
    sick, leave, a cover, a day at another restaurant, a part day.
 7. Any time before closing (preferably in the morning), the head chef or a supervisor picks
@@ -100,7 +124,11 @@ Redrafted 2026-11-16 (ADR-096); it replaces the 11-01 draft.
   role), ADR-036 (the 8am business day), ADR-037 (placements, copying, picks, access).
 - Specced 2026-11-01 (queue 3zi to 3zr): business-day, role-assignments, roles-page,
   roster-stations, roster-staff, roster-week, roster-day-status, tonight-picks, login-tonight,
-  write-permission.
+  write-permission. Built since: business-day (PR #55), role-assignments (#78), roles-page (#83).
+- Decided 2026-11-17 (ADR-107): any number of jobs a day; Purchaser is a station; Function's minimum
+  0; a cover also gets the covered person's "also works" job; the supervisor sets all day offs and
+  the kitchen switch stays an option; a note per day; take-overs written in the break. Each roster
+  spec has a 2026-11-17 block.
 - Stations and staff are data (the workbook import and the Staff page); nothing about real people
   is in the repo.
 - Likod's roster starts when Likod becomes a site (A12); the same features apply.
@@ -112,7 +140,7 @@ Redrafted 2026-11-16 (ADR-096); it replaces the 11-01 draft.
 
 ## Open questions
 
-- How the supervisor shares the roster today (printed, a photo in a group chat, or both): the week
-  view prints either way.
-- Silingan's stations, rows, minimums and people are drafted from his sheet in the private notes
-  (2026-11-16) for the people workbook: confirm them with him before the import.
+- How the supervisor shares the roster: answered 2026-11-17 (a daily text message, above).
+- Silingan's stations, rows, minimums and people are drafted in the private notes (2026-11-16). Naoki
+  (2026-11-22): build with the draft; the supervisor corrects names, times and minimums on the Staff
+  page after the update.

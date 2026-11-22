@@ -61,3 +61,7 @@ Status: IRL Written - FLOW Drafted - APP Decided
   chops, tuna cubes and tuna steaks direct (ADR-067). The buyer can tick lines bought or "not
   found" (rolls to tomorrow) and attaches receipt photos (ADR-068). Later: an in-app alert for
   supervisors on "not found". Planned (A9).
+- Specced 2026-11-15: supply-tags (how each restaurant meat is bought).
+
+## Open questions
+- The A9 questions are in arrivals-and-bills.md.

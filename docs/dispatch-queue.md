@@ -114,18 +114,31 @@ is. Read the step's own section in `session-status.md` before starting.
 > started on Naoki's laptop) may build them, after stale-saves and before preview-pid and
 > landing-sales (no shared files). Naoki reviews and merges.
 > **2026-11-22 (Marble is offline today) - Order now for the beta-3 lane.** Naoki builds it all
-> himself, in this order: stale-saves -> sign-the-cookie -> landing-sales -> backup-restore ->
+> himself, in this order: stale-saves -> sign-the-cookie -> landing-sales -> fc-landing-lines
+> (added later on 11-22) -> backup-restore ->
 > restaurant-pc-ii (respecced) -> roles-guard -> save-safety -> cost-guard (widened) ->
 > preview-pid. What the restaurant PC's first install needs comes first. PR #87 (db-start) merges
 > as built; PR #85 (npm-audit) gets one more audit pass (ADR-106), then merges; issue #86 is
 > answered. The specs for backup-restore, restaurant-pc-ii, roles-guard, save-safety and
 > cost-guard's block land in today's drop-ins, each before its build. Marble picks up wherever the
 > lane stands when he is back.
+> **2026-11-22 (later) - FC first; beta-3 is smaller.** Naoki: FC's counter tests FC's sales at FC
+> soon. **beta-3** = stale-saves (PR #88), landing-sales, fc-landing-lines; tag it once those are
+> merged and the smoke list's lines 1-8, 10 and 11 pass, and install with the launcher as it is
+> (its setup asks the three Loyverse tokens). **beta-4**, by `update beta-4` and then
+> `scripts\restaurant-pc.bat` run once with no word (beta-3 has no stub launcher yet), in this
+> order: sign-the-cookie -> backup-restore -> restaurant-pc-ii -> roles-guard -> save-safety ->
+> cost-guard -> preview-pid. Accepted for those few days: admin logins without a password (as in
+> all of Beta so far) and the old two-file backups (made at every start; nobody restores by
+> hand). FC's device reaches the PC through Tailscale (ADR-070) as an invited restaurant device
+> (ADR-103).
 
 #### Fable fixes (2026-11-17)
 
 ### Step stale-saves - a row nobody touched never saves  [runnable]
-Touches: server/engines/blindCount.js, server/engines/blindCount.test.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/commands.test.js, public/daily-audit.html, public/commissary.html
+Touches: server/engines/blindCount.js, server/engines/blindCount.test.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/commands.test.js, server/routes/authorship.test.js, public/daily-audit.html, public/commissary.html
+**2026-11-22 (issue #89):** server/routes/authorship.test.js joins Touches - two of its tests now
+send `touched: true`, as the spec says for existing tests that expect a write. PR #88.
 ADR-104 (Fable I-01 = F2 = U-01, U-04, I-02 = U-03): a phone's Save no longer puts back numbers its
 person never typed - landing counts, portions and prepped, and the commissary count, which also
 keeps and shows its notes. No schema change. PUBLIC -> click-through. Full spec:
@@ -156,6 +169,28 @@ at 3 PM and 3 AM (Task Scheduler), kept by age (14 days plus one a month); `rest
 back; an optional copy folder in `.env`. After landing-sales, before restaurant-pc-ii. The Node
 half in CI; the launcher needs Windows (You check). Full spec: session-status.md -> "Step
 backup-restore".
+
+### Step fc-landing-lines - beta-3's starting data: FC's 27 lines and two meals, Kare-Kare's placeholder  [Naoki's own PR]
+Touches: server/db/seed-data-B.json, server/db/seed-data.json, server/db/seed.js, server/db/seedData.test.js
+FC's 27 paper lines in the paper's order become its seeded meats (Pork Jowl in kg, the rest in
+pieces; the six lines that keep no stock included, counted as 0); FC's old dishes and recipes
+leave the seed until fc-dish-map; FC gets two meal slots like Silingan; Silingan gets a placeholder
+meat for Kare-Kare and the dish D044. Data only; reaches the PC through beta-3's fresh install.
+After landing-sales. Full spec: session-status.md -> "Step fc-landing-lines".
+
+### Step roles-guard - no admin lockout; admin and read-only as base roles only  [blocked: sign-the-cookie (order)]
+Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/roles.js, server/routes/roles.test.js, server/index.js, scripts/import-settings.js, server/db/importSettings.test.js, public/roles.html
+ADR-099 (Fable U-17 = PERM-10, PERM-09 = C-14, PERM-14): the built-in admin role and your own base
+role cannot be switched off or lose admin, nor your own base role changed; admin and read-only only
+as base roles (old extra rows grant nothing); look-alike role names refused, the import too.
+PUBLIC -> click-through. Full spec: session-status.md -> "Step roles-guard".
+
+### Step save-safety - one Save is one transaction; bad numbers, dates and ids refused  [blocked: stale-saves, roles-guard (order)]
+Touches: server/validate.js, server/validate.test.js, server/db/activityLog.js, server/db/activityLog.test.js, server/engines/monthOpening.js, server/routes/dailyAudit.js, server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/stockReceipts.js, server/routes/stockReceipts.test.js, server/routes/allocations.js, server/routes/allocations.test.js, server/middleware/requireSiteAccess.js, server/middleware/requireSiteAccess.test.js, server/index.js, public/daily-audit.html, public/commissary.html, public/stock-receipts.html, public/commissary-shipments.html, public/allocations.html
+Fable I-08 = F5, F3, PERM-12, I-07 = U-08, I-09, run 1's `{}` lead: a Save is all or nothing and
+names a bad row; BEGIN IMMEDIATE; a JSON error handler (no stack traces); bad numbers (allocations
+keep negatives), dates, repeated query fields and non-number ids refused. PUBLIC -> click-through.
+Full spec: session-status.md -> "Step save-safety".
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -537,11 +572,15 @@ landing-sales".
 2026-11-17 block.
 **2026-11-22:** + Silingan's new Kare-Kare as D044 (map only). See the spec's 2026-11-22 block.
 
-### Step cost-guard - unit costs need the see_costs switch  [blocked: save-safety, then its 2026-11-17 block (ADR-100)]
+### Step cost-guard - unit costs need the see_costs switch  [blocked: save-safety (order)]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
 ADR-060: cost fields leave every read for anyone without see_costs, logged out included; adds
 edit_side_items (ADR-062). PUBLIC -> click-through. Full spec: session-status.md -> "Step
 cost-guard".
+**2026-11-22:** its 2026-11-17 block is written (ADR-100): the rice price and staff-meal budgets
+join the cost fields, History and the two staff-meal reads are covered, a missing key keeps the
+stored value, and Settings shows "Saved" or the error per row. Touches add history.js and
+sideItems.js with their tests.
 
 ### Step import-settings-env - the settings import uses the app's database and says which file  [runnable]
 **CLOSED 2026-11-15, PR #79 (`300c87a`).**
@@ -675,20 +714,11 @@ adds a step, and an idle assistant costs far less than an invented one.
 From the five Fable reports (docs/reviews/). Order: the 2026-11-17 note at the top of the Queue.
 Every finding's place: session-status, 2026-11-17 block.
 
-Specced and in the Queue: stale-saves, sign-the-cookie (3zv), npm-audit, db-start; backup-restore
-and restaurant-pc-ii's respec (2026-11-22).
+Specced and in the Queue: stale-saves, sign-the-cookie (3zv), npm-audit, db-start; backup-restore,
+restaurant-pc-ii's respec, fc-landing-lines, roles-guard, save-safety and cost-guard's block
+(2026-11-22).
 
-Before beta-3:
-- **roles-guard** (Marble): the built-in admin role cannot be switched off or lose admin; admin and
-  read-only only as base roles (ADR-099); role names too close to a built-in one are refused.
-  U-17 = PERM-10, PERM-09 = C-14, PERM-14.
-- **save-safety** (Marble): one Save = one transaction; the lock wait works (BEGIN IMMEDIATE); a
-  JSON error handler, never a stack trace; counts, receipts and shipments refuse bad numbers, every
-  write refuses a bad business date, naming the row; body ids must be numbers. I-08 = F5, F3,
-  PERM-12, I-07 = U-08, I-09, run 1's `{}` lead.
-- **cost-guard** (queued; Marble; widened by ADR-100): plus History, the rice price and the two
-  staff-meal Settings reads; a missing key keeps the stored value (cost, meat type, active); cost
-  inputs disabled without see_costs. PERM-06 = C-03 = C-04 = U-11, U-12, I-11 item 4.
+Before beta-3: all specced (above).
 
 After beta-3:
 - **blind-reads**: ADR-101 on every page; takes over blind-history. PERM-03 = C-13 = U-10,
@@ -702,6 +732,10 @@ After beta-3:
 - **settings-safety** (Naoki, after cost-guard): a recipe edit no longer counts twice on its day; a
   meat's unit locked once used; a duplicate recipe line refused; Settings changes logged; seeded
   adjustment types pinned; seeded recipes dated early. I-04, I-11, PERM-16 = C-09, I-14.
+
+Also from run 2 (docs/reviews/fable-2026-11-17-2-integrity.md): its five side-waste notes (which day a
+line belongs to, units, COOKED never negative, fix and charge, pinned type names) go into side-waste's
+spec when it is written.
 
 P2, between roster steps: **page-errors** (U-05, U-09, U-06, U-07, U-13, U-14's name and Log out on
 two pages), **page-dates** (F7 = U-15), **list-limits** (F6; and three commissary indexes, db-start's 2026-11-22 review), **actor-from-login** (PERM-08 = I-13),

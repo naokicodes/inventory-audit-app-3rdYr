@@ -26,8 +26,14 @@ Status: IRL Confirmed - FLOW Drafted - APP Specced
   in-house and cash-advance slips are settled at the weekly payroll.
 - The in-house order slip (photo 2026-11-16): name, date, order no., department; lines of
   quantity, item, unit, amount and remarks; a total amount; signed by the employee, "approved by"
-  and "released by". Asked: whether the same order is also rung up in Loyverse, and where the name
-  goes there.
+  and "released by". 2026-11-17 (Naoki): the same order is also rung up in Loyverse, with the staff
+  member's name as the ticket name.
+- Rice (2026-11-17): it is cooked on big trays in a multi-tray rice machine, not served by the cup;
+  Naoki's estimate is 25 to 40 cups a tray, so cups stay the unit. Still to ask: the raw rice in one
+  tray (that divided by about 30 gives grams per cup) and the sack price.
+- 2026-11-17 and 2026-11-22 (Naoki): two meals a day is the default for every site for now, FC
+  included (the first line above said FC 3); extra meals happen (birthdays) and are added on the
+  day, with the same steps as a scheduled meal.
 - Leftovers are not weighed and are out of scope.
 - Sources: photo of the staff-meal log; chat 2026-10-22/24.
 
@@ -80,5 +86,6 @@ sits inside each slot. Rice is never typed: management sees a daily estimate (AD
 - Rice (answered 2026-11-11, ADR-044) and Likod's non-meat ingredients
   (answered 2026-11-12, ADR-046) are closed.
 - Miscut meals (ADR-018) are not in A10: they join when the miscut item exists.
-- Which Loyverse field carries the staff member's name on a staff order
-  (customer or note)? Staff orders are recognised by the staff name (53).
+- Which Loyverse field carries the staff member's name: answered 2026-11-17 (the ticket name).
+- FC's meals: answered 2026-11-22 (two by default, more added on the day). An extra meal uses the
+  same steps as a scheduled meal (staff-meal-check's extra meal).

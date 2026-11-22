@@ -1,6 +1,7 @@
 # ADR-046 Typed non-meat lines until the item lists exist
 
-- Status: Accepted 2026-11-12
+- Status: Accepted 2026-11-12; superseded in part by ADR-109 (a staff-meal line may name a side
+  item)
 - Decided by: Naoki
 - Supersedes: ADR-003's "Sides: an approximate kg per item" line, for staff meals, until the item
   lists exist (A8)

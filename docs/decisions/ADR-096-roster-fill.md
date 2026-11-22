@@ -1,6 +1,6 @@
 # ADR-096 Roster: shift rows, day offs first, and Fill
 
-- Status: Accepted 2026-11-16
+- Status: Accepted 2026-11-16; superseded in part by ADR-107 (any number of placements a day)
 - Decided by: Naoki
 - Supersedes: ADR-013 in part (a new week as a full copy of last week; one placement per person per day)
 

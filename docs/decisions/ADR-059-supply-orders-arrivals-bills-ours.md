@@ -1,7 +1,9 @@
 # ADR-059 Supplier orders, arrivals and bills are ours
 
 - Status: Accepted 2026-10-19; the frozen-SPOS assumption superseded by ADR-005, the unit-cost
-  line by ADR-020; detailed by ADR-021 to ADR-023
+  line by ADR-020; detailed by ADR-021 to ADR-023; its "supplier orders are made here: the commi for
+  raw meat, the podium for side items" line superseded by ADR-021 (each sheet's counter writes the
+  first lines and the landing has the final say; the podium receives, it does not order)
 - Decided by: Naoki
 - Supersedes: ADR-058
 

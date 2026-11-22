@@ -132,9 +132,71 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-106; the index, and a map from handoff item numbers to records, is in
+to ADR-109; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-22 architect (A0 #85 #86 #87, the beta-3 specs, the 11-17 answers) - decided (recorded: ADR-106 to ADR-109)
+
+- **A0.** Issue #86: a second audit pass (ADR-106: an audit fix may move a patch version inside
+  package.json's range; express 4.22.3). PR #87 (db-start) and PR #85 (npm-audit) merged on 11-22.
+  db-start's review: three commissary lookups go to list-limits; no site starts without a count
+  sheet.
+- **Who builds.** Marble is offline today, so Naoki builds the whole before-beta-3 lane:
+  stale-saves -> sign-the-cookie -> landing-sales -> fc-landing-lines -> backup-restore ->
+  restaurant-pc-ii -> roles-guard -> save-safety -> cost-guard -> preview-pid (dispatch-queue's
+  2026-11-22 note). Tag beta-3 when all are merged and the smoke list passes, as before.
+- **FC first (later on 11-22; replaces the beta-3 line above).** FC's counter is to test FC's sales
+  at FC soon, so beta-3 is stale-saves (PR #88), landing-sales and fc-landing-lines, installed with
+  today's launcher; the rest of the lane follows as beta-4 by update (dispatch-queue's later
+  2026-11-22 note). Until beta-4: admin logins without a password, the old two-file backups, and
+  after `update beta-4` the repo's bat is run once with no word. FC's device joins the tailnet
+  (ADR-070, ADR-103).
+- **Specced today.** backup-restore (ADR-105: one file per backup at every start and at 3 PM and 3
+  AM by Task Scheduler - the restaurant PC stays on overnight and is restarted on some days; kept 14
+  days plus the first of each month; a copy folder in `.env`, on E: at the install, the Drive folder
+  later; `.env` copied beside the local backups only). restaurant-pc-ii's respec (the stub launcher,
+  update from a temp copy, the unfinished-update marker, no `npm ci` for an unchanged lockfile,
+  first-step messages, only Git and Node on the PC, the `.env` questions, auto-start, an Update
+  shortcut). fc-landing-lines (beta-3's starting data: FC's 27 paper lines, Pork Jowl in kg, the
+  six no-stock lines included so the landing person copies the paper one to one; FC's old dishes
+  leave the seed; two meal slots for FC as for Silingan; a placeholder meat for Kare-Kare, whose
+  meat is new, and the dish D044).
+  roles-guard (ADR-099; and an admin cannot switch off or demote the role they use, or change their
+  own base role; old extra admin or read-only rows grant nothing; the import refuses look-alike
+  names). save-safety (allocations keep negatives; a ceiling of 100,000; the landing's two requests
+  stay and the message names which part saved). cost-guard's 2026-11-17 block (History's costs
+  follow see_costs from the base role or an every-site role).
+- **Recorded from 11-17.** ADR-107 (any number of jobs a day; Purchaser a station; Function's
+  minimum 0; a cover gets the covered person's "also works" job; the supervisor sets all day offs,
+  the kitchen switch stays an option); ADR-108 (finalization not planned); ADR-109 (staff-meal lines
+  may name a side item, C-17); the roster specs' 2026-11-17 blocks (C-12, C-15, C-16). Also accepted
+  on 11-17: only tonight's pick or placement saves the side sheets (write-permission's block, C-11);
+  FC counts its landing in the app from beta-3, and nobody relies on FC's expected or variance until
+  fc-dish-map; nobody types sales in during Beta - the real Loyverse sync comes after the roster,
+  before Live; the three "Kim" examples stay; the architect drafts the admin manual before the
+  beta-3 install (C-19).
+- **Also 11-22.** PR #88 (stale-saves) built; issue #89 answered: authorship.test.js joins its
+  Touches (two tests send `touched: true`, as the spec says). Silingan's new Kare-Kare (D044) joins
+  landing-sales' map, exact name only (the head chef counts only it). Staff meals: two a day is the
+  default everywhere; extra meals are added on the day with the same steps. FC's map is final; Pork Jowl arrives from the commi and is used through an
+  allocation. The restaurant PC only hosts the app until hosting: its setup installs no VS Code,
+  Claude Code or graphify, and the overnight runner stays on Naoki's laptop. The rice per tray does
+  not block beta-3 (only staff-meal-log needs it). Payroll: weekly, made on Sunday, started on
+  Saturday. Roster: build with the draft; the supervisor corrects names, times and minimums on the
+  Staff page after the update; a note per day (the uniform); take-overs written in the break.
+- **Fable docs items done today:** C-05, C-07, C-08, C-09, C-11, C-12, C-15, C-16, C-17, C-20, C-21
+  and C-25, and run 2's notes (side-sheets' block, side-waste's note, cost-guard's block). Left:
+  C-19 (the admin manual, before the install) and A14b's clean-up (C-10, C-22, C-23, C-24, run 4's
+  D2 to D7).
+- **The beta-3 install checklist** (with the 11-15 steps). Before, over AnyDesk: does Windows sign
+  in by itself after a restart (auto-start and the scheduled backups need a signed-in user); Disk
+  Management shows E: on another disk than C:; `git --version` and `node --version`; Windows Update
+  active hours 8:00 AM to 2:00 AM. At the install: the setup's `.env` questions (the three Loyverse
+  tokens with FC's, the admin password, the copy folder); the people import; FC's landing shows its
+  27 lines; one backup and one restore tried; a restart opens the app by itself. Fable's: run 4's
+  fsync.js once on the PC, a real iPhone, Kitchen Sales with the real tokens against FC's paper for
+  one day, and the 30 Nov -> 1 Dec turn at 07:59.
 
 ### 2026-11-17 architect (Fable reports sorted, the beta-3 line) - decided (recorded: ADR-098 to ADR-105)
 
@@ -412,7 +474,7 @@ disagree, that is a bug: ask Naoki and fix both the same day.
   Silingan + Likod | FC switch, FC's side grouped by FC's Loyverse categories. Step loyverse-fc;
   fc-dish-map planned.
 - **Supply (ADR-067, ADR-068).** How it's bought: supplier delivery, buyer run, from the commi (the
-  landing's meat lines become the built internal request). FC's sirloin, pork chops, tuna cubes and
+  landing's meat lines become the internal request - decided, not built: ADR-092). FC's sirloin, pork chops, tuna cubes and
   tuna steaks come direct to FC (exception to ADR-017). Buyer ticks and receipt photos; photos as
   files next to the database. The A9 steps are planned, specced as the steps before them land.
 - **Scope and access (ADR-069, ADR-070).** scope.md covers every inventory sheet. Remote phones use
@@ -499,6 +561,8 @@ disagree, that is a bug: ask Naoki and fix both the same day.
   at that site, never kitchen. Copy last week reverts one-offs. The head chef edits her kitchen
   people's days, supervisors everything. Login list: tonight first, then always-listed, then
   everyone else. OJT are never on the roster; head count = on duty + floater at the site.
+  (Superseded in part: copy last week, one placement a day and the head count by ADR-096 and
+  ADR-107; who edits a kitchen person's days by ADR-107.)
 - **Blind follows the site's roles; Likod counts blind (ADR-038).** Blind = no "sees expected"
   switch at that site. Likod's grillers count blind; its appointed head chef sees.
 
@@ -544,15 +608,15 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   (ending stock x the cost price set in settings), for meats and sides. Sales
   revenue / margin / profit never enters this app. **[Amended 2026-10-19: the cost price is the item's last billed arrival unit cost, with the settings cost as fallback - see "Supply, cost and SPOS integration".]**
 - **Side inventory is simple counting**, separate from the meat engine: beginning
-  + receipts − ending, no recipe / no variance, valued at price as a guide. Must NOT route through `auditEngine`. Build now from the workbook's transcribed Side_Items catalog; **units are unverified** and need a data investigation / re-setup pass later — don't block the build on it (2026-09-28).
+  + receipts − ending, no recipe / no variance (except the bar's sellables, which get an expected and a difference: ADR-025, ADR-087), valued at price as a guide. Must NOT route through `auditEngine`. Build now from the workbook's transcribed Side_Items catalog; **units are unverified** and need a data investigation / re-setup pass later — don't block the build on it (2026-09-28).
 - **Sahog / no-standard consumption is a derived residual** at day-close (total
   consumed − what the direct + prep standards explain), labeled "unstandardized"
   (NOT "staff meals"), ONE bucket. A reclassification of the already-computed
   variance, not a new real-time entry.
 - **Endorsement IS the receipt** — confirming an arrival writes the stock receipt
   (one record), capturing arrived / short (qty) / none. Record-only, non-blocking.
-- **Running-low is user-configured** (par level = a settings field); watches the real ending count with a calculated-ending fallback the checker can overwrite. Both modes are BUILT — PERCENT (ending < X% of par) and ABSOLUTE (ending <= N) — but only **ABSOLUTE threshold 0** is seeded/used for now (2026-09-28); percent thresholds need a data investigation and are deferred (feature present, unused).
-- **Roles are configurable (GitHub-style)**, with server-side per-capability enforcement (never client-side hide-the-button) and a safe bootstrap (un-lockable super-admin + default roles). Roles are site-scoped, station-AGNOSTIC. CONFIRMED 2026-09-26: five roles — super-admin, admin, management (read-only), head-chef/ops, checker; checker is differentiated by site membership, not role; cashier is not an app user. **[2026-10-19: one scoped exception - a bills-only role while SPOS is frozen; see "Supply, cost and SPOS integration".]** Decision C (2026-09-28): a **roles table seeded from the settings workbook** carries the capability flags (can_enter_counts / can_finalize / can_admin / read_only); the five names are fixed; super-admin is seeded and never lockable.
+- **Running-low is user-configured** (par level = a settings field); watches the real ending count with a calculated-ending fallback the checker can overwrite. Both modes are decided; neither is built (corrected 2026-11-22, Fable C-08) — PERCENT (ending < X% of par) and ABSOLUTE (ending <= N) — but only **ABSOLUTE threshold 0** is seeded/used for now (2026-09-28); percent thresholds need a data investigation and are deferred (feature present, unused).
+- **Roles are configurable (GitHub-style)**, with server-side per-capability enforcement (never client-side hide-the-button) and a safe bootstrap (un-lockable super-admin + default roles). Roles are site-scoped, station-AGNOSTIC. CONFIRMED 2026-09-26: five roles — super-admin, admin, management (read-only), head-chef/ops, checker; checker is differentiated by site membership, not role; cashier is not an app user. **[2026-10-19: one scoped exception - a bills-only role while SPOS is frozen; see "Supply, cost and SPOS integration".]** Decision C (2026-09-28): a **roles table seeded from the settings workbook** carries the capability flags (can_enter_counts / can_finalize / can_admin / read_only); the five names are fixed (superseded: six built-in names, and other roles can be added and renamed - ADR-034, ADR-083); super-admin is seeded and never lockable.
 - **Identity now, passwords later.** A thin `users` table (id, name, role) that
   `created_by` points at is built now; login is a stub (pick-your-name, no
   password) until the recycled auth lands. Phased beta: P0 open -> P1
@@ -564,7 +628,7 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   ruled out entirely per "Station-to-station transfer is out of scope." user-sites / site-filter
   are built on site membership, model B.)
 - **Finalization is two-step, soft** per (site, category, date) sheet (CLOSED 2026-09-26): the owner (assigned cook) marks **Done**; head-chef/admin **Closes**; reopening is logged. State model: Not started -> In progress -> Done -> Closed. Never a hard lock. First-time entry is not logged; changing stored data is. Done is **mark-and-warn** (2026-09-28): the owner may mark Done anytime; incomplete/uncounted rows are flagged, never blocked. Those flags surface to the head-chef, who **acknowledges** them as part of Close - so the record shows the chef saw them.
-- **Sheets are a first-class two-tier entity, overlay-not-churn** (CLOSED 2026-09-26). Tier 1 = definition (site, category, engine_type MEAT|SIDE, active), admin-fed per site from the settings workbook's Sheet_Definitions. Tier 2 = dated instance (site, category, date) with owner_user_id + finalization_status, **lazy-created** (row on first touch, no cron). The tested engines stay untouched; the status/ownership row sits over them.
+- **Sheets are a first-class two-tier entity, overlay-not-churn** (CLOSED 2026-09-26). Tier 1 = definition (site, category, engine_type MEAT|SIDE, active), admin-fed per site from the settings workbook's Sheet_Definitions. Tier 2 = dated instance (site, category, date) with owner_user_id + finalization_status, **lazy-created** (row on first touch, no cron). The tested engines stay untouched; the status/ownership row sits over them. (Tier 2 and its finalization: not planned, ADR-108.)
 - **Concurrency is optimistic** (a version / `updated_at` column + "changed under
   you — reload"), paired with `busy_timeout` and one-owner-per-sheet. NOT
   last-write-wins, NOT a waitlist.
@@ -652,8 +716,9 @@ architect-held 2026-09-15 handoff (local). Build order is in `dispatch-queue.md`
   dropdown silently books stock to the wrong location. Crossing locations is
   two events — a yield, then an allocation.
 - Tech stack: Node.js + Express + `node:sqlite` (not better-sqlite3, not
-  Postgres) — see `changelog.md` for why.- Single local machine, one SQLite file, no hosting/multi-user — see
-  `scope.md`.
+  Postgres) — see `changelog.md` for why.
+- Single local machine, one SQLite file, no hosting/multi-user — see
+  `scope.md`. (Superseded: multi-user since 2026-09 and hosting later - ADR-034, ADR-070, scope.md.)
 - Docs-first workflow: update the relevant `docs/*.md` file whenever a
   real decision changes, before or alongside the code. Architecture
   decisions are made between sessions, in the docs — not decided
@@ -3070,7 +3135,7 @@ ordered_by_user_id, assigned_user_id, status ('OPEN', 'DONE', 'CANCELLED'), crea
 - After picking their name, the assigned person sees "Recount: <items>" at the top of the count
   page. Their save of that item is a RECOUNT, closes the order and becomes the current value. The
   first count stays in count_entries.
-- Finalization is not built yet; when it lands it blocks new orders. isBlocked() refuses recount
+- Finalization is not planned (ADR-108). isBlocked() refuses recount
   saves exactly as it refuses any save today.
 
 **Landing person's view.** The review page as today, plus per item with history: who counted,
@@ -3531,6 +3596,17 @@ before merge.
   and is idempotent.
 - Times are text only: nothing reads a time out of a name (ADR-013, ADR-096).
 
+**Decisions 2026-11-17 (ADR-107; Fable C-15; Naoki 2026-11-17 and 2026-11-22).** These override
+any reading of the text above.
+- Who owns what (C-15, ADR-082): the Stations and Shifts tabs add new stations and rows. For an
+  existing one they compare and list each difference in the report ("change it on the Staff page")
+  and never write it; they never remove a station, a row or a sheet link. A name on two rows of a
+  tab is held and reported (ADR-047). `--export` writes both tabs from the app. The workbook is the
+  first load only: after it the supervisor works on the Staff and Roster pages (Naoki, 2026-11-17).
+- Purchaser is a station like any other; Function may have minimum 0 (data; nothing to build).
+- Station names and times start from the private draft; the supervisor corrects them on the Staff
+  page after the update (Naoki, 2026-11-22).
+
 ## Step roster-staff - the staff list: main station, sub-stations, standing access, login link (A6)
 **Hold lifted 2026-11-16 (ADR-096):** see the decision block at the end of this step.
 
@@ -3592,6 +3668,19 @@ PUBLIC -> click-through before merge.
 - Page: usual break and "Also works" on the person's edit form.
 - Tests add: usual_break stored and returned; also_shift_id at the main station refused; the import
   reads both and warns on an unknown row.
+
+**Decisions 2026-11-17 (ADR-107; Fable C-15, C-16 item 5).** These override any reading of the text
+above.
+- "Also works" may name a station with no shift rows (most stations): staff gains also_station_id
+  INTEGER (FK stations, nullable) beside also_shift_id. also_shift_id is required only when that
+  station has active rows, and must belong to it. The Staff tab's also_works is `site:station` or
+  `site:station:row`.
+- Who owns what (C-15, ADR-082): the Staff tab adds new people. For an existing person it compares
+  main station, sub-stations, access, usual break and also works, lists each difference ("change it
+  on the Staff page") and never writes it; it never removes a sub-station or an access. A duplicated
+  name is held and reported (ADR-047). `--export` writes the tab.
+- Tests add: also works at a station with no rows is stored; also_shift_id at another station
+  refused; the import lists a changed main station without writing it.
 
 ## Step roster-week - the weekly roster: placements, rest days, copy last week (A6)
 **Hold lifted 2026-11-16 (ADR-096):** see the decision block at the end of this step.
@@ -3685,6 +3774,35 @@ public/roster.html (new), public/index.html. PUBLIC -> click-through before merg
   copies only rest days; a hand edit clears filled; closed_yesterday across a week boundary.
 - Touches unchanged.
 
+**Decisions 2026-11-17 (ADR-107; Fable C-12, C-16; Naoki 2026-11-17 and 2026-11-22).** These
+override any reading of the text above, the 11-16 block included.
+- **Any number of placements a day:** slot is 1, 2, 3 and so on; every slot after the first only
+  when slot 1 is ON_DUTY, and itself ON_DUTY at another row or station. Deleting slot 1 deletes the
+  others. The person sheet's "Add a second job" becomes "Add another job".
+- **Start the week (C-12)** copies each person's last-week REST_DAY onto the same weekday of the new
+  week when that person has no entry that day. It is refused only when the new week already has a
+  REST_DAY at the site ("Day offs are already set for this week"), so a leave or a placement typed
+  in advance never blocks it.
+- **What dies (C-16 item 1):** "one entry per person per day", copyWeek and its tests, the "Copy
+  last week" button, and "copy last week" in the step's title (the title reads "placements, day
+  offs, Start the week").
+- **Who edits (C-16 item 2; Naoki 2026-11-17):** roster_all at the person's home site edits
+  everything (the supervisor sets all day offs). roster_kitchen edits any entry whose station is a
+  kitchen station, whoever the person, and the day offs of people whose main station is a kitchen
+  station. So a head chef with it can place the commissary person on her closing row, and cannot
+  touch his commissary entry.
+- **A note for the day** (Naoki, 2026-11-22: "Uniform: BLACK"): new table roster_day_notes
+  (site_code TEXT NOT NULL, business_date TEXT NOT NULL, note TEXT NOT NULL, updated_by_user_id,
+  updated_at, PRIMARY KEY (site_code, business_date)); roster_all edits it; it shows at the top of
+  the day and in the week view, and prints.
+- **Breaks:** break_text is prefilled from usual_break and changed for the day; a take-over during a
+  break is written in it ("2-3PM; <name> takes over"). Nothing else models take-overs.
+- Tests add: a third and a fourth placement allowed; Start the week with a leave already set copies
+  the day offs around it, and is refused once a day off exists; with roster_kitchen, the commissary
+  person's kitchen entry is editable and his commissary entry is not; a day note is saved, shown and
+  replaced; activity_log rows for each.
+- Touches add: nothing (the new table is in schema.sql, already listed).
+
 ## Step roster-day-status - leave, sick, absent, floater, covering; the day's totals and head count (A6)
 **Hold lifted 2026-11-16 (ADR-096):** see the decision block at the end of this step.
 
@@ -3730,6 +3848,20 @@ present (editable, ADR-027); "Roster not set for this day" leaves it empty.
   counts people, not entries; the staff-meal prefill stays Present (ADR-027).
 - Tests add: a three-day leave writes three entries and replaces their placements; a person with
   two placements counts once.
+
+**Decisions 2026-11-17 (ADR-107; Fable C-16 items 4, 6 and 7).** These override any reading of the
+text above.
+- Present counts a person once a day, at the site of their slot 1 (C-16 item 6). A person with
+  three jobs counts once.
+- Totals (C-16 item 7): the day view and the grid show the paper's four rows - Present, Day offs,
+  Leave (LEAVE + SICK_LEAVE), Head count (Present + Day offs + Leave) - with Absent and Floater as
+  lines under them when there are any. headCount() returns { present, day_off, leave, sick_leave,
+  absent, floater, head_count }: leave includes sick leave, and sick_leave is its part.
+- Covering (C-16 item 4): a person set as covering someone also gets that person's "also works" job
+  that day, as another placement (the commissary person's cover does both jobs, as on the 11-17
+  message).
+- Tests add: a person with three placements counts once, at slot 1's site; head_count equals
+  present + day_off + leave; covering the commissary person adds his kitchen-closer placement.
 
 ## Step roster-fill - Fill places the week (A6)
 
@@ -3807,6 +3939,18 @@ server/routes/roster.test.js, public/roster.html. PUBLIC -> click-through before
 
 Not in scope: break planning; hours; rules for one site only; Likod (A12).
 
+**Decisions 2026-11-17 (ADR-107; Fable C-16 items 3 and 4).** These override any reading of the
+text above.
+- Row tie-break (C-16 item 3): among the allowed rows of yesterday's kind, Fill keeps yesterday's
+  row when it still exists (Silingan's kitchen has two mid rows and the scullery three), so a cell
+  stays mostly the same all week, as on paper.
+- Covers (C-16 item 4): when Fill moves a person in to cover a station whose main person is off, it
+  also gives them the off person's "also works" placement, when the rest rule allows.
+- Any number of placements (ADR-107): Fill adds at most the "also works" placement; other extra jobs
+  are set by hand.
+- Tests add: two mid rows - a person keeps yesterday's row; the commissary person's cover gets the
+  kitchen closing too.
+
 ## Step tonight-picks - tonight's kitchen counter and other picks, with reassignment (A6)
 
 Decided ADR-014, ADR-017 and ADR-037. DEPENDS ON roster-day-status.
@@ -3855,6 +3999,10 @@ Touches: server/db/schema.sql, server/engines/tonightPicks.js (new),
 server/engines/tonightPicks.test.js (new), server/routes/roster.js, server/routes/roster.test.js,
 public/roster.html. PUBLIC -> click-through before merge.
 
+**2026-11-17 (ADR-107; Fable C-16 item 8):** DEPENDS ON roster-fill (as the queue says), not
+roster-day-status. Candidates are people with any ON_DUTY placement (any slot) or FLOATER at the
+site that date.
+
 ## Step login-tonight - the login list from tonight's roster; "your work tonight" (A6)
 
 Decided ADR-011 and ADR-037. DEPENDS ON tonight-picks.
@@ -3890,6 +4038,9 @@ after login, Home shows their sheets or "No work for you tonight".
 Touches: server/engines/tonightWork.js (new), server/engines/tonightWork.test.js (new),
 server/routes/auth.js, server/routes/auth.test.js, server/routes/roster.js, public/login.html,
 public/index.html. PUBLIC -> click-through before merge.
+
+**2026-11-17 (ADR-107; Fable C-16 item 8):** "Tonight" lists a person with any ON_DUTY placement
+(any slot) at the site; their work tonight is every sheet of every station they are placed at.
 
 ## Step write-permission - only tonight's people write (ADR-011 enforced) (A6)
 
@@ -3952,6 +4103,17 @@ beyond this refusal. Tests: a management login gets 403 on a count save, a stock
 edit and an allocation, and 200 on the reads; logging in and out still work. Touches gains:
 server/index.js, server/middleware/refuseReadOnly.js (new), server/middleware/refuseReadOnly.test.js
 (new).
+
+**Decisions 2026-11-17 (ADR-107, ADR-108; Fable C-07, C-11; Naoki 2026-11-17).** These override
+any reading of the text above.
+- "ON_DUTY at the site" means any placement, any slot (ADR-107).
+- Enforced on also: the side-sheet save, against that sheet (mayWriteSheet), if side-sheets is on
+  main; if not, side-sheets adds the call when it lands (C-11). Only tonight's pick or placement
+  saves the veggie, pantry and bar sheets, as on the meat landing (Naoki, 2026-11-17).
+- Finalization is not planned (ADR-108): "finalize" leaves the list of review-page actions, and the
+  Blocked edge state reads "isBlocked refuses first, as today".
+- Touches add: server/routes/sideSheets.js and server/routes/sideSheets.test.js, if side-sheets is
+  on main.
 
 ## Step site-filter-ii - two-site requests and lists across sites (A0)
 **CLOSED 2026-11-15, PR #80 (`8a2d8fd`).**
@@ -4341,6 +4503,16 @@ server/engines/staffMeals.js (new), server/engines/staffMeals.test.js (new),
 server/routes/staffMeals.js (new), server/routes/staffMeals.test.js (new), server/index.js,
 public/staff-meals.html (new), public/index.html. PUBLIC -> click-through before merge.
 
+**Decisions 2026-11-17 (ADR-109; Fable C-17).** These override any reading of the text above.
+- A non-meat line can pick a side item from the site's catalog (the sheets of that site, ADR-062)
+  with an approximate quantity in one of its units; a typed name with an estimated peso amount
+  stays for anything not in the catalog. staff_meal_lines gains side_item_id (FK side_items,
+  nullable), quantity REAL and unit TEXT (both required with a side item; the unit must be the
+  item's main unit or one of its conversions, ADR-024). Meat lines stay quantities; staff rice
+  stays an estimate line (ADR-044).
+- Tests add: a side-item line stores the item, quantity and unit; an unknown unit is refused; a
+  typed line still works.
+
 ## Step staff-meal-check - the head chef checks; extra meals, late logs, copy a past meal (A10)
 
 Decided (ADR-045). DEPENDS ON staff-meal-log (3zx); same files, so after it.
@@ -4667,6 +4839,40 @@ public/settings.html (and
 server/routes/sideItems.js if side-items is on main). PUBLIC -> click-through: Claude checks as Test
 Counter RA (no costs) and Test Head Chef RA (costs); You check the looks.
 
+**Decisions 2026-11-17 (ADR-100; Fable PERM-06 = C-03 = C-04 = U-11, U-12, I-11 item 4; run 2's
+notes) and 2026-11-22 (Naoki: History's cost fields follow see_costs from the base role or an
+every-site role).** These override any reading of the text above. Written 2026-11-22.
+- COST_FIELDS: `cost_per_unit`, `cost_per_portion`, `price_per_kg`, `fixed_budget`,
+  `per_head_rate` (the rice price is a unit price; the budgets are the owners' figures, ADR-100).
+- withoutCosts also covers GET /api/settings/staff-meal-slots (per row's site) and GET
+  /api/settings/staff-rice-rates (not per site: `can(user, 'see_costs', null)`). Logged out never
+  gets any of them.
+- GET /api/history: for a reader without `can(user, 'see_costs', null)`, each row's `before` and
+  `after` go through withoutCosts. History has no site, so a person whose base role has see_costs
+  (a head chef) sees every site's costs there (Naoki, 2026-11-22).
+- GET /api/side-items keeps siteSideSheets' `withCost` flag (one mechanism, run 2's note 3), set
+  from `can(user, 'see_costs', site)` instead of admin only.
+- A save that leaves a key out keeps the stored value (I-11 item 4, run 2's note 4): PUT
+  /api/settings/meats/:id, /dishes/:id and /commissary-meats/:id keep the stored cost, meat_type_id
+  (commissary meats) and active when the key is absent; a key sent as null or '' still clears cost
+  and meat type. The staff-meal slot and rice-rate PUTs keep budget, rate and price when absent.
+- public/settings.html: one shared `saveRow(url, body, row)` for every table's row save (U-12). It
+  reads the answer and shows "Saved" beside the row, or the server's message, reloading the table
+  on an error. A non-admin's inputs are disabled (Settings writes are admin-only, ADR-042). A row
+  whose data has no cost shows no cost field, and a cost key is never sent for it.
+- The cook's own staff-meal page keeps the budget of the meal in front of them (ADR-100); that page
+  is staff-meal-log (parked), nothing here.
+- Tests add: logged out and a checker get no price_per_kg, fixed_budget or per_head_rate; a head
+  chef gets them; History logged out and as a checker has no cost or budget key in any before or
+  after (side_items, staff_rice_rates and staff_meal_slots rows), a head chef and an admin see
+  them; the side-items read gives cost to head chef, supervisor and management and not to a
+  checker; PUT without cost, meat_type_id or active keeps each; PUT with cost null clears it.
+- Touches add: server/routes/history.js, server/routes/history.test.js, server/routes/sideItems.js,
+  server/routes/sideItems.test.js.
+- Click-through add: Claude checks as Test Counter RA: Settings -> Staff meals shows no budget or
+  rice price and History shows no cost field; as Test Admin, a cost edit shows "Saved" and a
+  refused edit shows the message, then the stored value after the reload.
+
 ## Step side-items - the side-item catalog and its import (A8)
 **CLOSED 2026-11-14, PR #74 (`c3b1777`).**
 
@@ -4844,6 +5050,16 @@ Received (A9), who counts which sheet tonight (tonight-picks).
 
 **Added 2026-11-14 (ADR-078).** The main-unit rule gains counts: PUT on a side item also refuses a
 main_unit change once the item has any side_counts row (same 409 message). Tests gain it.
+
+**Notes 2026-11-17 (Fable run 2, docs/reviews/fable-2026-11-17-2-integrity.md, "Notes on the three
+specced steps"), to settle when this step is unparked (after roster-fill):** (1) a changed
+conversion skews Used on the day it changes - store the factor or the main-unit figure per part
+with the count; (2) a missing conversion leaves Used null for two days and never heals -
+recompute or say "re-save to convert"; (3) a negative Used ("more than expected - check
+Received"), with null kept apart from 0 in every total and in COOKED; (4) Received on a day with no
+ending is dropped - say so; (5) Save per card stays, and a restored draft stays "(unsaved)"; (6)
+the log's actor is the logged-in person, and a rule for fixing a past count of a switched-off item.
+Also C-11: the save goes through write-permission's mayWriteSheet (its 2026-11-17 block).
 
 ## Step settings-tabs - the Settings tab row scrolls in its own strip (issue #70)
 **CLOSED 2026-11-14, PR #75 (`2440655`).**
@@ -5186,6 +5402,13 @@ transaction per Save and the error messages (save-safety); the "Your name" box a
 (actor-from-login); a commissary draft and drafts per person (page-errors); "Sync batch stock"
 following later sales changes (stock-math, I-12); a "changed under you" warning (ADR-104: none).
 
+**2026-11-22 (issue #89, PR #88).** server/routes/authorship.test.js joins Touches: two of its
+tests now send `touched: true` (a prepped correction and a commissary re-save), exactly as the
+test line above says for existing tests that expect a write. The spec missed that caller, not the
+build. Not needed: cleaning up prepped zeros stored before this step (cubic) - beta.db is new at
+beta-3 and a dev database is reseeded. Seen while building, left for its own step: the landing page
+errors when it first opens a restaurant the person cannot use (Fable U-02, site-picker).
+
 ## Step npm-audit - the three npm advisories, lockfile only (A0, Fable N-1)
 **CLOSED 2026-11-22, PR #85 (`cd7054c`).**
 
@@ -5399,3 +5622,223 @@ older backup (the count is gone), restore the before-restore backup (it is back)
 
 Not in scope: backups on a host (later, ADR-105); photos (run 4's D6, when photos are built); the
 full health line; the launcher's other changes (restaurant-pc-ii).
+
+## Step fc-landing-lines - beta-3's starting data: FC's 27 lines and two meals, Silingan's Kare-Kare placeholder (A0, 2026-11-22)
+
+Decided 2026-11-22 (Naoki): all 27 paper lines, the six that keep no stock included, because the
+landing person copies the paper one to one and the zeros are part of it; Pork Jowl in kg, every
+other line in pieces; FC's old dishes and recipes leave the starting data; two staff meals a day is
+the default for every site (FC's seed had three); Kare-Kare uses a new meat, so Silingan gets a
+placeholder for it. Naoki's lane, before beta-3, after landing-sales. Data only, no schema change.
+
+What FC's landing person sees from beta-3: the landing lists FC's paper lines in the paper's order
+(docs/areas/meat-landing.md, "FC, 2026-11-15"): Pork Jowl, Paella, Baglaw Tuna, Tuna Tinola, Tuna
+Steak, Skewers, Pork Chops, Beef Tapa, Garlic Beef; Bagnet, Laing, ASG, CPA, Sisig, Sinigang,
+Dinuguan, Salpicao, Tinola, Pancit, Daing, Arrabiatta, Burger Patty, Chicken Brgr, Burger Buns;
+Whole Chicken, Half, Quarter. Laing, CPA, Salpicao, Tinola, Pancit and Half keep no stock and are
+counted as 0, as on paper. There are no dish (portion) rows for FC until fc-dish-map.
+
+- server/db/seed-data-B.json: `meats` becomes these 27 lines, meat_code M01 to M27 in this order
+  (the landing sorts by meat_code), the names as written above, unit `kg` for Pork Jowl and `unit`
+  for the rest, cost_per_unit null. `dishes` and `recipe_bom` become empty lists: FC's old dishes
+  do not match today's menu, and nothing reads them in Beta (no sales are stored); fc-dish-map
+  brings the real ones from the landing-sales map.
+- server/db/seed.js: DEFAULT_SLOTS gives FC two meal slots ('Meal 1', 'Meal 2'), like Silingan.
+  Extra meals on a day are staff-meal-check's (an extra meal), not more slots.
+- server/db/seed-data.json (Restaurant A = Silingan): a placeholder meat for Kare-Kare's new meat,
+  meat_code M12, name "Kare-Kare meat", unit `kg`, cost null - the admin renames it (and changes
+  its unit if needed) in Settings before its first count, when the kitchen names the meat; and the
+  dish D044 "Kare-Kare" (prep_type DIRECT, cost null) with no recipe line yet. D044 matches
+  landing-sales' map entry.
+- Nothing else is seeded for FC: the commi picks the restaurant meat on each shipment line, and
+  conversion standards are an admin's.
+- beta.db is new at beta-3 (a fresh install), so the seed is how this reaches the restaurant PC. A
+  database seeded before this step keeps its old FC meats (INSERT OR IGNORE by code): run `npm run
+  reseed` on a dev database.
+
+Edge states: Empty - FC's landing shows the 27 lines and no portions section. Stale - an older dev
+database keeps its old FC lines until reseeded. Failure, Partial, Blocked, Inactive, Two devices -
+unchanged.
+
+Tests: a fresh seed gives FC 27 active meats in the paper's order (by meat_code), Pork Jowl `kg`
+and the other 26 `unit`, and no FC dishes or recipe lines; FC gets two meal slots; Restaurant A
+gains only M12 "Kare-Kare meat" (kg) and D044 "Kare-Kare" with no recipe line; seeding twice adds
+nothing. Tests that read FC's old seeded meats or dishes move to the new list.
+
+Touches: server/db/seed-data-B.json, server/db/seed-data.json, server/db/seed.js,
+server/db/seedData.test.js (new), and any test that reads the seeded rows it changes. Server-only, no click-through (no page changes). You check at the beta-3
+install: FC's landing shows the 27 lines in the paper's order; Silingan's landing shows "Kare-Kare
+meat"; Settings -> Staff meals shows two slots per site.
+
+Not in scope: FC's dishes and recipes (fc-dish-map); the commi's own meats; prices.
+
+## Step roles-guard - no admin lockout; admin and read-only as base roles only; look-alike names (A0, Fable)
+
+Decided 2026-11-17 (ADR-099; Fable U-17 = PERM-10, PERM-09 = C-14, PERM-14) and 2026-11-22 (Naoki:
+an admin cannot switch off or demote the role they use, nor change their own base role; old extra
+roles with admin or read-only grant nothing; the people import refuses look-alike names too).
+Before beta-3; Naoki builds it today (Marble offline). No schema change.
+
+What admins see:
+- The built-in admin role has no Deactivate button and its Admin switch cannot be turned off: "The
+  admin role keeps admin and stays on. Make a copy to change it."
+- An admin cannot switch off, or turn admin off on, the role they are logged in with, and cannot
+  change their own base role: "You are using this role. Ask another admin or the super-admin."
+- A role with admin or read-only cannot be given as an extra role ("Give this as the person's base
+  role."), and admin or read-only cannot be turned on for a role someone holds as an extra role:
+  "<names> hold this as an extra role. Remove it there first, or make it their base role."
+- A new role, or a rename, whose letters and digits match a built-in role's is refused: "That name
+  is too close to the built-in role <name>." ("super admin", "super_admin", "Super.Admin", "admin"
+  with an unseen character, "headchef".) "Admin 2" and "Admins" are fine.
+- Nothing changes for anyone else.
+
+Server (server/db/permissions.js):
+1. `isAdmin(db, actor)` reads the base role only: the person is active, their base role is active
+   and has can_admin = 1 (today it also counts every-site extra roles: PERM-09). The other admin
+   checks already read the base role (requireAdmin, commands' adminOnly, side items, isBypass) and
+   stay. A read-only check reads the base role's read_only the same way, never through roleGrants,
+   which says yes to everything for a role with admin.
+2. `liveRoles` skips extra roles (user_roles rows) whose role has can_admin = 1 or read_only = 1:
+   an old row grants nothing (ADR-099). The base role is read as today.
+3. `assignRole` refuses a role with can_admin = 1 or read_only = 1: 400 "Give this as the person's
+   base role."
+4. `setRoleToggle` refuses turning admin or read_only on while any user_roles row holds the role
+   (400, the people's names, at most five, then "and <n> more"). `setRoleToggle` (admin off) and
+   `updateRole` (active off) refuse, with 400 and the messages above: the built-in `admin` role
+   (found by name, ADR-083), and the acting person's own base role. Super-admin stays as today.
+5. `setBaseRole` refuses when the person is the actor: 400 "Your own base role is changed by
+   another admin or the super-admin."
+6. `createRole` and `updateRole` (a rename) refuse a name whose letters and digits alone
+   (`name.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]/g, '')`) equal a built-in role's
+   (superadmin, admin, management, headchef, checker, supervisor). ADR-047's name key stays for
+   matching names.
+7. At server start (beside ensureRoleDefaults), when any user_roles row holds a role with admin or
+   read-only, print once: "Extra roles that grant nothing now (admin and read-only are base roles
+   only): <person> - <role> (<site or every site>). Remove them on the Roles page." None are
+   expected (beta.db is new at beta-3).
+
+Import (scripts/import-settings.js): importRoles skips a new role whose name is too close to a
+built-in one (rule 6) and reports it: `Roles row <n> "<name>": too close to the built-in role
+<name> - skipped`. Existing roles are matched by ADR-047's key, as today.
+
+Routes and page: GET /api/roles gives each role, for the viewer, `can_switch_off` and
+`can_turn_admin_off` (false for the built-in admin role and the viewer's own base role).
+public/roles.html hides Deactivate and disables the Admin switch where those are false, with the
+reason as a short line under the role; the extra-role picker lists only roles without admin or
+read-only; every refusal shows the server's message beside the role.
+
+Edge states: Blocked - each refusal is a 400 with its message and writes nothing (no
+activity_log row). Inactive - a switched-off role grants nothing, as today. Two devices - each
+check reads inside the write's transaction, so a second admin's change is seen. Empty, Partial,
+Stale - unchanged.
+
+Tests (made-up names): PERM-09's repro is refused at assign; an old user_roles row with an admin
+role, inserted directly, grants no switch at a site, isAdmin is false, and the start line lists it;
+assignRole refuses admin and management; turning admin on for a role held as an extra role is
+refused and names the person; U-17's repro: Deactivate and admin-off on the built-in admin role are
+refused; a copy of admin as my base role: I cannot switch it off or turn its admin off, another
+admin can; setBaseRole on myself is refused; "super admin", "super_admin", "Super.Admin",
+"admin\u200b" and "headchef" are refused on create and on rename, "Admin 2" and "Admins" are
+allowed; the import skips a "super admin" row and reports it.
+
+Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/roles.js,
+server/routes/roles.test.js, server/index.js, scripts/import-settings.js,
+server/db/importSettings.test.js, public/roles.html. PUBLIC -> click-through (390px). Claude
+checks as Test Admin: the admin role shows no Deactivate; "super admin" is refused with the
+message; the extra-role picker has no admin or management. You check: the reason lines read well.
+
+Not in scope: real per-person logins (ADR-011); which switch allows which write (write-switches,
+ADR-102).
+
+## Step save-safety - one Save is one transaction; bad numbers, dates and ids refused; plain errors (A0, Fable)
+
+Decided 2026-11-17 (Fable I-08 = F5, F3, PERM-12, I-07 = U-08, I-09; run 1's `{}` lead) and
+2026-11-22 (Naoki, recs: adjustments keep negatives; a ceiling of 100,000; the landing's two
+requests stay). Before beta-3, after roles-guard. DEPENDS ON stale-saves (both change saveCount
+and the three count routes). No schema change.
+
+What staff see:
+- A Save is all or nothing. One wrong row saves nothing, and the message names it: "Ground Beef:
+  the count must be a number, 0 or more. Nothing was saved."
+- "1,5", a space, "-7" or "abc" as a count is refused; "1.5" and "0" are fine. Above 100,000: "That
+  number is too large - check it."
+- When something goes wrong on the server the phone shows a plain message, never a page of code:
+  "Something went wrong on the server. Nothing was saved. Try again; if it happens again, tell the
+  admin." When the database is busy: "The app is busy. Wait a moment and save again."
+- The landing's Save still sends meats, then dish rows. If the second part fails: "Meats saved.
+  Dish rows not saved: <message>." The unsaved rows stay as drafts on the phone.
+
+Server:
+1. **One validator,** server/validate.js (new): `quantity(value, { negative = false, max = 100000
+   })` gives a number or a reason. It accepts numbers and plain decimal strings ("12", "1.5"); it
+   refuses other text, a blank or whitespace-only string, "1,5", Infinity and NaN, below 0 unless
+   `negative`, and beyond `max` either way. `isIsoDate` lives here; monthOpening.js re-exports it.
+2. **Counts:** POST /api/daily-audit (ending), /daily-audit/portions (count and prepped) and POST
+   /api/commissary/daily-audit check every row first: a bad row gives 400 `{ error, row }` naming
+   the item, and nothing is written. Then one withTransaction around the whole loop, saveCount
+   inside it.
+3. **Receipts, shipments, yields:** POST and PATCH /api/stock-receipts (quantity); POST
+   /api/commissary/shipments (the total and each line); the yield log's raw_weight_in,
+   backed_weight_out, input_quantity and miscut_weight. 0 or more, at most 100,000; a 400 names
+   the field. Commissary adjustments already refuse negatives and keep doing so.
+4. **Allocations keep negatives:** POST /api/allocations and /allocations/conversion accept a
+   negative number (a reversal: today's only undo, and a conversion writes one on purpose); they
+   refuse 0, non-numbers and anything beyond 100,000 either way.
+5. **withTransaction** (server/db/activityLog.js) starts with `BEGIN IMMEDIATE` (F3: the
+   5-second lock wait then applies) and nests: a call inside an open withTransaction runs fn
+   directly (a depth counter in the module; `db.isTransaction` is missing on Node 22.13 to 22.15).
+   A throw anywhere rolls back the outer transaction.
+6. **Dates (I-09):** the site guard (server/middleware/requireSiteAccess.js) refuses any write
+   under /api (POST, PUT, PATCH, DELETE) whose body `business_date` is present and not a real
+   YYYY-MM-DD date: 400 "business_date must be a date like 2026-11-22". One place covers every
+   route I-09 lists, the two opening-stock PATCHes included. On GETs, a query `date` or
+   `business_date` that is present must be one real date the same way.
+7. **Query fields (PERM-12):** on every GET under /api, a query field given twice (an array) or as
+   an object (`a[x]=1`) gives 400 "<field> was given more than once".
+8. **Body ids (run 1's `{}` lead):** for writes, every body field whose name ends in `_id`, at the
+   top level and inside each `rows[]`, `lines[]` and `items[]` entry, is absent, null, empty or one
+   whole number above 0 (the guard's parseId, ADR-074); otherwise 400 "<field> must be one whole
+   number".
+9. **One error handler** at the end of server/index.js, after the routers: express.json's parse
+   error gives 400 "The request was not valid JSON."; a locked database (SQLITE_BUSY) gives 503
+   with the busy message; anything else gives 500 with the plain message. The error and its stack
+   go to the server window with the method and path, never into the answer. An unknown /api path
+   gives 404 `{ "error": "Not found" }`.
+
+Pages (public/daily-audit.html, commissary.html, stock-receipts.html, commissary-shipments.html,
+allocations.html): show the server's message as given, never "Unexpected token '<'"; the landing
+names which part of its Save went through; count, receipt and shipment inputs get `min="0"` and
+`inputmode="decimal"` (allocations keep negatives).
+
+Edge states: Failure - one transaction per Save, nothing half-written; a busy database answers
+503 after up to 5 s. Partial - the landing's dish rows failing after its meats saved: named, the
+dish rows stay as drafts. Empty - nothing typed: stale-saves' "Nothing new to save." Stale -
+stale-saves' rule. Blocked - the month block refuses as today, before anything is written.
+Inactive - unchanged. Two devices - two Saves at once: the second waits for the first (BEGIN
+IMMEDIATE and busy_timeout), then runs.
+
+Tests (made-up names; Fable's repros as tests): three rows with the middle one "abc" give 400
+naming the middle item and save none of them (landing, portions, commissary); "-7", " ", "1,5",
+"1e308" and 100001 are refused, "1.5" and 0 accepted; a receipt of -20 is refused; an allocation
+of -5 is accepted, of 0 refused; a body business_date of "2026-11-2", "11/16/2026" or
+"2026-11-16T10:00" gives 400 on every route I-09 lists (one loop); `date=a&date=b` on GET
+/api/daily-audit and `restaurant_ids=1&restaurant_ids=2` on the stock rollup give 400 JSON; a body
+meat_id of `{}` gives 400; a malformed JSON body gives 400 JSON; a route that throws gives 500 JSON
+with the plain message and no file path in the body; with a second connection holding the write
+lock for 2 s a landing Save waits and succeeds, held for 8 s it answers 503 after about 5 s; an
+inner withTransaction throw rolls back the outer one.
+
+Touches: server/validate.js (new), server/validate.test.js (new), server/db/activityLog.js,
+server/db/activityLog.test.js, server/engines/monthOpening.js, server/routes/dailyAudit.js,
+server/routes/dailyAudit.test.js, server/routes/commissary.js, server/routes/commissary.test.js,
+server/routes/stockReceipts.js, server/routes/stockReceipts.test.js, server/routes/allocations.js,
+server/routes/allocations.test.js, server/middleware/requireSiteAccess.js,
+server/middleware/requireSiteAccess.test.js, server/index.js, public/daily-audit.html,
+public/commissary.html, public/stock-receipts.html, public/commissary-shipments.html,
+public/allocations.html. PUBLIC -> click-through (390px). Claude checks: as Test Counter RA, a count
+of "1,5" is refused naming the item and nothing else is saved, then a good Save works; as Test
+Commi, the same on the commissary page; as Test Admin, a receipt of -20 is refused with its
+message on Stock Receipts. You check: the messages read well on a phone.
+
+Not in scope: Settings' saves (cost-guard's saveRow, settings-safety); a limit per meat; the other
+page-errors items; Loyverse.

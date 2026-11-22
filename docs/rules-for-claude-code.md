@@ -51,7 +51,9 @@ specific file wins for a collaborator.
    `commissary-and-stock-receipts.md` Part 3. This pattern is scoped to
    just these two tables for now — don't silently extend it to
    `ending_actual`/`adjustments`/`prepped`/`portion_ending_actual`; that's
-   deliberate future work, tracked in `scope.md`.
+   deliberate future work, tracked in `scope.md`. (Widened since: a step that names its own
+   log rows extends it - counts, roles, side items, staff-meal settings; settings-safety adds
+   Settings. See scope.md.)
 
 ## Specific to this project
 10. **The worker-facing (auditor's daily) screens must stay minimal** —
