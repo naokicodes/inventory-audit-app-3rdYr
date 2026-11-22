@@ -69,6 +69,12 @@
       "name": "Miscuts",
       "unit": "kg",
       "cost_per_unit": null
+    },
+    {
+      "meat_code": "M12",
+      "name": "Kare-Kare meat",
+      "unit": "kg",
+      "cost_per_unit": null
     }
   ],
   "dishes": [
@@ -303,6 +309,12 @@
     {
       "dish_code": "D039",
       "name": "Adobo Rice Platter",
+      "prep_type": "DIRECT",
+      "cost_per_portion": null
+    },
+    {
+      "dish_code": "D044",
+      "name": "Kare-Kare",
       "prep_type": "DIRECT",
       "cost_per_portion": null
     }
