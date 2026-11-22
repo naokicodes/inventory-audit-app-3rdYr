@@ -191,6 +191,7 @@ meat for Kare-Kare and the dish D044. Data only; reaches the PC through beta-3's
 After landing-sales. Full spec: session-status.md -> "Step fc-landing-lines".
 
 ### Step sales-cache - Kitchen Sales keeps what it fetched for a short time  [runnable]
+**CLOSED 2026-11-22, PR #92 (`b268fbf`).**
 Touches: server/routes/loyverse.js, server/routes/loyverse.test.js, public/kitchen-sales.html
 ADR-112: the server keeps each Kitchen Sales result in memory (today 2 minutes, the 7 days before
 30 minutes, older until a restart); Sync sends `fresh=1`; a failed account is never kept;

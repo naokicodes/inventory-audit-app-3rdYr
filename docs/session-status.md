@@ -5764,6 +5764,7 @@ meat"; Settings -> Staff meals shows two slots per site.
 Not in scope: FC's dishes and recipes (fc-dish-map); the commi's own meats; prices.
 
 ## Step sales-cache - Kitchen Sales keeps what it fetched for a short time (A0, 2026-11-22)
+**CLOSED 2026-11-22, PR #92 (`b268fbf`).**
 
 Decided 2026-11-22 (ADR-112; Naoki). Naoki's lane, first in beta-3.1. No schema change; nothing is
 written to the database.
