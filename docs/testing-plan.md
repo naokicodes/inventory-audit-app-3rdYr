@@ -78,6 +78,9 @@ Replaces the 2026-10-24 laptop plan.
   `.env`. Daily: the desktop "Start Inventory App" backs up `beta.db` to a dated copy, shows the
   phone link and runs the app.
 - **Dev and weekday testing: Naoki's laptop**, on `main`, with its own `beta.db`.
+- **The restaurant PC only with real staff (2026-11-22).** Its beta.db gets entries only in
+  sessions with real staff and Naoki there (in person or on a call); Naoki's own tests stay on
+  the laptop.
 - **Tags.** `beta-1`, `beta-2`, ... Each tag is a `main` Naoki already phone-checked, set before a
   session at the restaurant. Move the PC with `restaurant-pc.bat update <tag>` while the app is
   closed.

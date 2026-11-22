@@ -1,6 +1,7 @@
 # ADR-103 Tailscale counts as inside the restaurant for ADR-040
 
-- Status: Accepted 2026-11-17
+- Status: Accepted 2026-11-17; superseded in part by ADR-110 (a device away from the restaurant
+  gets a machine share, not an invite)
 - Decided by: Naoki
 - Supersedes: none (answers ADR-040's "Reopen only if")
 

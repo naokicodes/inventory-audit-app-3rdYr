@@ -37,6 +37,7 @@ listing what changed after it.
 | `ARCHITECTURE-HANDOFF-2026-11-14` | `af78da3` | 618 | End of 11-14: A0 (ADR-060, ADR-061, ADR-071 to ADR-080), A8 and A9 part 1 (ADR-062 to ADR-070); PRs #47 #59 #61 #63 #65 #69 #71 #72 #74 #75 #76 merged; the late cubic list left for the next chat. |
 | `ARCHITECTURE-HANDOFF-2026-11-15` | `6247ae6` | 701 | End of 11-15 (afternoon): A0 (ADR-081 to ADR-084, all late cubic findings sorted), A8 part 2 (ADR-085 to ADR-090), #81 (ADR-091), commissary and POs (ADR-092, ADR-093); beta-2 tagged; PRs #76 #78 #79 merged. |
 | `ARCHITECTURE-HANDOFF-2026-11-16` | `2cb16ee` | 748 | 11-15 evening and 11-16: A0 #84 (ADR-095), FC's sales follow its landing (ADR-094), the beta-3 plan, roster Fill (ADR-096), runs without a coder (ADR-097), A5 scope rewrite; PRs #82 #83 merged; the Fable prompts for 11-17. |
+| `ARCHITECTURE-HANDOFF-2026-11-22` | `934f170` | 780 | 11-17 and 11-22: the Fable reports sorted (ADR-098 to ADR-105), A0 #85 #86 #87 (ADR-106), the beta-3 specs and the 11-17 answers (ADR-107 to ADR-109); PRs #85 #87 merged; FC first (beta-3 = stale-saves, landing-sales, fc-landing-lines). |
 
 Not here: the 2026-09-15 handoff and the dispatcher handoff (never committed),
 and `architect-notes-PRIVATE.md` (stays private). Decisions 1-94 from the 10-22 to

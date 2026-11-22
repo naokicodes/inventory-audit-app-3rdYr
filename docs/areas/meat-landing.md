@@ -123,6 +123,10 @@ and are ignored (Naoki, 2026-11-17).
    stays in history; the recount becomes the count.
 3. The landing person / head chef enters allocations. Staff meals come from the
    staff-meal page; waste from waste entries.
+4. FC (from beta-3, 2026-11-22): FC's head chef counts FC's 27 lines in the app at FC, alongside
+   the paper, on a phone that reaches the restaurant PC through Tailscale (ADR-110). A month's
+   first count starts in the Month opening panel at the top of Landing. On the first day Naoki is
+   there or on a call, and Kitchen Sales' FC side is compared with FC's paper.
 
 ## APP
 - Built: daily audit (meat + portion counts, allocations, month opening and
@@ -152,6 +156,8 @@ and are ignored (Naoki, 2026-11-17).
   order, the six that keep no stock included (counted as 0: the landing person copies the paper one
   to one); Pork Jowl in kg, every other line in pieces; FC's old dishes leave the starting data
   until fc-dish-map (step fc-landing-lines, before beta-3).
+- Built 2026-11-22: Kitchen Sales' FC side by landing line (landing-sales, PR #90) and FC's 27
+  lines with two meal slots (fc-landing-lines, PR #91). On the restaurant PC from beta-3.
 
 ## Open questions
 - None open. (Pieces AND weight: closed 2026-10-28 - one unit per meat.)

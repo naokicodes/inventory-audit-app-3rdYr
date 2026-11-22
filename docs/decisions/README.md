@@ -145,13 +145,14 @@ flight. (ADR-001 explains the split.)
 | ADR-100 | Staff-meal budgets and rates: on the cook's page, behind see_costs in Settings, never logged out | Accepted 2026-11-17 |
 | ADR-101 | Blind counting follows the paper: Beginning and New stock are shown | Accepted 2026-11-17 |
 | ADR-102 | Which switch allows which write | Accepted 2026-11-17 |
-| ADR-103 | Tailscale counts as inside the restaurant for ADR-040 | Accepted 2026-11-17 |
+| ADR-103 | Tailscale counts as inside the restaurant for ADR-040 | Accepted 2026-11-17; superseded in part by ADR-110 (a share, not an invite) |
 | ADR-104 | A row nobody touched never saves | Accepted 2026-11-17 |
 | ADR-105 | Beta's database: one-file backups, a restore, a copy off the PC, its name | Accepted 2026-11-17 |
 | ADR-106 | An audit fix may move a patch version inside package.json's range | Accepted 2026-11-22 |
 | ADR-107 | A person can hold any number of jobs a day; Purchaser is a station | Accepted 2026-11-17 (recorded 2026-11-22) |
 | ADR-108 | Sheet finalization is not planned | Accepted 2026-11-17 (recorded 2026-11-22) |
 | ADR-109 | Staff-meal lines may name a side item, with an approximate quantity | Accepted 2026-11-17 (recorded 2026-11-22) |
+| ADR-110 | A device away from the restaurant gets the restaurant PC as a Tailscale share | Accepted 2026-11-22 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

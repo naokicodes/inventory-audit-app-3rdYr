@@ -132,9 +132,43 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-109; the index, and a map from handoff item numbers to records, is in
+to ADR-110; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-22 architect, evening (A0 #91, A16's install part, the restaurant PC) - decided (recorded: ADR-110)
+
+- **A0.** PR #91 (fc-landing-lines) merged (`a31d8d9`), checked against its spec on the branch (814
+  tests; a new beta.db seeds FC's 27 lines). Kitchen Sales' FC table writes the lines in capitals
+  (the map) and the landing in the seed's spelling: the same lines in the same order, left as is.
+  beta-3 is tagged on main (with this drop-in, docs only on top of `55423ca`) once the smoke list's
+  lines 1-8, 10 and 11 pass.
+- **The restaurant PC was not empty (corrects the 11-15 line).** Naoki installed it on 11-13 with PR
+  #47's 11-12 file and started it once on 11-18; nobody entered data there. So it runs beta-1 (the
+  newest tag on 11-13; its Version line confirms), its beta.db holds beta-1's starting data (FC's
+  old lines and dishes), its firewall rule has no Tailscale range (added 11-14) and its `.env` has
+  no FC token line. Git 2.56.0, Node 24.22.1. The 11-15 plan (clone to a temporary folder and run
+  its setup) suits an empty PC only: the setup keeps an existing app folder and beta.db as they are.
+- **beta-3 at the PC: an update and a fresh beta.db, the old one kept aside (Naoki).** Close the
+  app; `update beta-3` with the PC's launcher; move every `beta.db*` file into
+  `InventoryApp\old-beta-db-<date>`; run the repo's `scripts\restaurant-pc.bat` once with no word (it
+  asks FC's token, seeds beta.db from beta-3's starting data, adds Tailscale's range to the firewall
+  rule and refreshes the launcher copy); N at "Start the app now"; the people import; then start.
+  Steps and messages: `docs/official/running-the-app.md` (A16's install part, written today; the
+  backup and restore parts after beta-4). beta-3's setup still checks VS Code, Claude Code and
+  graphify (they go in restaurant-pc-ii).
+- **The restaurant PC is tested only with real staff and Naoki there** (in person or on a call);
+  Naoki's own tests stay on his laptop (the smoke list, throwaway databases). FC's first day: Naoki
+  with FC's head chef, Kitchen Sales' FC side against FC's paper (Fable run 4's one-day check).
+- **People for beta-3:** the people import with two rows (Naoki as super-admin at RA and FC; FC's
+  head chef as head-chef at FC); more people before each staff session. The CSV stays off the repo.
+- **Tailscale (ADR-110).** The restaurant PC joins Naoki's tailnet (run unattended, key expiry off);
+  FC's device gets the PC as a shared machine, never as an invited user. Whether it is the head
+  chef's own phone or an FC phone is still to say: the share works either way.
+- **Backups (Naoki):** on C: only for now; no copy folder yet, so beta-4's setup question "Copy
+  backups to" gets Enter. The Google Drive folder stays the plan (ADR-105).
+- **Still open:** Kare-Kare's meat and grams per serving; "ponytail"; before the install, the PC's
+  Version line, auto sign-in after a restart and the active hours; FC's device.
 
 ### 2026-11-22 architect (A0 #85 #86 #87, the beta-3 specs, the 11-17 answers) - decided (recorded: ADR-106 to ADR-109)
 
@@ -286,7 +320,8 @@ disagree, that is a bug: ask Naoki and fix both the same day.
   removed, its role on or off; "Add role" copies checker by default. PR #83 changes to match, then
   the phone check.
 - **beta-3 (Naoki, 2026-11-15).** Nothing was ever installed on the restaurant PC (the 11-14 and
-  11-15 "still on beta-1" was wrong). It installs fresh at beta-3, not beta-2. Tag beta-3 once #83
+  11-15 "still on beta-1" was wrong). (Corrected 2026-11-22, evening: a beta-1 install from 11-13
+  was there; beta-3 reaches it by update. See that block.) It installs fresh at beta-3, not beta-2. Tag beta-3 once #83
   (roles-page), landing-sales and restaurant-pc-ii are merged and the smoke list passes. At the PC:
   `git clone` the repo to a temporary folder and run its `scripts\restaurant-pc.bat` (a .bat
   downloaded from GitHub's raw view has LF endings, which cmd can misread around its labels; git
@@ -5217,6 +5252,9 @@ Touches: scripts/restaurant-pc.bat.
 - The restaurant PC installs fresh at beta-3 (nothing was ever installed there), so the "after
   update" check moves to the beta-4 update; the refused-prompt check and the auto-start are
   checked at the beta-3 install (restart the PC once: the app window opens by itself).
+  (Corrected 2026-11-22, evening: the PC has a beta-1 install from 11-13 and gets beta-3 by update
+  with today's launcher. This step lands in beta-4, so its checks come after `update beta-4` and
+  the setup run once, and the "after update" checks at the first update after that.)
 
 **Decisions 2026-11-22 (respec: Fable U-20 to U-23, run 4's D7; ADR-098, ADR-105; Naoki
 2026-11-22).** These override the text above where they differ. DEPENDS ON db-start (merged) and
@@ -5280,10 +5318,12 @@ backup-restore (both change restaurant-pc.bat: this one goes after it).
   the exit code.
 - Touches add: .env.example (the commented ADMIN_PASSWORD and BACKUP_COPY_DIR lines, if
   sign-the-cookie and backup-restore have not added them).
-- You check, on the laptop with INVENTORY_APP_DIR first, then at the beta-3 install: no VS Code,
+- You check, on the laptop with INVENTORY_APP_DIR first, then at the PC after `update beta-4` and
+  the setup run once (FC first; corrected 2026-11-22, evening): no VS Code,
   Claude Code or graphify step; the three `.env` questions; the desktop has Start and Update
   Inventory App and the Startup folder has the start file; a PC restart opens the app by itself; a
-  refused admin prompt prints the `[!]` line. At the beta-4 update: the stub runs the new code
+  refused admin prompt prints the `[!]` line. At the first update after beta-4 (the first through
+  the stub): the stub runs the new code
   (its Version line), the marker is gone after Done, and with the lockfile unchanged no npm step
   runs.
 
@@ -5542,8 +5582,8 @@ What the admin sees:
 - It keeps every backup of the last 14 days and the first backup of each older month, and deletes
   the rest. Each file is a few MB.
 - When `.env` has `BACKUP_COPY_DIR`, each finished backup is also copied there, with the same keep
-  rule. At the beta-3 install that is a folder on E: (if Disk Management shows E: on another disk
-  than C:); later the Google Drive folder shared with the management, once Google Drive for desktop
+  rule. For now there is none: the backups stay on C: only (Naoki, 2026-11-22, evening), so the
+  setup's question gets Enter; later the Google Drive folder shared with the management, once Google Drive for desktop
   is on the PC (ADR-105).
 - `restaurant-pc.bat backup` makes one backup now (the two scheduled tasks run this word).
 - `restaurant-pc.bat restore` lists the backups, newest first and numbered, with date and size (the
@@ -5616,9 +5656,9 @@ Touches: scripts/restaurant-pc.bat, scripts/backup-db.js (new), scripts/restore-
 server/db/backup.js (new), server/db/backup.test.js (new), .env.example. The Node half runs in CI;
 the launcher needs Windows.
 
-You check (on the laptop first, then at the beta-3 install): start makes one `beta_<stamp>.db`;
+You check (on the laptop first, then at the PC after `update beta-4`): start makes one `beta_<stamp>.db`;
 `restaurant-pc.bat backup` while a phone saves, and the phone's save goes through; `schtasks /query
-/tn "Inventory App backup 3PM"` shows the task; with BACKUP_COPY_DIR on E:, the copy appears there;
+/tn "Inventory App backup 3PM"` shows the task; with BACKUP_COPY_DIR set (on the laptop, any other folder), the copy appears there;
 restore is refused while the app runs; then, with the app closed: save a test count, restore an
 older backup (the count is gone), restore the before-restore backup (it is back).
 

@@ -30,7 +30,7 @@ engineer's rules. Read this folder to understand the app; read the rest to chang
 | management-guide.md - reading the dashboard | management | to write, with the dashboard |
 | admin-guide.md - items, recipes, sites, roles | admins | to write |
 | spos-integration.md - exactly what crosses between the two apps | Prince, maintainers | to write |
-| running-the-app.md - install, start, reset Beta, back up | whoever runs the server | to write |
+| [running-the-app.md](running-the-app.md) - start, update, install, a fresh database, people, Tailscale | whoever runs the server | written for beta-3; backups and restore after beta-4 |
 
 ---
 Last checked: 2026-10-19, against `main` `a6ec30d` plus the decisions recorded that day.

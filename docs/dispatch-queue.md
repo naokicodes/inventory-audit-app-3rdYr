@@ -132,6 +132,11 @@ is. Read the step's own section in `session-status.md` before starting.
 > all of Beta so far) and the old two-file backups (made at every start; nobody restores by
 > hand). FC's device reaches the PC through Tailscale (ADR-070) as an invited restaurant device
 > (ADR-103).
+> **2026-11-22 (evening) - beta-3 is ready to tag.** fc-landing-lines merged (PR #91). Tag beta-3
+> on main once the smoke list's lines 1-8, 10 and 11 pass. The restaurant PC (a beta-1 install
+> from 11-13) gets it by `update beta-3` with a fresh beta.db, the old one kept aside
+> (`docs/official/running-the-app.md`). FC's device gets the PC as a Tailscale share, not an
+> invite (ADR-110). beta-4's order is unchanged.
 
 #### Fable fixes (2026-11-17)
 
