@@ -4619,6 +4619,16 @@ known).
   is an item in FC's export.
 - Tests add: an add-on with `"pos": {}` adds to the line it takes from and to no line of its own.
 
+**Decisions 2026-11-22 (Naoki; Silingan's Loyverse item export of 2026-11-22).**
+- Silingan's new dish **Kare-Kare** (the one new item since 11-17) joins the map as D044:
+  `{ "dish_code": "D044", "name": "Kare-Kare", "silingan": "Kare-Kare", "likod": "", "note": "New
+  2026-11-22; Crispy Kare-Kare and the trays are not counted (head chef)" }`. Exact name only:
+  Crispy Kare-Kare, Kare-Kare Trays and Ox trip kare² Trays stay unmatched, as the head chef
+  asked. Likod does not sell it. Like D040 to D043 it is in the map only; its dish row and recipe
+  come with Silingan's dish list later (its meat and grams per serving are not known yet).
+- Tests add: "Kare-Kare" gives D044; "Crispy Kare-Kare" and "Kare-Kare Trays" give no dish; the
+  committed-map test counts 44 dishes.
+
 ## Step cost-guard - unit costs need the see_costs switch (A0)
 
 Decided 2026-11-14 (ADR-060, ADR-062). DEPENDS ON role-assignments (3zj: can(), switch rows,
@@ -4991,6 +5001,75 @@ Touches: scripts/restaurant-pc.bat.
   update" check moves to the beta-4 update; the refused-prompt check and the auto-start are
   checked at the beta-3 install (restart the PC once: the app window opens by itself).
 
+**Decisions 2026-11-22 (respec: Fable U-20 to U-23, run 4's D7; ADR-098, ADR-105; Naoki
+2026-11-22).** These override the text above where they differ. DEPENDS ON db-start (merged) and
+backup-restore (both change restaurant-pc.bat: this one goes after it).
+- **The launcher copy is a stub (U-22).** Setup writes `%APPDIR%\restaurant-pc.bat` as two lines,
+  `@echo off` and `call "<REPO>\scripts\restaurant-pc.bat" %*` (REPO written out). The desktop
+  file, the Startup file and the scheduled backups all call the stub, so every word runs the
+  repo's current bat; the 11-15 "copy on the last line" goes.
+- **Update never runs from the file it replaces.** `git checkout` replaces
+  scripts\restaurant-pc.bat, and cmd reads a running .bat from disk. So `update` copies the repo's
+  bat to `%TEMP%\inventory-app-update.bat` and runs the copy (`update-run`, today's update body),
+  with the call and `exit /b` on one line: cmd reads a whole line before running it. `start`'s
+  `npm run dev` line and everything after it are one line too (an update can replace the file
+  while the app window waits at its last pause).
+- **An "update unfinished" marker (U-21).** Just before the checkout, update writes
+  `%APPDIR%\update-in-progress.txt` (the previous commit and the tag) and deletes it at "Done" and
+  at "Back on". `start`, `update`, `backup` and `restore` look for it first: "[X] The update to <tag>
+  did not finish (was the PC switched off?). Run Update Inventory App again. The app was not
+  started." A rerun reads the previous commit from the marker (not HEAD), and checks out with
+  `-f` (the marker shows the changed files are the update's own; `.env` and beta.db are not
+  tracked).
+- **No `npm ci` when the lockfile did not change (U-20, D7 (3)).** `git diff --quiet <prev> <tag> --
+  package-lock.json` and an existing node_modules: both installs are skipped. A failed install no
+  longer rolls back (that needs the same network): the marker stays, and the message reads "[X]
+  Could not download the app's parts. Check the internet, then run Update Inventory App again. The
+  app will not start until the update finishes."
+- **The self-test (U-23).** A failed verify rolls back as today, saying "[!] <tag> did not pass its
+  self-test - going back to <prev>. Run the update once more; if it fails again, keep using <prev>
+  and tell the admin. The log: <path>."
+- **Every message names a first step (U-23).** No message names Naoki. Each `[X]` and `[!]` line
+  says one thing the person can do alone: run it again, check the internet, close the app window
+  first, free some disk space, run the setup (restaurant-pc.bat with no word). "Could not reach
+  GitHub" becomes "Could not get the new version. Check the internet and run the update again."
+  The start's last line: "The app stopped. If you did not close it, read the lines above: 'database
+  file is missing' - run the setup again; 'newer version' - run Update Inventory App; anything
+  else - start it again; if it stops again, restart the PC."
+- **Going back asks first (U-23).** A tag older than the current version asks "<tag> is older than
+  this version (<now>). Go back only right after a bad update. Continue? (Y/N)". (db-start already
+  stops the server on a database newer than its code.)
+- **The port comes from .env (U-23).** APP_PORT is `.env`'s PORT when set, else 3000: the port
+  check, the phone link and the firewall rule use it.
+- **Setup installs only what the app needs (Naoki, 2026-11-22: the restaurant PC only hosts the
+  app until hosting).** Steps 2 to 4 (VS Code, Claude Code, graphify) go; setup-dev-environment.bat
+  is not run on the restaurant PC. When Git or Node 22.13+ is missing, setup installs it with
+  winget itself (the same two lines as setup-dev-environment.bat) and checks again. Steps renumber.
+  Nothing on the PC writes graphify-out\, so an update never stops at "edited by hand" for it.
+- **`.env` questions (ADR-098, ADR-105).** A new `.env`, after the Loyverse tokens: "Admin password
+  (asked on the phones when an admin logs in):" -> ADMIN_PASSWORD; "Copy backups to (a folder on
+  another disk, or Enter to skip):" -> BACKUP_COPY_DIR (created if missing; Enter writes the
+  commented line); COOKIE_SECRET is made by node (`crypto.randomBytes(32).toString('base64url')`)
+  and written without being shown. An existing `.env` missing any of the three lines gets the same
+  question once (as :fctoken does; a commented line counts as answered). Values are never printed.
+- **Auto-start (the 11-16 block).** Now safe: db-start refuses a missing database file instead of
+  starting on an empty one. The Startup folder file calls the stub with `start`; setup run again
+  replaces it.
+- **"Update Inventory App" on the desktop (Naoki, 2026-11-22):** `@call "%APPDIR%\restaurant-pc.bat"
+  update`, which lists the versions and asks which (update with no tag already does).
+- **A test install (for checking on the laptop):** `%INVENTORY_APP_DIR%`, when set, replaces
+  `%USERPROFILE%\InventoryApp` as APPDIR, so the setup can be tried in another folder.
+- The 11-15 items stay: `:admin` returns non-zero when netsh or powercfg fails and the setup checks
+  the exit code.
+- Touches add: .env.example (the commented ADMIN_PASSWORD and BACKUP_COPY_DIR lines, if
+  sign-the-cookie and backup-restore have not added them).
+- You check, on the laptop with INVENTORY_APP_DIR first, then at the beta-3 install: no VS Code,
+  Claude Code or graphify step; the three `.env` questions; the desktop has Start and Update
+  Inventory App and the Startup folder has the start file; a PC restart opens the app by itself; a
+  refused admin prompt prints the `[!]` line. At the beta-4 update: the stub runs the new code
+  (its Version line), the marker is gone after Done, and with the lockfile unchanged no npm step
+  runs.
+
 ## Step supply-tags - how each restaurant meat is bought (A9)
 
 Decided 2026-11-14 (ADR-067), specced 2026-11-15. DEPENDS ON staff-meal-settings and cost-guard
@@ -5223,3 +5302,100 @@ other tables.
   sheet closed (sheet-close: active = 0). findByCategory also finds closed rows, so a closed sheet
   is never added again. A later step that lets an admin rename a sheet must keep the defaults found:
   a renamed "Landing" would be added again at the next start.
+
+## Step backup-restore - one-file backups, a restore word, a copy off the PC (A0, Fable F4)
+
+Decided 2026-11-17 (ADR-105; Fable F4 (P0), B1 note 2) and 2026-11-22 (Naoki: the restaurant PC
+stays on overnight and is restarted on some days; recs for the times, the copy folder, `.env` and
+how long backups are kept). Naoki's lane, before beta-3: after db-start (it reads DB_PATH the same
+way) and landing-sales, before restaurant-pc-ii (both change scripts/restaurant-pc.bat).
+
+What the admin sees:
+- At every start, and at 3:00 PM and 3:00 AM every day while the PC is on, the launcher makes a
+  backup: one file, `InventoryApp\backups\beta_<YYYY-MM-DD_HHmm>.db`, taken while phones keep
+  saving. The 3 AM one catches the night's counts.
+- It keeps every backup of the last 14 days and the first backup of each older month, and deletes
+  the rest. Each file is a few MB.
+- When `.env` has `BACKUP_COPY_DIR`, each finished backup is also copied there, with the same keep
+  rule. At the beta-3 install that is a folder on E: (if Disk Management shows E: on another disk
+  than C:); later the Google Drive folder shared with the management, once Google Drive for desktop
+  is on the PC (ADR-105).
+- `restaurant-pc.bat backup` makes one backup now (the two scheduled tasks run this word).
+- `restaurant-pc.bat restore` lists the backups, newest first and numbered, with date and size (the
+  local ones, then any in the copy folder that are not local - so a new PC can restore from the
+  copy). It refuses while the app runs. For the chosen file it: checks it opens cleanly; makes a
+  backup of the current data named `..._before-restore.db`; moves the current beta.db, beta.db-wal
+  and beta.db-shm into `backups\replaced_<stamp>\` (never deletes them); copies the chosen backup
+  in as beta.db; and says "Restored <name>. To undo, run restore again and pick the
+  before-restore backup."
+
+Node (no dependency; the work is here so CI tests it):
+- server/db/backup.js: backupName(date, label), keptNames(names, today) (the keep rule, on names
+  only: a name's date within the last 14 days, or the earliest name of its calendar month; other
+  files are never touched), runBackup({ dbFile, dir, label, copyDir }) and restoreBackup({ from,
+  dbFile, backupsDir }).
+- runBackup opens the database file directly with `new DatabaseSync(dbFile)` and `PRAGMA
+  busy_timeout = 5000` - never through connection.js, which writes (migrations, schema.sql,
+  user_version). It runs `VACUUM INTO ?` to `<name>.part`, opens the part read-only and checks
+  `PRAGMA integrity_check` is `ok`, then renames it to the final name (a power cut leaves only a
+  `.part`, which the next run deletes). Then the keep rule in `dir`; then, with copyDir, a copy to
+  `<name>.part` there, renamed when done, and the keep rule there. It also copies `.env` to
+  `dir\env-backup.txt` (the newest only; never to the copy folder: it holds the tokens, the admin
+  password and the cookie secret).
+- scripts/backup-db.js `<backups dir> [label]`: loads `.env` from the repo root as server/index.js
+  does, resolves DB_PATH with dbPath.js's resolveDbPath, calls runBackup with BACKUP_COPY_DIR.
+  Exit 0 and one line ("Backed up to InventoryApp\backups\<name> (2.1 MB); copied to <dir>"); 1
+  when the backup failed; 2 when the backup is made but the copy failed. Nothing to back up yet (no
+  database file): exit 0, "No database yet - nothing to back up."
+- scripts/restore-db.js `<backups dir>`: the list, the question (a number, or Enter to cancel) and
+  restoreBackup. A chosen file that fails the integrity check is refused before anything moves.
+
+Launcher (scripts/restaurant-pc.bat):
+- `:backup` calls `node "%REPO%\scripts\backup-db.js" "%APPDIR%\backups" <label>`; the two `copy`
+  lines, the PowerShell keep line and KEEP_BACKUPS go. Exit 2 prints `[!] The backup is made, but it
+  was not copied to the copy folder - check that the disk or Google Drive is there.` and carries on.
+- New words `backup` (no pause at the end, so a scheduled run closes by itself; it writes its line
+  to `%APPDIR%\backups\last-backup.log`) and `restore` (portbusy first: "Close the app window
+  first, then run restore again.").
+- `update`'s backup gets the label `before-update-from-<PREVNAME>` (run 4's D7 (4)), so "go back"
+  is restore + the old tag.
+- `start` keeps its order (port, .env, backup, run). After the backup it prints the newest backup's
+  name and age, and the copy folder's newest, so a backup that stopped working shows at every start
+  (the cheapest part of run 4's "Health" line).
+- Setup creates, or replaces when run again, two Task Scheduler tasks for the signed-in user (no
+  admin prompt): `schtasks /create /f /sc daily /st 15:00 /tn "Inventory App backup 3PM" /tr
+  "\"%APPDIR%\restaurant-pc.bat\" backup"` and the same at 03:00 ("Inventory App backup 3AM").
+  They run while that user is signed in, which auto-start also needs.
+- `.env.example` gains `# BACKUP_COPY_DIR=E:\InventoryApp-backups`.
+
+Edge states: Failure - a failed VACUUM INTO, integrity check or rename leaves no file under a
+backup's name (the `.part` is deleted) and says "[X] The backup failed: <reason>. Your data is
+unchanged."; start carries on with its `[!]` line, as today. The copy folder missing or offline -
+the local backup stands, exit 2. Partial - a power cut mid-backup leaves a `.part`, deleted by the
+next run. Empty - no beta.db yet: nothing to back up (the setup's first run). Stale - none: a
+backup is a snapshot of committed saves, the newest included (it reads the `-wal`). Blocked -
+restore refuses while the app runs. Two devices - phones saving during a backup are not slowed
+(F4: 0.44 s for a 5-year database). Disk full - the failure line names it.
+
+Tests (server/db/backup.test.js, temp files): a backup taken while a second connection holds an
+uncommitted write has the committed rows only and does not wait; rows still in the `-wal` (not
+checkpointed) are in the backup; integrity `ok` and no `.part` left; a missing database file is
+refused and makes no file; keptNames on 70 days of names keeps the last 14 days plus the first of
+each older month and ignores other file names; the copy folder gets the file and its own keep
+rule; a copy folder that cannot be written gives "copied: false" and keeps the local backup; the
+`.env` copy never reaches the copy folder; restore moves the three files aside, makes the
+before-restore backup and the restored file reads the backup's rows; a damaged chosen file is
+refused before anything moves.
+
+Touches: scripts/restaurant-pc.bat, scripts/backup-db.js (new), scripts/restore-db.js (new),
+server/db/backup.js (new), server/db/backup.test.js (new), .env.example. The Node half runs in CI;
+the launcher needs Windows.
+
+You check (on the laptop first, then at the beta-3 install): start makes one `beta_<stamp>.db`;
+`restaurant-pc.bat backup` while a phone saves, and the phone's save goes through; `schtasks /query
+/tn "Inventory App backup 3PM"` shows the task; with BACKUP_COPY_DIR on E:, the copy appears there;
+restore is refused while the app runs; then, with the app closed: save a test count, restore an
+older backup (the count is gone), restore the before-restore backup (it is back).
+
+Not in scope: backups on a host (later, ADR-105); photos (run 4's D6, when photos are built); the
+full health line; the launcher's other changes (restaurant-pc-ii).

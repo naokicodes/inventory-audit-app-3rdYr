@@ -149,6 +149,14 @@ beta.db, sheet definitions at start, a schema version. Schema step (indexes). Se
 spec: session-status.md -> "Step db-start".
 **2026-11-18:** runnable for the overnight runner; Naoki reviews and merges.
 
+### Step backup-restore - one-file backups, a restore word, a copy off the PC  [Naoki's own PR]
+Touches: scripts/restaurant-pc.bat, scripts/backup-db.js, scripts/restore-db.js, server/db/backup.js, server/db/backup.test.js, .env.example
+ADR-105 (Fable F4, P0; B1 note 2): each backup is one file (VACUUM INTO), made at every start and
+at 3 PM and 3 AM (Task Scheduler), kept by age (14 days plus one a month); `restore` puts one
+back; an optional copy folder in `.env`. After landing-sales, before restaurant-pc-ii. The Node
+half in CI; the launcher needs Windows (You check). Full spec: session-status.md -> "Step
+backup-restore".
+
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
 ### 1. Step 25d-ii — CLOSED 2026-09-22, PR #5 (`6c21238`).
@@ -527,6 +535,7 @@ on the landing". Part of beta-3. PUBLIC -> click-through. Full spec: session-sta
 landing-sales".
 **2026-11-17:** + FC's `PORK 150grms (Add ons)` takes Bagnet 1 (an item on no line). See the spec's
 2026-11-17 block.
+**2026-11-22:** + Silingan's new Kare-Kare as D044 (map only). See the spec's 2026-11-22 block.
 
 ### Step cost-guard - unit costs need the see_costs switch  [blocked: save-safety, then its 2026-11-17 block (ADR-100)]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/commissary.js, server/routes/commissary.test.js, server/routes/settings.js, server/routes/settings.test.js, public/settings.html
@@ -553,6 +562,10 @@ power command shows `[!]`. Checked at the PC at beta-3. Full spec: session-statu
 restaurant-pc-ii".
 **2026-11-17:** respecced before it runs (U-20 to U-23, auto-start after db-start; see Planned -
 Fable fixes): do not start.
+**2026-11-22:** respecced - the stub launcher, update from a temp copy, the unfinished-update
+marker, no `npm ci` for an unchanged lockfile, first-step messages, only Git and Node on the PC,
+the `.env` questions (admin password, copy folder, cookie secret), auto-start, an Update shortcut.
+After backup-restore. See the spec's 2026-11-22 block.
 
 #### Sides (A8)
 
@@ -662,7 +675,8 @@ adds a step, and an idle assistant costs far less than an invented one.
 From the five Fable reports (docs/reviews/). Order: the 2026-11-17 note at the top of the Queue.
 Every finding's place: session-status, 2026-11-17 block.
 
-Specced and in the Queue: stale-saves, sign-the-cookie (3zv), npm-audit, db-start.
+Specced and in the Queue: stale-saves, sign-the-cookie (3zv), npm-audit, db-start; backup-restore
+and restaurant-pc-ii's respec (2026-11-22).
 
 Before beta-3:
 - **roles-guard** (Marble): the built-in admin role cannot be switched off or lose admin; admin and
@@ -675,12 +689,6 @@ Before beta-3:
 - **cost-guard** (queued; Marble; widened by ADR-100): plus History, the rice price and the two
   staff-meal Settings reads; a missing key keeps the stored value (cost, meat type, active); cost
   inputs disabled without see_costs. PERM-06 = C-03 = C-04 = U-11, U-12, I-11 item 4.
-- **backup-restore** (Naoki): one-file backups, a `restore` word, kept by age, an optional copy
-  folder (ADR-105). F4 (P0), B1 note 2.
-- **restaurant-pc-ii** (queued; Naoki; respecced): the desktop launcher becomes a one-line call of
-  the repo's copy; an "update unfinished" marker; no `npm ci` when the lockfile is unchanged; every
-  message names a first step; auto-start, after db-start. U-20 to U-23, run 4's D7, PR #47's
-  leftovers.
 
 After beta-3:
 - **blind-reads**: ADR-101 on every page; takes over blind-history. PERM-03 = C-13 = U-10,

@@ -52,6 +52,9 @@ in the 2026-11-15 architect chat):
   Sinigang). Forgotten remarks are much of FC's shorts.
 - Pork Jowl is raw jowl, kept just in case since the time the commissary did not work well; no dish
   sells it.
+- 2026-11-22 (Naoki): Pork Jowl arrives from the commi like FC's other commi meat (New stock), and
+  when it is used the landing writes an allocation for it rather than a dish taking it. So no
+  Loyverse item counts it, on purpose.
 - Arrabiatta arrives in kg (the shrimp) and is portioned; Tuna Tinola and Daing are counted in
   packs. Grams per dish and servings per pack are not known yet, and need not be strict: what matters
   is the usage rate and remembering allocations.
@@ -104,6 +107,11 @@ Takes (shown as "also taken" on the line taken from):
 Not on the landing: the boodle upgrades (the boodle already counts its chicken), trays and "Old
 Price" items, pastas other than Arrabbiata, rice, sauces, drinks, boxes, the veggie dishes, Law-oy,
 and pizza (its own table).
+
+The map is final for beta-3 (2026-11-22): every name above is an item in FC's Loyverse export of
+2026-11-17. Five older dishes still in that export (Double Roasted Pork Belly, Chicken Supreme
+Stroganoff, Pot Roast Beef w/Mashed Potato, Squeaky Gud, Chicken de Oro Pasta) are no longer sold
+and are ignored (Naoki, 2026-11-17).
 
 ## FLOW - how they will use the app (drafted)
 1. Tonight's kitchen counter (the Kitchen Window dispatcher, picked by the head
