@@ -132,7 +132,7 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-105; the index, and a map from handoff item numbers to records, is in
+to ADR-106; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
 
@@ -5125,6 +5125,18 @@ Touches: package-lock.json. Server-only, no click-through.
 
 Not in scope: upgrading express itself; any other dependency.
 
+**Decisions 2026-11-22 (ADR-106; issue #86).** These override any reading of the text above.
+- The overnight runner's single pass (draft PR #85) cleared proxy-addr and body-parser; qs stayed,
+  because express 4.22.2 accepts only qs 6.15.x. On PR #85's branch, run `npm audit fix` once more
+  (still never `--force`): express moves 4.22.2 -> 4.22.3 and qs to 6.16.2, inside package.json's
+  `^4.19.2`; package.json does not change. `npm audit` then reports 0. Then `npm ci` and
+  `npm run verify`; the PR body shows `npm audit` before, after the first pass and after the
+  second. Then the PR is marked ready.
+- Checked 2026-11-22: express 4.22.3's only code change is one line in `req.fresh` (the QUERY
+  method, unused here); the suite is green on it.
+- "Not in scope: upgrading express itself" now reads: no minor or major version of express, and no
+  change to package.json (ADR-106).
+
 ## Step db-start - the database at server start: indexes, the right file, safer guards (A0, Fable)
 
 Decided 2026-11-17 (ADR-105; Fable F1, F10, PERM-18, I-15, B1 note 3). Naoki's lane, before beta-3
@@ -5193,3 +5205,19 @@ no click-through. You check (at the beta-3 install): the server starts on beta.d
 
 Not in scope: the backup and restore (backup-restore); the launcher (restaurant-pc-ii); indexes on
 other tables.
+
+**Review 2026-11-22 (PR #87: merge as built).**
+- Three commissary lookups still scan their table (EXPLAIN QUERY PLAN on a fresh seed): Stock In
+  (`commissary_stock_receipts` by meat and day), Backed Up's credit to an output meat
+  (`commissary_yield_log` by `COALESCE(output_commissary_meat_id, commissary_meat_id)` and day) and
+  allocations in (`commissary_adjustments` by `destination_commissary_meat_id` and day). The spec
+  named one index per commissary table, and the PR built exactly that. These tables stay small for
+  years; the three indexes go to list-limits (one is an expression index on the COALESCE).
+- The opened-file identity check runs once connection.js has opened the file (its migrations and
+  schema.sql have run, as at every server start) and before the reset's or seed:test's first
+  write. That is the intended reading of item 3.
+- Every active site gets its default sheet at start, sites added later in Settings included: no
+  site starts without a count sheet (Naoki, 2026-11-22). A site that should not count gets its
+  sheet closed (sheet-close: active = 0). findByCategory also finds closed rows, so a closed sheet
+  is never added again. A later step that lets an admin rename a sheet must keep the defaults found:
+  a renamed "Landing" would be added again at the next start.
