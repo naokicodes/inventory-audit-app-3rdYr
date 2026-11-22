@@ -4690,6 +4690,7 @@ planned: FC's menu has changed since the app's FC dish list); FC's bar check (ba
 - Rows are by item name; FC sells no variants today. PR #71 is complete as built.
 
 ## Step landing-sales - Kitchen Sales: FC by landing line, a Pizza table on both sides (A0)
+**CLOSED 2026-11-22, PR #90 (`8355d5d`).**
 
 Decided 2026-11-15 (ADR-094; supersedes ADR-066's FC category cards). DEPENDS ON nothing open
 (loyverse-fc is closed). Runnable now. Part of beta-3.

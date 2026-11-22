@@ -564,6 +564,7 @@ click-through. Full spec: session-status.md -> "Step loyverse-fc".
 **2026-11-14:** issue #73 answered (ADR-076): refunds subtract on FC's side, deleted items keep their category; PR #71 complete as built.
 
 ### Step landing-sales - Kitchen Sales: FC by landing line, a Pizza table on both sides  [Naoki's own PR]
+**CLOSED 2026-11-22, PR #90 (`8355d5d`).**
 Touches: server/db/loyverse-name-map.json, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/routes/loyverse.js, server/routes/loyverse.test.js, public/kitchen-sales.html
 ADR-094: FC's side is one table of its landing lines in portions (platters folded in), each line
 opening to its items and to what other dishes took; a Pizza table on both sides; the rest in "Not
