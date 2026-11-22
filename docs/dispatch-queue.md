@@ -140,6 +140,7 @@ lockfile only. Server-only. Full spec: session-status.md -> "Step npm-audit".
 4.22.3, lockfile only), then it is ready to merge. See the spec's 2026-11-22 block.
 
 ### Step db-start - the database at start: indexes, the right file, safer guards  [runnable]
+**CLOSED 2026-11-22, PR #87 (`8a74e8a`).**
 Touches: server/db/schema.sql, server/db/dbPath.js, server/db/testAccounts.js, server/db/connection.js, server/db/seed.js, scripts/seed-test-accounts.js, server/index.js, server/db/reseed.test.js, server/db/testAccounts.test.js, server/db/connection.test.js
 ADR-105, Fable F1, F10, PERM-18, I-15: five indexes (the first thing to slow down), DB_PATH read from
 the repo root and a missing file refused, both seed guards check the real file and reseed refuses

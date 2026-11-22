@@ -5138,6 +5138,7 @@ Not in scope: upgrading express itself; any other dependency.
   change to package.json (ADR-106).
 
 ## Step db-start - the database at server start: indexes, the right file, safer guards (A0, Fable)
+**CLOSED 2026-11-22, PR #87 (`8a74e8a`).**
 
 Decided 2026-11-17 (ADR-105; Fable F1, F10, PERM-18, I-15, B1 note 3). Naoki's lane, before beta-3
 and before restaurant-pc-ii (its auto-start needs item 2). One schema step at a time: this one adds
