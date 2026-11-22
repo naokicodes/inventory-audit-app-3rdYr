@@ -148,6 +148,7 @@ flight. (ADR-001 explains the split.)
 | ADR-103 | Tailscale counts as inside the restaurant for ADR-040 | Accepted 2026-11-17 |
 | ADR-104 | A row nobody touched never saves | Accepted 2026-11-17 |
 | ADR-105 | Beta's database: one-file backups, a restore, a copy off the PC, its name | Accepted 2026-11-17 |
+| ADR-106 | An audit fix may move a patch version inside package.json's range | Accepted 2026-11-22 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

@@ -731,3 +731,19 @@ INSERT OR IGNORE INTO adjustment_types (name, requires_transfer_locations, requi
   ('Damaged', 0, 0),
   ('Other / Uncategorized', 0, 0),
   ('Portion Conversion', 0, 1);
+
+-- Step db-start (ADR-105, Fable F1): lookup indexes for the queries the
+-- landing and commissary engines run for every meat and dish on every load
+-- (one site, one item, one day). Checked with EXPLAIN QUERY PLAN in
+-- server/db/connection.test.js. Plain indexes, no constraint: IF NOT EXISTS,
+-- so every start adds only what is missing and beta.db gets them at the next
+-- update. idx_sales_manual_unique above is partial (MANUAL rows only), so a
+-- lookup with no source filter cannot use it.
+CREATE INDEX IF NOT EXISTS idx_sales_lookup ON sales (restaurant_id, dish_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_stock_receipts_lookup ON stock_receipts (restaurant_id, meat_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_adjustments_lookup ON adjustments (restaurant_id, meat_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_count_entries_lookup ON count_entries (restaurant_id, business_date, kind, item_id);
+CREATE INDEX IF NOT EXISTS idx_recount_orders_lookup ON recount_orders (restaurant_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_commissary_shipments_lookup ON commissary_shipments (commissary_meat_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_commissary_yield_log_lookup ON commissary_yield_log (commissary_meat_id, business_date);
+CREATE INDEX IF NOT EXISTS idx_commissary_adjustments_lookup ON commissary_adjustments (commissary_meat_id, business_date);

@@ -113,6 +113,14 @@ is. Read the step's own section in `session-status.md` before starting.
 > **2026-11-18:** npm-audit and db-start are runnable now: the overnight runner (scripts/run-queue.ps1,
 > started on Naoki's laptop) may build them, after stale-saves and before preview-pid and
 > landing-sales (no shared files). Naoki reviews and merges.
+> **2026-11-22 (Marble is offline today) - Order now for the beta-3 lane.** Naoki builds it all
+> himself, in this order: stale-saves -> sign-the-cookie -> landing-sales -> backup-restore ->
+> restaurant-pc-ii (respecced) -> roles-guard -> save-safety -> cost-guard (widened) ->
+> preview-pid. What the restaurant PC's first install needs comes first. PR #87 (db-start) merges
+> as built; PR #85 (npm-audit) gets one more audit pass (ADR-106), then merges; issue #86 is
+> answered. The specs for backup-restore, restaurant-pc-ii, roles-guard, save-safety and
+> cost-guard's block land in today's drop-ins, each before its build. Marble picks up wherever the
+> lane stands when he is back.
 
 #### Fable fixes (2026-11-17)
 
@@ -128,8 +136,11 @@ Touches: package-lock.json
 Fable N-1: three advisories under express (proxy-addr, body-parser, qs); `npm audit fix` changes the
 lockfile only. Server-only. Full spec: session-status.md -> "Step npm-audit".
 **2026-11-18:** runnable for the overnight runner; Naoki reviews and merges.
+**2026-11-22 (ADR-106, issue #86):** PR #85 gets one more `npm audit fix` pass (express 4.22.2 ->
+4.22.3, lockfile only), then it is ready to merge. See the spec's 2026-11-22 block.
 
 ### Step db-start - the database at start: indexes, the right file, safer guards  [runnable]
+**CLOSED 2026-11-22, PR #87 (`8a74e8a`).**
 Touches: server/db/schema.sql, server/db/dbPath.js, server/db/testAccounts.js, server/db/connection.js, server/db/seed.js, scripts/seed-test-accounts.js, server/index.js, server/db/reseed.test.js, server/db/testAccounts.test.js, server/db/connection.test.js
 ADR-105, Fable F1, F10, PERM-18, I-15: five indexes (the first thing to slow down), DB_PATH read from
 the repo root and a missing file refused, both seed guards check the real file and reseed refuses
@@ -684,7 +695,7 @@ After beta-3:
   adjustment types pinned; seeded recipes dated early. I-04, I-11, PERM-16 = C-09, I-14.
 
 P2, between roster steps: **page-errors** (U-05, U-09, U-06, U-07, U-13, U-14's name and Log out on
-two pages), **page-dates** (F7 = U-15), **list-limits** (F6), **actor-from-login** (PERM-08 = I-13),
+two pages), **page-dates** (F7 = U-15), **list-limits** (F6; and three commissary indexes, db-start's 2026-11-22 review), **actor-from-login** (PERM-08 = I-13),
 **import-report** (U-18, U-19, PERM-11), **loyverse-guard** (Naoki, after landing-sales: PERM-15,
 F8, I-14's unused name-map keys).
 
