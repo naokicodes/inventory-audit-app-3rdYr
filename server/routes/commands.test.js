@@ -284,7 +284,7 @@ test('running balance: genuinely selling more than beginning+prepped covers IS f
 async function landingToSyncChain() {
   const os = require('os');
   const express = require('express');
-  const DB_FILE = path.join(os.tmpdir(), `commands-stale-saves-test-${process.pid}.db`);
+  const DB_FILE = path.join(os.tmpdir(), `commands-stale-saves-test-${process.pid}-${Date.now()}.db`);
   process.env.DB_PATH = DB_FILE;
   const liveDb = require('../db/connection.js');
   const { currentUser } = require('./auth.js');

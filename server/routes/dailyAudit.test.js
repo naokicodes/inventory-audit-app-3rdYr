@@ -230,7 +230,7 @@ test('a no-op prepped save (same value reposted) writes nothing, logs nothing, a
   const before = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-08-29'`).get();
   const logCountBefore = db.prepare(`SELECT COUNT(*) as c FROM activity_log WHERE entity_type = 'prepped'`).get().c;
 
-  const saved = savePortions(1, '2026-08-29', [{ dish_id: 1, prepped: 18 }]);
+  const saved = savePortions(1, '2026-08-29', [{ dish_id: 1, prepped: 18, touched: true }]);
 
   const after = db.prepare(`SELECT * FROM prepped WHERE restaurant_id = 1 AND dish_id = 1 AND business_date = '2026-08-29'`).get();
   const logCountAfter = db.prepare(`SELECT COUNT(*) as c FROM activity_log WHERE entity_type = 'prepped'`).get().c;

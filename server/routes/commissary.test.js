@@ -1464,7 +1464,7 @@ async function staleSavesOverHttp() {
   console.log('\nCommissary Route Tests (step stale-saves: real POST/GET /commissary/daily-audit)\n');
   const os = require('os');
   const express = require('express');
-  const DB_FILE = path.join(os.tmpdir(), `commissary-stale-saves-test-${process.pid}.db`);
+  const DB_FILE = path.join(os.tmpdir(), `commissary-stale-saves-test-${process.pid}-${Date.now()}.db`);
   process.env.DB_PATH = DB_FILE;
   const liveDb = require('../db/connection.js');
   const { currentUser } = require('./auth.js');
