@@ -1,15 +1,14 @@
 // Step test-accounts (ADR-039): fake "Test ..." accounts for phone
 // click-throughs and dev databases. Created by `npm run seed:test`, which the
 // previews run right after the reseed. The accounts NEVER reach the live
-// inventory.db or beta.db - Beta must stay free of test users (ADR-039), so
-// the refusal here is stricter than reseedRefusal, which allows beta.db.
+// inventory.db or beta.db - Beta must stay free of test users (ADR-039). Since
+// step db-start reseedRefusal refuses beta.db too.
 //
 // Side-effect free on purpose, like reseedRefusal in dbPath.js: the script
 // checks the refusal BEFORE requiring connection.js (which opens and migrates
 // the file), and the tests exercise the refusal without going near a database.
 
-const path = require('path');
-const { LIVE_DB_PATH, resolveDbPath } = require('./dbPath.js');
+const { LIVE_DB_PATH, resolveDbPath, samePath, hasColonAfterDrive, isBetaDb } = require('./dbPath.js');
 const { resolveSiteCode } = require('./siteAccess.js');
 
 // The seed's sites are RA, FC (restaurants) and COM-A (commissary). Later
@@ -27,23 +26,23 @@ const TEST_ACCOUNTS = [
   { name: 'Test Supervisor RA', role: 'supervisor', sites: ['RA'] },  // role-assignments
 ];
 
-// Same case rule as dbPath.js samePath: Windows paths are case-insensitive.
-function samePath(a, b, platform) {
-  return platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
-}
-
 // Returns a refusal message, or null if the seed may run. Refuses an unset
 // DB_PATH, the live inventory.db (resolved via dbPath.js), and any file named
-// beta.db in any folder - test accounts must not reach Beta (ADR-039).
+// beta.db in any folder - test accounts must not reach Beta (ADR-039). Uses
+// dbPath.js's samePath (step db-start): trailing full stops and spaces are
+// dropped, and a ":" after the drive letter is refused.
 function testAccountsRefusal(envDbPath = process.env.DB_PATH, platform = process.platform) {
   if (!envDbPath) {
     return 'seed:test refused: DB_PATH is not set. Test accounts only go on a non-live database, e.g. DB_PATH=server/db/preview.db npm run seed:test';
   }
   const resolved = resolveDbPath(envDbPath);
+  if (hasColonAfterDrive(resolved)) {
+    return `seed:test refused: DB_PATH has a ":" after the drive letter (${resolved}). Use a disposable file such as preview.db or dev.db.`;
+  }
   if (samePath(resolved, LIVE_DB_PATH, platform)) {
     return `seed:test refused: DB_PATH resolves to the live database (${LIVE_DB_PATH}). Test accounts never go on the live file.`;
   }
-  if (path.basename(resolved).toLowerCase() === 'beta.db') {
+  if (isBetaDb(resolved)) {
     return 'seed:test refused: DB_PATH points at beta.db. Test accounts must not reach Beta (ADR-039); use a disposable file such as preview.db or dev.db.';
   }
   return null;

@@ -15,12 +15,36 @@ const { lanUrls } = require('./lanAddress.js');
 const ENV_PATH = path.join(__dirname, '..', '.env');
 if (fs.existsSync(ENV_PATH)) process.loadEnvFile(ENV_PATH);
 
+// Step db-start (F10): opening a missing file would quietly create an empty
+// database. When DB_PATH names a file that is not there, stop before the
+// database opens. Unset DB_PATH (dev's inventory.db) is unchanged.
+if (process.env.DB_PATH) {
+  const dbFile = require('./db/dbPath.js').resolveDbPath(process.env.DB_PATH);
+  if (!fs.existsSync(dbFile)) {
+    console.error(`The database file ${dbFile} is missing. Nothing was started. On a new install, run the setup again; otherwise check DB_PATH in .env.`);
+    process.exit(1);
+  }
+}
+
 // Touching the db connection here just to confirm it opens without error.
-const db = require('./db/connection.js');
+// A database opened by a newer version of the app stops the server here.
+let db;
+try {
+  db = require('./db/connection.js');
+} catch (err) {
+  if (err.code !== 'DB_SCHEMA_TOO_NEW') throw err;
+  console.error(err.message);
+  process.exit(1);
+}
 
 // Step role-assignments: beta.db is never reseeded, so the supervisor role and
 // the default role switches are applied here, once per database.
 require('./db/permissions.js').ensureRoleDefaults(db);
+
+// Step db-start (I-15): the same for the sheet definitions - only what is
+// missing is added, so a site added in Settings and a never-reseeded beta.db
+// get their Landing / Commi sheet.
+require('./engines/sheetDefinitions.js').ensureDefaultSheets(db);
 
 const dailyAuditRoutes = require('./routes/dailyAudit.js');
 const settingsRoutes = require('./routes/settings.js');
