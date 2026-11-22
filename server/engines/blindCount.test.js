@@ -124,7 +124,7 @@ test('a save writes the current value and one COUNT row together; the next chang
   const row = (await getJson(MIXED, cara)).rows[0];
   assert.deepStrictEqual([row.count, row.remark], [8, 'two bags']);
 
-  await postMeat(hugo, [{ meat_id: 1, ending_actual: '7.5', remarks: 'two bags' }]);
+  await postMeat(hugo, [{ meat_id: 1, ending_actual: '7.5', remarks: 'two bags', touched: true }]);
   assert.deepStrictEqual(entries('MEAT', 1).map(e => [e.entry_type, e.quantity, e.user_name]), [['COUNT', 8, 'Cara'], ['EDIT', 7.5, 'Hugo']]);
 });
 
@@ -187,7 +187,7 @@ test('a recount closes its order and becomes the count; the first count stays in
 test('a portion remark round-trips; a save without a remark keeps it', async () => {
   await postDish(cara, [{ dish_id: 1, portion_actual: '12', remark: 'two burnt', touched: true }]);
   assert.strictEqual((await getJson(MIXED, cara)).rows[2].remark, 'two burnt');
-  await postDish(hugo, [{ dish_id: 1, prepped: '', portion_actual: '11' }]);
+  await postDish(hugo, [{ dish_id: 1, prepped: '', portion_actual: '11', touched: true }]);
   assert.deepStrictEqual(entries('PORTION', 1).map(e => [e.entry_type, e.quantity, e.remark]), [['COUNT', 12, 'two burnt'], ['EDIT', 11, 'two burnt']]);
   assert.deepStrictEqual([(await getJson(MIXED, cara)).rows[2].count, (await getJson(MIXED, cara)).rows[2].remark], [11, 'two burnt']);
 });
@@ -208,6 +208,90 @@ test('count history: 403 for a blind user; the head chef sees entries, orders an
   assert.ok(h.entries.length >= 5);
   assert.deepStrictEqual(h.people.map(p => p.name), ['Cara', 'Dee', 'Hugo']);
   assert.strictEqual((await getJson(url, mona)).can_order, false);
+});
+
+// ---------- Step stale-saves (ADR-104): a row nobody touched never saves ----------
+// Own dates and items, created here, so the tests above keep their shapes.
+const D2 = '2026-11-02';
+const postOn = (url, date) => (user, rows) => call('POST', url, { user, body: { restaurant_id: 1, business_date: date, rows } });
+const addMeat = (id, code, name) => {
+  db.prepare(`INSERT INTO meats (id, restaurant_id, meat_code, name, unit) VALUES (?, 1, ?, ?, 'kg')`).run(id, code, name);
+  recordRecount(db, 'restaurant', 1, id, DATE, 10);
+};
+const addDish = (id, code, name) =>
+  db.prepare(`INSERT INTO dishes (id, restaurant_id, dish_code, name, prep_type) VALUES (?, 1, ?, ?, 'BATCH_PREPPED')`).run(id, code, name);
+const endingOn = (meatId, date) => db.prepare(`SELECT quantity FROM ending_actual WHERE meat_id = ? AND business_date = ?`).get(meatId, date);
+
+test('stale meat: A saves 40 then corrects to 47; B posts 40 untouched plus another item touched -> 47 stays, B\'s item saves', async () => {
+  addMeat(3, 'M03', 'Beef Shank');
+  addMeat(4, 'M04', 'Pork Ribs');
+  const post = postOn('/api/daily-audit', D2);
+  await post(cara, [{ meat_id: 3, ending_actual: '40', remarks: '', touched: true }]);
+  await post(cara, [{ meat_id: 3, ending_actual: '47', remarks: '', touched: true }]);
+  const res = await (await post(dee, [
+    { meat_id: 3, ending_actual: '40', remarks: '', touched: false },
+    { meat_id: 4, ending_actual: '5', remarks: '', touched: true },
+  ])).json();
+  assert.strictEqual(endingOn(3, D2).quantity, 47);
+  assert.deepStrictEqual(entries('MEAT', 3).map(e => [e.entry_type, e.quantity, e.user_name]), [['COUNT', 40, 'Cara'], ['EDIT', 47, 'Cara']]);
+  assert.strictEqual(entries('MEAT', 3).some(e => e.user_id === dee), false);
+  assert.strictEqual(endingOn(4, D2).quantity, 5);
+  assert.deepStrictEqual(entries('MEAT', 4).map(e => [e.entry_type, e.quantity, e.user_name]), [['COUNT', 5, 'Dee']]);
+  assert.strictEqual(res.saved, 1);
+});
+
+test('stale portion: the same for a PORTION row', async () => {
+  addDish(2, 'D02', 'Chicken Wings');
+  addDish(3, 'D03', 'Onion Rings');
+  const post = postOn('/api/daily-audit/portions', D2);
+  await post(cara, [{ dish_id: 2, portion_actual: '40', touched: true }]);
+  await post(cara, [{ dish_id: 2, portion_actual: '47', touched: true }]);
+  await post(dee, [
+    { dish_id: 2, portion_actual: '40', touched: false },
+    { dish_id: 3, portion_actual: '5', touched: true },
+  ]);
+  const counted = id => db.prepare(`SELECT portions_counted FROM portion_ending_actual WHERE dish_id = ? AND business_date = ?`).get(id, D2).portions_counted;
+  assert.strictEqual(counted(2), 47);
+  assert.deepStrictEqual(entries('PORTION', 2).map(e => [e.entry_type, e.quantity, e.user_name]), [['COUNT', 40, 'Cara'], ['EDIT', 47, 'Cara']]);
+  assert.strictEqual(counted(3), 5);
+  assert.deepStrictEqual(entries('PORTION', 3).map(e => e.user_name), ['Dee']);
+});
+
+test('stale recount: the first counter\'s untouched repost after the recount leaves the recount', async () => {
+  const res = await call('POST', '/api/daily-audit/recount-orders', {
+    user: hugo, body: { restaurant_id: 1, business_date: D2, assigned_user_id: dee, items: [{ kind: 'MEAT', item_id: 3 }] }
+  });
+  assert.strictEqual(res.status, 200);
+  const post = postOn('/api/daily-audit', D2);
+  await post(dee, [{ meat_id: 3, ending_actual: '45', remarks: '', touched: true }]);
+  assert.strictEqual(endingOn(3, D2).quantity, 45);
+  await post(cara, [{ meat_id: 3, ending_actual: '47', remarks: '', touched: false }]);
+  assert.strictEqual(endingOn(3, D2).quantity, 45);
+  const history = entries('MEAT', 3);
+  assert.deepStrictEqual([history[history.length - 1].entry_type, history[history.length - 1].user_name], ['RECOUNT', 'Dee']);
+});
+
+test('an untouched row with nothing stored still creates the count', async () => {
+  const D3 = '2026-11-03';
+  const res = await (await postOn('/api/daily-audit', D3)(null, [{ meat_id: 4, ending_actual: '9' }])).json();
+  assert.strictEqual(endingOn(4, D3).quantity, 9);
+  assert.strictEqual(res.saved, 1);
+  const n = db.prepare(`SELECT COUNT(*) AS n FROM count_entries WHERE kind = 'MEAT' AND item_id = 4 AND business_date = ?`).get(D3).n;
+  assert.strictEqual(n, 1);
+});
+
+test('the landing\'s saved: 11 rows posted, one typed -> 1', async () => {
+  const D4 = '2026-11-04';
+  const ids = [];
+  for (let i = 0; i < 11; i++) { addMeat(20 + i, `M${20 + i}`, `Test Meat ${i}`); ids.push(20 + i); }
+  const post = postOn('/api/daily-audit', D4);
+  const first = await (await post(cara, ids.map(id => ({ meat_id: id, ending_actual: '3', remarks: '', touched: true })))).json();
+  assert.strictEqual(first.saved, 11);
+  const second = await (await post(dee, ids.map((id, i) => ({
+    meat_id: id, ending_actual: i === 0 ? '4' : '3', remarks: '', touched: i === 0
+  })))).json();
+  assert.strictEqual(second.saved, 1);
+  assert.strictEqual(endingOn(20, D4).quantity, 4);
 });
 
 const server = app.listen(0, async () => {

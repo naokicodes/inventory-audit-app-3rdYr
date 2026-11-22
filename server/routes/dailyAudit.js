@@ -188,13 +188,14 @@ router.post('/daily-audit', (req, res) => {
         continue;
       }
       // Step blind-count: the upsert and its count_entries row together.
+      // Step stale-saves: `saved` counts only the rows saveCount wrote.
       const quantity = Number(row.ending_actual);
-      saveCount(db, {
+      const wrote = saveCount(db, {
         restaurantId: Number(restaurant_id), date: business_date, kind: 'MEAT', itemId: Number(row.meat_id),
         quantity, remark: row.remarks || null, touched: row.touched === true, user: req.user
       }, remark => upsertEndingActual.run(restaurant_id, row.meat_id, business_date, quantity, remark, req.user?.name ?? null, req.user?.id ?? null));
+      if (wrote) saved++;
     }
-    saved++;
   }
 
   res.json({ ok: true, saved, refused });
@@ -303,13 +304,16 @@ router.post('/daily-audit/portions', (req, res) => {
   for (const row of rows) {
     let wrote = false;
 
-    if (row.prepped !== null && row.prepped !== undefined && row.prepped !== '') {
+    // Step stale-saves (ADR-104, U-04): prepped is written only for a row
+    // marked touched. The page shows 0 for "no prepped row" and posts it
+    // back on every save; storing that 0 made "Sync batch stock" skip every
+    // dish, and an untouched phone put back an older number.
+    if (row.touched === true && row.prepped !== null && row.prepped !== undefined && row.prepped !== '') {
       const value = Number(row.prepped);
       const existing = getPrepped.get(restaurant_id, row.dish_id, business_date);
-      // A repost of the same value (every dish row is posted on every save,
-      // touched or not - session-status.md "25d-ii", third half) must not
-      // clear an inferred SYSTEM stamp or log a no-op correction. Only a
-      // genuine change to portions_produced counts as a manual correction.
+      // A repost of the same value must not clear an inferred SYSTEM stamp
+      // or log a no-op correction (session-status.md "25d-ii", third half).
+      // Only a genuine change to portions_produced counts as a correction.
       if (!existing || existing.portions_produced !== value) {
         withTransaction(db, () => {
           if (existing) {
@@ -337,11 +341,11 @@ router.post('/daily-audit/portions', (req, res) => {
       // remark is new for portions and lives in count_entries only;
       // omitted = keep the current one.
       const quantity = Number(row.portion_actual);
-      saveCount(db, {
+      const entryType = saveCount(db, {
         restaurantId: Number(restaurant_id), date: business_date, kind: 'PORTION', itemId: Number(row.dish_id),
         quantity, remark: row.remark, touched: row.touched === true, user: req.user
       }, () => upsertPortionActual.run(restaurant_id, row.dish_id, business_date, quantity, req.user?.name ?? null, req.user?.id ?? null));
-      wrote = true;
+      if (entryType) wrote = true;
     }
 
     if (wrote) saved++;

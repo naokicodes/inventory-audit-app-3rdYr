@@ -177,11 +177,21 @@ router.get('/commissary/daily-audit', (req, res) => {
       rows = rows.filter(r => usable.has(r.commissary_meat_id));
     }
   }
+  // Step stale-saves (U-03): each row carries the note already stored for
+  // that meat and day (null when none), so the page can show it and a later
+  // save keeps it.
+  const getNotes = db.prepare(
+    `SELECT notes FROM commissary_ending_actual WHERE commissary_meat_id = ? AND business_date = ?`
+  );
+  rows = rows.map(r => {
+    const stored = getNotes.get(r.commissary_meat_id, date);
+    return { ...r, notes: stored ? stored.notes : null };
+  });
   res.json(rows);
 });
 
 // POST /api/commissary/daily-audit
-// Body: { commissary_id, business_date, actor?, rows: [{ commissary_meat_id, ending_actual, notes }] }
+// Body: { commissary_id, business_date, actor?, rows: [{ commissary_meat_id, ending_actual, notes?, touched? }] }
 // Step 25b (session-status.md): the write side of GET /commissary/daily-audit
 // above, mirroring POST /api/daily-audit (dailyAudit.js) closely - same
 // "only write fields actually provided" convention (null/undefined/'' means
@@ -203,8 +213,8 @@ router.get('/commissary/daily-audit', (req, res) => {
 //   business_date) DO UPDATE - a physical count is per-day and corrigible,
 //   so a same-day recount overwrites rather than duplicating or failing.
 //   Carries notes (per row, like ending_actual's remarks) and created_by
-//   (from the top-level actor, matching this file's existing convention for
-//   yield-log/adjustments) through; photo_path is left alone - nothing else
+//   (the logged-in name; the top-level actor only when logged out - step
+//   stale-saves, ADR-040) through; photo_path is left alone - nothing else
 //   in the app writes it, and this step doesn't introduce that.
 //
 // Deliberately not activity_log-scoped, same reasoning as opening_stock's
@@ -222,6 +232,18 @@ router.post('/commissary/daily-audit', (req, res) => {
     ON CONFLICT(commissary_meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes, created_by = excluded.created_by, created_by_user_id = excluded.created_by_user_id
   `);
 
+  const getStored = db.prepare(
+    `SELECT notes FROM commissary_ending_actual WHERE commissary_meat_id = ? AND business_date = ?`
+  );
+  // ADR-040: the logged-in person is the counter; the posted actor only
+  // when logged out.
+  const createdBy = req.user?.name ?? (actor || null);
+
+  // Step stale-saves (ADR-104, I-02 = U-03): the page posts every row on
+  // every save. A row not marked touched never replaces a count already
+  // stored for that meat and day (a first count is still written). notes:
+  // an absent key keeps the stored note; a sent value replaces it, and an
+  // empty or blank one clears it. `saved` counts the rows written.
   let saved = 0;
   const refused = [];
   for (const row of rows) {
@@ -230,9 +252,14 @@ router.post('/commissary/daily-audit', (req, res) => {
         refused.push(row.commissary_meat_id);
         continue;
       }
-      upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), row.notes || null, actor || null, req.user?.id ?? null);
+      const stored = getStored.get(row.commissary_meat_id, business_date);
+      if (row.touched !== true && stored) continue;
+      let notes;
+      if (!Object.prototype.hasOwnProperty.call(row, 'notes')) notes = stored ? stored.notes : null;
+      else notes = (row.notes === null || row.notes === undefined || String(row.notes).trim() === '') ? null : row.notes;
+      upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), notes, createdBy, req.user?.id ?? null);
+      saved++;
     }
-    saved++;
   }
 
   res.json({ ok: true, saved, refused });

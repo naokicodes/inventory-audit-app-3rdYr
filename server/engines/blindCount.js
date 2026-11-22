@@ -98,18 +98,20 @@ function currentCount(db, restaurantId, date, kind, itemId) {
  * Save one ending and its history row in ONE transaction.
  *   entry: { restaurantId, date, kind, itemId, quantity, remark, touched, user }
  *   writeCurrent(remark): the route's existing upsert
- * remark undefined = not sent, keep the current one. A repost of the same
- * quantity and remark that the user never touched is not a save (the page
- * posts every row on every save - the 25d-ii lesson): nothing is written.
+ * remark undefined = not sent, keep the current one. The page posts every
+ * row on every save (the 25d-ii lesson), so a row the user never touched
+ * never replaces a stored value (step stale-saves, ADR-104): a phone loaded
+ * before another phone's save must not put back the older number. With
+ * nothing stored, an untouched row is still written (a first count from a
+ * client that sends no touched flag).
  * Returns the entry_type written, or null.
  */
 function saveCount(db, entry, writeCurrent) {
   const { restaurantId, date, kind, itemId, quantity, touched, user } = entry;
   checkKind(kind);
   const current = currentCount(db, restaurantId, date, kind, itemId);
+  if (!touched && current) return null;
   const remark = entry.remark === undefined ? (current ? current.remark : null) : (entry.remark || null);
-  const changed = !current || current.quantity !== quantity || (current.remark || null) !== remark;
-  if (!changed && !touched) return null;
 
   return withTransaction(db, () => {
     const orders = openOrdersFor(db, restaurantId, date, user && user.id)

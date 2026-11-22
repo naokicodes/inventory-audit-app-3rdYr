@@ -275,5 +275,70 @@ test('running balance: genuinely selling more than beginning+prepped covers IS f
   assert.strictEqual(day2.shortfall, 3);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+// ---------- Step stale-saves (ADR-104, U-04): the landing -> Sync batch stock chain ----------
+// The real routes over HTTP (same shape as server/engines/blindCount.test.js),
+// against a throwaway database file in the OS temp dir - never the live
+// inventory.db. The landing shows 0 for "no prepped row" and posts it back on
+// every save; an untouched row must not store that 0, or Sync batch stock
+// skips the dish.
+async function landingToSyncChain() {
+  const os = require('os');
+  const express = require('express');
+  const DB_FILE = path.join(os.tmpdir(), `commands-stale-saves-test-${process.pid}-${Date.now()}.db`);
+  process.env.DB_PATH = DB_FILE;
+  const liveDb = require('../db/connection.js');
+  const { currentUser } = require('./auth.js');
+  const app = express();
+  app.use(express.json());
+  app.use('/api', currentUser);
+  app.use('/api', require('./dailyAudit.js'));
+  app.use('/api', require('./commands.js'));
+
+  liveDb.prepare(`INSERT INTO restaurants (id, name, code) VALUES (1, 'Restaurant A', 'A')`).run();
+  liveDb.prepare(`INSERT INTO dishes (id, restaurant_id, dish_code, name, prep_type) VALUES (1, 1, 'D01', 'Batch Dish', 'BATCH_PREPPED')`).run();
+  liveDb.prepare(`INSERT INTO sales (restaurant_id, dish_id, business_date, quantity, source) VALUES (1, 1, '2026-11-10', 14, 'MANUAL')`).run();
+  const adminRole = Number(liveDb.prepare(
+    'INSERT INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only) VALUES (?, 1, 1, 1, 0)'
+  ).run('test-admin').lastInsertRowid);
+  const adminId = Number(liveDb.prepare('INSERT INTO users (name, default_role_id) VALUES (?, ?)').run('Test Admin', adminRole).lastInsertRowid);
+
+  const server = await new Promise(resolve => { const s = app.listen(0, () => resolve(s)); });
+  const base = `http://localhost:${server.address().port}`;
+  const post = (url, body) => fetch(base + url, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: `user_id=${adminId}` }, body: JSON.stringify(body)
+  });
+  const name = 'stale-saves: an untouched dish row with prepped "0" and no prepped row writes nothing, and Sync batch stock then fills it from sales';
+  try {
+    const logBefore = liveDb.prepare(`SELECT COUNT(*) AS c FROM activity_log WHERE entity_type = 'prepped'`).get().c;
+    const res = await post('/api/daily-audit/portions', {
+      restaurant_id: 1, business_date: '2026-11-10', rows: [{ dish_id: 1, prepped: '0', portion_actual: '', touched: false }]
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual((await res.json()).saved, 0);
+    assert.strictEqual(liveDb.prepare(`SELECT * FROM prepped WHERE dish_id = 1 AND business_date = '2026-11-10'`).get(), undefined);
+    assert.strictEqual(liveDb.prepare(`SELECT COUNT(*) AS c FROM activity_log WHERE entity_type = 'prepped'`).get().c, logBefore);
+
+    const sync = await post('/api/commands/sync-batch-stock', {});
+    assert.strictEqual(sync.status, 200);
+    const row = liveDb.prepare(`SELECT portions_produced, created_by FROM prepped WHERE dish_id = 1 AND business_date = '2026-11-10'`).get();
+    assert.deepStrictEqual({ ...row }, { portions_produced: 14, created_by: 'SYSTEM:sync-batch-stock' });
+    console.log(`  PASS: ${name}`);
+    passed++;
+  } catch (err) {
+    console.log(`  FAIL: ${name}`);
+    console.log(`    ${err.message}`);
+    failed++;
+  } finally {
+    // Close the kept-alive fetch sockets and wait, so process.exit never
+    // races a closing handle (a libuv assertion on Windows).
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    liveDb.close();
+    for (const f of [DB_FILE, `${DB_FILE}-wal`, `${DB_FILE}-shm`]) fs.rmSync(f, { force: true });
+  }
+}
+
+landingToSyncChain().then(() => {
+  console.log(`\n${passed} passed, ${failed} failed`);
+  process.exitCode = failed > 0 ? 1 : 0;
+});

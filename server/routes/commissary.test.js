@@ -1223,8 +1223,12 @@ function computeCommissaryMeatAuditFor(commissaryMeatId, businessDate) {
 }
 
 // Mirrors POST /api/commissary/daily-audit exactly (route logic, not a live
-// server - same approach as the rest of this file).
-function postCommissaryDailyAudit({ commissary_id, business_date, rows, actor }) {
+// server - same approach as the rest of this file). Step stale-saves
+// (ADR-104): an untouched row never replaces a stored count, an absent notes
+// key keeps the stored note, created_by is the logged-in name (the posted
+// actor only when logged out), and saved counts the rows written. The real
+// route over HTTP is exercised at the end of this file.
+function postCommissaryDailyAudit({ commissary_id, business_date, rows, actor }, user = null) {
   if (!commissary_id || !business_date || !Array.isArray(rows)) {
     return { status: 400, error: 'commissary_id, business_date, and rows[] are required' };
   }
@@ -1235,6 +1239,9 @@ function postCommissaryDailyAudit({ commissary_id, business_date, rows, actor })
     ON CONFLICT(commissary_meat_id, business_date) DO UPDATE SET quantity = excluded.quantity, notes = excluded.notes, created_by = excluded.created_by
   `);
 
+  const getStored = db.prepare('SELECT notes FROM commissary_ending_actual WHERE commissary_meat_id = ? AND business_date = ?');
+  const createdBy = user?.name ?? (actor || null);
+
   let saved = 0;
   const refused = [];
   for (const row of rows) {
@@ -1243,9 +1250,14 @@ function postCommissaryDailyAudit({ commissary_id, business_date, rows, actor })
         refused.push(row.commissary_meat_id);
         continue;
       }
-      upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), row.notes || null, actor || null);
+      const stored = getStored.get(row.commissary_meat_id, business_date);
+      if (row.touched !== true && stored) continue;
+      let notes;
+      if (!Object.prototype.hasOwnProperty.call(row, 'notes')) notes = stored ? stored.notes : null;
+      else notes = (row.notes === null || row.notes === undefined || String(row.notes).trim() === '') ? null : row.notes;
+      upsertEndingActual.run(row.commissary_meat_id, business_date, Number(row.ending_actual), notes, createdBy);
+      saved++;
     }
-    saved++;
   }
   return { status: 200, ok: true, saved, refused };
 }
@@ -1340,7 +1352,7 @@ test('an ending actual (physical count) write produces a real variance', () => {
 test('recounting the same meat/date overwrites the prior count to a single row, not a duplicate', () => {
   const r = postCommissaryDailyAudit({
     commissary_id: 1, business_date: '2026-09-05',
-    rows: [{ commissary_meat_id: 30, ending_actual: 48, notes: 'recount' }]
+    rows: [{ commissary_meat_id: 30, ending_actual: 48, notes: 'recount', touched: true }]
   });
   assert.strictEqual(r.status, 200);
   const rows = db.prepare('SELECT * FROM commissary_ending_actual WHERE commissary_meat_id = 30 AND business_date = ?').all('2026-09-05');
@@ -1358,7 +1370,7 @@ test('blank/null fields are skipped, never written as zero', () => {
     rows: [{ commissary_meat_id: 31, opening_stock: '5', ending_actual: null }]
   });
   assert.strictEqual(r.status, 200);
-  assert.strictEqual(r.saved, 1, 'the row still counts as processed even though nothing was written');
+  assert.strictEqual(r.saved, 0, 'saved counts only the rows written (step stale-saves)');
   const after = db.prepare('SELECT COUNT(*) as n FROM commissary_ending_actual WHERE commissary_meat_id = 31').get().n;
   assert.strictEqual(after, before, 'no row written for a blank/null ending_actual');
   const openings = db.prepare('SELECT * FROM commissary_opening_stock WHERE commissary_meat_id = 31').all();
@@ -1444,5 +1456,119 @@ test('PATCH commissary opening-stock: a negative quantity is refused (400) and t
   assert.strictEqual(row.quantity, 20);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+// ---------- Step stale-saves (ADR-104, I-02 = U-03): the real routes over HTTP ----------
+// Same shape as server/engines/blindCount.test.js: the real commissary router
+// and the currentUser middleware on an ephemeral port, against a throwaway
+// database file in the OS temp dir - never the live inventory.db.
+async function staleSavesOverHttp() {
+  console.log('\nCommissary Route Tests (step stale-saves: real POST/GET /commissary/daily-audit)\n');
+  const os = require('os');
+  const express = require('express');
+  const DB_FILE = path.join(os.tmpdir(), `commissary-stale-saves-test-${process.pid}-${Date.now()}.db`);
+  process.env.DB_PATH = DB_FILE;
+  const liveDb = require('../db/connection.js');
+  const { currentUser } = require('./auth.js');
+  const app = express();
+  app.use(express.json());
+  app.use('/api', currentUser);
+  app.use('/api', require('./commissary.js'));
+
+  const comId = Number(liveDb.prepare("INSERT INTO commissaries (code, name) VALUES ('COM-T', 'Test Commissary')").run().lastInsertRowid);
+  const meat = code => Number(liveDb.prepare(
+    "INSERT INTO commissary_meats (commissary_id, code, name, unit, allowed_leeway_pct) VALUES (?, ?, ?, 'kg', 5)"
+  ).run(comId, code, `Test ${code}`).lastInsertRowid);
+  const pork = meat('T01');
+  const beef = meat('T02');
+  for (const id of [pork, beef]) recordRecount(liveDb, 'commissary', comId, id, '2026-11-01', 100);
+  const roleId = Number(liveDb.prepare(
+    'INSERT INTO roles (name, can_enter_counts, can_finalize, can_admin, read_only) VALUES (?, 1, 1, 1, 0)'
+  ).run('test-commi').lastInsertRowid);
+  const user = name => Number(liveDb.prepare('INSERT INTO users (name, default_role_id) VALUES (?, ?)').run(name, roleId).lastInsertRowid);
+  const ana = user('Test Commi A');
+  const ben = user('Test Commi B');
+
+  const server = await new Promise(resolve => { const srv = app.listen(0, () => resolve(srv)); });
+  const base = `http://localhost:${server.address().port}`;
+  const DATE = '2026-11-12';
+  const save = async (userId, rows, actor) => {
+    const res = await fetch(base + '/api/commissary/daily-audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(userId ? { Cookie: `user_id=${userId}` } : {}) },
+      body: JSON.stringify({ commissary_id: comId, business_date: DATE, rows, ...(actor ? { actor } : {}) }),
+    });
+    assert.strictEqual(res.status, 200);
+    return res.json();
+  };
+  const stored = id => ({ ...liveDb.prepare('SELECT quantity, notes, created_by FROM commissary_ending_actual WHERE commissary_meat_id = ? AND business_date = ?').get(id, DATE) });
+  const getRows = async date => (await fetch(base + `/api/commissary/daily-audit?date=${date}&commissary_id=${comId}`, { headers: { Cookie: `user_id=${ana}` } })).json();
+
+  const httpTests = [
+    ['A saves 60, corrects to 66 with a note; B posts 60 untouched plus another meat touched -> 66 and the note stay', async () => {
+      await save(ana, [{ commissary_meat_id: pork, ending_actual: '60', notes: null, touched: true }]);
+      await save(ana, [{ commissary_meat_id: pork, ending_actual: '66', notes: 'two bags thawing', touched: true }]);
+      const r = await save(ben, [
+        { commissary_meat_id: pork, ending_actual: '60', notes: null, touched: false },
+        { commissary_meat_id: beef, ending_actual: '20', notes: null, touched: true },
+      ]);
+      assert.strictEqual(r.saved, 1);
+      assert.deepStrictEqual(stored(pork), { quantity: 66, notes: 'two bags thawing', created_by: 'Test Commi A' });
+      assert.strictEqual(stored(beef).quantity, 20);
+    }],
+    ['a second save with nothing touched keeps the note and writes nothing', async () => {
+      const r = await save(ana, [
+        { commissary_meat_id: pork, ending_actual: '66', notes: 'two bags thawing', touched: false },
+        { commissary_meat_id: beef, ending_actual: '20', notes: null, touched: false },
+      ]);
+      assert.strictEqual(r.saved, 0);
+      assert.strictEqual(stored(pork).notes, 'two bags thawing');
+    }],
+    ['a touched row without the notes key keeps the stored note', async () => {
+      await save(ana, [{ commissary_meat_id: pork, ending_actual: '65', touched: true }]);
+      assert.deepStrictEqual([stored(pork).quantity, stored(pork).notes], [65, 'two bags thawing']);
+    }],
+    ['a touched row with notes "" (or blank) clears it', async () => {
+      await save(ana, [{ commissary_meat_id: pork, ending_actual: '65', notes: '', touched: true }]);
+      assert.strictEqual(stored(pork).notes, null);
+      await save(ana, [{ commissary_meat_id: pork, ending_actual: '65', notes: 'again', touched: true }]);
+      await save(ana, [{ commissary_meat_id: pork, ending_actual: '65', notes: '   ', touched: true }]);
+      assert.strictEqual(stored(pork).notes, null);
+    }],
+    ['a logged-in save stamps the logged-in name, not the posted actor; logged out uses the actor', async () => {
+      await save(ben, [{ commissary_meat_id: beef, ending_actual: '21', notes: null, touched: true }], 'Someone Else');
+      assert.strictEqual(stored(beef).created_by, 'Test Commi B');
+      await save(null, [{ commissary_meat_id: beef, ending_actual: '22', notes: null, touched: true }], 'Logged Out Name');
+      assert.strictEqual(stored(beef).created_by, 'Logged Out Name');
+    }],
+    ['the GET returns the stored note for each meat and day (null when none)', async () => {
+      await save(ana, [{ commissary_meat_id: pork, ending_actual: '65', notes: 'see <b>tag</b>', touched: true }]);
+      const byId = Object.fromEntries((await getRows(DATE)).map(r => [r.commissary_meat_id, r.notes]));
+      assert.deepStrictEqual(byId, { [pork]: 'see <b>tag</b>', [beef]: null });
+      assert.ok((await getRows('2026-11-13')).every(r => r.notes === null));
+    }],
+  ];
+  try {
+    for (const [name, fn] of httpTests) {
+      try {
+        await fn();
+        console.log(`  PASS: ${name}`);
+        passed++;
+      } catch (err) {
+        console.log(`  FAIL: ${name}`);
+        console.log(`    ${err.message}`);
+        failed++;
+      }
+    }
+  } finally {
+    // Close the kept-alive fetch sockets and wait, so the process never
+    // exits while a handle is closing (a libuv assertion on Windows).
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    liveDb.close();
+    for (const f of [DB_FILE, `${DB_FILE}-wal`, `${DB_FILE}-shm`]) fs.rmSync(f, { force: true });
+  }
+}
+
+staleSavesOverHttp().then(() => {
+  console.log(`\n${passed} passed, ${failed} failed`);
+  process.exitCode = failed > 0 ? 1 : 0;
+});

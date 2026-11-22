@@ -79,7 +79,7 @@ test('prepped and portion counts saved while logged in are stamped; prepped.crea
 test('a SYSTEM prepped row corrected by a logged-in human gets the human id, stamp cleared', async () => {
   db.prepare("INSERT INTO prepped (restaurant_id, dish_id, business_date, portions_produced, created_by) VALUES (?, ?, '2026-11-06', 20, 'SYSTEM:sync-batch-stock')").run(restaurantId, dishId);
   ok(await post('/api/daily-audit/portions', true, {
-    restaurant_id: restaurantId, business_date: '2026-11-06', rows: [{ dish_id: dishId, prepped: 25 }]
+    restaurant_id: restaurantId, business_date: '2026-11-06', rows: [{ dish_id: dishId, prepped: 25, touched: true }]
   }));
   const row = db.prepare("SELECT created_by, created_by_user_id FROM prepped WHERE dish_id = ? AND business_date = '2026-11-06'").get(dishId);
   assert.deepStrictEqual({ ...row }, { created_by: null, created_by_user_id: userId });
@@ -117,7 +117,7 @@ test('a commissary count is stamped, and a re-save credits the last saver (ADR-0
   const save = async cookie => {
     const res = await fetch(base + '/api/commissary/daily-audit', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify({ commissary_id: comId, business_date: '2026-11-05', rows: [{ commissary_meat_id: cMeatId, ending_actual: 7 }] }),
+      body: JSON.stringify({ commissary_id: comId, business_date: '2026-11-05', rows: [{ commissary_meat_id: cMeatId, ending_actual: 7, touched: true }] }),
     });
     assert.strictEqual(res.status, 200);
     return db.prepare('SELECT created_by_user_id FROM commissary_ending_actual WHERE commissary_meat_id = ?').get(cMeatId).created_by_user_id;

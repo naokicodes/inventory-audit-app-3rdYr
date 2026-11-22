@@ -775,8 +775,11 @@
         statusEl.textContent = `Saved. Reloading...`;
         statusEl.className = 'status-message success';
         await loadGrid();
-        statusEl.textContent = `Saved ${result.saved} meat row(s)${portionsSaved ? ` and ${portionsSaved} dish row(s)` : ''}.`
-          + (refusedNames.length ? ` Not saved - needs month opening first: ${refusedNames.join(', ')}.` : '');
+        // Step stale-saves: both requests count only the rows really written.
+        statusEl.textContent = (result.saved === 0 && portionsSaved === 0 && refusedNames.length === 0)
+          ? 'Nothing new to save.'
+          : `Saved ${result.saved} meat row(s)${portionsSaved ? ` and ${portionsSaved} dish row(s)` : ''}.`
+            + (refusedNames.length ? ` Not saved - needs month opening first: ${refusedNames.join(', ')}.` : '');
         if (refusedNames.length) statusEl.className = 'status-message error';
       } catch (err) {
         statusEl.textContent = 'Error saving: ' + err.message;
