@@ -47,6 +47,7 @@
     /* Step landing-sales (ADR-094): FC's Landing table, and a Pizza table on
        both sides. Full width, names wrap: no sideways scroll at 390px. */
     .ks-h2 { font-size: 1.1rem; margin: 1rem 0 0.4rem; }
+    .ks-total { font-size: 0.9rem; font-weight: 600; color: var(--ink2); }
     .ks-full { width: 100%; }
     .ks-full td:first-child { overflow-wrap: anywhere; }
     /* A landing line opens with a button the width of its name cell, 44px tall. */
@@ -122,7 +123,7 @@
     </div>
 
     <!-- Step landing-sales: the two accounts' pizza lists, one row per name. -->
-    <h2 class="ks-h2">Pizza</h2>
+    <h2 class="ks-h2">Pizza <span id="sl-pizza-total" class="ks-total"></span></h2>
     <p id="sl-pizza-error" class="ks-note" hidden>Couldn't load the pizza list</p>
     <table id="sl-pizza-table" class="ks-full">
       <thead>
@@ -153,7 +154,7 @@
       <tbody></tbody>
     </table>
 
-    <h2 class="ks-h2">Pizza</h2>
+    <h2 class="ks-h2">Pizza <span id="fc-pizza-total" class="ks-total"></span></h2>
     <p id="fc-pizza-error" class="ks-note" hidden>Couldn't load the pizza list</p>
     <table id="fc-pizza-table" class="ks-full">
       <thead><tr><th>Item</th><th class="num">FC</th></tr></thead>
@@ -321,13 +322,17 @@
     // whole side failed) shows "Couldn't load the pizza list" instead. An
     // account whose list failed while the others loaded shows the note too,
     // above the table with its column at "-".
-    function renderPizza(tableId, errorId, data) {
+    function renderPizza(tableId, errorId, totalId, data) {
       const table = document.getElementById(tableId);
       const errorEl = document.getElementById(errorId);
       const pizza = data.pizza;
       const partial = data.accounts.some(a => a.ok && a.catalogError);
       errorEl.hidden = !(pizza === null || partial);
       table.hidden = pizza === null;
+      // A short grand total beside the heading (Naoki, click-through 2026-11-22):
+      // every row's total added up; nothing when the list did not load.
+      document.getElementById(totalId).textContent = pizza === null
+        ? '' : `· Total ${qty(pizza.rows.reduce((s, r) => s + (r.total || 0), 0))}`;
       table.querySelector('tbody').innerHTML = pizza === null ? '' : pizza.rows.map(r => {
         const zero = r.total === 0;
         const cells = pizza.columns.length > 1
@@ -386,7 +391,7 @@
           numCell(d.total) + `</tr>`;
       }).join('');
 
-      renderPizza('sl-pizza-table', 'sl-pizza-error', data);
+      renderPizza('sl-pizza-table', 'sl-pizza-error', 'sl-pizza-total', data);
 
       document.getElementById('account-status').innerHTML = data.accounts.map(a => {
         if (!a.ok) return `<p class="ks-note">${esc(a.label)}: could not be fetched</p>`;
@@ -461,7 +466,7 @@
           `<tr id="fc-line-${i}" class="ks-detail" hidden><td colspan="2">${lineDetail(l)}</td></tr>`;
       }).join('');
 
-      renderPizza('fc-pizza-table', 'fc-pizza-error', data);
+      renderPizza('fc-pizza-table', 'fc-pizza-error', 'fc-pizza-total', data);
 
       const n = data.other.length;
       fcOtherEl.open = false;
