@@ -172,6 +172,7 @@ half in CI; the launcher needs Windows (You check). Full spec: session-status.md
 backup-restore".
 
 ### Step fc-landing-lines - beta-3's starting data: FC's 27 lines and two meals, Kare-Kare's placeholder  [Naoki's own PR]
+**CLOSED 2026-11-22, PR #91 (`a31d8d9`).**
 Touches: server/db/seed-data-B.json, server/db/seed-data.json, server/db/seed.js, server/db/seedData.test.js
 FC's 27 paper lines in the paper's order become its seeded meats (Pork Jowl in kg, the rest in
 pieces; the six lines that keep no stock included, counted as 0); FC's old dishes and recipes

@@ -5626,6 +5626,7 @@ Not in scope: backups on a host (later, ADR-105); photos (run 4's D6, when photo
 full health line; the launcher's other changes (restaurant-pc-ii).
 
 ## Step fc-landing-lines - beta-3's starting data: FC's 27 lines and two meals, Silingan's Kare-Kare placeholder (A0, 2026-11-22)
+**CLOSED 2026-11-22, PR #91 (`a31d8d9`).**
 
 Decided 2026-11-22 (Naoki): all 27 paper lines, the six that keep no stock included, because the
 landing person copies the paper one to one and the zeros are part of it; Pork Jowl in kg, every
