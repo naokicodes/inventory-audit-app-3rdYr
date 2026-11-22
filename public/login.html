@@ -5,26 +5,69 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Log in - Inventory Audit App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#222121">
   <style>
-    #user-list { display: flex; flex-direction: column; gap: 0.5rem; max-width: 20rem; }
-    #user-list button { text-align: left; }
+    .user-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .user-list button { text-align: left; min-height: 48px; font-size: 1.05rem; }
+    .login-h2 { font-size: 1rem; color: var(--ink2); margin: 1.25rem 0 0.5rem; }
+    #find { width: 100%; box-sizing: border-box; padding: 0.6rem; font-size: 1rem; }
+    .find-label { display: block; font-weight: 600; margin: 1.25rem 0 0.4rem; }
   </style>
 </head>
-<body>
-  <!-- Step stub-login: pick your name, no password. Identity only. -->
-  <div class="box">
-    <h1>Log in</h1>
-    <p>Pick your name.</p>
-    <div id="user-list"></div>
-    <p id="login-message" class="status-message"></p>
-  </div>
+<body data-shell="login">
+  <nav></nav>
+  <script src="shell.js"></script>
+  <!-- Step stub-login: pick your name, no password. Identity only.
+       Step ui-shell (ADR-111): this phone's recent names first, then a find
+       box over everyone, A to Z. -->
+  <h1>Log in</h1>
+  <section id="recent" hidden>
+    <h2 class="login-h2">On this phone</h2>
+    <div id="recent-list" class="user-list"></div>
+  </section>
+  <label class="find-label" for="find">Find your name</label>
+  <input type="text" id="find" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <h2 class="login-h2">Everyone</h2>
+  <div id="user-list" class="user-list"></div>
+  <p id="login-message" class="status-message"></p>
   <script>
     const listEl = document.getElementById('user-list');
+    const recentEl = document.getElementById('recent');
+    const recentListEl = document.getElementById('recent-list');
+    const findEl = document.getElementById('find');
     const messageEl = document.getElementById('login-message');
+    const RECENT_KEY = 'recentLogins';
 
     function showError(text) {
       messageEl.textContent = text;
       messageEl.classList.add('error');
+    }
+
+    // Ignore capitals and extra spaces.
+    function norm(s) {
+      return String(s).toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+
+    // recentLogins: this device's last three logins, newest first, as
+    // [{ id, name }]. Per device only; storage that fails just means no list.
+    function readRecent() {
+      try {
+        const list = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+        return Array.isArray(list) ? list : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function saveRecent(user) {
+      try {
+        const list = readRecent().filter((r) => r && r.id !== user.id);
+        list.unshift({ id: user.id, name: user.name });
+        localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 3)));
+      } catch (err) { /* no storage: nothing remembered */ }
     }
 
     async function logIn(user) {
@@ -34,26 +77,43 @@
         body: JSON.stringify({ user_id: user.id }),
       });
       if (res.ok) {
+        saveRecent(user);
         location.href = 'index.html';
       } else {
         showError((await res.json()).error || 'Could not log in.');
       }
     }
 
+    function userButton(user) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = user.name;
+      btn.addEventListener('click', () => logIn(user));
+      return btn;
+    }
+
     fetch('/api/auth/users')
       .then(res => res.json())
       .then(users => {
         if (users.length === 0) {
-          listEl.textContent = 'No active users.';
+          listEl.textContent = 'No people yet - ask the admin to add people.';
+          findEl.disabled = true;
           return;
         }
-        for (const user of users) {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.textContent = user.name;
-          btn.addEventListener('click', () => logIn(user));
-          listEl.appendChild(btn);
-        }
+        // A recent name no longer in the list (inactive or gone) is skipped.
+        const byId = new Map(users.map((u) => [u.id, u]));
+        const recent = readRecent().map((r) => r && byId.get(r.id)).filter(Boolean);
+        for (const user of recent) recentListEl.appendChild(userButton(user));
+        recentEl.hidden = recent.length === 0;
+
+        const sorted = [...users].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        const rows = sorted.map((user) => ({ user, key: norm(user.name), btn: userButton(user) }));
+        for (const row of rows) listEl.appendChild(row.btn);
+        findEl.addEventListener('input', () => {
+          const q = norm(findEl.value);
+          for (const row of rows) row.btn.hidden = q !== '' && !row.key.includes(q);
+        });
       })
       .catch(() => showError('Could not load the user list.'));
   </script>

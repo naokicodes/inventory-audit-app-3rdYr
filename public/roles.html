@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Roles - Inventory Audit App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#222121">
   <style>
     .intro { color: var(--ink2); }
     .role-card, .person-card { padding: 0.75rem 1rem; margin: 0 0 0.75rem; }
@@ -31,20 +35,9 @@
     #status { min-height: 1.4em; }
   </style>
 </head>
-<body>
-  <nav>
-    <a href="index.html">Home</a>
-    <a href="daily-audit.html">Landing</a>
-    <a href="stock-receipts.html">Stock Receipts</a>
-    <a href="commissary.html">Commissary</a>
-    <a href="commissary-shipments.html">Shipments</a>
-    <a href="sales.html">Sales</a>
-    <a href="terminal.html">Terminal</a>
-    <a href="allocations.html">Allocations</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="settings.html">Settings</a>
-    <a href="history.html">History</a>
-  </nav>
+<body class="page-wide">
+  <nav></nav>
+  <script src="shell.js"></script>
   <!-- Step roles-page (ADR-034, ADR-082, ADR-083): switches per role, roles
        per person. Anyone signed in may look; only admins get buttons; the
        server checks every change. -->

@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Terminal - Inventory Audit App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#222121">
   <style>
-    body { max-width: 800px; }
     /* Docked bar is fixed to the viewport bottom, so reserve room for it
        at the bottom of the page (non-modal: content stays visible and
        scrollable above the bar, never hidden behind it). 11rem clears
@@ -162,20 +165,9 @@
     .history-empty { color: var(--ink3); font-size: 0.85rem; }
   </style>
 </head>
-<body>
-  <nav>
-    <a href="index.html">Home</a>
-    <a href="daily-audit.html">Landing</a>
-    <a href="stock-receipts.html">Stock Receipts</a>
-    <a href="commissary.html">Commissary</a>
-    <a href="commissary-shipments.html">Shipments</a>
-    <a href="sales.html">Sales</a>
-    <a href="terminal.html">Terminal</a>
-    <a href="allocations.html">Allocations</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="settings.html">Settings</a>
-    <a href="history.html">History</a>
-  </nav>
+<body class="page-wide">
+  <nav></nav>
+  <script src="shell.js"></script>
 
   <h1>Terminal</h1>
   <p class="hint">
@@ -978,6 +970,18 @@
       historyToggle.setAttribute('aria-expanded', String(nowOpen));
       historyToggle.textContent = nowOpen ? 'History \u2715' : 'History';
     });
+
+    // Step ui-shell: the fixed History button sits just below the shared top
+    // bar (and the wide menu row), never over its Menu, Log in or name button;
+    // the sidebar's top padding follows it.
+    function placeHistoryToggle() {
+      const nav = document.querySelector('nav');
+      const top = nav ? Math.max(16, Math.round(nav.getBoundingClientRect().bottom + window.scrollY + 8)) : 16;
+      historyToggle.style.top = `${top}px`;
+      historySidebar.style.paddingTop = `${top + historyToggle.offsetHeight + 12}px`;
+    }
+    placeHistoryToggle();
+    window.addEventListener('resize', placeHistoryToggle);
 
     (async function init() {
       loadHistory();

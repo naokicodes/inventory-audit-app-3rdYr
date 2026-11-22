@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Commissary Shipments - Inventory Audit App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#222121">
   <style>
     table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-bottom: 1rem; }
     th, td { border: 1px solid var(--line); padding: 0.4rem; text-align: left; }
@@ -26,20 +30,9 @@
     .line-sum-hint { font-size: 0.8rem; color: var(--ink2); margin: 0.3rem 0 1rem; }
   </style>
 </head>
-<body style="max-width: 1100px;">
-  <nav>
-    <a href="index.html">Home</a>
-    <a href="daily-audit.html">Landing</a>
-    <a href="stock-receipts.html">Stock Receipts</a>
-    <a href="commissary.html">Commissary</a>
-    <a href="commissary-shipments.html">Shipments</a>
-    <a href="sales.html">Sales</a>
-    <a href="terminal.html">Terminal</a>
-    <a href="allocations.html">Allocations</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="settings.html">Settings</a>
-    <a href="history.html">History</a>
-  </nav>
+<body class="page-wide">
+  <nav></nav>
+  <script src="shell.js"></script>
 
   <h1>Commissary Shipments</h1>
   <p class="hint">Log an outbound batch from the Commissary to a restaurant, broken into the named portions that restaurant actually receives (e.g. Jowl &rarr; Bagnet/Sisig/Sinigang). Each line writes a normal Stock Receipts row for the destination automatically - nothing else to do on that end.</p>

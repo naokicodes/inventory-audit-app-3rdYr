@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Stock Receipts - Inventory Audit App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#222121">
   <style>
     table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-bottom: 1rem; }
     th, td { border: 1px solid var(--line); padding: 0.4rem; text-align: left; }
@@ -29,20 +33,9 @@
     tr.assigning select { width: 100%; padding: 0.2rem; font-size: 0.85rem; }
   </style>
 </head>
-<body style="max-width: 1100px;">
-  <nav>
-    <a href="index.html">Home</a>
-    <a href="daily-audit.html">Landing</a>
-    <a href="stock-receipts.html">Stock Receipts</a>
-    <a href="commissary.html">Commissary</a>
-    <a href="commissary-shipments.html">Shipments</a>
-    <a href="sales.html">Sales</a>
-    <a href="terminal.html">Terminal</a>
-    <a href="allocations.html">Allocations</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="settings.html">Settings</a>
-    <a href="history.html">History</a>
-  </nav>
+<body class="page-wide">
+  <nav></nav>
+  <script src="shell.js"></script>
 
   <h1>Stock Receipts</h1>
   <p class="hint">One log for everything a restaurant receives - direct deliveries and commissary shipments alike. Landing's New Stock cell is a read-only sum of this log.</p>
