@@ -5,7 +5,7 @@
 
 const assert = require('assert');
 const {
-  computePreview, computeCategories, loadNameMap, isValidDate, manilaDate, businessDate, receiptWindow, normalize, buildResolver,
+  computePreview, computeFcLanding, loadNameMap, isValidDate, manilaDate, businessDate, receiptWindow, normalize, buildResolver,
 } = require('./loyversePreview.js');
 
 let passed = 0, failed = 0;
@@ -473,7 +473,8 @@ test('every map row present in map order, zeros included; no price/total-money k
   assert.deepStrictEqual(r.dishes.map(d => d.dish_code), ['D001', 'D002', 'D003', 'D004', 'D005']);
   assert.deepStrictEqual(row(r, 'D005'), { dish_code: 'D005', name: 'Never Sold', silingan: 0, likod: 0, total: 0 });
   assert.deepStrictEqual(row(r, 'D001'), { dish_code: 'D001', name: 'Meatball Pasta', silingan: 2, likod: 0, total: 2 });
-  assert.deepStrictEqual(Object.keys(r), ['date', 'accounts', 'dishes', 'unmatched', 'idCandidates']);
+  assert.deepStrictEqual(Object.keys(r), ['date', 'accounts', 'dishes', 'unmatched', 'idCandidates', 'pizza']);
+  assert.strictEqual(r.pizza, null, 'no pizza list in this map');
   const keys = new Set();
   (function walk(v) {
     if (Array.isArray(v)) v.forEach(walk);
@@ -483,14 +484,14 @@ test('every map row present in map order, zeros included; no price/total-money k
   assert.ok(!JSON.stringify(r).includes('999'), 'a price value leaked');
 });
 
-test('the committed name map loads with 43 dishes and resolves the October renames', () => {
+test('the committed name map loads with 44 dishes and resolves the October renames', () => {
   const map = loadNameMap();
   assert.deepStrictEqual(map.accounts.map(a => [a.tokenEnv, a.group]), [
     ['LOYVERSE_SILINGAN_TOKEN', 'silingan-likod'],
     ['LOYVERSE_LIKOD_TOKEN', 'silingan-likod'],
     ['LOYVERSE_FC_TOKEN', 'fc'],
   ]);
-  assert.strictEqual(map.dishes.length, 43);
+  assert.strictEqual(map.dishes.length, 44);
   for (const d of map.dishes) {
     assert.ok(d.dish_code && typeof d.silingan === 'string' && typeof d.likod === 'string', d.dish_code);
   }
@@ -503,13 +504,18 @@ test('the committed name map loads with 43 dishes and resolves the October renam
   const s = buildResolver(map.dishes, 'silingan');
   assert.strictEqual(s('Beef Nilaga').dish_code, 'D037');
   assert.strictEqual(s('Braised Beef Trays'), null);
+  // 2026-11-22: Silingan's Kare-Kare is D044, exact name only (the head chef).
+  assert.strictEqual(s('Kare-Kare').dish_code, 'D044');
+  assert.strictEqual(s('Crispy Kare-Kare'), null);
+  assert.strictEqual(s('Kare-Kare Trays'), null);
+  assert.strictEqual(l('Kare-Kare'), null);
 });
 
 test('malformed date is rejected', async () => {
   await assert.rejects(() => computePreview({ date: '2026-13-01', nameMap: MAP, env: ENV, fetchImpl: stubFetch({}) }), /YYYY-MM-DD/);
 });
 
-// --- Step loyverse-fc: FC's account and the category view ---
+// --- Step loyverse-fc: FC's account in the map ---
 
 const FC_ACCOUNT = { label: 'FC', key: 'fc', tokenEnv: 'TOK_FC', group: 'fc' };
 const MAP_FC = { ...MAP, accounts: [...MAP.accounts, FC_ACCOUNT] };
@@ -531,18 +537,6 @@ function stubFetchFc(receiptPages, catalog = {}, calls = []) {
   };
 }
 
-const FC_CATALOG = {
-  'secret-fc': {
-    categories: [{ id: 'cat-p', name: 'Pizza' }, { id: 'cat-a', name: 'Add-ons' }, { id: 'cat-d', name: 'Drinks' }],
-    items: [
-      { id: 'i-Margherita', item_name: 'Margherita', category_id: 'cat-p' },
-      { id: 'i-Pepperoni', item_name: 'Pepperoni', category_id: 'cat-p' },
-      { id: 'i-Extra Cheese', item_name: 'Extra Cheese', category_id: 'cat-a' },
-      { id: 'i-Coke', item_name: 'Coke', category_id: 'cat-d' },
-      { id: 'i-Loose', item_name: 'Loose', category_id: null },
-    ],
-  },
-};
 const ENV_FC = { ...ENV, TOK_FC: 'secret-fc' };
 const D = '2026-10-03T04:00:00Z';
 
@@ -561,121 +555,277 @@ test('loyverse-fc: the dish preview is byte-for-byte the same with FC in the map
   assert.ok(calls.every(c => c.token !== 'secret-fc'), 'FC fetched by the dish preview');
 });
 
-test('loyverse-fc: FC lines are grouped by its categories, sorted by name, items biggest first, 0 left out', async () => {
-  const r = await computeCategories({
-    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
-    fetchImpl: stubFetchFc({ 'secret-fc': [[
-      receipt(D, [['Margherita', 2], ['Pepperoni', 5], ['Coke', 1]]),
-      receipt(D, [['Margherita', 1], ['Extra Cheese', 2]]),
-      receipt('2026-10-04T04:00:00Z', [['Pepperoni', 50]]), // another business date
-      receipt(D, [['Pepperoni', 7]], { cancelled_at: D }),
-    ]] }, FC_CATALOG),
-  });
-  assert.strictEqual(r.date, '2026-10-03');
-  assert.strictEqual(r.group, 'fc');
-  assert.deepStrictEqual(r.categories, [
-    { name: 'Add-ons', items: [{ name: 'Extra Cheese', quantity: 2 }] },
-    { name: 'Drinks', items: [{ name: 'Coke', quantity: 1 }] },
-    { name: 'Pizza', items: [{ name: 'Pepperoni', quantity: 5 }, { name: 'Margherita', quantity: 3 }] },
+// --- Step landing-sales: FC's landing lines and the Pizza tables (ADR-094) ---
+
+// The committed map's FC landing and pizza lists, on the test accounts.
+const REAL = loadNameMap();
+const MAP_LS = { ...MAP_FC, pizza: REAL.pizza, fcLanding: REAL.fcLanding };
+
+function cat(token, categories, items) {
+  return { [token]: { categories, items: items.map(([name, category_id, deleted_at = null]) => ({ id: 'i-' + name, item_name: name, category_id, deleted_at })) } };
+}
+const FC_CAT = cat('secret-fc',
+  [{ id: 'c-pz', name: 'Pizza' }, { id: 'c-ap', name: 'ADD-ONS  pizza' }, { id: 'c-k', name: 'Kitchen' }],
+  [
+    ['Margherita', 'c-pz'], ['Pepperoni', 'c-pz'], ['Extra Cheese', 'c-ap'], ['FREE CHEESE PIZZA', 'c-k'],
+    ['Old Hawaiian', 'c-pz', '2026-09-01T00:00:00Z'], ['Gone Veggie', 'c-pz', '2026-09-01T00:00:00Z'],
+    ['PORK BAGNET - SOLO', 'c-k'],
   ]);
-  assert.strictEqual(r.accounts.length, 1);
-  assert.strictEqual(r.accounts[0].label, 'FC');
-  assert.strictEqual(r.accounts[0].ok, true);
-  assert.strictEqual(r.accounts[0].receiptsKept, 2);
-  assert.strictEqual(r.accounts[0].lastReceiptAt, D);
+const LEFT_CAT = {
+  ...cat('secret-s', [{ id: 's-pz', name: 'PIZZA' }], [['Margherita', 's-pz'], ['Garlic Bread', 's-pz'], ['Pasta', null]]),
+  ...cat('secret-l', [{ id: 'l-pz', name: 'Likod Pizza' }, { id: 'l-x', name: 'PIZZA' }], [['margherita ', 'l-pz'], ['Quattro', 'l-pz'], ['Decoy', 'l-x']]),
+};
+
+async function fc(receipts, catalog = FC_CAT, env = ENV_FC) {
+  return computeFcLanding({ date: '2026-10-03', nameMap: MAP_LS, env, fetchImpl: stubFetchFc({ 'secret-fc': [receipts] }, catalog) });
+}
+function line(r, name) { return r.landing.find(l => l.line === name); }
+
+test('landing-sales: a Pork Bagnet platter adds 3 to BAGNET and lists as portions 3', async () => {
+  const r = await fc([receipt(D, [['PLATTER - PORK BAGNET', 1], ['Pork Bagnet - Solo', 2]])]);
+  const b = line(r, 'BAGNET');
+  assert.strictEqual(b.sold, 5);
+  assert.deepStrictEqual(b.items, [
+    { name: 'Pork Bagnet - Solo', quantity: 2, portions: 1 },
+    { name: 'PLATTER - PORK BAGNET', quantity: 1, portions: 3 },
+  ]);
+  assert.strictEqual(b.taken, 0);
+  assert.deepStrictEqual(b.takenBy, []);
 });
 
-test('loyverse-fc: REFUND lines subtract; an item netting 0 is left out', async () => {
-  const r = await computeCategories({
-    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
-    fetchImpl: stubFetchFc({ 'secret-fc': [[
-      receipt(D, [['Margherita', 4], ['Coke', 1]]),
-      receipt(D, [['Margherita', 1], ['Coke', 1]], { receipt_type: 'REFUND' }),
-    ]] }, FC_CATALOG),
-  });
-  assert.deepStrictEqual(r.categories, [{ name: 'Pizza', items: [{ name: 'Margherita', quantity: 3 }] }]);
+test('landing-sales: Laing Pork - Solo x2 gives LAING 2 and BAGNET taken 1', async () => {
+  const r = await fc([receipt(D, [['LAING PORK - SOLO', 2]])]);
+  assert.strictEqual(line(r, 'LAING').sold, 2);
+  assert.deepStrictEqual(line(r, 'LAING').items, [{ name: 'LAING PORK - SOLO', quantity: 2, portions: 1 }]);
+  assert.strictEqual(line(r, 'BAGNET').sold, 0);
+  assert.strictEqual(line(r, 'BAGNET').taken, 1);
+  assert.deepStrictEqual(line(r, 'BAGNET').takenBy, [{ name: 'LAING PORK - SOLO', quantity: 2, amount: 0.5 }]);
+});
+
+test('landing-sales: CPA takes from Bagnet and Quarter; Half takes 1/2 a Whole Chicken', async () => {
+  const r = await fc([receipt(D, [['CHICKEN PORK ADOBO - SOLO', 3], ['PLATTER - CHICKEN PORK ADOBO', 1], ['HALF CHICKEN', 3]])]);
+  assert.strictEqual(line(r, 'CPA').sold, 5);
+  assert.strictEqual(line(r, 'BAGNET').taken, 2.5);
+  assert.strictEqual(line(r, 'QUARTER').taken, 4);
+  assert.strictEqual(line(r, 'QUARTER').sold, 0);
+  assert.strictEqual(line(r, 'HALF').sold, 3);
+  assert.strictEqual(line(r, 'WHOLE CHICKEN').taken, 1.5);
+});
+
+test('landing-sales: a burger counts on its patty line and on Burger Buns', async () => {
+  const r = await fc([receipt(D, [['HOMEMADE BURGER', 2], ['CHICKEN BURGER', 1]])]);
+  assert.strictEqual(line(r, 'BURGER PATTY').sold, 2);
+  assert.strictEqual(line(r, 'CHICKEN BRGR').sold, 1);
+  assert.strictEqual(line(r, 'BURGER BUNS').sold, 3);
+  assert.deepStrictEqual(line(r, 'BURGER BUNS').items.map(i => i.name), ['HOMEMADE BURGER', 'CHICKEN BURGER']);
+});
+
+test('landing-sales: an add-on with "pos": {} adds to the line it takes from and to no line of its own', async () => {
+  const r = await fc([receipt(D, [['PORK 150grms (Add ons)', 2]])]);
+  assert.deepStrictEqual(line(r, 'BAGNET').takenBy, [{ name: 'PORK 150grms (Add ons)', quantity: 2, amount: 1 }]);
+  assert.strictEqual(line(r, 'BAGNET').taken, 2);
+  for (const l of r.landing) {
+    assert.strictEqual(l.sold, 0, l.line);
+    assert.deepStrictEqual(l.items, [], l.line);
+  }
+  assert.deepStrictEqual(r.other, []);
+});
+
+test('landing-sales: a refund subtracts from sold and taken; a cancelled receipt counts nothing', async () => {
+  const r = await fc([
+    receipt(D, [['PLATTER - LAING PORK', 3]]),
+    receipt(D, [['PLATTER - LAING PORK', 1]], { receipt_type: 'REFUND' }),
+    receipt(D, [['PLATTER - LAING PORK', 50], ['BEEF TAPA', 9]], { cancelled_at: D }),
+    receipt('2026-10-04T04:00:00Z', [['BEEF TAPA', 7]]), // another business date
+  ]);
+  assert.strictEqual(line(r, 'LAING').sold, 4);
+  assert.deepStrictEqual(line(r, 'LAING').items, [{ name: 'PLATTER - LAING PORK', quantity: 2, portions: 2 }]);
+  assert.strictEqual(line(r, 'BAGNET').taken, 2);
+  assert.strictEqual(line(r, 'BEEF TAPA').sold, 0);
   assert.deepStrictEqual(r.accounts[0].receiptTypes, { SALE: 1, REFUND: 1 });
+  assert.strictEqual(r.accounts[0].receiptsKept, 2);
 });
 
-test('loyverse-fc: an item missing from /items, or without a category, lands in "No category"', async () => {
-  const r = await computeCategories({
-    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
-    fetchImpl: stubFetchFc({ 'secret-fc': [[receipt(D, [['Ghost', 2], ['Loose', 1], ['Margherita', 1]])]] }, FC_CATALOG),
-  });
-  assert.deepStrictEqual(r.categories, [
-    { name: 'No category', items: [{ name: 'Ghost', quantity: 2 }, { name: 'Loose', quantity: 1 }] },
-    { name: 'Pizza', items: [{ name: 'Margherita', quantity: 1 }] },
+test('landing-sales: an item refunded to 0 is left out of items and other', async () => {
+  const r = await fc([
+    receipt(D, [['BEEF TAPA', 1], ['Rice', 2]]),
+    receipt(D, [['BEEF TAPA', 1], ['Rice', 2]], { receipt_type: 'REFUND' }),
   ]);
-  assert.strictEqual(r.accounts[0].catalogError, undefined);
+  assert.deepStrictEqual(line(r, 'BEEF TAPA'), { line: 'BEEF TAPA', sold: 0, taken: 0, items: [], takenBy: [] });
+  assert.deepStrictEqual(r.other, []);
 });
 
-test('loyverse-fc: /items or /categories failing -> every item under "No category" and catalogError, token redacted', async () => {
+test('landing-sales: an unknown item lands in other, biggest first then by name', async () => {
+  const r = await fc([receipt(D, [['Iced Tea', 2], ['Rice', 5], ['banana Shake', 2], ['rice', 1], ['Margherita', 1]])]);
+  assert.deepStrictEqual(r.other, [
+    { name: 'Rice', quantity: 6 },
+    { name: 'banana Shake', quantity: 2 },
+    { name: 'Iced Tea', quantity: 2 },
+  ]);
+});
+
+test('landing-sales: every line in the file order, 0s included (Pork Jowl at 0); no sales -> all 0, other empty', async () => {
+  const r = await fc([receipt(D, [['BEEF TAPA', 1]])]);
+  assert.deepStrictEqual(r.landing.map(l => l.line), REAL.fcLanding.lines);
+  assert.deepStrictEqual(line(r, 'PORK JOWL'), { line: 'PORK JOWL', sold: 0, taken: 0, items: [], takenBy: [] });
+  assert.strictEqual(r.landing[0].line, 'PORK JOWL');
+  const empty = await fc([]);
+  assert.strictEqual(empty.accounts[0].ok, true);
+  assert.strictEqual(empty.landing.length, 27);
+  assert.ok(empty.landing.every(l => l.sold === 0 && l.taken === 0));
+  assert.deepStrictEqual(empty.other, []);
+  assert.ok(empty.pizza.rows.every(p => p.fc === 0 && p.total === 0));
+});
+
+test('landing-sales: FC body shape; the Pizza table lists every pizza item, unsold at 0, sorted by name', async () => {
+  const r = await fc([receipt(D, [['Pepperoni', 2], ['Extra Cheese', 1], ['Gone Veggie', 1]])]);
+  assert.deepStrictEqual(Object.keys(r), ['date', 'group', 'accounts', 'landing', 'pizza', 'other']);
+  assert.strictEqual(r.group, 'fc');
+  assert.deepStrictEqual(Object.keys(r.landing[0]), ['line', 'sold', 'taken', 'items', 'takenBy']);
+  assert.deepStrictEqual(r.pizza, {
+    columns: ['fc'],
+    rows: [
+      { name: 'Extra Cheese', fc: 1, total: 1 },
+      { name: 'FREE CHEESE PIZZA', fc: 0, total: 0 },
+      { name: 'Gone Veggie', fc: 1, total: 1 }, // deleted, but sold that day
+      { name: 'Margherita', fc: 0, total: 0 },
+      { name: 'Pepperoni', fc: 2, total: 2 },
+    ],
+  });
+  assert.deepStrictEqual(r.other, [], 'a pizza is not in other');
+});
+
+test('landing-sales: "FREE * PIZZA" matches "FREE CHEESE PIZZA"', async () => {
+  const r = await fc([receipt(D, [['FREE CHEESE PIZZA', 2]])]);
+  assert.deepStrictEqual(r.pizza.rows.find(p => p.name === 'FREE CHEESE PIZZA'), { name: 'FREE CHEESE PIZZA', fc: 2, total: 2 });
+  const resolve = buildResolver([{ dish_code: 'x', n: 'FREE * PIZZA' }], 'n');
+  assert.ok(resolve('free cheese pizza'));
+  assert.strictEqual(resolve('FREE PIZZA'), null);
+});
+
+test('landing-sales: FC /items or /categories failing -> landing still counts, pizza null, pizza sales in other', async () => {
   for (const failing of ['itemsStatus', 'categoriesStatus']) {
-    const catalog = { 'secret-fc': { ...FC_CATALOG['secret-fc'], [failing]: 500 } };
-    const r = await computeCategories({
-      date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
-      fetchImpl: stubFetchFc({ 'secret-fc': [[receipt(D, [['Margherita', 2], ['Coke', 1]])]] }, catalog),
-    });
+    const catalog = { 'secret-fc': { ...FC_CAT['secret-fc'], [failing]: 500 } };
+    const r = await fc([receipt(D, [['Pepperoni', 2], ['PORK BAGNET - SOLO', 1]])], catalog);
     assert.strictEqual(r.accounts[0].ok, true, failing);
     assert.ok(/500/.test(r.accounts[0].catalogError), failing);
-    assert.deepStrictEqual(r.categories, [
-      { name: 'No category', items: [{ name: 'Margherita', quantity: 2 }, { name: 'Coke', quantity: 1 }] },
-    ], failing);
+    assert.strictEqual(r.pizza, null, failing);
+    assert.strictEqual(line(r, 'BAGNET').sold, 1, failing);
+    assert.deepStrictEqual(r.other, [{ name: 'Pepperoni', quantity: 2 }], failing);
     assert.ok(!JSON.stringify(r).includes('secret-fc'), 'token leaked (' + failing + ')');
   }
 });
 
-test('loyverse-fc: categories and items follow the cursor across pages', async () => {
-  const calls = [];
-  const fetchImpl = async (url) => {
-    const u = new URL(url);
-    calls.push(u);
-    const page = u.searchParams.get('cursor') ? 2 : 1;
-    if (u.pathname.endsWith('/receipts')) {
-      return { status: 200, json: async () => ({ receipts: [receipt(D, [['Margherita', 1], ['Coke', 1]])], cursor: null }) };
-    }
-    if (u.pathname.endsWith('/items')) {
-      return { status: 200, json: async () => (page === 1
-        ? { items: [{ id: 'i-Margherita', category_id: 'cat-p' }], cursor: 'x' }
-        : { items: [{ id: 'i-Coke', category_id: 'cat-d' }], cursor: null }) };
-    }
-    return { status: 200, json: async () => (page === 1
-      ? { categories: [{ id: 'cat-p', name: 'Pizza' }], cursor: 'y' }
-      : { categories: [{ id: 'cat-d', name: 'Drinks' }], cursor: null }) };
-  };
-  const r = await computeCategories({ date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC, fetchImpl });
-  assert.deepStrictEqual(r.categories.map(c => c.name), ['Drinks', 'Pizza']);
-  assert.strictEqual(calls.filter(u => u.pathname.endsWith('/items')).length, 2);
-  assert.strictEqual(calls.filter(u => u.pathname.endsWith('/categories')).length, 2);
-});
-
-test('loyverse-fc: an unset FC token fails only FC; no sales -> empty categories', async () => {
-  const r = await computeCategories({ date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV, fetchImpl: stubFetchFc({}) });
-  assert.deepStrictEqual(r.accounts.map(a => [a.label, a.ok, a.error]), [['FC', false, 'token not set']]);
-  assert.deepStrictEqual(r.categories, []);
-  const empty = await computeCategories({ date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC, fetchImpl: stubFetchFc({}, FC_CATALOG) });
-  assert.strictEqual(empty.accounts[0].ok, true);
-  assert.deepStrictEqual(empty.categories, []);
-});
-
-test('loyverse-fc: a receipts failure never carries the token; no price or total field in the FC body', async () => {
-  const bad = await computeCategories({
-    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC, fetchImpl: stubFetchFc({ 'secret-fc': { status: 401 } }),
+test('landing-sales: an unset FC token fails only FC (pizza null); a receipts failure never carries the token', async () => {
+  const unset = await fc([], FC_CAT, ENV);
+  assert.deepStrictEqual(unset.accounts.map(a => [a.label, a.ok, a.error]), [['FC', false, 'token not set']]);
+  assert.strictEqual(unset.pizza, null);
+  const bad = await computeFcLanding({
+    date: '2026-10-03', nameMap: MAP_LS, env: ENV_FC, fetchImpl: stubFetchFc({ 'secret-fc': { status: 401 } }),
   });
   assert.strictEqual(bad.accounts[0].ok, false);
   assert.ok(/401/.test(bad.accounts[0].error));
   assert.ok(!JSON.stringify(bad).includes('secret-fc'));
-  const thrown = await computeCategories({
-    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
+  const thrown = await computeFcLanding({
+    date: '2026-10-03', nameMap: MAP_LS, env: ENV_FC,
     fetchImpl: async () => { throw new Error('socket hang up for secret-fc'); },
   });
   assert.strictEqual(thrown.accounts[0].ok, false);
   assert.ok(!JSON.stringify(thrown).includes('secret-fc'));
-  const ok = await computeCategories({
-    date: '2026-10-03', group: 'fc', nameMap: MAP_FC, env: ENV_FC,
-    fetchImpl: stubFetchFc({ 'secret-fc': [[receipt(D, [['Margherita', 2]])]] }, FC_CATALOG),
+  await assert.rejects(() => computeFcLanding({ date: '2026-13-01', nameMap: MAP_LS, env: ENV_FC, fetchImpl: stubFetchFc({}) }), /YYYY-MM-DD/);
+});
+
+function left(pages, catalog = LEFT_CAT, env = ENV_FC) {
+  return computePreview({ date: '2026-10-03', nameMap: MAP_LS, env, fetchImpl: stubFetchFc(pages, catalog) });
+}
+
+test("landing-sales: the left Pizza table puts one name's Silingan and Likod counts on one row", async () => {
+  const r = await left({
+    'secret-s': [[receipt(D, [['Margherita', 2], ['Meatball Pasta', 1]])]],
+    'secret-l': [[receipt(D, [['margherita ', 3], ['Decoy', 4]])]],
   });
-  assert.ok(!/price|total|money|cost/i.test(JSON.stringify(ok)), 'money field in FC body');
+  assert.deepStrictEqual(Object.keys(r), ['date', 'accounts', 'dishes', 'unmatched', 'idCandidates', 'pizza']);
+  assert.deepStrictEqual(r.pizza, {
+    columns: ['silingan', 'likod'],
+    rows: [
+      { name: 'Garlic Bread', silingan: 0, likod: 0, total: 0 },
+      { name: 'Margherita', silingan: 2, likod: 3, total: 5 },
+      { name: 'Quattro', silingan: 0, likod: 0, total: 0 },
+    ],
+  });
+  assert.strictEqual(row(r, 'D001').total, 1, 'the dish table is unchanged');
+  assert.ok(r.unmatched.some(u => u.item_name === 'Margherita'), 'pizza still unmatched in the dish table');
+});
+
+test('landing-sales: Likod failing gives null in its column and Silingan\'s count as the total', async () => {
+  const pages = { 'secret-s': [[receipt(D, [['Margherita', 2]])]], 'secret-l': { status: 401 } };
+  const r = await left(pages);
+  assert.deepStrictEqual(r.pizza.rows.find(p => p.name === 'Margherita'), { name: 'Margherita', silingan: 2, likod: null, total: 2 });
+  assert.deepStrictEqual(r.pizza.rows.map(p => p.name), ['Garlic Bread', 'Margherita']);
+  const unset = await left({ 'secret-s': [[receipt(D, [['Margherita', 2]])]] }, LEFT_CAT, { TOK_S: 'secret-s' });
+  assert.strictEqual(unset.pizza.rows.find(p => p.name === 'Margherita').likod, null);
+  const catalogDown = await left(
+    { 'secret-s': [[receipt(D, [['Margherita', 2]])]], 'secret-l': [[receipt(D, [['margherita', 1]])]] },
+    { ...LEFT_CAT, 'secret-l': { ...LEFT_CAT['secret-l'], itemsStatus: 503 } },
+  );
+  assert.ok(/503/.test(catalogDown.accounts[1].catalogError));
+  assert.strictEqual(catalogDown.accounts[1].ok, true);
+  assert.deepStrictEqual(catalogDown.pizza.rows.find(p => p.name === 'Margherita'), { name: 'Margherita', silingan: 2, likod: null, total: 2 });
+  const bothDown = await left({ 'secret-s': { status: 500 }, 'secret-l': { status: 500 } });
+  assert.strictEqual(bothDown.pizza, null);
+});
+
+test('landing-sales: refunds subtract in the left Pizza table; the dish table keeps counting them', async () => {
+  const r = await left({
+    'secret-s': [[
+      receipt(D, [['Margherita', 3], ['Meatball Pasta', 1]]),
+      receipt(D, [['Margherita', 1], ['Meatball Pasta', 1]], { receipt_type: 'REFUND' }),
+    ]],
+  });
+  assert.strictEqual(r.pizza.rows.find(p => p.name === 'Margherita').silingan, 2);
+  assert.strictEqual(row(r, 'D001').silingan, 2, 'dish table: refund still counted like a sale');
+});
+
+test('landing-sales: no price or money field in either body (the 999 price never leaks)', async () => {
+  const bodies = [
+    await fc([receipt(D, [['PLATTER - PORK BAGNET', 1], ['Pepperoni', 1], ['Rice', 1]])]),
+    await left({ 'secret-s': [[receipt(D, [['Margherita', 2], ['Meatball Pasta', 1]])]] }),
+  ];
+  for (const b of bodies) {
+    const keys = new Set();
+    (function walk(v) {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { keys.add(k); walk(x); }
+    })(b);
+    for (const k of keys) assert.ok(!/price|money|cost|discount|tax|tip/i.test(k), `money key in output: ${k}`);
+    assert.ok(!JSON.stringify(b).includes('999'), 'a price value leaked');
+  }
+});
+
+test('landing-sales: the committed map - lines unique, every pos/takes key a line, amounts positive, no name twice', () => {
+  const { lines, items } = REAL.fcLanding;
+  assert.strictEqual(lines.length, 27);
+  assert.strictEqual(new Set(lines).size, lines.length, 'a line name appears twice');
+  const seen = new Set();
+  for (const item of items) {
+    assert.ok(typeof item.name === 'string' && item.name.trim(), 'an item without a name');
+    for (const part of item.name.split('|').map(normalize).filter(Boolean)) {
+      assert.ok(!seen.has(part), `item name twice: ${part}`);
+      seen.add(part);
+    }
+    assert.ok(item.pos && typeof item.pos === 'object', item.name);
+    for (const field of ['pos', 'takes']) {
+      for (const [l, n] of Object.entries(item[field] || {})) {
+        assert.ok(lines.includes(l), `${item.name}: ${field} key "${l}" is not a line`);
+        assert.ok(typeof n === 'number' && Number.isFinite(n) && n > 0, `${item.name}: ${field}.${l} = ${n}`);
+      }
+    }
+  }
+  assert.deepStrictEqual(REAL.pizza, {
+    silingan: { categories: ['PIZZA'] },
+    likod: { categories: ['Likod Pizza'] },
+    fc: { categories: ['PIZZA', 'ADD-ONS PIZZA'], items: ['FREE * PIZZA'] },
+  });
 });
 
 (async () => {

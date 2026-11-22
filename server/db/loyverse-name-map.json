@@ -1,5 +1,5 @@
 {
-  "_about": "Loyverse item name -> dish map for the read-only Kitchen Sales page. Copied 2026-10-30 from the Google Sheet Name_Map (the Apps Script's map, with the October renames). '*' is a wildcard; '|' separates several names for one account (e.g. an item's old and new name - receipts keep the name from the time of sale); an empty string means that account does not sell the dish. Tokens are NEVER stored here; they live in .env (gitignored).",
+  "_about": "Loyverse item name -> dish map for the read-only Kitchen Sales page. Copied 2026-10-30 from the Google Sheet Name_Map (the Apps Script's map, with the October renames). '*' is a wildcard; '|' separates several names for one account (e.g. an item's old and new name - receipts keep the name from the time of sale); an empty string means that account does not sell the dish. Tokens are NEVER stored here; they live in .env (gitignored). `pizza` (Step landing-sales, ADR-094) lists each account's pizza items for Kitchen Sales' Pizza tables: Loyverse category names (matched ignoring capitals and extra spaces) and optional item names (the dish cells' rules); temporary until Naoki picks the pizzas in effect. `fcLanding` (Step landing-sales, ADR-094) is FC's landing: `lines` are the sheet's lines in the sheet's order; each item (the dish cells' rules) counts `pos` portions on a line per one sold, and `takes` an amount from another line's stock (shown as \"also taken\"); copied from docs/areas/meat-landing.md -> \"FC's map (ADR-094)\".",
   "lookbackDays": 7,
   "timezone": "Asia/Manila",
   "accounts": [
@@ -323,6 +323,378 @@
       "silingan": "Grilled cheese sandwich",
       "likod": "",
       "note": "Seen at Silingan only"
+    },
+    {
+      "dish_code": "D044",
+      "name": "Kare-Kare",
+      "silingan": "Kare-Kare",
+      "likod": "",
+      "note": "New 2026-11-22; Crispy Kare-Kare and the trays are not counted (head chef)"
     }
-  ]
+  ],
+  "pizza": {
+    "silingan": {
+      "categories": [
+        "PIZZA"
+      ]
+    },
+    "likod": {
+      "categories": [
+        "Likod Pizza"
+      ]
+    },
+    "fc": {
+      "categories": [
+        "PIZZA",
+        "ADD-ONS PIZZA"
+      ],
+      "items": [
+        "FREE * PIZZA"
+      ]
+    }
+  },
+  "fcLanding": {
+    "lines": [
+      "PORK JOWL",
+      "PAELLA",
+      "BAGLAW TUNA",
+      "TUNA TINOLA",
+      "TUNA STEAK",
+      "SKEWERS",
+      "PORK CHOPS",
+      "BEEF TAPA",
+      "GARLIC BEEF",
+      "BAGNET",
+      "LAING",
+      "ASG",
+      "CPA",
+      "SISIG",
+      "SINIGANG",
+      "DINUGUAN",
+      "SALPICAO",
+      "TINOLA",
+      "PANCIT",
+      "DAING",
+      "ARRABIATTA",
+      "BURGER PATTY",
+      "CHICKEN BRGR",
+      "BURGER BUNS",
+      "WHOLE CHICKEN",
+      "HALF",
+      "QUARTER"
+    ],
+    "items": [
+      {
+        "name": "PAELLA NEGRA",
+        "pos": {
+          "PAELLA": 1
+        }
+      },
+      {
+        "name": "BAGLAW",
+        "pos": {
+          "BAGLAW TUNA": 1
+        },
+        "takes": {
+          "BAGNET": 1
+        }
+      },
+      {
+        "name": "TUNA TINOLA",
+        "pos": {
+          "TUNA TINOLA": 1
+        }
+      },
+      {
+        "name": "PAN GRILLED TUNA STEAK",
+        "pos": {
+          "TUNA STEAK": 1
+        }
+      },
+      {
+        "name": "GARLIC PARMA CHICKEN SKEWERS",
+        "pos": {
+          "SKEWERS": 1
+        }
+      },
+      {
+        "name": "PAN SEARED HERBED PORK CHOP",
+        "pos": {
+          "PORK CHOPS": 1
+        }
+      },
+      {
+        "name": "BEEF TAPA",
+        "pos": {
+          "BEEF TAPA": 1
+        }
+      },
+      {
+        "name": "GARLIC PEPPER BEEF",
+        "pos": {
+          "GARLIC BEEF": 1
+        }
+      },
+      {
+        "name": "PORK BAGNET - SOLO",
+        "pos": {
+          "BAGNET": 1
+        }
+      },
+      {
+        "name": "BAGNET EXPRESS - SOLO",
+        "pos": {
+          "BAGNET": 1
+        }
+      },
+      {
+        "name": "BAGNET BINAGOONGAN - SOLO",
+        "pos": {
+          "BAGNET": 1
+        }
+      },
+      {
+        "name": "PLATTER - PORK BAGNET",
+        "pos": {
+          "BAGNET": 3
+        }
+      },
+      {
+        "name": "PLATTER - BAGNET EXPRESS",
+        "pos": {
+          "BAGNET": 2
+        }
+      },
+      {
+        "name": "PLATTER - BAGNET BINAGOONGAN",
+        "pos": {
+          "BAGNET": 2
+        }
+      },
+      {
+        "name": "LAING PORK - SOLO",
+        "pos": {
+          "LAING": 1
+        },
+        "takes": {
+          "BAGNET": 0.5
+        }
+      },
+      {
+        "name": "PLATTER - LAING PORK",
+        "pos": {
+          "LAING": 2
+        },
+        "takes": {
+          "BAGNET": 1
+        }
+      },
+      {
+        "name": "ADOBO SA GINAMOS - SOLO",
+        "pos": {
+          "ASG": 1
+        }
+      },
+      {
+        "name": "PLATTER - ADOBO SA GINAMOS",
+        "pos": {
+          "ASG": 2
+        }
+      },
+      {
+        "name": "CHICKEN PORK ADOBO - SOLO",
+        "pos": {
+          "CPA": 1
+        },
+        "takes": {
+          "BAGNET": 0.5,
+          "QUARTER": 1
+        }
+      },
+      {
+        "name": "PLATTER - CHICKEN PORK ADOBO",
+        "pos": {
+          "CPA": 2
+        },
+        "takes": {
+          "BAGNET": 1,
+          "QUARTER": 1
+        }
+      },
+      {
+        "name": "SISIG SOLO",
+        "pos": {
+          "SISIG": 1
+        }
+      },
+      {
+        "name": "SISIG PLATTER",
+        "pos": {
+          "SISIG": 2
+        }
+      },
+      {
+        "name": "BAGNET SINIGANG",
+        "pos": {
+          "SINIGANG": 1
+        }
+      },
+      {
+        "name": "DINUGUAN - SOLO",
+        "pos": {
+          "DINUGUAN": 1
+        }
+      },
+      {
+        "name": "PLATTER - DINUGUAN",
+        "pos": {
+          "DINUGUAN": 2
+        }
+      },
+      {
+        "name": "CHICKEN SALPICAO",
+        "pos": {
+          "SALPICAO": 1
+        },
+        "takes": {
+          "QUARTER": 1
+        }
+      },
+      {
+        "name": "TINOLA SA UPO",
+        "pos": {
+          "TINOLA": 1
+        },
+        "takes": {
+          "QUARTER": 1
+        }
+      },
+      {
+        "name": "CANTON GUISADO",
+        "pos": {
+          "PANCIT": 1
+        },
+        "takes": {
+          "QUARTER": 1
+        }
+      },
+      {
+        "name": "PANCIT de ORO",
+        "pos": {
+          "PANCIT": 1
+        },
+        "takes": {
+          "QUARTER": 1
+        }
+      },
+      {
+        "name": "PORK 150grms (Add ons)",
+        "pos": {},
+        "takes": {
+          "BAGNET": 1
+        }
+      },
+      {
+        "name": "DAING NA SUNGAB",
+        "pos": {
+          "DAING": 1
+        }
+      },
+      {
+        "name": "SHRIMP ARRABBIATA",
+        "pos": {
+          "ARRABIATTA": 1
+        }
+      },
+      {
+        "name": "HOMEMADE BURGER",
+        "pos": {
+          "BURGER PATTY": 1,
+          "BURGER BUNS": 1
+        }
+      },
+      {
+        "name": "CHICKEN BURGER",
+        "pos": {
+          "CHICKEN BRGR": 1,
+          "BURGER BUNS": 1
+        }
+      },
+      {
+        "name": "REGULAR - Whole Chicken",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "LARGE- Whole Chicken",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "EXTRA LARGE- Whole Chicken",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "JUMBO - Whole Chicken",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "REG BOODLE(4 SWAKTO)",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "LARGE-BOODLE ( 4 SWAKTO)",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "XL -BOODLE (4 SWAKTO)",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "JUMBO-BOODLE (4 SWAKTO)",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "FREE WHOLE CHICKEN",
+        "pos": {
+          "WHOLE CHICKEN": 1
+        }
+      },
+      {
+        "name": "HALF CHICKEN",
+        "pos": {
+          "HALF": 1
+        },
+        "takes": {
+          "WHOLE CHICKEN": 0.5
+        }
+      },
+      {
+        "name": "SOLO QUARTER",
+        "pos": {
+          "QUARTER": 1
+        }
+      },
+      {
+        "name": "SOLO QUARTER UNLI",
+        "pos": {
+          "QUARTER": 1
+        }
+      }
+    ]
+  }
 }
