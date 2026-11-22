@@ -372,7 +372,8 @@
     }
 
     function syncedText(data) {
-      let s = `Synced ${timeFor(Date.now())}`;
+      // Step sales-cache: the time Loyverse was asked, which can be a few minutes ago.
+      let s = `Synced ${timeFor(data.fetchedAt || Date.now())}`;
       if (data.date === currentBusinessDate()) s += ' - this day stays open until 8:00 AM';
       return s;
     }
@@ -488,7 +489,8 @@
       document.getElementById(btn.getAttribute('aria-controls')).hidden = !open;
     });
 
-    async function load() {
+    // Step sales-cache: only Sync asks for fresh numbers; date and side switches may reuse.
+    async function load(fresh) {
       const mySeq = ++loadSeq;
       const loadPos = pos;
       syncBtn.disabled = true;
@@ -503,7 +505,8 @@
       syncedEl.textContent = '';
       try {
         const posParam = loadPos === 'fc' ? '&pos=fc' : '';
-        const res = await fetch(`/api/loyverse/preview?date=${encodeURIComponent(selected)}${posParam}`);
+        const freshParam = fresh === true ? '&fresh=1' : '';
+        const res = await fetch(`/api/loyverse/preview?date=${encodeURIComponent(selected)}${posParam}${freshParam}`);
         // A proxy or crash page may not be JSON: report the HTTP status, not a parse error.
         const body = await res.json().catch(() => ({}));
         if (mySeq !== loadSeq) return; // the switch or date moved on
@@ -602,7 +605,7 @@
         try { dateInput.showPicker(); } catch (e) { /* already open / unsupported */ }
       }
     });
-    syncBtn.addEventListener('click', load);
+    syncBtn.addEventListener('click', () => load(true));
     copyBtn.addEventListener('click', copy);
     posSlBtn.addEventListener('click', () => setPos('silingan-likod'));
     posFcBtn.addEventListener('click', () => setPos('fc'));
