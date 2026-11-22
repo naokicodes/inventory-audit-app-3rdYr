@@ -167,11 +167,18 @@ test('openedFileRefusal: refuses a scratch file opened under another spelling of
   const guarded = path.join(scratchDir, 'guarded.db');
   new DatabaseSync(guarded).close();
   // Windows: another case, and a trailing full stop SQLite drops on open.
-  // Elsewhere: a roundabout path to the same file.
-  const spellings = process.platform === 'win32'
-    ? [guarded.toUpperCase(), guarded + '.', guarded.toUpperCase() + ' ']
-    : [path.join(scratchDir, '.', 'sub', '..', 'guarded.db')];
-  if (process.platform !== 'win32') fs.mkdirSync(path.join(scratchDir, 'sub'), { recursive: true });
+  // Elsewhere: a hard link - a genuinely different path to the same file
+  // (path.join would collapse a "sub/.." spelling back to the same string).
+  let spellings;
+  if (process.platform === 'win32') {
+    spellings = [guarded.toUpperCase(), guarded + '.', guarded.toUpperCase() + ' '];
+  } else {
+    const alias = path.join(scratchDir, 'guarded-alias.db');
+    fs.rmSync(alias, { force: true });
+    fs.linkSync(guarded, alias);
+    assert.notStrictEqual(alias, guarded);
+    spellings = [alias];
+  }
   for (const spelling of spellings) {
     const db = new DatabaseSync(spelling);
     try {
@@ -188,6 +195,17 @@ test('openedFileRefusal: allows a different file, and ignores a protected file t
   try {
     assert.strictEqual(openedFileRefusal(db, 'reseed', [path.join(scratchDir, 'guarded.db')]), null);
     assert.strictEqual(openedFileRefusal(db, 'reseed', [path.join(scratchDir, 'never-created.db')]), null);
+  } finally {
+    db.close();
+  }
+});
+
+test('openedFileRefusal: refuses when a protected file cannot be checked (not the same as missing)', () => {
+  const other = path.join(scratchDir, 'other.db');
+  const db = new DatabaseSync(other);
+  try {
+    // A NUL byte makes stat throw an error that is not ENOENT.
+    assert.match(openedFileRefusal(db, 'reseed', ['bad\0path.db']) || '', /^reseed refused: could not check/);
   } finally {
     db.close();
   }

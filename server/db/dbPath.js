@@ -72,13 +72,15 @@ function reseedRefusal(envDbPath = process.env.DB_PATH, platform = process.platf
 }
 
 // dev + ino of a file, or null if it does not exist. bigint, because an NTFS
-// file index does not fit a double.
+// file index does not fit a double. Any other error (no permission, a disk
+// error) is thrown: "could not check" must never pass as "not there".
 function fileIdentity(file) {
   try {
     const s = fs.statSync(file, { bigint: true });
     return { dev: s.dev, ino: s.ino };
-  } catch {
-    return null;
+  } catch (err) {
+    if (err && (err.code === 'ENOENT' || err.code === 'ENOTDIR')) return null;
+    throw err;
   }
 }
 
@@ -99,13 +101,19 @@ function sameFile(a, b, idA, idB) {
 function openedFileRefusal(db, label, protectedFiles = [LIVE_DB_PATH, BETA_DB_PATH]) {
   const row = db.prepare("SELECT file FROM pragma_database_list WHERE name = 'main'").get();
   const opened = row && row.file;
-  const openedId = opened ? fileIdentity(opened) : null;
-  if (!openedId) return null;
-  for (const file of protectedFiles) {
-    const id = fileIdentity(file);
-    if (id && sameFile(opened, file, openedId, id)) {
-      return `${label} refused: the database it opened (${opened}) is ${file}.`;
+  let current = opened;
+  try {
+    const openedId = opened ? fileIdentity(opened) : null;
+    if (!openedId) return null;
+    for (const file of protectedFiles) {
+      current = file;
+      const id = fileIdentity(file);
+      if (id && sameFile(opened, file, openedId, id)) {
+        return `${label} refused: the database it opened (${opened}) is ${file}.`;
+      }
     }
+  } catch (err) {
+    return `${label} refused: could not check ${current} (${(err && err.code) || err}), so it may be a protected database.`;
   }
   return null;
 }
