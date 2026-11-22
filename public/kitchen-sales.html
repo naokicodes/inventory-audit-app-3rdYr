@@ -305,6 +305,12 @@
       return (v < 0 ? '-' : '') + s;
     }
 
+    // "+1 1/2 taken"; a refund that leaves less than nothing reads "-1/2 taken",
+    // never "+-1/2".
+    function takenText(v) {
+      return `${v > 0 ? '+' : ''}${qty(v)} taken`;
+    }
+
     // A count cell for the Pizza and Landing tables: numCell, with halves.
     function qtyCell(v) {
       const dash = v === null || v === undefined;
@@ -448,7 +454,7 @@
 
       fcLandingBody.innerHTML = data.landing.map((l, i) => {
         const zero = l.sold === 0;
-        const taken = l.taken !== 0 ? `<span class="ks-taken">+${esc(qty(l.taken))} taken</span>` : '';
+        const taken = l.taken !== 0 ? `<span class="ks-taken">${esc(takenText(l.taken))}</span>` : '';
         return `<tr${zero ? ' class="ks-zero"' : ''}>` +
           `<td class="ks-line-cell"><button type="button" class="ks-line-btn" aria-expanded="false" aria-controls="fc-line-${i}">${esc(l.line)}</button></td>` +
           `<td class="num">${esc(qty(l.sold))}${taken}</td></tr>` +
@@ -551,7 +557,7 @@
         lastReceiptText(data).replace('Last kitchen receipt', 'Last receipt'),
       ];
       data.landing.filter(l => l.sold !== 0 || l.taken !== 0).forEach(l => {
-        lines.push(`${l.line} ${qty(l.sold)}${l.taken !== 0 ? ` (+${qty(l.taken)} taken)` : ''}`);
+        lines.push(`${l.line} ${qty(l.sold)}${l.taken !== 0 ? ` (${takenText(l.taken)})` : ''}`);
       });
       failedAccounts(data).forEach(a => lines.push(fcFailureLine(a)));
       return lines.join('\n');

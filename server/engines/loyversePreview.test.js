@@ -655,6 +655,38 @@ test('landing-sales: an item refunded to 0 is left out of items and other', asyn
   assert.deepStrictEqual(r.other, []);
 });
 
+test('landing-sales: FC receipts, /items and /categories follow the cursor across pages', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const u = new URL(url);
+    calls.push(u);
+    const page = u.searchParams.get('cursor') ? 2 : 1;
+    if (u.pathname.endsWith('/receipts')) {
+      return { status: 200, json: async () => (page === 1
+        ? { receipts: [receipt(D, [['PLATTER - PORK BAGNET', 1], ['Margherita', 1]])], cursor: 'r' }
+        : { receipts: [receipt(D, [['PORK BAGNET - SOLO', 2], ['Pepperoni', 3]])], cursor: null }) };
+    }
+    if (u.pathname.endsWith('/items')) {
+      return { status: 200, json: async () => (page === 1
+        ? { items: [{ id: 'i-Margherita', item_name: 'Margherita', category_id: 'c-pz' }], cursor: 'x' }
+        : { items: [{ id: 'i-Pepperoni', item_name: 'Pepperoni', category_id: 'c-pz' }], cursor: null }) };
+    }
+    return { status: 200, json: async () => (page === 1
+      ? { categories: [{ id: 'c-k', name: 'Kitchen' }], cursor: 'y' }
+      : { categories: [{ id: 'c-pz', name: 'PIZZA' }], cursor: null }) };
+  };
+  const r = await computeFcLanding({ date: '2026-10-03', nameMap: MAP_LS, env: ENV_FC, fetchImpl });
+  assert.strictEqual(line(r, 'BAGNET').sold, 5);
+  assert.deepStrictEqual(r.pizza.rows, [
+    { name: 'Margherita', fc: 1, total: 1 },
+    { name: 'Pepperoni', fc: 3, total: 3 },
+  ]);
+  assert.deepStrictEqual(r.other, []);
+  for (const path of ['/receipts', '/items', '/categories']) {
+    assert.strictEqual(calls.filter(u => u.pathname.endsWith(path)).length, 2, path);
+  }
+});
+
 test('landing-sales: an unknown item lands in other, biggest first then by name', async () => {
   const r = await fc([receipt(D, [['Iced Tea', 2], ['Rice', 5], ['banana Shake', 2], ['rice', 1], ['Margherita', 1]])]);
   assert.deepStrictEqual(r.other, [
