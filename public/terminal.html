@@ -10,7 +10,6 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="theme-color" content="#222121">
   <style>
-    body { max-width: 800px; }
     /* Docked bar is fixed to the viewport bottom, so reserve room for it
        at the bottom of the page (non-modal: content stays visible and
        scrollable above the bar, never hidden behind it). 11rem clears
@@ -971,6 +970,18 @@
       historyToggle.setAttribute('aria-expanded', String(nowOpen));
       historyToggle.textContent = nowOpen ? 'History \u2715' : 'History';
     });
+
+    // Step ui-shell: the fixed History button sits just below the shared top
+    // bar (and the wide menu row), never over its Menu, Log in or name button;
+    // the sidebar's top padding follows it.
+    function placeHistoryToggle() {
+      const nav = document.querySelector('nav');
+      const top = nav ? Math.max(16, Math.round(nav.getBoundingClientRect().bottom + window.scrollY + 8)) : 16;
+      historyToggle.style.top = `${top}px`;
+      historySidebar.style.paddingTop = `${top + historyToggle.offsetHeight + 12}px`;
+    }
+    placeHistoryToggle();
+    window.addEventListener('resize', placeHistoryToggle);
 
     (async function init() {
       loadHistory();

@@ -597,7 +597,7 @@ td.num {
     left: -1rem;
     right: -1rem;
     z-index: 1100;
-    max-height: calc(100vh - 70px);
+    max-height: calc(100vh - 6rem);
     overflow-y: auto;
     padding: 0.25rem 1rem 0.75rem;
     background: var(--card);

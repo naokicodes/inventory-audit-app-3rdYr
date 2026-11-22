@@ -5,7 +5,7 @@
 // server uses. Plain assertions and the suite's "N passed, M failed" line.
 
 const assert = require('assert');
-const { readdirSync, readFileSync, existsSync } = require('node:fs');
+const { readdirSync, readFileSync, existsSync, statSync } = require('node:fs');
 const { join } = require('node:path');
 const express = require('express');
 
@@ -20,7 +20,7 @@ function test(name, fn) { tests.push({ name, fn }); }
 // A PNG's width and height sit in its IHDR chunk, bytes 16-23.
 function pngSize(file) {
   const b = readFileSync(join(PUBLIC, file));
-  assert.strictEqual(b.toString('latin1', 1, 4), 'PNG', `${file} is not a PNG`);
+  assert.strictEqual(b.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', `${file} is not a PNG`);
   return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;
 }
 
@@ -47,7 +47,7 @@ test('every href in shell.js is a file in public/; Kitchen Sales in Kitchen, Typ
   const js = read('shell.js');
   const hrefs = [...js.matchAll(/href: '([^']+)'/g)].map((m) => m[1]);
   assert.strictEqual(hrefs.length, 12);
-  for (const h of hrefs) assert.ok(existsSync(join(PUBLIC, h)), `missing ${h}`);
+  for (const h of hrefs) assert.ok(existsSync(join(PUBLIC, h)) && statSync(join(PUBLIC, h)).isFile(), `missing ${h}`);
   const kitchen = js.slice(js.indexOf("name: 'Kitchen'"), js.indexOf("name: 'Commissary'"));
   assert.ok(kitchen.includes("{ label: 'Kitchen Sales', href: 'kitchen-sales.html' }"));
   const admin = js.slice(js.indexOf("name: 'Admin'"));
@@ -70,6 +70,7 @@ test('no page keeps an inline body max-width; Home and Login narrow, the rest wi
   for (const f of pages) {
     const body = read(f).match(/<body[^>]*>/)[0];
     assert.ok(!/style=/.test(body), `${f}: ${body}`);
+    assert.ok(!/\bbody\s*\{[^}]*max-width/.test(read(f)), `${f}: a <style> rule sets the body's max-width`);
     const wide = /class="page-wide"/.test(body);
     assert.strictEqual(wide, !['index.html', 'login.html'].includes(f), `${f}: ${body}`);
   }

@@ -104,7 +104,12 @@
   }
   menuBtn.addEventListener('click', () => setOpen(!nav.classList.contains('menu-open')));
   menu.addEventListener('click', (e) => { if (e.target.closest('a')) setOpen(false); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !nav.classList.contains('menu-open')) return;
+    const hadFocus = menu.contains(document.activeElement);
+    setOpen(false);
+    if (hadFocus) menuBtn.focus();
+  });
   document.addEventListener('click', (e) => {
     if (nav.classList.contains('menu-open') && !nav.contains(e.target)) setOpen(false);
   });
