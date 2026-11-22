@@ -1,6 +1,6 @@
 # Money and operating expenses
 
-Status: IRL Written (payroll template) - FLOW None - APP Decided (charges; payroll stays in Excel, ADR-088)
+Status: IRL Written (payroll template, the purchaser's logbook, the cashier's tally) - FLOW None - APP Decided (charges; payroll stays in Excel, ADR-088)
 
 ## IRL
 - Two flows that meet at buying (money out, stock in) and using (stock out,
@@ -20,6 +20,20 @@ Status: IRL Written (payroll template) - FLOW None - APP Decided (charges; payro
   advance, charge, late, in-house, SSS, PhilHealth, Pag-IBIG; total deduction; net pay; signature.
   Totals at the bottom (gross, deductions, net, and each deduction). The admin tab also keeps a
   deduction list (name, charge, amount).
+- 2026-11-17 and 2026-11-22 (Naoki): the template sent was old; Likod uses the same one. The payroll
+  is weekly and made on Sunday; the main supervisor starts it on Saturday.
+- **The purchaser's logbook** (source: photos 2026-11-13 to 11-17; figures in the private notes): one
+  handwritten page a day. Per restaurant (Silingan, FC, Likod): each store with its receipt total,
+  ticked when checked; extra lines (firewood, fruit, grocery); tips; the fare for each leg of the
+  run; a subtotal per restaurant. Some "cash out <person>" lines. At the bottom: cash on hand
+  (given), total purchased, cash left (on hand minus purchased), cash counted, and the difference
+  written as the short. The main supervisor writes "checked" and signs.
+- **The cashier's tally** (Silingan's DAILY SALES REPORT; source: photo 2026-11-17): the cashier and
+  date; cashier expenses (what the till paid with no purchaser: deliveries such as ice, gas,
+  parcels); other expenses (the purchaser's stores, matching the logbook, and a "P.O" line);
+  discounts; in-house by name; e-payments (GCash and others); the cash denomination count; the two
+  shift readings and their total, less discounts; and pizza sales worked out by hand (an old
+  habit). The two Loyverse shift reports are clipped on.
 
 ## APP
 - Decided 2026-11-15 (ADR-088): charges are recorded in the app; payroll stays in Excel; later a
@@ -28,7 +42,9 @@ Status: IRL Written (payroll template) - FLOW None - APP Decided (charges; payro
   charges with their list; pay rates, cash advances, lates and the contributions stay hers.
 
 ## Open questions
-- For the export: where Likod's staff are paid (the template has no Likod tab); whether the
-  export gives days or pesos for the day columns; how long the weekly payroll takes her.
+- For the export: whether it gives days or pesos for the day columns. (Where Likod is paid: the same
+  template, 2026-11-17. How long: Saturday to Sunday, 2026-11-22.)
+- The logbook's "cash out <person>" lines, and who covers a purchaser's short (assumed: payroll).
+- The tally's "AMD", its "P.O" line and "comp" under in-house: what they are.
 - Operating expenses (gas, electricity, water): entered where? (Final scope)
 - Queue item A13.

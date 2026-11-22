@@ -15,3 +15,6 @@ Silingan and Likod sculleries have none.
 ## APP
 - Decided as a side sheet (flexible units), then kept on paper (ADR-065, 2026-11-14): its sheet
   exists switched off.
+
+## Open questions
+- None open.

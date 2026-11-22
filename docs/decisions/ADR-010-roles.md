@@ -1,6 +1,8 @@
 # ADR-010 Roles and site scope
 
-- Status: Accepted 2026-10-28
+- Status: Accepted 2026-10-28; refined by ADR-034 and ADR-091 (a role assignment at a site also
+  gives the site); "until supervisor exists, blindness is derived from role flags" superseded by
+  ADR-038
 - Decided by: Naoki
 - Supersedes: none
 

@@ -1,6 +1,7 @@
 # ADR-024 Side sheets: separate sheets, flexible units
 
-- Status: Accepted 2026-10-24
+- Status: Accepted 2026-10-24; "Staff fill only beginning and ending" superseded by ADR-063 (the
+  counter types the ending and Received)
 - Decided by: Naoki
 - Supersedes: none
 

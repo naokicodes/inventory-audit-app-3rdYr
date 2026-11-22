@@ -45,7 +45,8 @@ instead of deciding it.
 - **Reading the day:** Kitchen Sales (ADR-066, ADR-094); views as cards for supervisors and
   management (ADR-089); the roster board (ADR-090).
 - **Roles as switches per site** (ADR-034, ADR-082): who may do what is data, Discord-style, never
-  a hard-coded role check. Changes to stock and settings are kept in an activity log.
+  a hard-coded role check. Changes to stock, roles, side items and staff-meal settings are kept in
+  an activity log; the other Settings changes are logged from step settings-safety.
 - **Where it runs:** the restaurant PC on the restaurant network, phones over Wi-Fi, Tailscale for
   remote checks (ADR-070); a hosted server later, behind real logins before Live.
 - **Code in a public repo:** no prices, costs, budgets, credentials or staff details are ever
@@ -69,8 +70,8 @@ instead of deciding it.
 - Per-person permission overrides; the real Loyverse port (nightly sync); the Loyverse name map in
   Settings (name-map-settings, ADR-097); receipt OCR; AI summaries.
 - The commissary's jowl reconciled against FC's portion lines; burger-patty blends.
-- An activity log on every table (today: stock receipts, yield, settings, roles, roster and the
-  other tables their steps name).
+- An activity log on every table (today: stock receipts, yields, counts, roles, side items and
+  staff-meal settings; the other Settings tables from settings-safety; the roster with its steps).
 
 ## The worker-facing surface stays small
 

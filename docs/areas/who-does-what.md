@@ -1,6 +1,6 @@
 # Who does what tonight
 
-Status: IRL Confirmed - FLOW Drafted - APP Specced (pick-your-name login Built, PR #33)
+Status: IRL Confirmed - FLOW Drafted - APP Built in part (login, roles per site, the Roles page); picks Specced
 
 ## IRL - how it works today
 
@@ -49,7 +49,9 @@ Status: IRL Confirmed - FLOW Drafted - APP Specced (pick-your-name login Built, 
   site), ADR-037 (picks, standing access, the login list), ADR-038 (blind by site role).
 - Built: pick-your-name login and current user (stub-login, PR #33).
 - Specced 2026-11-01: role-assignments (3zj), roles-page (3zk), tonight-picks (3zp), login-tonight
-  (3zq), write-permission (3zr).
+  (3zq), write-permission (3zr). Built since: role-assignments (PR #78), roles-page (PR #83).
+- 2026-11-17: only tonight's pick or placement saves the veggie, pantry and bar sheets too
+  (write-permission's 2026-11-17 block); finalization is not planned (ADR-108).
 - Decided (ADR-012): an admin can close a sheet ("under maintenance"): it cannot be assigned, is not
   counted, never shows as missing, and keeps its history.
 

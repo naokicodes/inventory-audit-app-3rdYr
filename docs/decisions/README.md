@@ -52,7 +52,7 @@ flight. (ADR-001 explains the split.)
 | ADR-007 | Beta runs on the restaurant PC, pinned to tags | Accepted 2026-10-28; backups line superseded by ADR-105 |
 | ADR-008 | How architect work runs: area docs, a queue, Edge states, ask first | Accepted 2026-10-24 |
 | ADR-009 | Public repo, private details | Accepted 2026-10-24 |
-| ADR-010 | Roles and site scope | Accepted 2026-10-28 |
+| ADR-010 | Roles and site scope | Accepted 2026-10-28; refined by ADR-034 and ADR-091 (a role at a site gives the site); blindness from role flags superseded by ADR-038 |
 | ADR-011 | Write permission is enforced; process is not | Accepted 2026-10-22 |
 | ADR-012 | Stations and sheets | Accepted 2026-10-22 |
 | ADR-013 | The roster | Accepted 2026-10-28; superseded in part by ADR-096 (week start, two placements a day) |
@@ -66,7 +66,7 @@ flight. (ADR-001 explains the split.)
 | ADR-021 | Supplier orders (POs) | Accepted 2026-10-28 |
 | ADR-022 | Buying: shop runs, tags and the buyer's list | Accepted 2026-10-25 |
 | ADR-023 | Receiving and arrivals | Accepted 2026-10-24 |
-| ADR-024 | Side sheets: separate sheets, flexible units | Accepted 2026-10-24 |
+| ADR-024 | Side sheets: separate sheets, flexible units | Accepted 2026-10-24; "staff fill only beginning and ending" superseded by ADR-063 |
 | ADR-025 | Bar: exact sales check, not blind | Accepted 2026-10-25 |
 | ADR-026 | Waste is its own entry | Accepted 2026-10-25; superseded in part by ADR-064 (side waste after endings) |
 | ADR-027 | Staff meals: slots, budgets and head count | Accepted 2026-10-28; who logs superseded by ADR-045; rice answered by ADR-044 |
@@ -79,7 +79,7 @@ flight. (ADR-001 explains the split.)
 | ADR-034 | Roles per site and role switches | Accepted 2026-11-01; superseded in part by ADR-099 (admin and read-only only as base roles) |
 | ADR-035 | The landing belongs to the head-chef role at that site | Accepted 2026-11-01 |
 | ADR-036 | The business day turns at 8am everywhere | Accepted 2026-11-01 |
-| ADR-037 | Roster placements, copying, picks and access | Accepted 2026-11-01 |
+| ADR-037 | Roster placements, copying, picks and access | Accepted 2026-11-01; superseded in part by ADR-096 (copy last week, one placement a day) and ADR-107 (kitchen edits) |
 | ADR-038 | Blind counting follows the site's roles; Likod counts blind | Accepted 2026-11-01 |
 | ADR-039 | Testing: Claude checks the logic, people check the looks; fake test accounts | Accepted 2026-11-02 |
 | ADR-040 | Logged-out visitors keep working until write-permission | Accepted 2026-11-02 |
@@ -88,7 +88,7 @@ flight. (ADR-001 explains the split.)
 | ADR-043 | Catalog reads stay open | Accepted 2026-11-11; its cost question answered by ADR-060 |
 | ADR-044 | Staff rice is an estimate line, never in the meal budget | Accepted 2026-11-11 |
 | ADR-045 | Staff meals: any cook logs, the head chef checks | Accepted 2026-11-11 |
-| ADR-046 | Typed non-meat lines until the item lists exist | Accepted 2026-11-12 |
+| ADR-046 | Typed non-meat lines until the item lists exist | Accepted 2026-11-12; superseded in part by ADR-109 (side items on staff meals) |
 | ADR-047 | People import: held duplicates, loose names, full site lists | Accepted 2026-11-12 |
 | ADR-048 | Every intake records a count and a weight | Superseded by ADR-049 |
 | ADR-049 | Intake is quantity-only; kg is weighed at production | Accepted 2026-09-28 |
@@ -101,7 +101,7 @@ flight. (ADR-001 explains the split.)
 | ADR-056 | Money stays in the POS | Superseded in part by ADR-057 |
 | ADR-057 | Separate apps: stock and losses in pesos are computed here (D3) | Accepted 2026-10-19 |
 | ADR-058 | The 10-03 leans: SPOS owns supplier POs and cost prices | Superseded by ADR-059 |
-| ADR-059 | Supplier orders, arrivals and bills are ours | Accepted 2026-10-19; frozen-SPOS assumption superseded by ADR-005, unit-cost line by ADR-020 |
+| ADR-059 | Supplier orders, arrivals and bills are ours | Accepted 2026-10-19; frozen-SPOS assumption superseded by ADR-005, unit-cost line by ADR-020, who writes the orders by ADR-021 |
 | ADR-060 | Unit costs need a "see costs" switch | Accepted 2026-11-14 |
 | ADR-061 | Queue steps are named, not numbered | Accepted 2026-11-14 |
 | ADR-062 | Side items: one imported catalog with units | Accepted 2026-11-14 |
@@ -138,7 +138,7 @@ flight. (ADR-001 explains the split.)
 | ADR-093 | No browser pop-ups | Accepted 2026-11-15 |
 | ADR-094 | FC's sales follow its landing sheet | Accepted 2026-11-15 |
 | ADR-095 | Roles page: switch wording, removing extra roles, the copy default | Accepted 2026-11-15 |
-| ADR-096 | Roster: shift rows, day offs first, and Fill | Accepted 2026-11-16 |
+| ADR-096 | Roster: shift rows, day offs first, and Fill | Accepted 2026-11-16; superseded in part by ADR-107 (any number of placements a day) |
 | ADR-097 | The app runs without a coder | Accepted 2026-11-16 |
 | ADR-098 | Sign the cookie now; one shared password for admin accounts | Accepted 2026-11-17 |
 | ADR-099 | Admin and management are base roles only | Accepted 2026-11-17 |
@@ -149,6 +149,9 @@ flight. (ADR-001 explains the split.)
 | ADR-104 | A row nobody touched never saves | Accepted 2026-11-17 |
 | ADR-105 | Beta's database: one-file backups, a restore, a copy off the PC, its name | Accepted 2026-11-17 |
 | ADR-106 | An audit fix may move a patch version inside package.json's range | Accepted 2026-11-22 |
+| ADR-107 | A person can hold any number of jobs a day; Purchaser is a station | Accepted 2026-11-17 (recorded 2026-11-22) |
+| ADR-108 | Sheet finalization is not planned | Accepted 2026-11-17 (recorded 2026-11-22) |
+| ADR-109 | Staff-meal lines may name a side item, with an approximate quantity | Accepted 2026-11-17 (recorded 2026-11-22) |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

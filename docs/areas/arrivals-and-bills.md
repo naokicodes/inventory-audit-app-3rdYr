@@ -17,6 +17,10 @@ Status: IRL Written - FLOW Drafted - APP Decided
   their restaurant; the podium rechecks a receipt's quantities against what arrived, in pesos
   (supplier-orders.md). This differs from the note above (receipts to each cashier on arrival):
   asked.
+- 2026-11-17 (Naoki), the answer: by kind of supplier. A supplier a purchaser goes to or receives
+  from is on the purchasers' budget with the COO, and its receipts go through the main supervisor.
+  A delivery that needs no purchaser (ice, for example: ordered and delivered) goes straight to the
+  cashier, not through her (money.md: the cashier's tally lists those as cashier expenses).
 
 ## FLOW - how they will use the app (drafted)
 1. The receiver checks the arrival against the PO: quantities only, receipt
@@ -39,8 +43,8 @@ Status: IRL Written - FLOW Drafted - APP Decided
   on FC's landing (ADR-067). The podium logs name and quantity (podium.md). Planned (A9).
 
 ## Open questions
-- (A9) Do only the purchaser's shop-run receipts go to the main supervisor, while supplier delivery
-  receipts still go to the cashier on arrival, or does everything go through her now?
+- (A9) Which receipts go through the main supervisor: answered 2026-11-17 (by kind of supplier,
+  above).
 - (A9) The arrival check compares against the receipt, not the PO (rec: yes; the PO stays the
   order list)?
 - (A9) Help the evening change check: the purchaser types each receipt's total and the app shows
