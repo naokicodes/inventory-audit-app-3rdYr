@@ -269,7 +269,7 @@ console.log(`Sheet definitions: ${ensureDefaultSheets(db).inserted} inserted`);
 // 8. Staff meal slots (step staff-meal-settings): names only, for a restaurant
 // with no slots yet. No amounts and no rice rate - every value is entered in
 // Settings (ADR-027; the values are off-repo).
-const DEFAULT_SLOTS = { RA: ['Afternoon', 'Evening'], FC: ['Meal 1', 'Meal 2', 'Meal 3'] };
+const DEFAULT_SLOTS = { RA: ['Afternoon', 'Evening'], FC: ['Meal 1', 'Meal 2'] };
 let slotsInserted = 0;
 for (const [code, names] of Object.entries(DEFAULT_SLOTS)) {
   if (!db.prepare('SELECT 1 FROM restaurants WHERE code = ?').get(code)) continue;
