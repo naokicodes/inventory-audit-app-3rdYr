@@ -2,16 +2,17 @@
 // GET /api/loyverse/preview?date=YYYY-MM-DD - per-dish sales from the
 // Silingan + Likod accounts for one business date. Writes nothing; the logic
 // lives in server/engines/loyversePreview.js.
-// GET /api/loyverse/preview?date=&pos=fc (Step loyverse-fc, ADR-066) - FC's
-// items sold that date, grouped by FC's own Loyverse categories. No `pos`, or
-// pos=silingan-likod, is the dish preview unchanged; any other pos -> 400.
+// GET /api/loyverse/preview?date=&pos=fc (Step landing-sales, ADR-094) - FC's
+// side: FC's landing lines in portions, its Pizza table and everything else
+// sold. No `pos`, or pos=silingan-likod, is the dish preview (plus its Pizza
+// table); any other pos -> 400.
 //
 // Tokens come from process.env (LOYVERSE_SILINGAN_TOKEN,
 // LOYVERSE_LIKOD_TOKEN, LOYVERSE_FC_TOKEN, loaded from .env by
 // server/index.js). They are never logged and never sent to the browser.
 
 const express = require('express');
-const { computePreview, computeCategories, POS_GROUPS, isValidDate, businessDate } = require('../engines/loyversePreview.js');
+const { computePreview, computeFcLanding, POS_GROUPS, isValidDate, businessDate } = require('../engines/loyversePreview.js');
 
 const router = express.Router();
 
@@ -26,10 +27,9 @@ async function handlePreview(query, deps = {}) {
   if (!isValidDate(date)) {
     return { status: 400, body: { error: 'date must be YYYY-MM-DD' } };
   }
-  if (pos !== 'silingan-likod') {
-    const body = await computeCategories({
+  if (pos === 'fc') {
+    const body = await computeFcLanding({
       date,
-      group: pos,
       nameMap: deps.nameMap,
       env: deps.env || process.env,
       fetchImpl: deps.fetchImpl || fetch,

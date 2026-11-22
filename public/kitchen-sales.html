@@ -44,13 +44,32 @@
       font-weight: 600;
     }
     .ks-switch button[aria-pressed="true"] { background: var(--accent); color: var(--card); }
-    /* FC's side: one card per Loyverse category. */
-    .ks-card {
-      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-      padding: 0.6rem 0.75rem; margin-bottom: 0.6rem;
+    /* Step landing-sales (ADR-094): FC's Landing table, and a Pizza table on
+       both sides. Full width, names wrap: no sideways scroll at 390px. */
+    .ks-h2 { font-size: 1.1rem; margin: 1rem 0 0.4rem; }
+    .ks-total { font-size: 0.9rem; font-weight: 600; color: var(--ink2); }
+    .ks-full { width: 100%; }
+    .ks-full td:first-child { overflow-wrap: anywhere; }
+    /* A landing line opens with a button the width of its name cell, 44px tall. */
+    .ks-line-btn {
+      display: block; width: 100%; min-height: 44px; margin: 0; padding: 0.25rem 0;
+      border: 0; border-radius: 0; background: none; color: inherit;
+      font: inherit; font-weight: 600; text-align: left;
     }
-    .ks-card h2 { font-size: 1.1rem; margin: 0 0 0.4rem; }
-    .ks-card table { width: 100%; }
+    .ks-line-btn::before { content: '\25B8\00a0'; }
+    .ks-line-btn[aria-expanded="true"]::before { content: '\25BE\00a0'; }
+    .ks-line-cell { padding-top: 0; padding-bottom: 0; }
+    .ks-taken { display: block; font-size: 0.8rem; color: var(--ink2); white-space: nowrap; }
+    .ks-detail td { background: var(--paper); }
+    .ks-detail-list { list-style: none; margin: 0; padding: 0 0 0 1rem; }
+    .ks-detail-list li {
+      display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.15rem 0;
+    }
+    .ks-detail-list li span:first-child { overflow-wrap: anywhere; }
+    .ks-detail-list li span:last-child { white-space: nowrap; }
+    .ks-sub { font-size: 0.85rem; font-weight: 600; color: var(--ink2); margin: 0.4rem 0 0.1rem; }
+    .ks-other { margin-top: 1rem; }
+    .ks-other summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -103,6 +122,16 @@
       </table>
     </div>
 
+    <!-- Step landing-sales: the two accounts' pizza lists, one row per name. -->
+    <h2 class="ks-h2">Pizza <span id="sl-pizza-total" class="ks-total"></span></h2>
+    <p id="sl-pizza-error" class="ks-note" hidden>Couldn't load the pizza list</p>
+    <table id="sl-pizza-table" class="ks-full">
+      <thead>
+        <tr><th>Item</th><th class="num">Silingan</th><th class="num">Likod</th><th class="num">Total</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
     <div id="account-status"></div>
 
     <details id="unmatched" hidden>
@@ -114,19 +143,37 @@
         </table>
       </div>
     </details>
+  </div>
 
+  <!-- Step landing-sales (ADR-094): FC's side - its landing lines in portions,
+       its pizza list, then everything else FC sold. -->
+  <div id="fc-result" hidden>
+    <h2 class="ks-h2">Landing</h2>
+    <table id="fc-landing" class="ks-full">
+      <thead><tr><th>Line</th><th class="num">Portions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h2 class="ks-h2">Pizza <span id="fc-pizza-total" class="ks-total"></span></h2>
+    <p id="fc-pizza-error" class="ks-note" hidden>Couldn't load the pizza list</p>
+    <table id="fc-pizza-table" class="ks-full">
+      <thead><tr><th>Item</th><th class="num">FC</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <details id="fc-other" class="ks-other">
+      <summary></summary>
+      <table class="ks-full"><tbody></tbody></table>
+    </details>
+  </div>
+
+  <!-- Copy as text, for whichever side is showing. -->
+  <div id="copy-area" hidden>
     <div class="save-bar">
       <button id="copy-btn">Copy as text</button>
       <span id="copy-status" class="status-message"></span>
     </div>
     <textarea id="copy-text" rows="8" readonly hidden></textarea>
-  </div>
-
-  <!-- Step loyverse-fc: FC's side - items sold, one card per FC category. -->
-  <div id="fc-result" hidden>
-    <p id="fc-partial" class="ks-note" hidden></p>
-    <p id="fc-empty" hidden>No sales for this date.</p>
-    <div id="fc-cards"></div>
   </div>
 
   <script>
@@ -157,16 +204,17 @@
     const posSlBtn = document.getElementById('pos-sl');
     const posFcBtn = document.getElementById('pos-fc');
     const fcResultEl = document.getElementById('fc-result');
-    const fcPartialEl = document.getElementById('fc-partial');
-    const fcEmptyEl = document.getElementById('fc-empty');
-    const fcCardsEl = document.getElementById('fc-cards');
+    const fcLandingBody = document.querySelector('#fc-landing tbody');
+    const fcOtherEl = document.getElementById('fc-other');
+    const copyArea = document.getElementById('copy-area');
 
-    let current = null;
+    let current = null; // the shown side's body, for Copy as text
+    let currentPos = null;
     let selected = null;
     let loadSeq = 0; // only the newest load may draw (switching mid-load)
 
     // --- POS switch (Step loyverse-fc, ADR-066) ---
-    // 'silingan-likod' (left, the dish table) or 'fc' (right, FC's categories).
+    // 'silingan-likod' (left, the dish table) or 'fc' (right, FC's landing, ADR-094).
     // Remembered on this phone (localStorage, in try/catch like draft-store.js)
     // and in the address (?pos=fc), so a link opens the right side.
     const POS_KEY = 'kitchenSales.pos';
@@ -244,6 +292,56 @@
       return `<td class="num${dash ? ' ks-dash' : ''}">${dash ? '-' : esc(String(v))}</td>`;
     }
 
+    // Step landing-sales: halves show as "1/2" (1.5 as "1 1/2"); the engine
+    // sends plain numbers. A null is "-", as in show().
+    function qty(v) {
+      if (v === null || v === undefined) return '-';
+      const a = Math.abs(v);
+      const whole = Math.floor(a + 1e-9);
+      const frac = a - whole;
+      let s;
+      if (frac < 1e-9) s = String(whole);
+      else if (Math.abs(frac - 0.5) < 1e-9) s = whole ? `${whole} 1/2` : '1/2';
+      else s = String(Math.round(a * 100) / 100);
+      return (v < 0 ? '-' : '') + s;
+    }
+
+    // "+1 1/2 taken"; a refund that leaves less than nothing reads "-1/2 taken",
+    // never "+-1/2".
+    function takenText(v) {
+      return `${v > 0 ? '+' : ''}${qty(v)} taken`;
+    }
+
+    // A count cell for the Pizza and Landing tables: numCell, with halves.
+    function qtyCell(v) {
+      const dash = v === null || v === undefined;
+      return `<td class="num${dash ? ' ks-dash' : ''}">${esc(qty(v))}</td>`;
+    }
+
+    // A Pizza table: unsold rows greyed; null (pizza list not loaded, or the
+    // whole side failed) shows "Couldn't load the pizza list" instead. An
+    // account whose list failed while the others loaded shows the note too,
+    // above the table with its column at "-".
+    function renderPizza(tableId, errorId, totalId, data) {
+      const table = document.getElementById(tableId);
+      const errorEl = document.getElementById(errorId);
+      const pizza = data.pizza;
+      const partial = data.accounts.some(a => a.ok && a.catalogError);
+      errorEl.hidden = !(pizza === null || partial);
+      table.hidden = pizza === null;
+      // A short grand total beside the heading (Naoki, click-through 2026-11-22):
+      // every row's total added up; nothing when the list did not load.
+      document.getElementById(totalId).textContent = pizza === null
+        ? '' : `· Total ${qty(pizza.rows.reduce((s, r) => s + (r.total || 0), 0))}`;
+      table.querySelector('tbody').innerHTML = pizza === null ? '' : pizza.rows.map(r => {
+        const zero = r.total === 0;
+        const cells = pizza.columns.length > 1
+          ? pizza.columns.map(k => qtyCell(r[k])).join('') + qtyCell(r.total)
+          : qtyCell(r.total);
+        return `<tr${zero ? ' class="ks-zero"' : ''}><td>${esc(r.name)}</td>${cells}</tr>`;
+      }).join('');
+    }
+
     function failedAccounts(data) {
       return data.accounts.filter(a => !a.ok);
     }
@@ -293,6 +391,8 @@
           numCell(d.total) + `</tr>`;
       }).join('');
 
+      renderPizza('sl-pizza-table', 'sl-pizza-error', 'sl-pizza-total', data);
+
       document.getElementById('account-status').innerHTML = data.accounts.map(a => {
         if (!a.ok) return `<p class="ks-note">${esc(a.label)}: could not be fetched</p>`;
         const refunds = (a.receiptTypes && a.receiptTypes.REFUND) || 0;
@@ -311,14 +411,43 @@
         `<tr><td>${esc(u.account)}</td><td>${esc(u.item_name)}</td><td class="num">${esc(u.quantity)}</td></tr>`
       ).join('');
 
+      resultEl.hidden = false;
+      showCopy();
+    }
+
+    function showCopy() {
       copyStatus.textContent = '';
       copyStatus.className = 'status-message';
       copyText.hidden = true;
-      resultEl.hidden = false;
+      copyArea.hidden = false;
     }
 
-    // FC's side: one card per category (the engine sorts categories by name
-    // and items biggest first, and leaves 0s out).
+    // One "name  numbers" row of an opened landing line.
+    function detailItem(name, numbers) {
+      return `<li><span>${esc(name)}</span><span>${esc(numbers)}</span></li>`;
+    }
+
+    // An opened line: each item counted there ("x3 = 6" when its portions are
+    // not 1), then "Also taken": each dish, its quantity and the amount.
+    function lineDetail(l) {
+      let html = '';
+      if (l.items.length) {
+        html += '<ul class="ks-detail-list">' + l.items.map(i => detailItem(i.name,
+          i.portions === 1 ? qty(i.quantity) : `${qty(i.quantity)} x${qty(i.portions)} = ${qty(i.quantity * i.portions)}`
+        )).join('') + '</ul>';
+      }
+      if (l.takenBy.length) {
+        html += '<p class="ks-sub">Also taken</p><ul class="ks-detail-list">' + l.takenBy.map(t =>
+          detailItem(t.name, `${qty(t.quantity)} x ${qty(t.amount)} = ${qty(t.quantity * t.amount)}`)
+        ).join('') + '</ul>';
+      }
+      return html || '<p class="ks-note">Nothing sold</p>';
+    }
+
+    // FC's side (ADR-094): the Landing table - every line in the sheet's order,
+    // a line at 0 greyed, "+N taken" beside the number; a line opens under its
+    // row - then Pizza, then "Not on the landing" (closed). If FC itself could
+    // not be fetched, only its banner shows, as before.
     function renderFc(data) {
       bannersEl.innerHTML = '';
       failedAccounts(data).forEach(a => banner(fcFailureLine(a)));
@@ -326,21 +455,38 @@
       lastReceiptEl.textContent = lastReceiptText(data).replace('Last kitchen receipt', 'Last receipt');
       syncedEl.textContent = syncedText(data);
 
-      const partial = data.accounts.filter(a => a.ok && a.catalogError);
-      fcPartialEl.hidden = partial.length === 0;
-      fcPartialEl.textContent = partial.length
-        ? "Loyverse's item list or categories could not be loaded, so every item is under No category."
-        : '';
+      if (!data.accounts.some(a => a.ok)) return;
 
-      const anyOk = data.accounts.some(a => a.ok);
-      fcEmptyEl.hidden = !(anyOk && data.categories.length === 0);
-      fcCardsEl.innerHTML = data.categories.map(c =>
-        `<section class="ks-card"><h2>${esc(c.name)}</h2><table><tbody>` +
-        c.items.map(i => `<tr><td>${esc(i.name)}</td><td class="num">${esc(String(i.quantity))}</td></tr>`).join('') +
-        `</tbody></table></section>`
+      fcLandingBody.innerHTML = data.landing.map((l, i) => {
+        const zero = l.sold === 0;
+        const taken = l.taken !== 0 ? `<span class="ks-taken">${esc(takenText(l.taken))}</span>` : '';
+        return `<tr${zero ? ' class="ks-zero"' : ''}>` +
+          `<td class="ks-line-cell"><button type="button" class="ks-line-btn" aria-expanded="false" aria-controls="fc-line-${i}">${esc(l.line)}</button></td>` +
+          `<td class="num">${esc(qty(l.sold))}${taken}</td></tr>` +
+          `<tr id="fc-line-${i}" class="ks-detail" hidden><td colspan="2">${lineDetail(l)}</td></tr>`;
+      }).join('');
+
+      renderPizza('fc-pizza-table', 'fc-pizza-error', 'fc-pizza-total', data);
+
+      const n = data.other.length;
+      fcOtherEl.open = false;
+      fcOtherEl.querySelector('summary').textContent = `Not on the landing: ${n} item${n === 1 ? '' : 's'}`;
+      fcOtherEl.querySelector('tbody').innerHTML = data.other.map(o =>
+        `<tr><td>${esc(o.name)}</td>${qtyCell(o.quantity)}</tr>`
       ).join('');
+
       fcResultEl.hidden = false;
+      showCopy();
     }
+
+    // Tapping a line opens it under its row; tapping again closes it.
+    fcLandingBody.addEventListener('click', e => {
+      const btn = e.target.closest('.ks-line-btn');
+      if (!btn) return;
+      const open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', String(open));
+      document.getElementById(btn.getAttribute('aria-controls')).hidden = !open;
+    });
 
     async function load() {
       const mySeq = ++loadSeq;
@@ -351,6 +497,7 @@
       loadingEl.hidden = false;
       resultEl.hidden = true;
       fcResultEl.hidden = true;
+      copyArea.hidden = true;
       bannersEl.innerHTML = '';
       lastReceiptEl.textContent = '';
       syncedEl.textContent = '';
@@ -361,13 +508,10 @@
         const body = await res.json().catch(() => ({}));
         if (mySeq !== loadSeq) return; // the switch or date moved on
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-        if (loadPos === 'fc') {
-          current = null; // Copy as text belongs to the left side
-          renderFc(body);
-        } else {
-          current = body;
-          render(body);
-        }
+        current = body;
+        currentPos = loadPos;
+        if (loadPos === 'fc') renderFc(body);
+        else render(body);
       } catch (err) {
         if (mySeq !== loadSeq) return;
         current = null;
@@ -410,6 +554,20 @@
       return lines.join('\n');
     }
 
+    // FC's text (Step landing-sales): the landing lines with sold and taken,
+    // non-zero only ("BAGNET 5 (+1 1/2 taken)").
+    function asTextFc(data) {
+      const lines = [
+        `Kitchen Sales (Loyverse) - FC - ${data.date}`,
+        lastReceiptText(data).replace('Last kitchen receipt', 'Last receipt'),
+      ];
+      data.landing.filter(l => l.sold !== 0 || l.taken !== 0).forEach(l => {
+        lines.push(`${l.line} ${qty(l.sold)}${l.taken !== 0 ? ` (${takenText(l.taken)})` : ''}`);
+      });
+      failedAccounts(data).forEach(a => lines.push(fcFailureLine(a)));
+      return lines.join('\n');
+    }
+
     // navigator.clipboard needs HTTPS or localhost; a LAN http:// address
     // falls back to execCommand, then to a textarea for manual copy.
     function execCopy(text) {
@@ -424,7 +582,7 @@
 
     async function copy() {
       if (!current) return;
-      const text = asText(current);
+      const text = currentPos === 'fc' ? asTextFc(current) : asText(current);
       let ok = false;
       if (navigator.clipboard && window.isSecureContext) {
         try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }

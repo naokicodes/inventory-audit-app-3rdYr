@@ -147,15 +147,42 @@ test('loyverse-fc: no pos and pos=silingan-likod return the same body as before 
   }
 });
 
-test('loyverse-fc: pos=fc returns FC by category, no money field, token not in the body', async () => {
+// Step landing-sales (ADR-094): FC's side is its landing lines, a Pizza table
+// and everything else sold. The rows' `total` is a count, not money.
+const MAP_LS = {
+  ...MAP_FC,
+  pizza: { fc: { categories: ['PIZZA'] } },
+  fcLanding: { lines: ['BEEF TAPA', 'PORK JOWL'], items: [{ name: 'BEEF TAPA', pos: { 'BEEF TAPA': 1 } }] },
+};
+
+test('landing-sales: pos=fc returns the landing body, no money field, token not in the body', async () => {
   const r = await handlePreview({ date: '2026-10-03', pos: 'fc' }, {
-    nameMap: MAP_FC, env: { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l', LOYVERSE_FC_TOKEN: 'f' }, fetchImpl: fetchFc(),
+    nameMap: MAP_LS, env: { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l', LOYVERSE_FC_TOKEN: 'f' }, fetchImpl: fetchFc(),
   });
   assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(Object.keys(r.body), ['date', 'group', 'accounts', 'landing', 'pizza', 'other']);
   assert.strictEqual(r.body.group, 'fc');
   assert.deepStrictEqual(r.body.accounts.map(a => a.label), ['FC']);
-  assert.deepStrictEqual(r.body.categories, [{ name: 'Pizza', items: [{ name: 'Margherita', quantity: 4 }] }]);
-  assert.ok(!/price|total|money/i.test(JSON.stringify(r.body)), 'money field in FC body');
+  assert.deepStrictEqual(r.body.landing, [
+    { line: 'BEEF TAPA', sold: 0, taken: 0, items: [], takenBy: [] },
+    { line: 'PORK JOWL', sold: 0, taken: 0, items: [], takenBy: [] },
+  ]);
+  assert.deepStrictEqual(r.body.pizza, { columns: ['fc'], rows: [{ name: 'Margherita', fc: 4, total: 4 }] });
+  assert.deepStrictEqual(r.body.other, []);
+  const text = JSON.stringify(r.body);
+  assert.ok(!/price|money|cost/i.test(text), 'money field in FC body');
+  assert.ok(!text.includes('450') && !text.includes('1800'), 'a money value leaked');
+  assert.ok(!text.includes('"f"'), 'token in the body');
+});
+
+test('landing-sales: pos=fc with the committed map lists its 27 lines in order; the left body gains pizza', async () => {
+  const env = { LOYVERSE_SILINGAN_TOKEN: 's', LOYVERSE_LIKOD_TOKEN: 'l', LOYVERSE_FC_TOKEN: 'f' };
+  const r = await handlePreview({ date: '2026-10-03', pos: 'fc' }, { env, fetchImpl: fetchFc() });
+  assert.strictEqual(r.body.landing.length, 27);
+  assert.strictEqual(r.body.landing[0].line, 'PORK JOWL');
+  assert.strictEqual(r.body.landing[26].line, 'QUARTER');
+  const leftSide = await handlePreview({ date: '2026-10-03' }, { env, fetchImpl: fetchFc() });
+  assert.deepStrictEqual(leftSide.body.pizza.columns, ['silingan', 'likod']);
 });
 
 test('loyverse-fc: an unset FC token fails only FC; the left side is untouched', async () => {
