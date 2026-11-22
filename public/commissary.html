@@ -283,6 +283,15 @@
       if (r.openingSource) return fmt(r.beginning) + ` <span class="carry-tag">(${OPENING_SOURCE_TAG[r.openingSource]})</span>`;
       return fmt(r.beginning);
     }
+    // Step stale-saves (ADR-104): the meats typed in since the table was
+    // drawn, sent as `touched` so an untouched row never overwrites a count
+    // saved from another phone.
+    const touchedCounts = new Set();
+
+    // Escapes stored text put into the page (same helper as month-opening.js).
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
     function renderCountEntry(rows) {
       const el = document.getElementById('count-entry');
       if (!commissarySelect.value) {
@@ -304,7 +313,7 @@
               <td>${r.code} - ${r.name} <span class="hint">(${r.unit})</span></td>
               <td class="calculated">${beginningCellText(r)}</td>
               <td><input type="number" step="0.01" class="count-actual" value="${r.actual ?? ''}" placeholder="0"${r.status === 'MISSING_PERIOD_OPENING' ? ' disabled' : ''}></td>
-              <td><input type="text" class="count-notes" placeholder="optional"></td>
+              <td><input type="text" class="count-notes" value="${esc(r.notes)}" placeholder="optional"></td>
               <td class="status-${r.status}">${r.status === 'MISSING_PERIOD_OPENING' ? BLOCKED_STATUS_TEXT : r.status.replace(/_/g, ' ')}</td>
             </tr>
           `).join('')}</tbody>
@@ -312,6 +321,11 @@
         </div>
         <button id="save-counts">Save counts</button>
       `;
+      // Step stale-saves: typing in a row's count or note marks it touched.
+      touchedCounts.clear();
+      el.querySelectorAll('tbody tr').forEach(tr => {
+        tr.addEventListener('input', () => touchedCounts.add(tr.dataset.id));
+      });
       document.getElementById('save-counts').addEventListener('click', saveCounts);
     }
 
@@ -324,7 +338,8 @@
       const rows = Array.from(document.querySelectorAll('#count-entry tbody tr')).map(tr => ({
         commissary_meat_id: Number(tr.dataset.id),
         ending_actual: tr.querySelector('.count-actual').value,
-        notes: tr.querySelector('.count-notes').value.trim() || null
+        notes: tr.querySelector('.count-notes').value.trim() || null,
+        touched: touchedCounts.has(tr.dataset.id)
       }));
 
       countStatus.textContent = 'Saving...';
@@ -346,7 +361,7 @@
         });
         countStatus.textContent = refusedNames.length
           ? `Saved. Not saved - needs month opening first: ${refusedNames.join(', ')}.`
-          : `Saved.`;
+          : (result.saved === 0 ? 'Nothing new to save.' : 'Saved.');
         countStatus.className = refusedNames.length ? 'status-message error' : 'status-message success';
         await loadBalances();
       } catch (err) {
