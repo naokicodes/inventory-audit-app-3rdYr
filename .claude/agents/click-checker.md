@@ -33,8 +33,11 @@ If any of these is missing, do not guess it: report the checks it blocks as `Not
    where a check is about saving or refusing, the network response (`read_network_requests`).
    For a blind step, also check as the counter that the numbers appear in neither the page source
    nor any network response, not only that the screen hides them (`docs/click-through.md`).
-5. Before any click that could open a confirm, alert or prompt (Delete, Remove, Discard, leaving a
-   page with unsaved changes), do not click it: report the check as `Not checked` with that reason.
+5. An in-page confirmation (a box or button drawn by the page itself) is fine to use. Before a
+   click that could open a native browser `confirm`, `alert` or `prompt` (Delete, Remove, Discard,
+   leaving a page with unsaved changes), check the page's script for one (`javascript_tool` or
+   `find`). If it uses a native one, do not click: report the check as `Not checked` with that
+   reason.
 6. Close every tab you opened (`tabs_close_mcp`).
 
 `Read` is for `docs/click-through.md` only, and only if you need its widths or accounts table.

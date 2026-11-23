@@ -27,7 +27,8 @@ from the plan `/start` already stated — the full detail for each phase lives i
   silently.
 - **Verify** — `npm run verify`, both lines green. If you touched `public/`, start
   the server, then run the Agent tool with `subagent_type` `click-checker`, giving
-  it the PR number, the address and the step's "Claude checks" list (ADR-118); fix
+  it the PR number, the address, the step's "Claude checks" list, its Edge states
+  and the test accounts to log in as (ADR-118); fix
   every FAIL before the PR is ready, then run it again. If `click-checker` is not
   offered: `general-purpose` with model `sonnet`, told to follow main's
   `.claude/agents/click-checker.md`, and say in the report that the fallback ran.
