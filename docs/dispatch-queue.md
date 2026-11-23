@@ -142,6 +142,14 @@ is. Read the step's own section in `session-status.md` before starting.
 > list's lines 1-8, 10 and 11 pass with ui-shell's click-through; at the PC, `update beta-3.1` and
 > the setup once. Then beta-4's order, unchanged; sign-the-cookie gains ADR-113 (a login lasts
 > one business day) and builds on ui-shell's login page.
+> **2026-11-23 - beta-3.1 is on the PC; the PC moves only for staff tests (ADR-114).** Naoki's lane:
+> sign-the-cookie (building), then the smoke list's lines 1-8, 10 and 11, tag **beta-3.2** (beta-3.1
+> + sign-the-cookie) and update the PC (ADR-103's order; the PC's `.env` gets COOKIE_SECRET and
+> ADMIN_PASSWORD by hand). Then the rest of beta-4 in its order (backup-restore -> restaurant-pc-ii
+> -> roles-guard -> save-safety -> cost-guard -> preview-pid), tested and tagged on the laptop only.
+> Then the roster chain: Silingan's roster is the first staff test. forequarter (data only) after
+> the official switch. **sign-the-cookie (PR #94):** issue #95 allowed (ten test files; the spec's
+> 2026-11-23 block): `/naoki-qs 94` reviews and merges.
 
 #### Fable fixes (2026-11-17)
 
@@ -207,6 +215,13 @@ a find box; two widths; Typed sales under Admin; the Silingan icon and a manifes
 files from AuditApp-Assets). Everyone sees every link for now. Front end only. Naoki's lane,
 after sales-cache, before sign-the-cookie. PUBLIC -> click-through (390px and 1366px). Full
 spec: session-status.md -> "Step ui-shell".
+
+### Step forequarter - the seed's Forequarter replaces Shortplate  [blocked: the official switch (Naoki)]
+Touches: server/db/seed-data.json, server/db/commissary-seed-data.json, server/db/seedData.test.js (and each test that reads M05 from the seed files)
+ADR-116: Silingan's "Kare-Kare meat" (M12) becomes Forequarter for the braised beef, the nilaga and
+Kare-Kare (0.2 kg each); Shortplate leaves the seed; the commissary's Shortplate becomes Forequarter.
+Data only; an existing database changes in Settings. Naoki's lane, after the official switch. Full spec: session-status.md -> "Step
+forequarter".
 
 ### Step roles-guard - no admin lockout; admin and read-only as base roles only  [blocked: sign-the-cookie (order)]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/roles.js, server/routes/roles.test.js, server/index.js, scripts/import-settings.js, server/db/importSettings.test.js, public/roles.html
@@ -556,6 +571,8 @@ dependency). Server-only, no click-through. Full spec: session-status.md -> "Ste
 (the login page). See the spec's 2026-11-17 block.
 **2026-11-22 (ADR-113):** a login lasts until the next 8 AM (the cookie carries its business
 date); after ui-shell (beta-3.1), on its login page. See the spec's 2026-11-22 block.
+**2026-11-23 (issue #95):** PR #94 is built; Touches add ten test files that only swap a typed
+cookie for `cookieFor(id)`. See the spec's 2026-11-23 block.
 
 ### 3zw. Step staff-meal-settings - meal slots, budgets and rice rates in Settings  [blocked: settings-guard]
 **CLOSED 2026-11-16, PR #82 (`f49e5f4`).**

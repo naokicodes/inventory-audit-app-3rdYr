@@ -31,6 +31,19 @@ Status: IRL Written - FLOW Drafted - APP Decided
 3. A line that belongs to the other restaurant is moved there (logged) the same
    day.
 
+**2026-11-23, Naoki (A9 round 1; flow notes for the spec, not decided yet):**
+- On a phone or tablet, no per-line dropdown. Every PO line shows by itself, grouped; the groups are
+  big buttons like Kitchen Sales' site switch. The receiver checks and types how many arrived.
+- Unticking is faster than ticking: the kitchen unticks the veggies that did not come. It checks by
+  eye and hand, no weighing; up to 0.5 kg off is accepted.
+- The podium counts what arrives: mostly pieces (cans and such), not kg.
+- A whole group is approved at once.
+- A line that did not come (no tomatoes at the public market) leaves its group and waits ungrouped,
+  until it arrives from another supplier and joins that group.
+- Extras: anything that arrives with no PO line (a catch-up or a random buy) is added by hand.
+- The purchaser types each receipt's grand total, before service (ADR-117). The podium's count and
+  the purchaser's receipt meet on the receipt.
+
 ## APP
 - Decided: prices and bill rule (1); moving a line between Silingan and Likod
   (9); unplanned buys (28); receivers assigned via roster (29).
@@ -47,5 +60,8 @@ Status: IRL Written - FLOW Drafted - APP Decided
   above).
 - (A9) The arrival check compares against the receipt, not the PO (rec: yes; the PO stays the
   order list)?
+  Answered 2026-11-23 (Naoki): against the PO's lines, every one shown; the receipt is the
+  purchaser's (ADR-117).
 - (A9) Help the evening change check: the purchaser types each receipt's total and the app shows
-  cash given minus receipts = change (rec: yes, inside the buyer run; not now)?
+  cash given minus receipts = change (rec: yes, inside the buyer run; not now)? Answered 2026-11-23: yes
+  (ADR-117), the grand total per receipt, typed before service.

@@ -132,9 +132,78 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-113; the index, and a map from handoff item numbers to records, is in
+to ADR-117; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-23 architect (A0 #92 #93, beta-3.1 at the PC, the PC's rule, #95, A9's first round, A17) - decided (recorded: ADR-114 to ADR-117)
+
+- **beta-3.1 is tagged and on the restaurant PC.** PR #92 (sales-cache) and PR #93 (ui-shell) merged
+  on 11-22; beta-3.1 is `ac5b388` (834 tests, SUITE GREEN, AUDIT CLEAN); Naoki updated the PC to it.
+  Both PRs match their specs (architect check, 11-23). Accepted as built: at 8 AM, the day that just
+  closed can keep numbers up to 2 minutes old for up to 30 minutes more; Sync refreshes them.
+- **The PC takes a new tag only for a staff test (ADR-114).** Naoki tests every tag on his laptop.
+  The PC updates only for a staff test with Naoki there (he takes the staff's feedback to make the
+  pages simpler), or when a recorded condition needs it. Until then the PC serves Kitchen Sales:
+  each landing (the head-chef role at a site) reads the day's sales to fill the paper landing's POS
+  column, and counting stays on paper; the counters stay blind (ADR-101). Counting in the app now
+  would mean more work, confusion and a late night for the staff (Naoki). This replaces the counting
+  part of the 2026-11-22 "FC first" plan: FC's head chef reads FC's side of Kitchen Sales on his own
+  phone through the Tailscale share (working; added as an external user, ADR-110) and counts on
+  paper.
+- **beta-3.2 = beta-3.1 + sign-the-cookie, on the PC (ADR-114's one exception).** ADR-103 wants the
+  signed cookie and the admin password before a device outside the restaurant joins, and FC's phone
+  already has. Once sign-the-cookie merges: the smoke list's lines 1-8, 10 and 11, tag beta-3.2, at
+  the PC `update beta-3.2`, then two lines added to the PC's `.env` by hand (COOKIE_SECRET, made with
+  node; ADMIN_PASSWORD), because the setup asks for them only from restaurant-pc-ii. The rest of
+  beta-4 is built, tested and tagged on the laptop.
+- **Staff tests (Naoki):** Silingan's roster with its supervisor first (the roster chain is the next
+  build after beta-4); then the podium's check of a delivery against the PO together with the
+  purchaser's receipt totals (specced together: A9, next in the architect queue); the meat inventory
+  last, once its pages are staff friendly. Staff meals' place in the order is not set yet.
+- **Staff-friendly pages (ADR-115).** The staff find today's pages confusing: too much text, an odd
+  arrangement. Before a staff test, the pages it uses get a pass that Naoki checks on the laptop at
+  phone width: few words, laid out in the order the staff work (Naoki's flow), colors that guide,
+  spacing and big targets. The full visual pass from the mockups stays later (ADR-111).
+- **Forequarter replaces Shortplate (ADR-116).** Braised Beef Short Plate, Beef Short Plate Nilaga
+  and Kare-Kare all use Forequarter now; Silingan's placeholder "Kare-Kare meat" (M12) becomes it.
+  Shortplate is hidden, never deleted, so old counts keep their meaning; the commissary does the
+  same. Settings already does all of it on an existing database (a recipe change closes the old line
+  and opens a new one from that day). Forequarter is on trial now; the official switch comes later.
+  Until real grams: 200 g per serving for all three (Naoki). Step forequarter brings the seed in line
+  after the official switch.
+- **The PC:** Windows signs in by itself after a restart (autologon), as restaurant-pc-ii's
+  auto-start needs. The people import is not done: Kitchen Sales needs no login today, but if
+  blind-reads hides sales from a logged-out reader (ADR-040 keeps logged-out blind), the landings
+  need their logins before the PC takes blind-reads. blind-reads' spec checks this.
+- **A17 (token use), measured on the 11-22 Claude Code logs:** docs/reviews/token-use-2026-11-22.md.
+  Every session starts at about 55k tokens; a build with a click-through grows to 190k-264k and sends
+  11 to 21 million tokens in all, against about 2 million for a small step. Nearly all of it is the
+  session sent again on every call; the model's own writing is under 1%. graphify ran twice in 17
+  sessions. Next: Naoki pastes `/context` and `/usage` from a fresh session, then a token-diet step
+  (the click-through in its own subagent; a short rules digest). Ponytail (a Claude Code skill for
+  writing less code): not now (Naoki).
+- **Issue #95 (sign-the-cookie, PR #94): allowed.** The review flagged ten test files outside the
+  step's Touches. Each only swaps a hand-typed `user_id=<id>` cookie, which the spec now reads as
+  logged out, for auth.js's `cookieFor(id)`; no assertion changes. Recorded in the spec's 2026-11-23
+  block. cubic's two suggestions (locking out repeated wrong admin passwords, a minimum length) stay
+  out of scope until real logins before Live (ADR-011).
+- **The purchaser's run records expenses (ADR-117).** The purchaser types each receipt's grand total
+  (with its photo) after the run, before service, when the logbook is filled today; the run holds the
+  cash given and the cash counted, and shows the short. Sales money never enters (D3). This reverses
+  ADR-059's and ADR-068's "the buying money is not stored here" for the run only.
+- **A9's first round (Naoki; flow notes, not decided):** arrivals show every PO line by itself,
+  grouped (buttons like Kitchen Sales' site switch); the kitchen unticks the veggies that did not come
+  (checked by eye and hand, up to 0.5 kg off accepted), the podium counts pieces; a whole group is
+  approved at once; a line that did not come waits ungrouped until it arrives from another supplier;
+  extras for anything off the PO. Each item may get a main and a backup supplier, sorted on a quick
+  drag-and-drop screen. The podium and the purchaser meet on the receipt. The first podium test:
+  Naoki runs the app beside the podium's logbook with a list made from photos, to show the time
+  saved. Details: arrivals-and-bills.md, podium.md, veggies.md, supplier-orders.md.
+- **A16:** the Silingan icon shows after Add to Home screen (running-the-app.md gains the steps).
+- **Still open:** Forequarter's real grams and the official switch date; what the commissary's
+  "fore quarter" line (on its October sheet, beside shortplate) was for; Windows Update's active
+  hours; rice per tray and the sack's price and weight; the money (A13) and photo items of 11-22.
 
 ### 2026-11-22 architect, late (beta-3 at the PC; ui-shell and sales-cache as beta-3.1) - decided (recorded: ADR-111 to ADR-113)
 
@@ -4445,6 +4514,16 @@ line above.
   the next 8 AM (an injected now at 21:00 gives 11 hours, at 07:59 gives 60 seconds); a changed
   business date with the old signature is refused.
 
+**Added 2026-11-23 (issue #95; architect, A0).** PR #94 already has these edits: nothing to build.
+Touches add the ten test files that logged in with a hand-typed `user_id=<id>` cookie, which this
+spec reads as logged out: server/db/permissions.test.js, server/engines/blindCount.test.js,
+server/middleware/requireSiteAccess.test.js, server/middleware/siteFilterII.test.js,
+server/routes/authorship.test.js, server/routes/commands.test.js, server/routes/commissary.test.js,
+server/routes/roles.test.js, server/routes/settings.test.js, server/routes/sideItems.test.js. Each
+only swaps the typed cookie for auth.js's `cookieFor(id)`; no assertion changes. Not in scope
+(cubic's suggestions on PR #94): locking out repeated wrong admin passwords, and a minimum password
+length - one shared admin password stays until real logins before Live (ADR-011).
+
 ## Step staff-meal-settings - meal slots, budgets and the rice rates in Settings (A10)
 **CLOSED 2026-11-16, PR #82 (`f49e5f4`).**
 
@@ -5895,6 +5974,36 @@ phone - the looks, and the icon after Add to Home screen.
 
 Not in scope: hiding links by role (with login-tonight); HTTPS and a tab-free window (with
 hosting); the visual pass from the mockups (after the roster and login steps); offline use.
+
+## Step forequarter - the seed's Forequarter replaces Shortplate (A0, 2026-11-23)
+
+Decided 2026-11-23 (ADR-116; Naoki). Naoki's lane, after the official switch (Forequarter is on
+trial now). Data
+only: no schema change, no server code. An existing database is changed in Settings, never by this
+step (beta.db is never reseeded).
+
+What changes: a fresh install (and the laptop's dev.db after a reseed) starts with Forequarter where
+Shortplate was.
+
+- server/db/seed-data.json (Restaurant A = Silingan): M12 "Kare-Kare meat" is renamed "Forequarter"
+  (kg, cost null); M05 Shortplate leaves the seed (a fresh install has no history to keep);
+  recipe_bom: D015 Braised Beef Short Plate and D037 Beef Short Plate Nilaga move from M05 to M12,
+  and D044 Kare-Kare gains M12: 0.2 kg per serving each (Naoki, 2026-11-23), or the real grams if
+  Naoki has them by the build.
+- server/db/commissary-seed-data.json: the meat type and the commissary meat "Shortplate" become
+  "Forequarter" (codes unchanged).
+- Tests: server/db/seedData.test.js follows the seed; a test that reads Shortplate or M05 from the
+  seed files changes with it. Tests that build their own Shortplate rows (commissaryYieldEngine and
+  others) keep them.
+- The dish names stay as Loyverse has them (the name map is unchanged) unless Naoki says the menu
+  renames them.
+
+Edge states: none beyond a reseed (two seeds in a row add nothing twice, as today).
+
+Touches: server/db/seed-data.json, server/db/commissary-seed-data.json, server/db/seedData.test.js,
+and each test that reads M05 from the seed files. Data only: no click-through.
+
+Not in scope: changing an existing database (Settings, ADR-116); carrying Shortplate stock over.
 
 ## Step roles-guard - no admin lockout; admin and read-only as base roles only; look-alike names (A0, Fable)
 

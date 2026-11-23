@@ -26,6 +26,10 @@ Sheet "Inventory Form Kitchen - VEG/SPICES" at Silingan and FC (source: photos
 - Veggies are eyeballed at count time. On arrival the kitchen only confirms
   the veggies are there; the buyer already weighed them.
 
+- Arrivals (Naoki, 2026-11-23): the kitchen checks the veggies by eye and hand, no weighing; up to
+  0.5 kg off is accepted. Unticking what did not come is faster than ticking everything
+  (arrivals-and-bills.md).
+
 ## FLOW - how they will use the app (drafted)
 1. The assigned kitchen counter opens Veggies (separate from Pantry; one person
    may hold both tonight).

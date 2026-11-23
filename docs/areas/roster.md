@@ -140,6 +140,8 @@ Redrafted 2026-11-16 (ADR-096); it replaces the 11-01 draft.
 
 ## Open questions
 
+- 2026-11-23 (ADR-114): the roster is the first staff test at the restaurant PC, with Naoki and the
+  supervisor; its pages get the staff-friendly pass first (ADR-115).
 - How the supervisor shares the roster: answered 2026-11-17 (a daily text message, above).
 - Silingan's stations, rows, minimums and people are drafted in the private notes (2026-11-16). Naoki
   (2026-11-22): build with the draft; the supervisor corrects names, times and minimums on the Staff
