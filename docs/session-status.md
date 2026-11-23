@@ -132,11 +132,11 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-117; the index, and a map from handoff item numbers to records, is in
+to ADR-118; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
 
-### 2026-11-23 architect (A0 #92 #93, beta-3.1 at the PC, the PC's rule, #95, A9's first round, A17) - decided (recorded: ADR-114 to ADR-117)
+### 2026-11-23 architect (A0 #92 #93, beta-3.1 at the PC, the PC's rule, #95, A9's first round, A17) - decided (recorded: ADR-114 to ADR-118)
 
 - **beta-3.1 is tagged and on the restaurant PC.** PR #92 (sales-cache) and PR #93 (ui-shell) merged
   on 11-22; beta-3.1 is `ac5b388` (834 tests, SUITE GREEN, AUDIT CLEAN); Naoki updated the PC to it.
@@ -180,9 +180,11 @@ disagree, that is a bug: ask Naoki and fix both the same day.
   Every session starts at about 55k tokens; a build with a click-through grows to 190k-264k and sends
   11 to 21 million tokens in all, against about 2 million for a small step. Nearly all of it is the
   session sent again on every call; the model's own writing is under 1%. graphify ran twice in 17
-  sessions. Next: Naoki pastes `/context` and `/usage` from a fresh session, then a token-diet step
-  (the click-through in its own subagent; a short rules digest). Ponytail (a Claude Code skill for
-  writing less code): not now (Naoki).
+  sessions. `/usage` (Naoki's laptop, last 24 hours): `/naoki-qs` 86% of usage, claude-in-chrome
+  13%. Decided (ADR-118): step token-diet - the click-through's "Claude checks" run in a
+  click-checker subagent on Sonnet that returns PASS/FAIL lines; builds stay on Opus; builders read
+  the new Digest of rules-for-claude-code.md; `/usage`'s fix key is not used. `/context` (the 55k
+  start) is optional. Ponytail (a Claude Code skill for writing less code): not now (Naoki).
 - **Issue #95 (sign-the-cookie, PR #94): allowed.** The review flagged ten test files outside the
   step's Touches. Each only swaps a hand-typed `user_id=<id>` cookie, which the spec now reads as
   logged out, for auth.js's `cookieFor(id)`; no assertion changes. Recorded in the spec's 2026-11-23
@@ -6005,6 +6007,57 @@ Touches: server/db/seed-data.json, server/db/commissary-seed-data.json, server/d
 and each test that reads M05 from the seed files. Data only: no click-through.
 
 Not in scope: changing an existing database (Settings, ADR-116); carrying Shortplate stock over.
+
+## Step token-diet - the click-through in its own subagent; the rules digest (A17, 2026-11-23)
+
+Decided 2026-11-23 (ADR-118; Naoki). Naoki's lane, any time: it shares no file with beta-4's steps or
+the roster chain. No app code: .claude/ files only.
+
+What Naoki sees: nothing new to do. A build's click-through runs in a separate helper that reports a
+short pass/fail list; the build session stays smaller, so a build uses less of the plan.
+
+- .claude/agents/click-checker.md (new). Frontmatter: `name: click-checker`; a description ("Walks one
+  step's 'Claude checks' list in Claude in Chrome for /continue and /naoki-qs. Give it the PR number,
+  the address and the list; returns PASS/FAIL lines."); `model: sonnet`; tools: the Claude in Chrome
+  tools it uses (tabs, navigate, find, read_page, form_input, computer, javascript_tool,
+  read_console_messages, read_network_requests, resize_window) plus Read. Body:
+  - what it gets: the PR number, the address, the "Claude checks" list and the edge states, the test
+    accounts to log in as;
+  - how: its own new tab; the widths the list names (390px through a same-origin iframe, as
+    docs/click-through.md says, and desktop width); log in as each named account; walk every check
+    and edge state; for a blind step, also the network response (docs/click-through.md);
+  - never: edit a file, run git or gh, comment on the PR, or trigger a browser dialog (ADR-093);
+  - reply, and only this: one line per check, `PASS <check>` or `FAIL <check> - <what it saw, under
+    20 words>`, then `Not checked: <check> - <why>` lines, or `Not checked: none`. No screenshots,
+    page text or HTML in the reply. It closes the tabs it opened.
+- .claude/commands/continue.md, the Verify bullet: "If you touched `public/`, start the server and
+  click through the actual screen" becomes: start the server, then run the Agent tool with
+  `subagent_type` `click-checker`, giving it the PR number, the address and the step's "Claude
+  checks" list; fix every FAIL before the PR is ready, then run it again. If `click-checker` is not
+  offered: `general-purpose` with model `sonnet`, told to follow main's
+  `.claude/agents/click-checker.md`, and say in the report that the fallback ran.
+- .claude/commands/naoki-qs.md: section 4's "One subagent only" becomes two (ADR-118): section 5's
+  pr-reviewer and the click-checker that /continue runs. Section 1's line that the rules in
+  `docs/rules-for-claude-code.md` "still apply in full" gains: "read that file's Digest; grep a
+  rule's own section when the step touches it."
+- .claude/commands/start.md (section 4) and .claude/commands/step.md (section 3): the line naming
+  `docs/rules-for-claude-code.md` reads "its Digest (grep a rule's own section when the step touches
+  it)".
+
+Edge states: the click-checker fails to start or Claude in Chrome is not connected - the build says
+so in its report and leaves the "Claude checks" for the person (no silent skip). A check it cannot
+reach - a `Not checked` line, never a PASS.
+
+Tests: none (no app code); `npm run verify` stays green. The PR shows one dry run: the click-checker
+on a page already on main (Home at 390px: the top bar shows Log in; the menu opens and closes), its
+reply pasted in the PR.
+
+Touches: .claude/agents/click-checker.md (new), .claude/commands/continue.md,
+.claude/commands/naoki-qs.md, .claude/commands/start.md, .claude/commands/step.md. Not `public/`: no
+phone check.
+
+Not in scope: changing the build's model; turning claude-in-chrome off; `/usage`'s fix key; trimming
+the 55k start (after `/context`, if Naoki runs it).
 
 ## Step roles-guard - no admin lockout; admin and read-only as base roles only; look-alike names (A0, Fable)
 

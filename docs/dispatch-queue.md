@@ -150,6 +150,8 @@ is. Read the step's own section in `session-status.md` before starting.
 > Then the roster chain: Silingan's roster is the first staff test. forequarter (data only) after
 > the official switch. **sign-the-cookie (PR #94):** issue #95 allowed (ten test files; the spec's
 > 2026-11-23 block): `/naoki-qs 94` reviews and merges.
+> **2026-11-23 (later, A17):** token-diet (ADR-118, .claude/ files only) is runnable any time in
+> Naoki's lane; after it, builds run their click-through in the click-checker subagent.
 
 #### Fable fixes (2026-11-17)
 
@@ -222,6 +224,12 @@ ADR-116: Silingan's "Kare-Kare meat" (M12) becomes Forequarter for the braised b
 Kare-Kare (0.2 kg each); Shortplate leaves the seed; the commissary's Shortplate becomes Forequarter.
 Data only; an existing database changes in Settings. Naoki's lane, after the official switch. Full spec: session-status.md -> "Step
 forequarter".
+
+### Step token-diet - the click-through in its own subagent; the rules digest  [runnable]
+Touches: .claude/agents/click-checker.md, .claude/commands/continue.md, .claude/commands/naoki-qs.md, .claude/commands/start.md, .claude/commands/step.md
+ADR-118: the "Claude checks" click-through runs in a click-checker subagent on Sonnet and returns
+PASS/FAIL lines; builders read the rules digest. No app code. Naoki's lane, any time. Full spec:
+session-status.md -> "Step token-diet".
 
 ### Step roles-guard - no admin lockout; admin and read-only as base roles only  [blocked: sign-the-cookie (order)]
 Touches: server/db/permissions.js, server/db/permissions.test.js, server/routes/roles.js, server/routes/roles.test.js, server/index.js, scripts/import-settings.js, server/db/importSettings.test.js, public/roles.html

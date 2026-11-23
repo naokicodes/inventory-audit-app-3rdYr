@@ -4,6 +4,8 @@ Any step that touches `public/` needs a click-through before merge (ADR-002, `/n
 policy).
 
 Since 2026-11-02 (ADR-039) it has two halves: Claude checks the logic, a person checks the looks.
+Since 2026-11-23 (ADR-118) the click-checker subagent (`.claude/agents/click-checker.md`, Sonnet)
+walks the "Claude checks" half and returns one PASS or FAIL line per check; the build acts on them.
 
 1. **Claude checks (logic).** Claude in Chrome opens the PR's preview (the link in the "Preview of
    PR #n is up" comment; label the PR `preview` to get one) at 390px wide (a same-origin iframe

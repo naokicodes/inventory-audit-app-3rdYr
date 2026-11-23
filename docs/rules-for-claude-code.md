@@ -9,6 +9,48 @@ start) and `docs/decision-authority.md` (which decisions you may make
 inside work you have started). Where any of the three disagree, the more
 specific file wins for a collaborator.
 
+## Digest (2026-11-23, ADR-118) - read this; grep a rule's own section when your step touches it
+
+Every rule below still applies in full; this page is how to find them. Where a later ADR,
+`docs/engineer-role.md` or a `/naoki-qs` section says otherwise (pull requests, not pushes to main;
+the shared admin password, ADR-098), the later text wins.
+
+- **1-3:** read the docs your step names; state the plan (files that change and that don't); stop and
+  ask when the task is not covered or grows scope.
+- **4:** stock, usage, expected, variance and yield are computed from the input tables, never stored
+  or hard-coded.
+- **5:** the stack in `tech-stack.md` only; no new database, framework, ORM or cloud dependency
+  without a conversation.
+- **6:** the audit and commissary yield engines are tested with real spreadsheet numbers.
+- **7:** never edit these rules or the architect's docs as a side effect; flag the gap.
+- **8, 16, 17:** small steps; commit as soon as the step's tests pass; a `wip:` commit only for a step
+  cut short, never leaving working behaviour broken, with a done / not done / untested note.
+- **9:** a write to `stock_receipts` or `commissary_yield_log` logs to `activity_log` in the same
+  transaction; their deletes are soft (widened by steps that name their own log rows).
+- **10:** the daily entry screens stay minimal: no math, no admin concepts.
+- **11:** never fill missing recipe quantities from assumptions.
+- **12:** positive variance = shortage, negative = surplus.
+- **13:** photos are references only: no OCR.
+- **14:** Loyverse never blocks the core audit engine.
+- **15:** never map commissary meats to restaurant meats by matching codes.
+- **18:** architect -> builder -> architect, one step at a time; never a batch of pre-written prompts.
+- **19:** the full suite after code changes and as the baseline before starting; not after `.md`-only
+  edits.
+- **20:** commit messages: one subject line and a few short paragraphs. Commands for Naoki: one per
+  line, no `&&`, no backslash continuations (PowerShell 5.1).
+- **21:** stop every server you start before you finish.
+- **22:** `/clear` at step boundaries; read the named section, never a whole big file; graphify or grep
+  for who calls what.
+- **23:** pull first; report doc drift and carry on; confirm a push with `git status -sb`.
+- **24:** never delete, move or overwrite `server/db/inventory.db` or its `-wal` / `-shm` files
+  (`scripts/guard-db.js` enforces it).
+- **Red flags (stop and ask):** auth or roles not in a spec; suggesting a hosted database or cloud
+  deployment; a feature not in `scope.md`; a hard-coded calculation; changing `data-model.md`'s signs,
+  units or table names; growing the daily entry screens; a code-matched meat map; a hard `DELETE` on
+  the two logged tables.
+- **Amendment 2026-09-02:** end with the raw `git status -sb` and `git log --oneline -1 origin/main`;
+  never push on a red suite or with a file outside the step's scope.
+
 ## Before writing code
 1. **Read the relevant docs first** (`data-model.md`, `scope.md`,
    `daily-workflow.md`, `tech-stack.md`, `loyverse-sync.md` if touching

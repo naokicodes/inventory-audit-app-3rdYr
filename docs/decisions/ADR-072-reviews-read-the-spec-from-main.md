@@ -1,6 +1,6 @@
 # ADR-072 A PR is reviewed against main's spec, by the pr-reviewer agent
 
-- Status: Accepted 2026-11-14
+- Status: Accepted 2026-11-14; superseded in part by ADR-118 (a second subagent, the click-checker)
 - Decided by: Naoki
 - Supersedes: -
 
