@@ -11,7 +11,7 @@ const express = require('express');
 const TEST_DB = path.join(os.tmpdir(), `side-items-test-${process.pid}.db`);
 process.env.DB_PATH = TEST_DB;
 const db = require('../db/connection.js');
-const { currentUser } = require('./auth.js');
+const { currentUser, cookieFor } = require('./auth.js');
 const router = require('./sideItems.js');
 
 console.log('Side Items Route Tests\n');
@@ -42,7 +42,7 @@ let base;
 const call = async (method, url, as, body) => {
   const res = await fetch(base + url, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: `user_id=${users[as]}` } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: cookieFor(users[as]) } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: res.status, body: await res.json() };

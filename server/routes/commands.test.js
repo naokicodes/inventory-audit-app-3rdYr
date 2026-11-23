@@ -287,7 +287,7 @@ async function landingToSyncChain() {
   const DB_FILE = path.join(os.tmpdir(), `commands-stale-saves-test-${process.pid}-${Date.now()}.db`);
   process.env.DB_PATH = DB_FILE;
   const liveDb = require('../db/connection.js');
-  const { currentUser } = require('./auth.js');
+  const { currentUser, cookieFor } = require('./auth.js');
   const app = express();
   app.use(express.json());
   app.use('/api', currentUser);
@@ -305,7 +305,7 @@ async function landingToSyncChain() {
   const server = await new Promise(resolve => { const s = app.listen(0, () => resolve(s)); });
   const base = `http://localhost:${server.address().port}`;
   const post = (url, body) => fetch(base + url, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: `user_id=${adminId}` }, body: JSON.stringify(body)
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookieFor(adminId) }, body: JSON.stringify(body)
   });
   const name = 'stale-saves: an untouched dish row with prepped "0" and no prepped row writes nothing, and Sync batch stock then fills it from sales';
   try {

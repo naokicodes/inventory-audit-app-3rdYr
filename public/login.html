@@ -15,6 +15,11 @@
     .login-h2 { font-size: 1rem; color: var(--ink2); margin: 1.25rem 0 0.5rem; }
     #find { width: 100%; box-sizing: border-box; padding: 0.6rem; font-size: 1rem; }
     .find-label { display: block; font-weight: 600; margin: 1.25rem 0 0.4rem; }
+    .admin-login { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.25rem 0 0.75rem; }
+    .admin-login[hidden] { display: none; }
+    .admin-login label { font-weight: 600; }
+    #admin-password { width: 100%; box-sizing: border-box; padding: 0.6rem; font-size: 1rem; }
+    .user-list .admin-login button { min-height: 48px; font-size: 1.05rem; text-align: center; }
   </style>
 </head>
 <body data-shell="login">
@@ -22,7 +27,9 @@
   <script src="shell.js"></script>
   <!-- Step stub-login: pick your name, no password. Identity only.
        Step ui-shell (ADR-111): this phone's recent names first, then a find
-       box over everyone, A to Z. -->
+       box over everyone, A to Z.
+       Step sign-the-cookie (ADR-098): an admin's name opens the Admin
+       password box under it; every other name logs in on one tap. -->
   <h1>Log in</h1>
   <section id="recent" hidden>
     <h2 class="login-h2">On this phone</h2>
@@ -33,6 +40,12 @@
   <h2 class="login-h2">Everyone</h2>
   <div id="user-list" class="user-list"></div>
   <p id="login-message" class="status-message"></p>
+  <form id="admin-login" class="admin-login" hidden>
+    <label for="admin-password">Admin password</label>
+    <input type="password" id="admin-password" autocomplete="current-password">
+    <button type="submit">Log in</button>
+    <p id="admin-message" class="status-message" role="alert"></p>
+  </form>
   <script>
     const listEl = document.getElementById('user-list');
     const recentEl = document.getElementById('recent');
@@ -70,25 +83,63 @@
       } catch (err) { /* no storage: nothing remembered */ }
     }
 
-    async function logIn(user) {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id }),
-      });
+    const adminForm = document.getElementById('admin-login');
+    const passwordEl = document.getElementById('admin-password');
+    const adminMessageEl = document.getElementById('admin-message');
+    const loginButton = adminForm.querySelector('button');
+    let adminUser = null;
+
+    // `onRefused` shows the server's message; the default is the page message.
+    async function logIn(user, password, onRefused = showError) {
+      let res;
+      try {
+        res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(password === undefined ? { user_id: user.id } : { user_id: user.id, password }),
+        });
+      } catch (err) {
+        onRefused('Could not log in.');
+        return;
+      }
       if (res.ok) {
         saveRecent(user);
         location.href = 'index.html';
       } else {
-        showError((await res.json()).error || 'Could not log in.');
+        const body = await res.json().catch(() => ({}));
+        onRefused(body.error || 'Could not log in.');
       }
     }
+
+    // An admin's name: the password box moves under the tapped button.
+    function askPassword(user, btn) {
+      adminUser = user;
+      btn.after(adminForm);
+      adminForm.hidden = false;
+      adminMessageEl.textContent = '';
+      adminMessageEl.classList.remove('error');
+      passwordEl.value = '';
+      passwordEl.focus();
+    }
+
+    adminForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!adminUser) return;
+      loginButton.disabled = true;
+      await logIn(adminUser, passwordEl.value, (text) => {
+        adminMessageEl.textContent = text;
+        adminMessageEl.classList.add('error');
+        passwordEl.value = '';
+        passwordEl.focus();
+      });
+      loginButton.disabled = false;
+    });
 
     function userButton(user) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = user.name;
-      btn.addEventListener('click', () => logIn(user));
+      btn.addEventListener('click', () => (user.needs_password ? askPassword(user, btn) : logIn(user)));
       return btn;
     }
 
@@ -113,6 +164,8 @@
         findEl.addEventListener('input', () => {
           const q = norm(findEl.value);
           for (const row of rows) row.btn.hidden = q !== '' && !row.key.includes(q);
+          // The password box goes when the admin's name it sits under is filtered out.
+          if (adminForm.previousElementSibling && adminForm.previousElementSibling.hidden) adminForm.hidden = true;
         });
       })
       .catch(() => showError('Could not load the user list.'));

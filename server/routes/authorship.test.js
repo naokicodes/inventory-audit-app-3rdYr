@@ -13,7 +13,7 @@ const express = require('express');
 const TEST_DB = path.join(os.tmpdir(), `authorship-test-${process.pid}.db`);
 process.env.DB_PATH = TEST_DB;
 const db = require('../db/connection.js');
-const { currentUser } = require('./auth.js');
+const { currentUser, cookieFor } = require('./auth.js');
 
 console.log('Authorship (created_by_user_id) Route Tests\n');
 
@@ -40,7 +40,7 @@ let base;
 const post = async (url, loggedIn, body) => {
   const res = await fetch(base + url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(loggedIn ? { Cookie: `user_id=${userId}` } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(loggedIn ? { Cookie: cookieFor(userId) } : {}) },
     body: JSON.stringify(body),
   });
   return { status: res.status, body: await res.json() };
@@ -122,8 +122,8 @@ test('a commissary count is stamped, and a re-save credits the last saver (ADR-0
     assert.strictEqual(res.status, 200);
     return db.prepare('SELECT created_by_user_id FROM commissary_ending_actual WHERE commissary_meat_id = ?').get(cMeatId).created_by_user_id;
   };
-  assert.strictEqual(await save(`user_id=${userId}`), userId);
-  assert.strictEqual(await save(`user_id=${otherId}`), otherId);
+  assert.strictEqual(await save(cookieFor(userId)), userId);
+  assert.strictEqual(await save(cookieFor(otherId)), otherId);
 });
 
 test('a write while logged out leaves created_by_user_id NULL', async () => {

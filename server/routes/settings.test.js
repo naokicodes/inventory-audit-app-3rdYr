@@ -455,7 +455,7 @@ const express = require('express');
 const GUARD_DB = path.join(os.tmpdir(), `settings-guard-test-${process.pid}.db`);
 process.env.DB_PATH = GUARD_DB;
 const liveDb = require('../db/connection.js');
-const { currentUser } = require('./auth.js');
+const { currentUser, cookieFor } = require('./auth.js');
 const settingsRouter = require('./settings.js');
 
 const roleUser = (name, flags) => {
@@ -483,7 +483,7 @@ app.post('/api/stock-receipts', (req, res) => res.json({ ok: true }));
 let base;
 const call = (method, url, as, body = {}) => fetch(base + url, {
   method,
-  headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: `user_id=${users[as]}` } : {}) },
+  headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: cookieFor(users[as]) } : {}) },
   body: method === 'GET' ? undefined : JSON.stringify(body),
 });
 

@@ -287,7 +287,7 @@ test('GET /api/auth/me returns capabilities_by_site for the sites the user can u
   const server = app.listen(0);
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
-    const me = async id => (await fetch(`${base}/api/auth/me`, { headers: id ? { Cookie: `user_id=${id}` } : {} })).json();
+    const me = async id => (await fetch(`${base}/api/auth/me`, { headers: id ? { Cookie: auth.cookieFor(id) } : {} })).json();
     const cara_ = await me(cara.id);
     assert.strictEqual(cara_.user.id, cara.id);
     assert.deepStrictEqual(Object.keys(cara_.capabilities_by_site).sort(), ['FC', 'RA']);

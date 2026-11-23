@@ -50,7 +50,7 @@ let base;
 const call = async (method, url, as, body) => {
   const res = await fetch(base + url, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: `user_id=${users[as]}` } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: auth.cookieFor(users[as]) } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: res.status, body: await res.json() };
