@@ -121,11 +121,29 @@ test('a .part left by a power cut is deleted by the next run; other files stay',
   const { dbFile, db } = makeDb(dir);
   const backups = path.join(dir, 'backups');
   fs.mkdirSync(backups);
-  fs.writeFileSync(path.join(backups, 'beta_2026-11-22_0300.db.part'), 'half');
+  const stale = path.join(backups, 'beta_2026-11-22_0300.db.part');
+  fs.writeFileSync(stale, 'half');
+  const anHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  fs.utimesSync(stale, anHourAgo, anHourAgo);
   fs.writeFileSync(path.join(backups, 'last-backup.log'), 'log');
   runBackup({ dbFile, dir: backups, now: NOW });
   db.close();
   assert.deepStrictEqual(fs.readdirSync(backups).sort(), ['beta_2026-11-23_1500.db', 'last-backup.log']);
+});
+
+test('two backups at once never share a name or a .part: a fresh .part is another run\'s and is left alone', () => {
+  const dir = freshDir('together');
+  const { dbFile, db } = makeDb(dir);
+  const backups = path.join(dir, 'backups');
+  fs.mkdirSync(backups);
+  const running = path.join(backups, 'beta_2026-11-23_1500.db.part');
+  fs.writeFileSync(running, ''); // the 3 PM task, claimed a moment ago
+  const r = runBackup({ dbFile, dir: backups, now: NOW });
+  db.close();
+  assert.strictEqual(r.name, 'beta_2026-11-23_1500_2.db');
+  assert.ok(fs.existsSync(running), 'the other run\'s .part is not deleted');
+  assert.deepStrictEqual(rowsOf(r.file), [10, 20]);
+  assert.deepStrictEqual(r.notes, []);
 });
 
 test('keptNames on 70 days of names keeps the last 14 days plus the first of each older month, and ignores other names', () => {
@@ -166,7 +184,9 @@ test('the copy folder gets the file and its own keep rule', () => {
   fs.mkdirSync(copyDir);
   fs.writeFileSync(path.join(copyDir, 'beta_2026-10-02_0300.db'), 'old');
   fs.writeFileSync(path.join(copyDir, 'beta_2026-10-01_0300.db'), 'first of the month');
-  fs.writeFileSync(path.join(copyDir, 'beta_2026-11-23_0300.db.part'), 'half');
+  const half = path.join(copyDir, 'beta_2026-11-23_0300.db.part');
+  fs.writeFileSync(half, 'half');
+  fs.utimesSync(half, new Date(Date.now() - 3600000), new Date(Date.now() - 3600000));
   fs.writeFileSync(path.join(copyDir, 'desktop.ini'), 'drive');
   const r = runBackup({ dbFile, dir: path.join(dir, 'backups'), copyDir, now: NOW });
   db.close();
@@ -289,6 +309,20 @@ test('a damaged chosen file is refused before anything moves', () => {
   assert.deepStrictEqual(fs.readdirSync(backups).sort(), listing, 'no before-restore backup, no replaced folder');
 });
 
+test('a restore that fails after the current files were moved aside puts them back', () => {
+  const dir = freshDir('putback');
+  const { dbFile, db } = makeDb(dir);
+  const backups = path.join(dir, 'backups');
+  const old = runBackup({ dbFile, dir: backups, now: new Date(2026, 10, 22, 3, 0) });
+  db.exec('INSERT INTO counts (qty) VALUES (30)');
+  db.close();
+  fs.mkdirSync(`${dbFile}.part`); // the copy-in step cannot write its .part
+  assert.throws(() => restoreBackup({ from: old.file, dbFile, backupsDir: backups, now: NOW }),
+    (err) => /the restore failed/.test(err.message));
+  assert.deepStrictEqual(rowsOf(dbFile), [10, 20, 30], 'the current data is back where it was');
+  assert.deepStrictEqual(fs.readdirSync(path.join(backups, 'replaced_2026-11-23_1500')), []);
+});
+
 test('restore on a PC with no database yet copies the backup in', () => {
   const dir = freshDir('newpc');
   const { dbFile, db } = makeDb(dir);
@@ -318,6 +352,11 @@ test('listBackups: local newest first, then copy-folder backups that are not loc
     'copy beta_2026-11-10_1500.db', 'copy beta_2026-11-01_0300.db',
   ]);
   assert.deepStrictEqual(listBackups({ backupsDir: path.join(dir, 'none'), copyDir: null }), []);
+  const aFile = path.join(dir, 'not-a-folder');
+  fs.writeFileSync(aFile, 'x');
+  assert.deepStrictEqual(listBackups({ backupsDir: local, copyDir: aFile }).map((b) => b.where), ['local', 'local'],
+    'a copy setting that names a file offers the local backups only');
+  assert.strictEqual(newestBackup(aFile, NOW), null);
   const newest = newestBackup(local, NOW);
   assert.strictEqual(newest.name, 'beta_2026-11-23_0300.db');
   assert.strictEqual(ageText(newest.ageMs), '12 hours old');

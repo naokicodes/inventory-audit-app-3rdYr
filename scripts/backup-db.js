@@ -46,7 +46,9 @@ function main() {
     console.error('Usage: node scripts/backup-db.js <backups dir> [label]');
     return 1;
   }
-  const copyDir = process.env.BACKUP_COPY_DIR || null;
+  // Resolved against the repo root, as DB_PATH is, so a relative value means the same folder
+  // whichever folder a scheduled task starts in.
+  const copyDir = process.env.BACKUP_COPY_DIR ? path.resolve(REPO_ROOT, process.env.BACKUP_COPY_DIR) : null;
   if (label === '--status') {
     status(dir, copyDir);
     return 0;
@@ -74,6 +76,7 @@ function main() {
   if (result.copied === true) console.log(`  ${made}; copied to ${copyDir}`);
   else if (result.copied === false) console.log(`  ${made}; not copied: ${result.copyError}`);
   else console.log(`  ${made}`);
+  for (const note of result.notes) console.log(`  [!] ${note}`);
   return result.copied === false ? 2 : 0;
 }
 

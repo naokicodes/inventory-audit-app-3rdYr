@@ -47,7 +47,8 @@ async function main() {
     console.error('Usage: node scripts/restore-db.js <backups dir>');
     return 1;
   }
-  const copyDir = process.env.BACKUP_COPY_DIR || null;
+  // Resolved against the repo root, as DB_PATH is (and as backup-db.js does).
+  const copyDir = process.env.BACKUP_COPY_DIR ? path.resolve(REPO_ROOT, process.env.BACKUP_COPY_DIR) : null;
   const backups = listBackups({ backupsDir: dir, copyDir });
   if (backups.length === 0) {
     console.log(`  There are no backups in ${dir}${copyDir ? ` or ${copyDir}` : ''}. Nothing was changed.`);
@@ -73,14 +74,21 @@ async function main() {
   }
 
   const chosen = backups[n - 1];
+  let result;
   try {
-    restoreBackup({ from: chosen.file, dbFile: resolveDbPath(process.env.DB_PATH), backupsDir: dir });
+    result = restoreBackup({ from: chosen.file, dbFile: resolveDbPath(process.env.DB_PATH), backupsDir: dir });
   } catch (err) {
     console.log(`  [X] Not restored: ${err.message}`);
     return 1;
   }
-  console.log(`  Restored ${chosen.name}. To undo, run restore again and pick the before-restore backup.`);
+  // No database before (a new PC restoring from the copy): there is no before-restore backup to undo with.
+  console.log(result.beforeRestore
+    ? `  Restored ${chosen.name}. To undo, run restore again and pick the before-restore backup.`
+    : `  Restored ${chosen.name}.`);
   return 0;
 }
 
-main().then((code) => { process.exitCode = code; });
+main().then((code) => { process.exitCode = code; }, (err) => {
+  console.log(`  [X] Not restored: ${err.message}. Nothing was changed.`);
+  process.exitCode = 1;
+});

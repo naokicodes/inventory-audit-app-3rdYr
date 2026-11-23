@@ -77,12 +77,17 @@ function applyKeepRule(dir, today) {
   }
 }
 
-// A power cut mid-backup leaves only a .part; the next run deletes it.
-function removeStaleParts(dir) {
+// A power cut mid-backup leaves only a .part; the next run deletes it. Only a .part untouched for
+// 10 minutes: a younger one may belong to a backup running right now (start at 3:00 PM and the
+// 3 PM task together), and a backup takes seconds.
+const STALE_PART_MS = 10 * 60 * 1000;
+function removeStaleParts(dir, now = Date.now()) {
   for (const name of fs.readdirSync(dir)) {
-    if (name.endsWith('.db.part') && isBackupName(name.slice(0, -'.part'.length))) {
-      fs.rmSync(path.join(dir, name), { force: true });
-    }
+    if (!name.endsWith('.db.part') || !isBackupName(name.slice(0, -'.part'.length))) continue;
+    const file = path.join(dir, name);
+    try {
+      if (now - fs.statSync(file).mtimeMs > STALE_PART_MS) fs.rmSync(file, { force: true });
+    } catch { /* gone already, or another run's; the next run tries again */ }
   }
 }
 
@@ -133,8 +138,9 @@ function moveFile(from, to) {
   }
 }
 
-// One backup of dbFile into dir. Returns { name, file, bytes, copied, copyError }: copied is true,
-// false (the local backup stands, the copy failed) or null (no copyDir). Throws when there is no
+// One backup of dbFile into dir. Returns { name, file, bytes, copied, copyError, notes }: copied is
+// true, false (the local backup stands, the copy failed) or null (no copyDir); notes are tidying
+// or .env-copy problems after the backup was made. Throws when there is no
 // database file (err.code 'NO_DATABASE', and nothing is made) or the backup itself failed (no
 // file is left under a backup's name).
 function runBackup({ dbFile, dir, label, copyDir, envFile, now = new Date(), keepRule = true }) {
@@ -147,14 +153,24 @@ function runBackup({ dbFile, dir, label, copyDir, envFile, now = new Date(), kee
   removeStaleParts(dir);
 
   // Never over an existing backup: a second one in the same minute (say, undoing a restore at
-  // once) would replace the very file being restored.
-  let name = backupName(now, label);
-  for (let i = 2; fs.existsSync(path.join(dir, name)); i++) {
-    name = backupName(now, cleanLabel(label) ? `${cleanLabel(label)}-${i}` : String(i));
-  }
-  const file = path.join(dir, name);
-  const part = `${file}.part`;
+  // once) would replace the very file being restored. The name is claimed by creating its empty
+  // .part exclusively, so two backups running at once never share one (VACUUM INTO accepts an
+  // empty file).
+  let name;
+  let file;
+  let part = null;
   try {
+    for (let i = 1; !part; i++) {
+      name = i === 1 ? backupName(now, label) : backupName(now, cleanLabel(label) ? `${cleanLabel(label)}-${i}` : String(i));
+      file = path.join(dir, name);
+      if (fs.existsSync(file)) continue;
+      try {
+        fs.closeSync(fs.openSync(`${file}.part`, 'wx'));
+        part = `${file}.part`;
+      } catch (err) {
+        if (err.code !== 'EEXIST') throw err;
+      }
+    }
     const src = new DatabaseSync(dbFile);
     try {
       src.exec('PRAGMA busy_timeout = 5000');
@@ -165,18 +181,33 @@ function runBackup({ dbFile, dir, label, copyDir, envFile, now = new Date(), kee
     checkIntegrity(part);
     fs.renameSync(part, file);
   } catch (err) {
-    fs.rmSync(part, { force: true });
+    if (part) fs.rmSync(part, { force: true });
     const failed = new Error(reason(err));
     failed.code = 'BACKUP_FAILED';
     throw failed;
   }
-  if (keepRule) applyKeepRule(dir, now);
+
+  // The backup is made from here on: tidying and the .env copy can only add a note, never undo it
+  // or stop the copy below.
+  const result = { name, file, bytes: fs.statSync(file).size, copied: null, copyError: null, notes: [] };
+  if (keepRule) {
+    try {
+      applyKeepRule(dir, now);
+    } catch (err) {
+      result.notes.push(`Old backups were not tidied: ${reason(err)}`);
+    }
+  }
 
   // .env holds the tokens, the admin password and the cookie secret: next to the backups on
   // this PC only, never in the copy folder.
-  if (envFile && fs.existsSync(envFile)) fs.copyFileSync(envFile, path.join(dir, ENV_COPY_NAME));
+  if (envFile && fs.existsSync(envFile)) {
+    try {
+      fs.copyFileSync(envFile, path.join(dir, ENV_COPY_NAME));
+    } catch (err) {
+      result.notes.push(`.env was not copied next to the backups: ${reason(err)}`);
+    }
+  }
 
-  const result = { name, file, bytes: fs.statSync(file).size, copied: null, copyError: null };
   if (copyDir) {
     try {
       if (!fs.existsSync(copyDir) || !fs.statSync(copyDir).isDirectory()) {
@@ -184,7 +215,13 @@ function runBackup({ dbFile, dir, label, copyDir, envFile, now = new Date(), kee
       }
       removeStaleParts(copyDir);
       copyThroughPart(file, path.join(copyDir, name));
-      if (keepRule) applyKeepRule(copyDir, now);
+      if (keepRule) {
+        try {
+          applyKeepRule(copyDir, now);
+        } catch (err) {
+          result.notes.push(`Old backups in the copy folder were not tidied: ${reason(err)}`);
+        }
+      }
       result.copied = true;
     } catch (err) {
       result.copied = false;
@@ -194,8 +231,9 @@ function runBackup({ dbFile, dir, label, copyDir, envFile, now = new Date(), kee
   return result;
 }
 
+// A copy folder that is missing, or names a file, simply has no backups to offer.
 function backupsIn(dir) {
-  if (!dir || !fs.existsSync(dir)) return [];
+  if (!dir || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return [];
   return fs.readdirSync(dir)
     .filter(isBackupName)
     .map((name) => {

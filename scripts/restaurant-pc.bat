@@ -271,7 +271,7 @@ if errorlevel 1 goto :fail_already
 call :checkenv
 if errorlevel 1 goto :fail
 call :backup
-if "%errorlevel%"=="1" echo  [!] The backup failed - see above. The app starts anyway; tell Naoki today.
+if not "%errorlevel%"=="0" if not "%errorlevel%"=="2" echo  [!] The backup failed - see above. The app starts anyway; tell Naoki today.
 REM The newest backup here and in the copy folder, so a backup that stopped working shows at every start.
 node "%REPO%\scripts\backup-db.js" "%APPDIR%\backups" --status
 echo.
@@ -325,7 +325,8 @@ for /f "delims=" %%H in ('git describe --tags --always') do set "PREVNAME=%%H"
 echo  Now: %PREVNAME%    Moving to: %NEWTAG%
 REM Labelled, so "go back" is restore this backup plus update to the old tag.
 call :backup before-update-from-%PREVNAME%
-if "%errorlevel%"=="1" goto :fail_nobackup
+REM Only 0 (backed up) and 2 (backed up, not copied) go on; any other code, say node missing, stops.
+if not "%errorlevel%"=="0" if not "%errorlevel%"=="2" goto :fail_nobackup
 git -c advice.detachedHead=false checkout -q "%NEWTAG%"
 if errorlevel 1 goto :fail_checkout
 echo  Installing dependencies...
