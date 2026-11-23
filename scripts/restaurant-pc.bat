@@ -6,6 +6,8 @@ REM
 REM    restaurant-pc.bat               setup; safe to run again, skips what is done
 REM    restaurant-pc.bat start         daily: backup, phone link, run the app
 REM    restaurant-pc.bat update TAG    move this PC to a tag, e.g. beta-2
+REM    restaurant-pc.bat backup        one backup now (the 3 PM and 3 AM tasks run this)
+REM    restaurant-pc.bat restore       put a backup back; the app must be closed
 REM
 REM  Run setup once AFTER setup-dev-environment.bat. The desktop file
 REM  "Start Inventory App" calls "start".
@@ -23,11 +25,12 @@ set "REPO=%APPDIR%\inventory-audit-app-3rdYr"
 set "REPO_URL=https://github.com/naokicodes/inventory-audit-app-3rdYr.git"
 set "TAG="
 set "APP_PORT=3000"
-set "KEEP_BACKUPS=14"
 set "WARN="
 
 if /i "%~1"=="start" goto :start
 if /i "%~1"=="update" goto :update
+if /i "%~1"=="backup" goto :backupword
+if /i "%~1"=="restore" goto :restore
 if /i "%~1"=="--admin" goto :admin
 
 title Inventory Audit App - restaurant PC setup
@@ -219,6 +222,22 @@ for /f "usebackq delims=" %%D in (`powershell -NoProfile -Command "[Environment]
 if not defined DESKTOP set "DESKTOP=%USERPROFILE%\Desktop"
 >"%DESKTOP%\Start Inventory App.bat" echo @call "%APPDIR%\restaurant-pc.bat" start
 
+REM --- Backups at 3 PM and 3 AM: two tasks for this user, no admin prompt -
+REM Created, or replaced when setup runs again (/f). They run while this user
+REM is signed in, which the app's auto-start needs anyway.
+set "SCHEDBAD="
+schtasks /create /f /sc daily /st 15:00 /tn "Inventory App backup 3PM" /tr "\"%APPDIR%\restaurant-pc.bat\" backup" >nul
+if errorlevel 1 set "SCHEDBAD=1"
+schtasks /create /f /sc daily /st 03:00 /tn "Inventory App backup 3AM" /tr "\"%APPDIR%\restaurant-pc.bat\" backup" >nul
+if errorlevel 1 set "SCHEDBAD=1"
+if defined SCHEDBAD goto :sched_bad
+echo  Backups scheduled every day at 3 PM and 3 AM.
+goto :sched_done
+:sched_bad
+echo  [!] Could not schedule the 3 PM and 3 AM backups. Run this file again; if it fails again, tell Naoki.
+set "WARN=1"
+:sched_done
+
 echo.
 echo  ===============================================================
 if defined WARN echo   Finished, with the [!] notes above.
@@ -246,15 +265,15 @@ call :refreshpath
 if not exist "%REPO%\package.json" goto :fail_norepo
 cd /d "%REPO%"
 title Inventory Audit App - keep this window open
-REM The port first: never copy beta.db while the app is using it.
+REM The port first: never start a second copy of the app. Then .env, the backup, the app.
 call :portbusy
 if errorlevel 1 goto :fail_already
 call :checkenv
 if errorlevel 1 goto :fail
 call :backup
-if not errorlevel 1 goto :start_backed_up
-echo  [!] The backup failed - see above. The app starts anyway; tell Naoki today.
-:start_backed_up
+if "%errorlevel%"=="1" echo  [!] The backup failed - see above. The app starts anyway; tell Naoki today.
+REM The newest backup here and in the copy folder, so a backup that stopped working shows at every start.
+node "%REPO%\scripts\backup-db.js" "%APPDIR%\backups" --status
 echo.
 for /f "delims=" %%H in ('git describe --tags --always') do echo  Version: %%H
 echo  Phones on the restaurant network open:
@@ -304,8 +323,9 @@ if not defined PREV goto :fail_prev
 set "PREVNAME="
 for /f "delims=" %%H in ('git describe --tags --always') do set "PREVNAME=%%H"
 echo  Now: %PREVNAME%    Moving to: %NEWTAG%
-call :backup
-if errorlevel 1 goto :fail_nobackup
+REM Labelled, so "go back" is restore this backup plus update to the old tag.
+call :backup before-update-from-%PREVNAME%
+if "%errorlevel%"=="1" goto :fail_nobackup
 git -c advice.detachedHead=false checkout -q "%NEWTAG%"
 if errorlevel 1 goto :fail_checkout
 echo  Installing dependencies...
@@ -335,8 +355,50 @@ echo  Back on %PREVNAME%. Nothing in the data was changed.
 goto :fail
 
 REM ===================================================================
+REM  Backup: one backup now. The 3 PM and 3 AM tasks run this word, so
+REM  it never pauses: the window closes by itself. Its lines go to
+REM  backups\last-backup.log too.
+REM ===================================================================
+:backupword
+call :refreshpath
+if not exist "%APPDIR%\backups" mkdir "%APPDIR%\backups"
+set "BKLOG=%APPDIR%\backups\last-backup.log"
+>"%BKLOG%" echo %DATE% %TIME%
+call :checkenv >>"%BKLOG%" 2>&1
+if errorlevel 1 goto :backupword_done
+call :backup >>"%BKLOG%" 2>&1
+:backupword_done
+set "BKERR=%errorlevel%"
+type "%BKLOG%"
+exit /b %BKERR%
+
+REM ===================================================================
+REM  Restore: put a backup back. The app must be closed first.
+REM ===================================================================
+:restore
+call :refreshpath
+if not exist "%REPO%\package.json" goto :fail_norepo
+cd /d "%REPO%"
+title Inventory Audit App - restore
+echo.
+echo  Inventory Audit App - restore
+echo  =============================
+call :portbusy
+if errorlevel 1 goto :fail_restore_running
+call :checkenv
+if errorlevel 1 goto :fail
+node "%REPO%\scripts\restore-db.js" "%APPDIR%\backups"
+if errorlevel 1 goto :fail
+echo.
+pause
+exit /b 0
+
+REM ===================================================================
 REM  Failures
 REM ===================================================================
+:fail_restore_running
+echo  [X] Close the app window first, then run restore again.
+goto :fail
 :no_git
 echo  [X] Git is not installed. Run setup-dev-environment.bat first.
 goto :fail
@@ -417,25 +479,14 @@ if defined NEWPATH set "PATH=%NEWPATH%;%USERPROFILE%\.local\bin;%APPDATA%\npm"
 goto :eof
 
 :backup
-REM Returns errorlevel 1 if any copy failed.
-if not exist "%REPO%\server\db\beta.db" exit /b 0
-set "STAMP="
-for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HHmm"`) do set "STAMP=%%T"
-if not defined STAMP goto :backup_bad
-if not exist "%APPDIR%\backups" mkdir "%APPDIR%\backups"
-copy /y "%REPO%\server\db\beta.db" "%APPDIR%\backups\beta_%STAMP%.db" >nul
-if errorlevel 1 goto :backup_bad
-if not exist "%REPO%\server\db\beta.db-wal" goto :backup_ok
-copy /y "%REPO%\server\db\beta.db-wal" "%APPDIR%\backups\beta_%STAMP%.db-wal" >nul
-if errorlevel 1 goto :backup_bad
-:backup_ok
-echo  Data backed up to InventoryApp\backups\beta_%STAMP%.db
-REM Keep the newest %KEEP_BACKUPS% backups; delete older ones (and their -wal files).
-powershell -NoProfile -Command "Get-ChildItem -LiteralPath '%APPDIR%\backups' -Filter 'beta_*.db' | Where-Object { $_.Extension -eq '.db' } | Sort-Object Name -Descending | Select-Object -Skip %KEEP_BACKUPS% | ForEach-Object { Remove-Item -LiteralPath $_.FullName; Remove-Item -LiteralPath ($_.FullName + '-wal') -ErrorAction SilentlyContinue }"
-exit /b 0
-:backup_bad
-echo  [X] Backing up the data failed. Is the disk full?
-exit /b 1
+REM One backup file (scripts\backup-db.js; %1 = an optional label). It keeps the
+REM last 14 days plus one a month, and copies to BACKUP_COPY_DIR when .env sets it.
+REM errorlevel 0 = backed up, or no database yet; 1 = failed (its line says why);
+REM 2 = backed up, but the copy to the copy folder failed.
+node "%REPO%\scripts\backup-db.js" "%APPDIR%\backups" %1
+set "BKERR=%errorlevel%"
+if "%BKERR%"=="2" echo  [!] The backup is made, but it was not copied to the copy folder - check that the disk or Google Drive is there.
+exit /b %BKERR%
 
 :portbusy
 REM errorlevel 1 when something already listens on the app's port.
