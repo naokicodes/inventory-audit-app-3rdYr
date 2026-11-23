@@ -563,6 +563,7 @@ Issue #70 (ADR-077): `.tabs` becomes one row that swipes sideways; the page stay
 only, page-local. PUBLIC -> click-through. Full spec: session-status.md -> "Step settings-tabs".
 
 ### 3zv. Step sign-the-cookie - the login cookie carries a signature  [blocked: stale-saves]
+**CLOSED 2026-11-23, PR #94 (`ffb6b74`).**
 Touches: server/routes/auth.js, server/routes/auth.test.js, .env.example, public/login.html
 cubic's P1 on PR #61: an HMAC on the user_id cookie (node:crypto, COOKIE_SECRET in .env, no
 dependency). Server-only, no click-through. Full spec: session-status.md -> "Step sign-the-cookie".

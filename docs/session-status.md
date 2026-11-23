@@ -4443,6 +4443,7 @@ on these pages (settings.html: sheet-close 3zd, staff-meal-settings 3zw).
   merges as built; Settings' tab row is step settings-tabs.
 
 ## Step sign-the-cookie - the login cookie carries a signature (A0 follow-up)
+**CLOSED 2026-11-23, PR #94 (`ffb6b74`).**
 
 Decided 2026-11-11 (cubic's P1 on PR #61). DEPENDS ON write-permission (3zr): until then nothing
 depends on who you are, so a forged cookie gains nothing a logged-out visitor lacks (ADR-040).
