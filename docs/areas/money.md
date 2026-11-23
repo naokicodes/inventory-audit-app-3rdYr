@@ -48,3 +48,6 @@ Status: IRL Written (payroll template, the purchaser's logbook, the cashier's ta
 - The tally's "AMD", its "P.O" line and "comp" under in-house: what they are.
 - Operating expenses (gas, electricity, water): entered where? (Final scope)
 - Queue item A13.
+- 2026-11-23 (ADR-117): the purchaser's run moves into the app as expenses: each receipt's grand
+  total, the cash given and counted, the short. The "None of this is stored" line above holds for
+  the till and sales money only. Fares, tips and who covers a short: A9's spec.

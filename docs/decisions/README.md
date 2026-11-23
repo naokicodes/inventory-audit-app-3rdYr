@@ -156,6 +156,10 @@ flight. (ADR-001 explains the split.)
 | ADR-111 | One shell for every page: a top bar, one grouped menu, a Home of big buttons, the icon | Accepted 2026-11-22 |
 | ADR-112 | Kitchen Sales keeps what it fetched from Loyverse for a short time | Accepted 2026-11-22 |
 | ADR-113 | A login lasts one business day | Accepted 2026-11-22 |
+| ADR-114 | The restaurant PC takes a new tag only for a staff test | Accepted 2026-11-23 |
+| ADR-115 | A page goes to staff only after a staff-friendly pass | Accepted 2026-11-23 |
+| ADR-116 | A replaced meat is hidden, never deleted: Forequarter replaces Shortplate | Accepted 2026-11-23 |
+| ADR-117 | The purchaser's run records expenses: receipt totals, cash given, the short | Accepted 2026-11-23 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

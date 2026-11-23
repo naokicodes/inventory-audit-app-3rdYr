@@ -12,6 +12,8 @@ Status: IRL Confirmed - FLOW Drafted - APP Built (blind count + recount, PR #51)
      salmon, shrimp, golabki.
    - COOKED: sisig, jowl, pata, slab inihaw, braised beef, nilaga, pasta, whole
      chicken; croquettes and mozzarella added by hand.
+   - 2026-11-23: the braised beef, the nilaga and the new Kare-Kare are all made from
+     Forequarter, which replaced Shortplate (ADR-116).
    - The counter fills END; QTY is their first PO quantity for the item,
      which the head chef reviews. The counter never sees an expected
      number: blind counting already happens on paper.
@@ -123,10 +125,11 @@ and are ignored (Naoki, 2026-11-17).
    stays in history; the recount becomes the count.
 3. The landing person / head chef enters allocations. Staff meals come from the
    staff-meal page; waste from waste entries.
-4. FC (from beta-3, 2026-11-22): FC's head chef counts FC's 27 lines in the app at FC, alongside
-   the paper, on a phone that reaches the restaurant PC through Tailscale (ADR-110). A month's
-   first count starts in the Month opening panel at the top of Landing. On the first day Naoki is
-   there or on a call, and Kitchen Sales' FC side is compared with FC's paper.
+4. FC (2026-11-23, ADR-114; replaces the 11-22 plan): FC's head chef counts on paper and reads
+   FC's side of Kitchen Sales on his own phone through the Tailscale share (ADR-110) to fill the
+   POS column. Counting in the app waits for a staff test with Naoki there.
+5. Every landing (2026-11-23, ADR-114): until the staff test, the head chef fills the paper
+   landing's POS column from Kitchen Sales. The counters never see sales (ADR-101).
 
 ## APP
 - Built: daily audit (meat + portion counts, allocations, month opening and

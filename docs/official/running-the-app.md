@@ -161,6 +161,17 @@ For each phone, one person at a time:
 Never invite staff into the tailnet as users: an invited user reaches every machine on it. To
 stop one phone, revoke its share in the admin console.
 
+## Put the app on a phone's Home screen (Built)
+
+On the phone or tablet, in Chrome, with the app open:
+
+1. Tap Chrome's menu (the three dots, top right).
+2. Tap **Add to Home screen**, then **Add**.
+3. The Silingan icon and "Inventory" appear on the Home screen. Tap it to open the app.
+
+Over the restaurant PC's plain http it still opens in a browser tab; a window without the tab comes
+with HTTPS, later, with hosting.
+
 ## Planned (beta-4)
 
 - Admin logins ask for the admin password; the setup asks it once and keeps it in `.env`.

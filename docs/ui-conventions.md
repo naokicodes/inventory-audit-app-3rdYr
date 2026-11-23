@@ -46,6 +46,19 @@ acknowledgment, sides) are known. Add to it; don't wait for it to be complete.
 - Narrow (700px): the login page and Home. Wide (1200px, `.page-wide`): every other page.
 - No page sets its own body width.
 
+## Staff-friendly pages (2026-11-23, ADR-115)
+
+Before a staff test, every page it uses gets this pass; Naoki checks it on the laptop at phone width,
+used as that staff member would.
+
+- **Few words.** A label, not a sentence. Help text only where a mistake costs something.
+- **The order of the work.** Top to bottom in the order the person does it (Naoki's flow), one main
+  action per part of the screen.
+- **Colors that guide,** the same on every page: the next thing to do, done, needs attention,
+  error. The first pass picks the four (from the Look section's palette); later pages reuse them.
+- **Room.** Space between parts; tap targets at least 48px high.
+- Assume someone who has never seen the app and reads little.
+
 ## Daily audit (and any Review/Enter sheet)
 
 - **Two views over one fetch.** Review (read the state) and Enter (type counts)

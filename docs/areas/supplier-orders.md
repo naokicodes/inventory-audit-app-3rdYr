@@ -48,6 +48,11 @@ Status: IRL Written - FLOW Drafted - APP Decided
 5. A supplier reports an item out of stock in its group chat: the landing person or the
    purchaser moves that line to the buyer's list in one tap (2026-11-15).
 
+**2026-11-23, Naoki (idea for A9's spec, not decided):** each item may have a main supplier and a
+backup supplier (optional). A quick sort screen first: item cards (names and icons, no numbers)
+dragged into supplier boxes, like a game; the cold-station head chef can place about half of them.
+Then a proper screen with the categories, items, quantities and required numbers.
+
 ## APP
 - Decided: PO change history and cost visibility (10); each item tagged by how
   it is bought: supplier delivery or buyer run (27); unplanned buys recorded

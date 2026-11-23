@@ -9,6 +9,9 @@ Sheet "Commissary Inventory" (source: photos 2026-10-23 and 2026-10-24).
 - About 18 meats, raw and processed pairs: whole chicken / raw, pata, belly
   slab / raw, jowl / raw, shortplate, pork steak, french cut, pompano, salmon
   belly, ground beef, tuna, pork chop, beef shank, ribs, fore quarter.
+- 2026-11-23 (Naoki): Forequarter replaces Shortplate for Silingan's braised beef, nilaga and
+  Kare-Kare (ADR-116). Asked: what the sheet's fore quarter line was for before, and whether the
+  commi stops shortplate entirely.
 - One portion block per destination (FC, Likod, Silingan): these are the
   shipments. Each shipment is written twice, as kg and as portions; that is how
   they record it, and the app's commi flow already matches (handoff 41).

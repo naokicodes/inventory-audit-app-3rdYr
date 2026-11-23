@@ -1,6 +1,6 @@
 # Sales (Loyverse)
 
-Status: IRL Confirmed - FLOW None - APP Built (Kitchen Sales, the FC switch); landing-sales Specced (ADR-094)
+Status: IRL Confirmed - FLOW Written (the landings' POS column, ADR-114) - APP Built (Kitchen Sales, the FC switch, FC by landing line, a short cache)
 
 ## IRL - how it works today
 - Three Loyverse accounts: Silingan, Likod and FC (FC's token is on the restaurant PC, 2026-11-17;
@@ -17,6 +17,9 @@ Status: IRL Confirmed - FLOW None - APP Built (Kitchen Sales, the FC switch); la
   out by hand there (money.md).
 - 2026-11-22: Silingan sells a new Kare-Kare; the kitchen counts only it, not Crispy Kare-Kare or the
   two trays.
+- 2026-11-23 (ADR-114): each landing (the head chef) reads the day's sales on Kitchen Sales for the
+  paper landing's POS column; FC's head chef on his own phone through the Tailscale share. The
+  counters never see sales (ADR-101).
 
 ## APP
 - Built: read-only Loyverse preview engine and the Kitchen Sales page
@@ -29,6 +32,8 @@ Status: IRL Confirmed - FLOW None - APP Built (Kitchen Sales, the FC switch); la
   (temporary); the rest in "Not on the landing". Planned: fc-dish-map (the database half, for
   the landing's expected values).
 - 2026-11-22: landing-sales also maps Silingan's Kare-Kare (D044).
+- Built 2026-11-22: landing-sales (PR #90) and sales-cache (PR #92, ADR-112: each result kept in
+  memory for a short time; Sync always fetches fresh). On the restaurant PC since beta-3.1.
 
 ## Open questions
 - None open.
