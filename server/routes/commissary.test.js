@@ -1467,7 +1467,7 @@ async function staleSavesOverHttp() {
   const DB_FILE = path.join(os.tmpdir(), `commissary-stale-saves-test-${process.pid}-${Date.now()}.db`);
   process.env.DB_PATH = DB_FILE;
   const liveDb = require('../db/connection.js');
-  const { currentUser } = require('./auth.js');
+  const { currentUser, cookieFor } = require('./auth.js');
   const app = express();
   app.use(express.json());
   app.use('/api', currentUser);
@@ -1493,14 +1493,14 @@ async function staleSavesOverHttp() {
   const save = async (userId, rows, actor) => {
     const res = await fetch(base + '/api/commissary/daily-audit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(userId ? { Cookie: `user_id=${userId}` } : {}) },
+      headers: { 'Content-Type': 'application/json', ...(userId ? { Cookie: cookieFor(userId) } : {}) },
       body: JSON.stringify({ commissary_id: comId, business_date: DATE, rows, ...(actor ? { actor } : {}) }),
     });
     assert.strictEqual(res.status, 200);
     return res.json();
   };
   const stored = id => ({ ...liveDb.prepare('SELECT quantity, notes, created_by FROM commissary_ending_actual WHERE commissary_meat_id = ? AND business_date = ?').get(id, DATE) });
-  const getRows = async date => (await fetch(base + `/api/commissary/daily-audit?date=${date}&commissary_id=${comId}`, { headers: { Cookie: `user_id=${ana}` } })).json();
+  const getRows = async date => (await fetch(base + `/api/commissary/daily-audit?date=${date}&commissary_id=${comId}`, { headers: { Cookie: cookieFor(ana) } })).json();
 
   const httpTests = [
     ['A saves 60, corrects to 66 with a note; B posts 60 untouched plus another meat touched -> 66 and the note stay', async () => {

@@ -13,7 +13,7 @@ const express = require('express');
 const DB_FILE = path.join(os.tmpdir(), `blind-count-test-${process.pid}.db`);
 process.env.DB_PATH = DB_FILE;
 const db = require('../db/connection.js');
-const { currentUser } = require('../routes/auth.js');
+const { currentUser, cookieFor } = require('../routes/auth.js');
 const dailyAudit = require('../routes/dailyAudit.js');
 const { recordRecount } = require('./monthOpening.js');
 const { computeMixedDailyAudit } = require('./auditEngine.js');
@@ -60,7 +60,7 @@ app.use('/api', currentUser);
 app.use('/api', dailyAudit);
 
 let base;
-const as = id => (id ? `user_id=${id}` : undefined);
+const as = id => (id ? cookieFor(id) : undefined);
 const call = (method, url, { body, user } = {}) => fetch(base + url, {
   method,
   headers: { 'Content-Type': 'application/json', ...(as(user) ? { Cookie: as(user) } : {}) },

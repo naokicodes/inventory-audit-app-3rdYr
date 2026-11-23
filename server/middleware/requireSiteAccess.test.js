@@ -12,7 +12,7 @@ const express = require('express');
 const DB_FILE = path.join(os.tmpdir(), `site-filter-test-${process.pid}.db`);
 process.env.DB_PATH = DB_FILE;
 const db = require('../db/connection.js');
-const { currentUser } = require('../routes/auth.js');
+const { currentUser, cookieFor } = require('../routes/auth.js');
 const requireSiteAccess = require('./requireSiteAccess.js');
 const { siteCodeFor, siteOfRow } = require('../db/siteAccess.js');
 
@@ -61,7 +61,7 @@ for (const r of ['dailyAudit', 'stockReceipts', 'sales', 'commissary']) app.use(
 let base;
 const call = (method, url, { body, as } = {}) => fetch(base + url, {
   method,
-  headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: `user_id=${as}` } : {}) },
+  headers: { 'Content-Type': 'application/json', ...(as ? { Cookie: cookieFor(as) } : {}) },
   body: body === undefined ? undefined : JSON.stringify(body),
 });
 const listLikod = `/api/stock-receipts?restaurant_id=${likod}`;               // group (a)
