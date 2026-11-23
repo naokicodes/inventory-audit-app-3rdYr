@@ -15,6 +15,7 @@ const db = require('../db/connection.js');
 const router = require('./auth.js');
 const { currentUser, cookieUserId, cookieFor, maxAgeSeconds } = router;
 const DAY = 24 * 60 * 60 * 1000;
+const { businessDate } = require('../businessDay.js');
 
 let passed = 0, failed = 0;
 const tests = [];
@@ -129,15 +130,23 @@ test('GET /auth/users lists active users only, by name, with needs_password', as
 });
 
 test('login sets a signed user_id cookie that lasts until the next 8 AM', async () => {
-  const before = Date.now();
-  const res = await login({ user_id: ana });
-  assert.strictEqual(res.status, 200);
-  const header = setCookie(res);
-  assert.match(header, /^user_id=\d+\.\d{4}-\d{2}-\d{2}\.[A-Za-z0-9_-]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=\d+$/);
-  const maxAge = Number(/Max-Age=(\d+)/.exec(header)[1]);
-  assert.ok(Math.abs(maxAge - maxAgeSeconds(before)) <= 2, `Max-Age ${maxAge}`);
-  assert.strictEqual(cookieUserId(`user_id=${valueOf(header)}`), ana);
-  assert.strictEqual((await me(`user_id=${valueOf(header)}`)).id, ana);
+  // Real clock: a run that crosses the 8 AM turn tries once more, since the
+  // cookie, Max-Age and the check after it would straddle two business days.
+  for (let attempt = 1; ; attempt++) {
+    const before = Date.now();
+    const res = await login({ user_id: ana });
+    const header = setCookie(res);
+    const signedIn = header && cookieUserId(`user_id=${valueOf(header)}`);
+    const viaMe = header && await me(`user_id=${valueOf(header)}`);
+    if (businessDate(before) !== businessDate(Date.now()) && attempt === 1) continue;
+    assert.strictEqual(res.status, 200);
+    assert.match(header, /^user_id=\d+\.\d{4}-\d{2}-\d{2}\.[A-Za-z0-9_-]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=\d+$/);
+    const maxAge = Number(/Max-Age=(\d+)/.exec(header)[1]);
+    assert.ok(Math.abs(maxAge - maxAgeSeconds(before)) <= 2, `Max-Age ${maxAge}`);
+    assert.strictEqual(signedIn, ana);
+    assert.strictEqual(viaMe.id, ana);
+    break;
+  }
 });
 
 test('login takes user_id as a whole number or a string of digits', async () => {
