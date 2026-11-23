@@ -135,11 +135,11 @@ test('login sets a signed user_id cookie that lasts until the next 8 AM', async 
   for (let attempt = 1; ; attempt++) {
     const before = Date.now();
     const res = await login({ user_id: ana });
+    assert.strictEqual(res.status, 200);
     const header = setCookie(res);
     const signedIn = header && cookieUserId(`user_id=${valueOf(header)}`);
     const viaMe = header && await me(`user_id=${valueOf(header)}`);
     if (businessDate(before) !== businessDate(Date.now()) && attempt === 1) continue;
-    assert.strictEqual(res.status, 200);
     assert.match(header, /^user_id=\d+\.\d{4}-\d{2}-\d{2}\.[A-Za-z0-9_-]+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=\d+$/);
     const maxAge = Number(/Max-Age=(\d+)/.exec(header)[1]);
     assert.ok(Math.abs(maxAge - maxAgeSeconds(before)) <= 2, `Max-Age ${maxAge}`);
