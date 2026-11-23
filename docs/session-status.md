@@ -132,9 +132,50 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-118; the index, and a map from handoff item numbers to records, is in
+to ADR-123; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-23 architect, evening (A0 #96; A9 round 2: the podium and purchaser tests) - decided (recorded: ADR-119 to ADR-123)
+
+- **A0: PR #96 (token-diet) matches its spec** (checked after the merge: `12b5e65`, closed `16a524e`;
+  846 tests, SUITE GREEN, AUDIT CLEAN). cubic's fix also hands the click-checker the edge states and
+  test accounts, which its own "what it gets" list names, and lets it use in-page confirms while never
+  clicking a native one (ADR-093). PR #94's last two commits changed only the Max-Age test. Drop-in
+  2026-11-23-02 is on main as `f0b1a3b`.
+- **No more work for the purchasers (Naoki).** They are already buried with early-morning work: the
+  app may replace what they do, never add to it. They never sort suppliers; their run replaces the
+  logbook page and is never filled as well as it; on a test day Naoki types the run beside the logbook
+  (ADR-122).
+- **Suppliers (ADR-119).** One list for all three restaurants (it delivers, or we pick up or buy
+  there). Each side item gets a main and an optional backup on a sort screen (tap a card, tap a box;
+  drag on the PC and tablet; icons per category). The cold-station head chef sorts the half they know;
+  the supervisors or the podium sort the rest from the data Naoki collects. An item's main supplier
+  sets its "how it is bought" tag.
+- **The PO line (ADR-120).** "Required numbers" = the amount to buy, typed as on the paper PO; on hand
+  (the paper's REM) optional; a par later, after side-sheets. A line is a catalog item or a typed name.
+  For the tests an admin types the lines.
+- **The receive screen (ADR-121).** Group buttons by supplier, plus Any shop, Waiting and + Extra; the
+  kitchen sees the veggie groups, the podium the rest; weights ticked to start with a 0.5 kg leeway
+  (Settings), pieces filled in with - / +; one **"All here"** per group, not "Approve" (the app checks,
+  never approves, ADR-045); a missing line waits, joins the group it came with, or is on the next day's
+  list at 8 AM; each group shows that store's receipt from the run.
+- **The purchaser's run (ADR-122; details ADR-117).** Cash given; one line per receipt (store,
+  restaurant, grand total, photo); fares, tips and other buys as lines; cash counted. The app shows
+  spent, cash left and the short, which is only shown (A13 decides charges). The restaurant comes from
+  the run's own list (Silingan, Likod, FC) until Likod is a site. Photos are optional, shrunk on the
+  phone, files beside the database, mirrored once by the backup (Fable D6). The main supervisor marks a
+  run checked.
+- **Four switches (ADR-123):** edit_suppliers (supervisor, head-chef), purchase (a "Purchaser" role made
+  on the Roles page), check_runs (supervisor), receive (supervisor, head-chef; the podium by a role).
+- **Specced, in this order, after the roster chain:** suppliers -> purchaser-run -> po-lines -> receive,
+  one PR each; each touches `public/`, so each gets the click-through and ADR-115's pass. Both tests
+  then need the PC to take that tag, and the purchasers' and the podium's logins (the people import).
+- **Fixed in passing:** ADR-059's and ADR-068's Status lines now name ADR-117's partial supersession
+  (missed on 11-23 morning); ADR-022's names ADR-119.
+- **Still open:** who covers a purchaser's short and the logbook's "cash out" lines (A13); one receipt
+  for two restaurants; Forequarter's real grams and the switch date; the commissary's October "fore
+  quarter" line; Windows Update's active hours; rice per tray and the sack's price and weight.
 
 ### 2026-11-23 architect (A0 #92 #93, beta-3.1 at the PC, the PC's rule, #95, A9's first round, A17) - decided (recorded: ADR-114 to ADR-118)
 
@@ -5792,7 +5833,7 @@ You check (on the laptop first, then at the PC after `update beta-4`): start mak
 restore is refused while the app runs; then, with the app closed: save a test count, restore an
 older backup (the count is gone), restore the before-restore backup (it is back).
 
-Not in scope: backups on a host (later, ADR-105); photos (run 4's D6, when photos are built); the
+Not in scope: backups on a host (later, ADR-105); photos (run 4's D6: step purchaser-run mirrors them, ADR-122); the
 full health line; the launcher's other changes (restaurant-pc-ii).
 
 ## Step fc-landing-lines - beta-3's starting data: FC's 27 lines and two meals, Silingan's Kare-Kare placeholder (A0, 2026-11-22)
@@ -6230,3 +6271,400 @@ message on Stock Receipts. You check: the messages read well on a phone.
 
 Not in scope: Settings' saves (cost-guard's saveRow, settings-safety); a limit per meat; the other
 page-errors items; Loyverse.
+
+## Step suppliers - the supplier list and the sort screen (A9, 2026-11-23)
+
+Decided 2026-11-23 (ADR-119, ADR-123; Naoki). After the roster chain (ADR-114: the roster is the
+first staff test); the first of A9's four (suppliers -> purchaser-run -> po-lines -> receive). New
+tables only: schema.sql, no migrate.js change.
+
+What the head chef, a supervisor or the podium sees (a phone first; ADR-115's staff-friendly pass):
+- Buying -> Suppliers. At the top, the supplier boxes in a grid: big tiles with the name, a mark for
+  the kind (delivers / we go there) and how many items have it as main. A last box, "Any shop", holds
+  the unsorted. "+ Supplier" opens an in-page form: the name and the kind (two big buttons). Tapping a
+  box's name opens it: rename, change the kind, switch it off (an in-page "Are you sure?", ADR-093).
+- Below, "To sort": item cards (the item's name and its category's icon, no numbers), with category
+  chips (All, then each category). Tap a card (it lifts), then tap a box: the item goes in as its main,
+  the card leaves "To sort" and the box's count goes up. On the PC and tablet a card can also be
+  dragged onto a box.
+- Inside a box, its cards. Tapping one shows "Main: <name>", "Backup: <name or none>" and three
+  buttons: "Set backup" (then tap a box), "Move" (then tap another box: the new main), "Unsort" (back to
+  To sort, main and backup cleared).
+- "Undo" takes back the last move. Every change saves at once (no Save button) and shows "Saved" for a
+  moment; a failed save puts the card back and says why.
+- Logged out, or without edit_suppliers at any site: the boxes and cards show, read only, with "Log in
+  to sort." or "You can look, not sort." Items from the commi are not on this screen (meat requests,
+  ADR-092).
+
+Server:
+1. server/engines/suppliers.js (new): createSupplier(db, { name, kind }, ctx), updateSupplier(db, id,
+   { name, kind, active }, ctx), board(db) and setItemSuppliers(db, itemId, { main, backup }, ctx);
+   each write logs one activity_log row (entity `suppliers` or `side_item_suppliers`, MANUAL). Names are
+   trimmed and single-spaced, unique ignoring capitals (sideItems.nameKey): 400 "There is already a
+   supplier called <name>." The kind is DELIVERS or PICKUP: 400 otherwise. A switched-off supplier keeps
+   its items but takes no new ones (400 "That supplier is switched off."); its box shows greyed at the
+   end.
+2. setItemSuppliers: main is an active supplier or null (unsort clears both); the backup needs a main
+   (400 "Set a main supplier first.") and differs from it (400 "The backup must be another
+   supplier."). In the same transaction it sets side_items.how_bought: DELIVERS -> 'SUPPLIER', PICKUP
+   -> 'BUYER' (ADR-119); unsort leaves how_bought as it was. An item whose how_bought is 'COMMI' is
+   refused (400 "This item comes from the commi.").
+3. board(db): { suppliers: [{ id, name, kind, active, main_count }], items: [{ id, name, main_unit,
+   categories (the distinct sheet_definitions.category of its active side_item_sheets links),
+   main_supplier_id, backup_supplier_id }] }: active side items not tagged 'COMMI', by name. No costs
+   (ADR-060).
+4. server/routes/suppliers.js (new), mounted in index.js: GET /api/suppliers (the list, for the later
+   pages), GET /api/suppliers/board (a catalog read, open as ADR-043), POST /api/suppliers, PUT
+   /api/suppliers/:id, PUT /api/side-items/:id/suppliers ({ main_supplier_id, backup_supplier_id }).
+   Writes need a login and edit_suppliers at any site: permissions.js gains `canAnySite(db, user,
+   capability)` (true when capabilitiesBySite has it at one or more sites; admin implies all). 401 "Log
+   in first." / 403 "You need the Edit suppliers switch."; read-only roles are refused as every write
+   is (ADR-084). Ids are whole numbers above 0 (ADR-074).
+5. permissions.js: `edit_suppliers` joins SWITCHES; DEFAULT_SETS gains 'supplier-switches' {
+   supervisor: ['edit_suppliers'], 'head-chef': ['edit_suppliers'] } (applied once per database at
+   server start, so beta.db gets it with no reseed). public/roles.html's TOGGLES: ['edit_suppliers',
+   null, 'Edits suppliers and sorts items'].
+
+Schema (server/db/schema.sql, new tables; the kind and the backup rule are checked in the engine, as
+side_items' are):
+- `suppliers` (id, name TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))).
+- `side_item_suppliers` (side_item_id INTEGER PRIMARY KEY REFERENCES side_items(id), main_supplier_id
+  INTEGER REFERENCES suppliers(id), backup_supplier_id INTEGER REFERENCES suppliers(id), updated_at
+  TEXT NOT NULL DEFAULT (datetime('now'))).
+
+Page: public/suppliers.html (new). public/shell.js: a new menu group "Buying" between Management and
+Admin, with Suppliers (uiShell.test.js's slices still hold). Icons: inline SVG, one per category word
+(veg: a leaf, pantry: a can, bar: a glass, pizza: a slice, anything else: a box); the PR lists them.
+Tap targets at least 48px.
+
+Edge states: Empty - no suppliers yet: "+ Supplier" and the cards, "Add a supplier to start sorting.";
+no side items: "No items yet. An admin adds them in Settings -> Side items." Loading - "Loading..."
+until the board answers. Failure - a failed board read: "Could not load." with "Try again"; a failed
+move: the card goes back with the reason. Stale - two phones sort the same item: the last save wins,
+the next read shows it, the log keeps both. Blocked - no switch: read only, as above. Two devices -
+people sorting different items do not interfere.
+
+Tests (server/engines/suppliers.test.js, server/routes/suppliers.test.js, permissions.test.js): create,
+rename; a duplicate name in other capitals refused; a bad kind refused; a main, then a backup; a backup
+equal to the main or without a main refused; a switched-off supplier refused as a main; how_bought
+follows DELIVERS and PICKUP and is left alone by unsort; a COMMI item refused and absent from the
+board; the board's categories come from active links only; each write logs one row; the routes refuse
+logged out (401), a checker without the switch (403), a read-only login and a bad id (400); a head-chef
+with one site may sort (canAnySite); 'supplier-switches' is applied once and not re-added after an
+admin removes it.
+
+Touches: server/db/schema.sql, server/engines/suppliers.js (new), server/engines/suppliers.test.js
+(new), server/routes/suppliers.js (new), server/routes/suppliers.test.js (new), server/index.js,
+server/db/permissions.js, server/db/permissions.test.js, public/suppliers.html (new), public/shell.js,
+public/roles.html.
+
+Click-through (390px and desktop). Claude checks (click-checker): as Test Head Chef RA - add two
+suppliers (one of each kind), sort three cards by tap and tap, set a backup, move one, unsort one, Undo;
+a duplicate name shows its message; Settings -> Side items (as Test Admin) shows the sorted items' new
+how-it-is-bought; as Test Counter RA - read only, with its line; no response carries a cost. You check:
+as a supervisor would, the cards and boxes read at a glance, the taps are easy, the colours follow
+ADR-115.
+
+Not in scope: a main supplier per restaurant; icons per item; the purchaser's list (buyer-list); PO
+lines (po-lines); importing suppliers from the settings workbook (later, if the list is long).
+
+## Step purchaser-run - the purchaser's run: receipts, fares, cash, the short (A9, 2026-11-23)
+
+Decided 2026-11-23 (ADR-117, ADR-122, ADR-123; Naoki). After suppliers (stores come from its list)
+and backup-restore (this step adds the photos to the backup). New tables only.
+
+What a purchaser sees (a phone; ADR-115's pass; the run replaces his logbook page, never adds to it):
+- Buying -> Purchases opens today's run (the business day, ADR-036), top to bottom: "Cash given" (one
+  big number box), "Receipts", "Fares and tips", "Cash counted", then the summary card.
+- "+ Receipt": the store (big buttons, most used first, then a find box over the supplier list; a name
+  not on the list can be typed), which restaurant (three big buttons: Silingan, Likod, FC), the grand
+  total, "Add photo" (the camera). Save. The receipt shows as a row: store, restaurant, total, a photo
+  mark or "no photo". Tapping a row edits it; "Remove" asks in-page (ADR-093).
+- "+ Fare", "+ Tip", "+ Other": the amount, which restaurant, an optional note.
+- The summary card, always current: per restaurant its receipts, fares, tips and other with a
+  subtotal; then Spent, Cash left (given - spent), Cash counted and, once counted is typed, "Short
+  <amount>", "Over <amount>" or "Even" (in the needs-attention, notice and done colours).
+
+An admin also sees "For: <person>" above the run (any active person), so Naoki types a run beside
+the logbook on a test day (ADR-122).
+
+Whoever checks runs (check_runs; the main supervisor) sees a day (today; < and > to move) with every
+run of that day as a card: the purchaser, spent, cash left, counted, the short, how many receipts
+have no photo. Opening one shows it as the purchaser sees it, read only, photos full size on a tap,
+and one big "Checked"; then "Checked by <name> at <time>" and "Uncheck". A checked run refuses its
+purchaser's changes: "Checked by <name>. Ask <name> to uncheck it."
+
+Server:
+1. server/engines/purchaseRuns.js (new): runFor(db, userId, date) (made by the first write, never by a
+   read), setCash, addReceipt / updateReceipt / removeReceipt, addLine / updateLine / removeLine (kind
+   FARE, TIP or OTHER), check / uncheck, summary(run) (spent, cash left, short, the subtotals) and
+   runsOn(db, date). Each write logs to activity_log (MANUAL). A removed receipt or line is switched
+   off (active = 0), never deleted.
+2. Money is whole centavos (INTEGER `*_cents`), typed as pesos with at most two decimals: 400 "Type an
+   amount like 1250 or 1250.50." for anything else, a negative, or above 1,000,000 pesos. The
+   restaurant is RA, LIKOD or FC (the run's own list, ADR-122; RA's and FC's names from the restaurants
+   table, "Likod" fixed): 400 otherwise.
+3. A receipt's store: an active supplier's id or a typed name (trimmed, 1 to 60 characters); one is
+   needed (400 "Pick or type the store.").
+4. server/routes/purchases.js (new), mounted in index.js: GET /api/purchases?date=&user_id= (one run
+   with its receipts, lines and summary), GET /api/purchases/day?date= (check_runs: the cards), PUT
+   /api/purchases/cash, POST /api/purchases/receipts, PUT and DELETE /api/purchases/receipts/:id, POST
+   /api/purchases/lines, PUT and DELETE /api/purchases/lines/:id, POST /api/purchases/:id/check and
+   /api/purchases/:id/uncheck, PUT and GET /api/purchase-receipts/:id/photo. Every route needs a login
+   (401 "Log in first."): a run is a person's, so there is no logged-out pass.
+5. Who may: the run's purchaser (purchase at any site, canAnySite) on today's or yesterday's business
+   day (400 "Only today's or yesterday's run can be changed."); an admin, any run, any day, and "For"
+   any person; check_runs (any site): reads every run, checks and unchecks; read-only roles read only
+   (ADR-084). A checked run refuses every write but uncheck: 409 with the message above. Anyone else:
+   403 "You need the Purchases switch."
+6. Photos (ADR-122, Fable D6): the page shrinks the picture (canvas; longest side 1600px, JPEG quality
+   0.7) and PUTs it as `image/jpeg`, through express.raw({ type: 'image/jpeg', limit: '3mb' }) on that
+   route only (index.js' express.json() stays). The server checks the JPEG start bytes (400 "That is not
+   a photo."), writes `photos/<YYYY>/<MM>/receipt-<id>-<8 random hex>.jpg` beside the database file
+   (dbPath.js' resolveDbPath), stores that relative path with forward slashes in
+   purchase_receipts.photo_path and keeps any older photo file (the log keeps both paths). GET sends
+   it, with `Cache-Control: private, max-age=3600`, to whoever may read the run (step receive adds the
+   holders of receive at the receipt's restaurant); 404 when there is none.
+7. The backup (server/db/backup.js, scripts/backup-db.js; from backup-restore): runBackup also mirrors
+   the `photos` folder beside the database into the backups folder's `photos`, copying only files not
+   there yet (same relative path, never deleting), then the same into BACKUP_COPY_DIR's `photos`. The
+   result line adds "<n> new photos". A photo that fails to copy is tried again next run and does not
+   fail the database backup. Restore never touches photos.
+8. permissions.js: `purchase` and `check_runs` join SWITCHES; DEFAULT_SETS gains 'run-switches' {
+   supervisor: ['check_runs'] } (no default for purchase, ADR-123). public/roles.html's TOGGLES:
+   ['purchase', null, 'Records their own purchases run'], ['check_runs', null, "Checks the purchasers'
+   runs"].
+9. .gitignore gains `photos/` (a dev database in server/db would put photos in the repo folder).
+
+Schema (server/db/schema.sql, new tables):
+- `purchase_runs` (id, user_id INTEGER NOT NULL REFERENCES users(id), business_date TEXT NOT NULL,
+  cash_given_cents INTEGER, cash_counted_cents INTEGER, checked_by_user_id INTEGER REFERENCES
+  users(id), checked_at TEXT, created_by_user_id INTEGER REFERENCES users(id), created_at TEXT NOT NULL
+  DEFAULT (datetime('now')), UNIQUE (user_id, business_date)).
+- `purchase_receipts` (id, run_id INTEGER REFERENCES purchase_runs(id) (NULL for a receiver's photo,
+  step receive), supplier_id INTEGER REFERENCES suppliers(id), store_name TEXT, for_site TEXT NOT NULL,
+  business_date TEXT NOT NULL, total_cents INTEGER (NULL only for a receiver's photo), photo_path TEXT,
+  active INTEGER NOT NULL DEFAULT 1, created_by_user_id INTEGER REFERENCES users(id), created_at TEXT
+  NOT NULL DEFAULT (datetime('now'))).
+- `purchase_run_lines` (id, run_id INTEGER NOT NULL REFERENCES purchase_runs(id), kind TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL, for_site TEXT NOT NULL, note TEXT, active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))).
+
+Page: public/purchases.html (new); public/shell.js: Purchases under Buying. Number boxes open the
+phone's number pad (`inputmode="decimal"`); pesos show as "1,250.50"; no browser dialogs (ADR-093).
+
+Edge states: Empty - no run yet today: the boxes empty, "Nothing yet today"; the first save makes the
+run. Loading - "Loading..." until the run answers. Failure - a failed save keeps what was typed with
+"Not saved: <why>. Try again."; a failed photo keeps the receipt (saved) with "Photo not sent. Try
+again." Partial - no cash counted yet: no short, "Type the cash counted at the end." Stale - checked
+while the purchaser was typing: his save gets the 409 message and the run reloads. Blocked - no switch:
+the 403 message; logged out: the login link. Two devices - the same person on two phones: each save is
+one row, and the summary is read fresh after every save. Disk full - the photo's write fails with its
+message; the receipt stays.
+
+Tests (server/engines/purchaseRuns.test.js, server/routes/purchases.test.js, server/db/backup.test.js,
+permissions.test.js): the summary of a run with receipts for all three restaurants, fares, tips and
+other (spent, cash left, short, over, even, subtotals) in centavos; three decimals, a comma, a negative
+or too big refused; a store needs a supplier or a name; a for_site off the list refused; a removed
+receipt leaves the sums; one run per person per day; the purchaser refused on a day two back, on
+another person's run and on a checked run (409); an admin types a run "For" a person; check_runs reads
+the day, checks and unchecks; read-only reads and cannot write; logged out 401; photos: a JPEG saved
+under photos/YYYY/MM beside a temp DB_PATH with its relative path, a PNG or text refused, a 4 MB body
+refused, the old file kept on replace, GET refused to another purchaser; the backup mirrors photos
+once, a second backup copies only the new one, nothing is deleted, a failed photo copy does not fail
+the backup; 'run-switches' applied once.
+
+Touches: server/db/schema.sql, server/engines/purchaseRuns.js (new),
+server/engines/purchaseRuns.test.js (new), server/routes/purchases.js (new),
+server/routes/purchases.test.js (new), server/index.js, server/db/permissions.js,
+server/db/permissions.test.js, server/db/backup.js, server/db/backup.test.js, scripts/backup-db.js,
+public/purchases.html (new), public/shell.js, public/roles.html, .gitignore.
+
+Click-through (390px and desktop). Claude checks (click-checker): as Test Admin - on the Roles page
+make a "Purchaser" role with Purchases on and give it to Test Counter RA; "For" Test Counter RA: cash
+given, three receipts (one typed store, one per restaurant), a fare, a tip, cash counted - the short
+and the subtotals add up; a small JPEG attaches and opens; as Test Counter RA - his run shows and takes
+a receipt; as Test Supervisor RA - the day's card, open, Checked; as Test Counter RA - refused with the
+message; as Test Supervisor RA - Uncheck. You check: on your phone beside a logbook page, the order
+matches the logbook, the amounts are easy to type, the short reads at a glance, "Add photo" opens the
+camera.
+
+Not in scope: a charge from a short and the "cash out" lines (A13); one receipt split across two
+restaurants; the cashier's till and sales money (D3, ADR-117); unit prices and receipt lines (bills);
+deleting old photos (kept for now, ADR-068); a free-space warning (the health line, later).
+
+## Step po-lines - a day's PO per restaurant, typed (A9, 2026-11-23)
+
+Decided 2026-11-23 (ADR-120; Naoki). After purchaser-run (one schema step at a time; receive reads
+both). New table only. For the podium test an admin types the PO from photos of the paper PO
+(ADR-114, podium.md).
+
+What an admin sees:
+- Buying -> PO: the restaurant (a site switch like Kitchen Sales') and the day the PO is for (the next
+  business day to start, as the paper PO is written after closing; < and > to move).
+- The lines in blocks by category, as the paper's blocks (a catalog item's first sheet category;
+  typed names under "Other"). Each line: the item, on hand (if typed), to buy (amount and unit), its
+  supplier or "Any shop".
+- "+ Line": a find box over the side items (a name not in the catalog offers "Add '<name>' as typed"),
+  then the amount, the unit (the item's units as buttons, its main unit first; free text for a typed
+  name), on hand (optional), the supplier (set to the item's main supplier; tap to change). Save puts it
+  in its block.
+- Tapping a line edits it; "Remove" (an in-page "Are you sure?") cancels it: it stays, struck through,
+  with who and when.
+- At the top, the lines per supplier ("<supplier>: 12", "Any shop: 3"): the groups the receiver will
+  see.
+
+Server:
+1. server/engines/poLines.js (new): addLine, updateLine, cancelLine and linesFor(db, site, date)
+   (each line with its category, supplier name and status); each write logs before and after to
+   activity_log (ADR-021: every change keeps who and what).
+2. A line: site (an active restaurant code; Likod waits for A12), for_date (a real date), exactly one of
+   side_item_id (an active side item) and item_name (typed, 1 to 60 characters); qty_ordered (above 0,
+   at most three decimals); unit (a catalog item's main unit or one of its side_item_units; any short
+   text for a typed name); on_hand (optional, 0 or more); supplier_id (an active supplier or null;
+   at creation, the item's main supplier unless given). 400 with a plain message for each.
+3. server/routes/poLines.js (new), mounted in index.js: GET /api/po-lines?site=&date= (anyone who may
+   use the site, through requireSiteAccess; no costs), POST /api/po-lines, PUT /api/po-lines/:id, POST
+   /api/po-lines/:id/cancel. Writes: admins only for now (requireAdmin): the counters' lines and the
+   landing's edits come with supplier-orders (ADR-120). A received or cancelled line refuses edits: 409
+   "This line is already received." / "This line was removed."
+
+Schema (server/db/schema.sql, new table): `po_lines` (id, site_code TEXT NOT NULL, for_date TEXT NOT
+NULL, side_item_id INTEGER REFERENCES side_items(id), item_name TEXT, qty_ordered REAL NOT NULL, unit
+TEXT NOT NULL, on_hand REAL, supplier_id INTEGER REFERENCES suppliers(id), status TEXT NOT NULL DEFAULT
+'ORDERED' (ORDERED, RECEIVED, WAITING, CANCELLED; checked in the engine), qty_received REAL,
+received_by_user_id INTEGER REFERENCES users(id), received_at TEXT, extra INTEGER NOT NULL DEFAULT 0,
+created_by_user_id INTEGER REFERENCES users(id), created_at TEXT NOT NULL DEFAULT (datetime('now')),
+updated_at TEXT). The receive columns are written by step receive: until then
+scripts/write-path-allowlist.json lists them, with the reason "step receive".
+
+Page: public/po.html (new); public/shell.js: PO under Buying.
+
+Edge states: Empty - no lines for that day: "No PO for <day> yet." and "+ Line". Loading - "Loading...".
+Failure - a failed save keeps the form filled, with the reason. Stale - another admin changed a line:
+the last save wins; the list reloads after every save. Blocked - not an admin: the list reads, no
+"+ Line", "Only an admin types the PO for now." Two devices - as Stale.
+
+Tests (server/engines/poLines.test.js, server/routes/poLines.test.js): a catalog line and a typed line;
+both or neither of item and name refused; 0, a negative or four decimals refused; a unit that is not
+the item's refused; the supplier defaults to the item's main and can be changed or cleared; cancel
+keeps the row (CANCELLED) and logs; linesFor puts typed names in Other and leaves cancelled lines out
+unless asked; a non-admin write refused (403), logged out refused; a bad site or date refused (400);
+audit-write-paths stays clean with the allowlist entries.
+
+Touches: server/db/schema.sql, server/engines/poLines.js (new), server/engines/poLines.test.js (new),
+server/routes/poLines.js (new), server/routes/poLines.test.js (new), server/index.js,
+scripts/write-path-allowlist.json, public/po.html (new), public/shell.js.
+
+Click-through (desktop and 390px). Claude checks (click-checker): as Test Admin - for tomorrow at RA, a
+catalog line in kg, a typed line in pcs, change a line's supplier, remove one; the blocks and the
+per-supplier counts match; as Test Head Chef RA - read only, with its line. You check: typing a 10-line
+PO from one of your PO photos takes about as long as you expect.
+
+Not in scope: the counters' own lines and the landing's cut with estimated cost (supplier-orders,
+ADR-021); the supplier picture and text; a par (ADR-120); the purchaser's list (buyer-list); Likod's
+PO (A12).
+
+## Step receive - the receive screen: groups, ticks, counts, All here (A9, 2026-11-23)
+
+Decided 2026-11-23 (ADR-121, ADR-122, ADR-123; Naoki). After po-lines (it receives its lines) and
+cost-guard (see_costs). One new table (app_settings). The podium test: Naoki runs it beside the
+podium's logbook (ADR-114).
+
+What the podium or the kitchen sees (a phone; ADR-115's pass):
+- Buying -> Receive: the restaurant (a site switch; only sites where they hold receive), today (the
+  business day), then "Kitchen" | "Podium" (remembered on this phone).
+- Big group buttons: each supplier with lines for that place today, with "<n> left" or a done mark;
+  "Any shop" for lines with no supplier; "Waiting <n>"; "+ Extra".
+- Inside a group:
+  - Weight lines (unit kg or g): a big tick, on to start, the item and the amount ordered. Untick what
+    did not come. Tap the amount to type the real one only if it is clearly off: within the leeway it
+    stays "in full", beyond it the line shows "<x> short" or "<x> over" (the needs-attention colour).
+  - Every other line: the amount ordered, already filled in, with - and +.
+  - The receipt: when a purchaser's run has a receipt from that supplier for this restaurant today,
+    its photo (tap to open) and, for someone with see_costs, its total. A supplier that delivers, with
+    no run receipt: "Add receipt photo" (a photo only, no total; ADR-068).
+  - One big "All here" at the bottom saves the whole group; the group turns done.
+- Waiting: the lines unticked or left at 0 today, and those still waiting from earlier days ("from
+  <day>"). Tap one, then the supplier it came with (big buttons): it joins that group, filled in. A line
+  still waiting at 8 AM shows the next day in its own supplier's group, marked "from <day>".
+- + Extra: the item (find box or a typed name), the amount and unit, and the group it came with; saved
+  as received and marked "extra".
+- A done group opens again and can be changed until the business day ends; each change is logged.
+
+An admin also gets Settings -> Receiving (a new tab): "Weight leeway (kg)" (0.5 to start; 0 to 5) and
+"The kitchen receives" (a tick per side-sheet category; to start, those whose name contains "veg",
+ADR-023). Everything else is the podium's.
+
+Server:
+1. server/engines/receive.js (new): dayFor(db, site, date, place) (the groups and their lines: that
+   date's lines plus WAITING lines from earlier dates, cancelled ones left out; a line's place comes
+   from its item's categories and the kitchen's list - a typed name or an item on no sheet is the
+   podium's); receiveGroup(db, site, date, supplierId or null, lines: [{ id, received, qty }], ctx) in
+   one transaction (received -> RECEIVED with qty_received, received_by_user_id, received_at; not
+   received or qty 0 -> WAITING); joinGroup(db, lineId, supplierId, ctx) (the supplier changes, logged);
+   addExtra(db, ...) (a po_lines row with extra = 1, status RECEIVED, qty_ordered = the amount
+   received); the leeway (a weight line typed within the leeway of qty_ordered is in full, qty_received
+   = qty_ordered; for a g line the leeway is in grams).
+2. A line from another site, day or group is refused (400 "That line is not in this group."); a
+   cancelled line too (409). A quantity is 0 or more, at most three decimals.
+3. server/routes/receive.js (new), mounted in index.js: GET /api/receive?site=&date=&place=, POST
+   /api/receive/group, POST /api/receive/lines/:id/join, POST /api/receive/extra, PUT
+   /api/receive/receipt-photo?site=&supplier_id= (makes a photo-only purchase_receipts row - run_id
+   NULL, total NULL - for this site, supplier and day, with purchaser-run's photo code). The run
+   receipt shown in a group: an active purchase_receipts row of that day, supplier and for_site, from
+   any run; its total only through withoutCosts (ADR-060). Writes need a login and receive at that site
+   (permissions.can): 403 "You need the Receive switch."; read-only refused (ADR-084); today's business
+   day only (400 "Only today can be received."; an admin may pick another day). server/routes/
+   purchases.js: GET /api/purchase-receipts/:id/photo also serves a holder of receive at the receipt's
+   restaurant.
+4. Settings: GET and PUT /api/settings/receiving in server/routes/settings.js (admin, settings-guard),
+   kept in app_settings (`receive_leeway_kg`; `kitchen_categories` as a JSON list); a missing value
+   means the default above.
+5. permissions.js: `receive` joins SWITCHES; DEFAULT_SETS gains 'receive-switches' { supervisor:
+   ['receive'], 'head-chef': ['receive'] }. public/roles.html's TOGGLES: ['receive', null, 'Receives
+   deliveries at the site'].
+6. scripts/write-path-allowlist.json: po_lines' "step receive" entries go (now written).
+
+Schema (server/db/schema.sql, new table): `app_settings` (key TEXT PRIMARY KEY, value TEXT NOT NULL,
+updated_by_user_id INTEGER REFERENCES users(id), updated_at TEXT NOT NULL DEFAULT (datetime('now'))).
+
+Page: public/receive.html (new); public/shell.js: Receive under Buying; public/settings.html: the
+Receiving tab.
+
+Edge states: Empty - no PO lines today: "Nothing to receive today." and + Extra. Loading - "Loading..."
+per group. Failure - a failed "All here" keeps the group as it is on screen with "Not saved: <why>. Try
+again." Partial - some lines unticked: they go to Waiting, the rest are received. Stale - another
+phone saved the same group: the last save wins, both are logged, and the group re-reads after every
+save. Blocked - no switch at this site: the 403 message; logged out: the login link. Two devices - the
+kitchen and the podium on the same supplier's two places do not interfere.
+
+Tests (server/engines/receive.test.js, server/routes/receive.test.js, settings.test.js,
+permissions.test.js): a group of two weight lines and two piece lines received in full; one unticked
+-> WAITING; one typed inside the leeway -> in full; one outside -> its amount, short; a piece line at 0
+-> WAITING; a line WAITING since yesterday shows today in its group, marked; join moves it and logs;
+an extra is a RECEIVED extra row; a line from another group or site refused; the kitchen's and the
+podium's places from the categories and the setting, a typed line the podium's; the group's run
+receipt, its total hidden without see_costs; the photo-only receipt; receive needed at that site (Test
+Head Chef FC refused at RA); read-only and logged out refused; the Receiving settings saved and read,
+with defaults; 'receive-switches' applied once.
+
+Touches: server/db/schema.sql, server/engines/receive.js (new), server/engines/receive.test.js (new),
+server/routes/receive.js (new), server/routes/receive.test.js (new), server/routes/settings.js,
+server/routes/settings.test.js, server/routes/purchases.js, server/index.js, server/db/permissions.js,
+server/db/permissions.test.js, scripts/write-path-allowlist.json, public/receive.html (new),
+public/settings.html, public/shell.js, public/roles.html.
+
+Click-through (390px and desktop). Claude checks (click-checker): with a PO of six lines for today at RA
+(two suppliers, kg and pcs, one typed) and one run receipt - as Test Head Chef RA, Podium: a group's
+piece lines filled in, - and +, All here; Kitchen: untick one kg line, type one inside and one outside
+the leeway, All here; Waiting shows the unticked one; join it to the other group; + Extra; reopen a
+done group; the receipt's photo opens and its total shows; as Test Counter RA with a role giving
+receive (made by Test Admin) - the total is in neither the page nor the network response. You check: at
+the podium beside the logbook, a delivery takes fewer taps than the logbook takes lines; the groups
+and colours read at a glance.
+
+Not in scope: moving a line to the other restaurant (arrivals, ADR-023); FC's direct meats on FC's
+landing; the side sheets' Received (side-sheets); the cashier's bills (bills, ADR-020); a leeway per
+item; supervisors' alerts on a waiting line (later, ADR-068).

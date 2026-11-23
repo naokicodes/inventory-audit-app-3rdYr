@@ -1,6 +1,6 @@
 # Arrivals and bills
 
-Status: IRL Written - FLOW Drafted - APP Decided
+Status: IRL Written - FLOW Written (the receive screen) - APP Specced (receive)
 
 ## IRL - how it works today
 - Receiving: veggies go to the kitchen (they confirm the items are there; the
@@ -44,16 +44,26 @@ Status: IRL Written - FLOW Drafted - APP Decided
 - The purchaser types each receipt's grand total, before service (ADR-117). The podium's count and
   the purchaser's receipt meet on the receipt.
 
+**2026-11-23 evening, decided (ADR-121):** the group's button is **"All here"** (the receiver confirms;
+the app never approves, ADR-045). The kitchen sees the veggie groups, the podium the rest (one
+Settings choice). Weights are ticked to start, with a 0.5 kg leeway in Settings; pieces are filled in
+with - / +. A line that did not come waits, joins the group it came with, or is on the next day's list
+at 8 AM. Each group shows that store's receipt from the purchaser's run (its total only with
+see_costs).
+
 ## APP
 - Decided: prices and bill rule (1); moving a line between Silingan and Likod
   (9); unplanned buys (28); receivers assigned via roster (29).
-- Not specced. Queue item A9.
+- A9: receive specced 2026-11-23 (below).
 
 - Decided (handoff 57): one bill per receipt; a buyer's receipts for the day
   are grouped under that day's run.
 - Decided 2026-11-14 (ADR-068): the buyer photographs buyer-run receipts, the receiver supplier
   receipts; photos are files next to the database on the restaurant PC. FC's direct meats arrive
   on FC's landing (ADR-067). The podium logs name and quantity (podium.md). Planned (A9).
+- Specced 2026-11-23: receive (ADR-121), after po-lines; the run's receipts come from purchaser-run
+  (ADR-122). Moving a line to the other restaurant, FC's direct meats and the bills stay later
+  (arrivals, bills).
 
 ## Open questions
 - (A9) Which receipts go through the main supervisor: answered 2026-11-17 (by kind of supplier,

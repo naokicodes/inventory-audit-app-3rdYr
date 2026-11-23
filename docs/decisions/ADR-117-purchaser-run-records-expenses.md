@@ -1,6 +1,7 @@
 # ADR-117 The purchaser's run records expenses: receipt totals, cash given, the short
 
-- Status: Accepted 2026-11-23
+- Status: Accepted 2026-11-23; detailed by ADR-122 (fares, tips, the short; the receipt's photo is
+  optional)
 - Decided by: Naoki
 - Supersedes: ADR-059 and ADR-068 in part (the buying money is no longer kept out of the app, for
   the purchaser's run only)

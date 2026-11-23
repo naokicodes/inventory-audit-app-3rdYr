@@ -1,6 +1,6 @@
 # Supplier orders and buying
 
-Status: IRL Written - FLOW Drafted - APP Decided
+Status: IRL Written - FLOW Written (the sort, the typed PO) - APP Specced (suppliers, po-lines)
 
 ## IRL - how it works today
 - Every counter writes a PO for their items on their own sheet. The landing
@@ -53,11 +53,18 @@ backup supplier (optional). A quick sort screen first: item cards (names and ico
 dragged into supplier boxes, like a game; the cold-station head chef can place about half of them.
 Then a proper screen with the categories, items, quantities and required numbers.
 
+**2026-11-23 evening, decided (ADR-119, ADR-120):** one supplier list for all three restaurants (it
+delivers, or we pick up or buy there); each item a main and an optional backup on the sort screen (tap
+a card, tap a box; drag on the PC and tablet). The cold-station head chef sorts the half they know; the
+supervisors or the podium sort the rest, from data Naoki collects. **Never the purchasers: they get no
+new work** (Naoki). "Required numbers" = the amount to buy, typed as on the paper PO; on hand (REM)
+optional; a par later. For the tests an admin types the PO.
+
 ## APP
 - Decided: PO change history and cost visibility (10); each item tagged by how
   it is bought: supplier delivery or buyer run (27); unplanned buys recorded
   against items (28); internal commi requests are not supplier orders (30).
-- Not specced. Queue item A9.
+- A9: suppliers and po-lines specced 2026-11-23 (below).
 
 - Decided (handoff 56): an admin sets each item's "how it is bought" tag in
   Settings; the landing person can suggest a change.
@@ -67,6 +74,10 @@ Then a proper screen with the categories, items, quantities and required numbers
   found" (rolls to tomorrow) and attaches receipt photos (ADR-068). Later: an in-app alert for
   supervisors on "not found". Planned (A9).
 - Specced 2026-11-15: supply-tags (how each restaurant meat is bought).
+- Specced 2026-11-23: suppliers (the list and the sort screen; the main supplier sets how_bought,
+  ADR-119) and po-lines (a day's PO per restaurant, typed by an admin for now, ADR-120); after the
+  roster chain. The counters' lines, the landing's cut and the supplier picture stay with
+  supplier-orders.
 
 ## Open questions
 - The A9 questions are in arrivals-and-bills.md.

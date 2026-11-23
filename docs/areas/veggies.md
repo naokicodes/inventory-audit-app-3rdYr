@@ -45,6 +45,7 @@ Sheet "Inventory Form Kitchen - VEG/SPICES" at Silingan and FC (source: photos
   and side-sheets (ADR-063: Used shows while the ending is typed; COOKED = usage less waste and
   in-house). Planned: side-waste (ADR-064: a "Waste today?" screen after endings).
 - Built 2026-11-14: side-items (PR #74). side-sheets is parked until roster-fill (2026-11-17).
+- Specced 2026-11-23: receive (ADR-121): the kitchen's groups, ticked to start, a 0.5 kg leeway.
 
 ## Open questions
 - None open.

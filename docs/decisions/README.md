@@ -64,7 +64,7 @@ flight. (ADR-001 explains the split.)
 | ADR-019 | Allocation requests | Accepted 2026-10-28 |
 | ADR-020 | Prices: the last billed unit price | Accepted 2026-10-22 |
 | ADR-021 | Supplier orders (POs) | Accepted 2026-10-28 |
-| ADR-022 | Buying: shop runs, tags and the buyer's list | Accepted 2026-10-25 |
+| ADR-022 | Buying: shop runs, tags and the buyer's list | Accepted 2026-10-25; who sets a sorted item's tag superseded by ADR-119 (its main supplier) |
 | ADR-023 | Receiving and arrivals | Accepted 2026-10-24 |
 | ADR-024 | Side sheets: separate sheets, flexible units | Accepted 2026-10-24; "staff fill only beginning and ending" superseded by ADR-063 |
 | ADR-025 | Bar: exact sales check, not blind | Accepted 2026-10-25 |
@@ -101,7 +101,7 @@ flight. (ADR-001 explains the split.)
 | ADR-056 | Money stays in the POS | Superseded in part by ADR-057 |
 | ADR-057 | Separate apps: stock and losses in pesos are computed here (D3) | Accepted 2026-10-19 |
 | ADR-058 | The 10-03 leans: SPOS owns supplier POs and cost prices | Superseded by ADR-059 |
-| ADR-059 | Supplier orders, arrivals and bills are ours | Accepted 2026-10-19; frozen-SPOS assumption superseded by ADR-005, unit-cost line by ADR-020, who writes the orders by ADR-021 |
+| ADR-059 | Supplier orders, arrivals and bills are ours | Accepted 2026-10-19; frozen-SPOS assumption superseded by ADR-005, unit-cost line by ADR-020, who writes the orders by ADR-021; the buying money kept out, for the purchaser's run, by ADR-117 |
 | ADR-060 | Unit costs need a "see costs" switch | Accepted 2026-11-14 |
 | ADR-061 | Queue steps are named, not numbered | Accepted 2026-11-14 |
 | ADR-062 | Side items: one imported catalog with units | Accepted 2026-11-14 |
@@ -110,7 +110,7 @@ flight. (ADR-001 explains the split.)
 | ADR-065 | FC: kitchen sheets in the app, the rest on paper | Accepted 2026-11-14 |
 | ADR-066 | FC on Loyverse; Kitchen Sales switches between POS groups | Accepted 2026-11-14; superseded in part by ADR-094 (FC's side follows its landing) |
 | ADR-067 | How it's bought: from the commi; FC's direct meats | Accepted 2026-11-14; superseded in part by ADR-092 (where requests come from; not built) |
-| ADR-068 | Buyer runs: ticks and receipt photos | Accepted 2026-11-14 |
+| ADR-068 | Buyer runs: ticks and receipt photos | Accepted 2026-11-14; the money kept out superseded in part by ADR-117; photos optional and mirrored once by ADR-122 |
 | ADR-069 | Scope: every inventory sheet, not meat only | Accepted 2026-11-14 |
 | ADR-070 | Remote access through Tailscale | Accepted 2026-11-14 |
 | ADR-071 | cubic's findings are sorted by the builder | Accepted 2026-11-14; its wait superseded by ADR-075 |
@@ -159,8 +159,13 @@ flight. (ADR-001 explains the split.)
 | ADR-114 | The restaurant PC takes a new tag only for a staff test | Accepted 2026-11-23 |
 | ADR-115 | A page goes to staff only after a staff-friendly pass | Accepted 2026-11-23 |
 | ADR-116 | A replaced meat is hidden, never deleted: Forequarter replaces Shortplate | Accepted 2026-11-23 |
-| ADR-117 | The purchaser's run records expenses: receipt totals, cash given, the short | Accepted 2026-11-23 |
+| ADR-117 | The purchaser's run records expenses: receipt totals, cash given, the short | Accepted 2026-11-23; detailed by ADR-122 (the photo optional) |
 | ADR-118 | The click-through runs in its own subagent; builders read the rules digest | Accepted 2026-11-23 |
+| ADR-119 | Suppliers: one list, a main and a backup supplier per item, a sort screen | Accepted 2026-11-23 |
+| ADR-120 | A PO line is the amount to buy, typed; a catalog item or a typed name | Accepted 2026-11-23 |
+| ADR-121 | The receive screen: groups by supplier, ticks for weights, counts for pieces, "All here" | Accepted 2026-11-23 |
+| ADR-122 | The purchaser's run: fares and tips as lines, the short, optional photos, no extra work | Accepted 2026-11-23 |
+| ADR-123 | Four supply switches: edit_suppliers, purchase, check_runs, receive | Accepted 2026-11-23 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and

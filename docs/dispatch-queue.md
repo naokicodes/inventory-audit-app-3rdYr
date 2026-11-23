@@ -152,6 +152,9 @@ is. Read the step's own section in `session-status.md` before starting.
 > 2026-11-23 block): `/naoki-qs 94` reviews and merges.
 > **2026-11-23 (later, A17):** token-diet (ADR-118, .claude/ files only) is runnable any time in
 > Naoki's lane; after it, builds run their click-through in the click-checker subagent.
+> **2026-11-23 (evening, A9 round 2):** token-diet closed (PR #96). Specced for the podium and
+> purchaser tests, in this order after the roster chain: suppliers -> purchaser-run -> po-lines ->
+> receive (ADR-119 to ADR-123; one PR each, all PUBLIC). The purchasers get no new work (ADR-122).
 
 #### Fable fixes (2026-11-17)
 
@@ -689,6 +692,32 @@ ADR-067: meats gain how_bought (Supplier / Buyer / Commi, default Commi; side it
 it); Settings -> Meats gets the select. Schema step. Full spec: session-status.md -> "Step
 supply-tags".
 
+### Step suppliers - the supplier list and the sort screen  [blocked: roster-fill (order)]
+Touches: server/db/schema.sql, server/engines/suppliers.js, server/engines/suppliers.test.js, server/routes/suppliers.js, server/routes/suppliers.test.js, server/index.js, server/db/permissions.js, server/db/permissions.test.js, public/suppliers.html, public/shell.js, public/roles.html
+ADR-119, ADR-123: one supplier list; each side item a main and an optional backup supplier, placed on a
+sort screen (tap a card, tap a box); the main sets how_bought; switch edit_suppliers (supervisor,
+head-chef). New tables. PUBLIC -> click-through. Full spec: session-status.md -> "Step suppliers".
+
+### Step purchaser-run - the purchaser's run: receipts, fares, cash, the short  [blocked: suppliers, backup-restore]
+Touches: server/db/schema.sql, server/engines/purchaseRuns.js, server/engines/purchaseRuns.test.js, server/routes/purchases.js, server/routes/purchases.test.js, server/index.js, server/db/permissions.js, server/db/permissions.test.js, server/db/backup.js, server/db/backup.test.js, scripts/backup-db.js, public/purchases.html, public/shell.js, public/roles.html, .gitignore
+ADR-117, ADR-122, ADR-123: cash given, each receipt's store, restaurant, grand total and optional
+photo, fares and tips, cash counted; the short shown; the supervisor marks it checked; photos beside
+the database, mirrored once by the backup. The run replaces the logbook page, never adds to it. New
+tables. PUBLIC -> click-through. Full spec: session-status.md -> "Step purchaser-run".
+
+### Step po-lines - a day's PO per restaurant, typed  [blocked: purchaser-run (order)]
+Touches: server/db/schema.sql, server/engines/poLines.js, server/engines/poLines.test.js, server/routes/poLines.js, server/routes/poLines.test.js, server/index.js, scripts/write-path-allowlist.json, public/po.html, public/shell.js
+ADR-120: the amount to buy, typed; on hand optional; a catalog item or a typed name; in blocks by
+category; the supplier from the item's main. Admins type it for now (the podium test). New table.
+PUBLIC -> click-through. Full spec: session-status.md -> "Step po-lines".
+
+### Step receive - the receive screen: groups, ticks, counts, All here  [blocked: po-lines, cost-guard]
+Touches: server/db/schema.sql, server/engines/receive.js, server/engines/receive.test.js, server/routes/receive.js, server/routes/receive.test.js, server/routes/settings.js, server/routes/settings.test.js, server/routes/purchases.js, server/index.js, server/db/permissions.js, server/db/permissions.test.js, scripts/write-path-allowlist.json, public/receive.html, public/settings.html, public/shell.js, public/roles.html
+ADR-121, ADR-123: group buttons by supplier (Kitchen | Podium), weights ticked with a leeway, pieces
+filled in with - / +, "All here" per group, Waiting and + Extra, the run's receipt on its group;
+Settings -> Receiving; switch receive (supervisor, head-chef). New table. PUBLIC -> click-through. Full
+spec: session-status.md -> "Step receive".
+
 ### 3. Step 25a — commissary stock receipts (supplier intake)
 **REVISED — quantity-only; the intake weigh-in is CANCELLED. Needs the rewritten quantity-only prompt before dispatch.**
 **2026-10-19:** the rewrite folds into the supply family (see Planned below): an arrival links to a supplier-order line.
@@ -888,7 +917,8 @@ lands, so it is written against the code it builds on. Roughly in order:
   the count screen hides; Q15).
 - **Roster (ADR-090, not A8):** roster-board (read-only Mon-Sun across the viewer's sites, for
   supervisors and management; the first card, ADR-089), after roster-day-status.
-- **Supply:** supply-tags (specced: in the Queue under Supply); suppliers;
+- **Supply:** supply-tags, and suppliers, purchaser-run, po-lines and receive (specced 2026-11-23: in
+  the Queue under Supply; the podium and purchaser tests, ADR-119 to ADR-123);
   supplier-orders (the landing's consolidation with history, picture plus text, estimated cost
   behind see_costs); buyer-list (ticks, "not found" to tomorrow, receipt photos, ADR-068; a line a
   supplier reports out of stock moves to the buyer's list in one tap); arrivals

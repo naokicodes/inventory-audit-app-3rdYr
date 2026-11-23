@@ -33,18 +33,18 @@ money details live in the private notes (Claude project files), never here.
 | 4 | [Pantry](pantry.md) | Confirmed (Silingan, FC) | Drafted | Built: side items (PR #74); side-sheets Specced (parked until roster-fill) |
 | 5 | [Bar](bar.md) | Confirmed (all three) | Drafted | Decided (ADR-087): sellables against Loyverse, raws side-style, deal drinks, supervisor checks; FC drinks only |
 | 6 | [Roster](roster.md) | Confirmed (Silingan: the Nov 16-22 sheet, the 11-17 message); Written (Likod, FC) | Drafted (Fill) | Built: business day (PR #55); Specced: shift rows and Fill (ADR-096), any number of jobs a day (ADR-107); roster board Decided (ADR-090) |
-| 7 | [Supplier orders and buying](supplier-orders.md) | Written | Drafted | Decided; supply-tags Specced |
-| 8 | [Arrivals and bills](arrivals-and-bills.md) | Written | Drafted | Decided |
+| 7 | [Supplier orders and buying](supplier-orders.md) | Written | Written (the sort, the typed PO) | Decided; supply-tags Specced; suppliers and po-lines Specced (ADR-119, ADR-120) |
+| 8 | [Arrivals and bills](arrivals-and-bills.md) | Written | Written (the receive screen) | Decided; receive Specced (ADR-121) |
 | 9 | [Staff meals and in-house](staff-meals.md) | Confirmed | Drafted | Built: meal settings (PR #82); log, check and view Specced (parked until roster-fill); side items on meals Decided (ADR-109) |
 | 10 | [Prices](prices.md) | Written | None | Decided; costs behind see_costs Specced (cost-guard) |
-| 11 | [Podium (receiving, misc)](podium.md) | Written | None | Decided; the delivery-vs-PO check specced next with the purchaser's receipt totals (A9) |
+| 11 | [Podium (receiving, misc)](podium.md) | Written | Written (the podium test) | receive Specced (ADR-121), with the purchaser's run (ADR-122) |
 | 12 | [Pizza stations](pizza.md) | Confirmed | None | Partly decided (dough in 12s) |
 | 13 | [Likod grill landing](likod-grill.md) | Confirmed | None | Decided (counts blind; appointed head chef) |
 | 14 | [FC scullery](fc-scullery.md) | Confirmed | None | Paper (ADR-065) |
 | 15 | [Commissary](commissary.md) | Confirmed | Drafted | Built: yield, shipments; requests and staging Decided, not built (ADR-092); Stock In from suppliers missing (A9); Likod destination missing; Forequarter replaces Shortplate (ADR-116) |
 | 16 | [Sales (Loyverse)](sales.md) | Confirmed | None | Built (Kitchen Sales, FC switch; FC by landing line and the Pizza tables, PR #90, Kare-Kare included); a short-lived cache (sales-cache, PR #92); the landings' POS column (ADR-114) |
 | 17 | [Management view](management-view.md) | Written | Drafted | Built: a stock rollup in quantities (no pesos yet); views as cards (ADR-089) |
-| 18 | [Money and operating expenses](money.md) | Written (payroll template, the purchaser's logbook, the cashier's tally) | None | Decided: charges recorded, payroll in Excel (ADR-088) |
+| 18 | [Money and operating expenses](money.md) | Written (payroll template, the purchaser's logbook, the cashier's tally) | Written (the purchaser's run) | Decided: charges recorded, payroll in Excel (ADR-088); the purchaser's run Specced (ADR-122) |
 | 19 | [Waste](waste.md) | Written | Drafted | Meat: Built (adjustment types); sides: Decided (any time + a catch-all after endings, ADR-086) |
 
 Gaps to read off the map: IRL Confirmed + APP None is safe backlog (pizza,

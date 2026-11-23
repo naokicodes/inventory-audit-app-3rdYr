@@ -1,6 +1,7 @@
 # ADR-022 Buying: shop runs, tags and the buyer's list
 
-- Status: Accepted 2026-10-25
+- Status: Accepted 2026-10-25; who sets a sorted item's "how it is bought" tag superseded by ADR-119
+  (it follows the item's main supplier, set on the sort screen)
 - Decided by: Naoki
 - Supersedes: none
 

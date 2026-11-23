@@ -1,6 +1,6 @@
 # Money and operating expenses
 
-Status: IRL Written (payroll template, the purchaser's logbook, the cashier's tally) - FLOW None - APP Decided (charges; payroll stays in Excel, ADR-088)
+Status: IRL Written (payroll template, the purchaser's logbook, the cashier's tally) - FLOW Written (the purchaser's run) - APP Decided (charges; payroll stays in Excel, ADR-088); the run Specced (purchaser-run)
 
 ## IRL
 - Two flows that meet at buying (money out, stock in) and using (stock out,
@@ -40,6 +40,10 @@ Status: IRL Written (payroll template, the purchaser's logbook, the cashier's ta
   Sunday export per person (days on duty, rest, leave, sick, absent, covering; the week's charges).
 - From the template (2026-11-15): the export can give which days each person worked and the
   charges with their list; pay rates, cash advances, lates and the contributions stay hers.
+- Specced 2026-11-23: purchaser-run (ADR-122): cash given; each receipt's store, restaurant, grand
+  total and optional photo; fares, tips and other buys as lines; cash counted; spent, cash left and
+  the short shown (not a charge yet); the main supervisor marks it checked. The run replaces the
+  logbook page, never adds to it (Naoki: the purchasers get no new work).
 
 ## Open questions
 - For the export: whether it gives days or pesos for the day columns. (Where Likod is paid: the same
@@ -51,3 +55,5 @@ Status: IRL Written (payroll template, the purchaser's logbook, the cashier's ta
 - 2026-11-23 (ADR-117): the purchaser's run moves into the app as expenses: each receipt's grand
   total, the cash given and counted, the short. The "None of this is stored" line above holds for
   the till and sales money only. Fares, tips and who covers a short: A9's spec.
+  Answered 2026-11-23 evening (ADR-122): fares and tips are lines in the run; the short is shown only.
+  Who covers a short stays open (A13).

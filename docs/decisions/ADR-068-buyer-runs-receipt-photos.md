@@ -1,6 +1,8 @@
 # ADR-068 Buyer runs: ticks and receipt photos
 
-- Status: Accepted 2026-11-14
+- Status: Accepted 2026-11-14; the money kept out of the app superseded in part by ADR-117 (the
+  purchaser's run); "the buyer attaches each receipt photo" by ADR-122 (a photo is optional; photos
+  are mirrored once by the backup)
 - Decided by: Naoki
 - Supersedes: -
 
