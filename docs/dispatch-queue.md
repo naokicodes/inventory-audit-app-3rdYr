@@ -226,6 +226,7 @@ Data only; an existing database changes in Settings. Naoki's lane, after the off
 forequarter".
 
 ### Step token-diet - the click-through in its own subagent; the rules digest  [runnable]
+**CLOSED 2026-11-23, PR #96 (`12b5e65`).**
 Touches: .claude/agents/click-checker.md, .claude/commands/continue.md, .claude/commands/naoki-qs.md, .claude/commands/start.md, .claude/commands/step.md
 ADR-118: the "Claude checks" click-through runs in a click-checker subagent on Sonnet and returns
 PASS/FAIL lines; builders read the rules digest. No app code. Naoki's lane, any time. Full spec:

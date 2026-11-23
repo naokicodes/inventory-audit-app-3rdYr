@@ -6009,6 +6009,7 @@ and each test that reads M05 from the seed files. Data only: no click-through.
 Not in scope: changing an existing database (Settings, ADR-116); carrying Shortplate stock over.
 
 ## Step token-diet - the click-through in its own subagent; the rules digest (A17, 2026-11-23)
+**CLOSED 2026-11-23, PR #96 (`12b5e65`).**
 
 Decided 2026-11-23 (ADR-118; Naoki). Naoki's lane, any time: it shares no file with beta-4's steps or
 the roster chain. No app code: .claude/ files only.
