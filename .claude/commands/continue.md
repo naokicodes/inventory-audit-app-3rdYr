@@ -26,7 +26,15 @@ from the plan `/start` already stated — the full detail for each phase lives i
   recommendation**, note what you did not change, then stop. Class C: park
   silently.
 - **Verify** — `npm run verify`, both lines green. If you touched `public/`, start
-  the server and click through the actual screen. Whatever you changed, grep for
+  the server, then run the Agent tool with `subagent_type` `click-checker`, giving
+  it the PR number, the address, the step's "Claude checks" list, its Edge states
+  and the test accounts to log in as (ADR-118); fix
+  every FAIL before the PR is ready, then run it again. If `click-checker` is not
+  offered: `general-purpose` with model `sonnet`, told to follow main's
+  `.claude/agents/click-checker.md`, and say in the report that the fallback ran.
+  If it fails to start or Claude in Chrome is not connected, say so in the report
+  and leave the "Claude checks" for the person (never a silent skip); a
+  `Not checked` line is never a PASS. Whatever you changed, grep for
   who calls it and exercise the route the way the real caller does (it may post
   every row on screen), not a minimal payload of your own design.
 - **Branch, commit, push, open the PR** — never to `main`, never force-push, never
