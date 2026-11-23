@@ -21,7 +21,8 @@ For this command only, two rules are replaced by the gates in sections 5 to 7:
 check `gh api user --jq .login`. If it is not `naokicodes`, you are a builder
 run: you go up to "ready to merge" and stop (section 7). Every other rule in
 `docs/rules-for-claude-code.md`, `docs/engineer-role.md`, `/start` and
-`/continue` still applies in full, including Class B stops, never `git add .`,
+`/continue` still applies in full (for the rules file: read that file's Digest;
+grep a rule's own section when the step touches it), including Class B stops, never `git add .`,
 never force-push, and never resolving a conflict in `server/db/migrate.js` or
 `server/db/schema.sql` yourself.
 
@@ -98,7 +99,8 @@ skipped list), then keep going without a checkpoint.
 
 ## 4. Build (for 3c, or a resumed 3.0)
 
-**One subagent only.** The only subagent this command runs is section 5's `pr-reviewer`. Build
+**Two subagents only (ADR-118).** The only subagents this command runs are section 5's
+`pr-reviewer` and the `click-checker` that `/continue` runs for a step touching `public/`. Build
 it yourself: do not hand searching or planning to Explore, Plan or general-purpose subagents, each
 of which starts from scratch and re-reads the docs. Read the step's own section, never the whole
 file, and always from `origin/main` (ADR-072; the branch's copy can be older than the newest decision

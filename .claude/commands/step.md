@@ -36,7 +36,8 @@ top of it will be blamed on you.
 - `docs/session-status.md` — the step's own section. This is the spec.
 - `docs/decision-authority.md` — what you may decide alone.
 - `docs/engineer-role.md` — the lane you are in and the git rules.
-- `docs/rules-for-claude-code.md` — the standing constraints.
+- `docs/rules-for-claude-code.md` — the standing constraints: its Digest (grep a
+  rule's own section when the step touches it).
 
 Use `graphify query "<question>"` for codebase questions rather than
 reading files linearly. Reading large docs top to bottom is one of the

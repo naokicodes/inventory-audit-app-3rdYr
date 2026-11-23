@@ -116,7 +116,8 @@ Planned or flagged step to have something to do.
 
 - Read the chosen step's own section in `docs/session-status.md` (the spec), plus
   `docs/decision-authority.md`, `docs/engineer-role.md`,
-  `docs/rules-for-claude-code.md`.
+  `docs/rules-for-claude-code.md` (its Digest; grep a rule's own section when the
+  step touches it).
 - Check the step's stated prerequisites against the **actual code** (grep the
   write path), not against the step text.
 
