@@ -136,6 +136,16 @@ to ADR-123; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
 
+### 2026-11-25 architect (issue #98: backup-restore's two questions) - answered
+
+- PR #97 (backup-restore, `c3095f2`): the review passed, CI green, cubic sorted; parked on issue #98's
+  two questions (the keep window; a second backup in the same minute), answered as built (Step
+  backup-restore's 2026-11-25 block). `/naoki-qs 97` merges.
+- `c3095f2` holds the review fixes recovered after a power cut stopped `/naoki-qs` mid-review on 11-23
+  (checked whole and run on a clone of the PR head: 865 tests, SUITE GREEN, AUDIT CLEAN).
+- beta-3.2 is on the restaurant PC since 2026-11-23 23:07 (`update beta-3.2`: a backup first, 846
+  passed, AUDIT CLEAN; COOKIE_SECRET and ADMIN_PASSWORD in the PC's `.env`).
+
 ### 2026-11-23 architect, evening (A0 #96; A9 round 2: the podium and purchaser tests) - decided (recorded: ADR-119 to ADR-123)
 
 - **A0: PR #96 (token-diet) matches its spec** (checked after the merge: `12b5e65`, closed `16a524e`;
@@ -5835,6 +5845,15 @@ older backup (the count is gone), restore the before-restore backup (it is back)
 
 Not in scope: backups on a host (later, ADR-105); photos (run 4's D6: step purchaser-run mirrors them, ADR-122); the
 full health line; the launcher's other changes (restaurant-pc-ii).
+
+**2026-11-25 (issue #98 answered; Naoki: "recs"):** both as built in PR #97, no change.
+(a) The keep window: every backup from today and the 13 days before it (14 calendar days); on the
+15th day a backup is deleted unless it is the first of its month. (b) A second backup in the same
+minute is saved as `beta_<stamp>_2.db` (or `_<label>-2`), never over the first: the second one is
+usually the before-restore backup of an undo, which must never replace the file being restored.
+running-the-app.md's "the newest 14 are kept" stays while the restaurant PC runs beta-3.2 (the old
+keep rule); A16's rewrite changes it when beta-4 reaches the PC. The You check above runs on the laptop
+before beta-4 is tagged (ADR-114: the PC takes beta-4 only for a staff test).
 
 ## Step fc-landing-lines - beta-3's starting data: FC's 27 lines and two meals, Silingan's Kare-Kare placeholder (A0, 2026-11-22)
 **CLOSED 2026-11-22, PR #91 (`a31d8d9`).**
