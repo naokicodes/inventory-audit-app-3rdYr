@@ -155,6 +155,8 @@ is. Read the step's own section in `session-status.md` before starting.
 > **2026-11-23 (evening, A9 round 2):** token-diet closed (PR #96). Specced for the podium and
 > purchaser tests, in this order after the roster chain: suppliers -> purchaser-run -> po-lines ->
 > receive (ADR-119 to ADR-123; one PR each, all PUBLIC). The purchasers get no new work (ADR-122).
+> **2026-11-25:** issue #98 answered (backup-restore's keep window and same-minute names: as built);
+> `/naoki-qs 97` merges. beta-3.2 is on the restaurant PC (2026-11-23).
 
 #### Fable fixes (2026-11-17)
 
