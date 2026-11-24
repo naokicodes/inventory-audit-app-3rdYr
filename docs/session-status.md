@@ -5750,6 +5750,7 @@ other tables.
   a renamed "Landing" would be added again at the next start.
 
 ## Step backup-restore - one-file backups, a restore word, a copy off the PC (A0, Fable F4)
+**CLOSED 2026-11-25, PR #97 (`bf69c71`).**
 
 Decided 2026-11-17 (ADR-105; Fable F4 (P0), B1 note 2) and 2026-11-22 (Naoki: the restaurant PC
 stays on overnight and is restarted on some days; recs for the times, the copy folder, `.env` and

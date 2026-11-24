@@ -189,6 +189,7 @@ spec: session-status.md -> "Step db-start".
 **2026-11-18:** runnable for the overnight runner; Naoki reviews and merges.
 
 ### Step backup-restore - one-file backups, a restore word, a copy off the PC  [Naoki's own PR]
+**CLOSED 2026-11-25, PR #97 (`bf69c71`).**
 Touches: scripts/restaurant-pc.bat, scripts/backup-db.js, scripts/restore-db.js, server/db/backup.js, server/db/backup.test.js, .env.example
 ADR-105 (Fable F4, P0; B1 note 2): each backup is one file (VACUUM INTO), made at every start and
 at 3 PM and 3 AM (Task Scheduler), kept by age (14 days plus one a month); `restore` puts one
