@@ -5508,6 +5508,41 @@ backup-restore (both change restaurant-pc.bat: this one goes after it).
   (its Version line), the marker is gone after Done, and with the lockfile unchanged no npm step
   runs.
 
+**2026-11-26 (architect; Naoki).** `/naoki-qs restaurant-pc-ii` stopped before claiming: this spec
+had no "Edge states:" line. Added below. `.env.example` already has the commented ADMIN_PASSWORD and
+BACKUP_COPY_DIR lines (sign-the-cookie, backup-restore), so Touches stays scripts/restaurant-pc.bat.
+backup-restore's two tasks already call `%APPDIR%\restaurant-pc.bat`, which this step makes the stub.
+One addition (the laptop test install must not change the laptop by surprise): with
+INVENTORY_APP_DIR set, the admin part first asks "Test install: also change this computer's firewall
+and sleep settings? (Y/N)"; N skips it and prints "Firewall and sleep settings skipped (test
+install)." Without INVENTORY_APP_DIR nothing is asked, as before.
+
+Edge states: Failure - every stop prints one `[X]` line naming a first step (U-23) and waits for a
+key: Git or Node still missing after winget ("[X] Git did not install. Check the internet, then run
+this file again.", the same for Node.js; the setup stops); the new version cannot be downloaded
+(before the checkout: no marker, nothing changed); the before-update backup fails (the update stops
+before the checkout, as today); `npm ci` fails (the marker stays: the 2026-11-22 block's line); the
+self-test fails (back to <prev> with its `[!]` line). A refused or closed admin prompt prints the
+`[!]` firewall line and the setup goes on (the stub, the desktop and Startup files, the two backup
+tasks), ending "Finished, with the [!] notes above." Partial - the PC switched off mid-update: the
+marker stays; start, update, backup and restore each refuse with its line, and the 3 PM and 3 AM
+tasks write that line to the backup log instead of making a backup (the before-update backup covers
+the gap); Update Inventory App run again reads <prev> from the marker and finishes. Switched off
+mid-setup: running the setup again is safe (the stub, the desktop and Startup files and the two tasks
+are replaced, never doubled; the firewall rule is deleted, then added; `.env` asks only its missing
+lines). Empty - a PC with no `.env`: the Loyverse tokens and the three questions; no beta.db: made as
+today. Stale - an old full launcher copy (beta-3.2 and before) runs the old code until the setup runs
+once: `update beta-4` runs from that copy, so the PC's steps say "then run
+scripts\restaurant-pc.bat once, with no word" (A16); from then on every word goes through the stub.
+A leftover `%TEMP%\inventory-app-update.bat` is replaced by the next update and run by nothing else.
+Blocked - update and restore refuse while the app runs, as today. Inactive - none. Two devices -
+phones (FC's included) saving while the app is closed for an update get the network error and keep
+their unsaved counts (count drafts) until the app is back. The laptop's test install changes only the
+laptop and only what the person allows (the question above; the refused-prompt check answers Y, then
+No on the Windows prompt). After the laptop check, Naoki removes the test's two desktop files, its
+Startup file and the two tasks (`schtasks /delete /f /tn "Inventory App backup 3PM"`, then the 3AM
+one), and turns sleep back on if he answered Y.
+
 ## Step supply-tags - how each restaurant meat is bought (A9)
 
 Decided 2026-11-14 (ADR-067), specced 2026-11-15. DEPENDS ON staff-meal-settings and cost-guard

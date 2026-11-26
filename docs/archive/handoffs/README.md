@@ -40,6 +40,7 @@ listing what changed after it.
 | `ARCHITECTURE-HANDOFF-2026-11-22` | `934f170` | 780 | 11-17 and 11-22: the Fable reports sorted (ADR-098 to ADR-105), A0 #85 #86 #87 (ADR-106), the beta-3 specs and the 11-17 answers (ADR-107 to ADR-109); PRs #85 #87 merged; FC first (beta-3 = stale-saves, landing-sales, fc-landing-lines). |
 | `ARCHITECTURE-HANDOFF-2026-11-22b` | `11ae4da` | 814 | 11-22 evening and late: beta-3 on the restaurant PC by update with a fresh beta.db; ui-shell and sales-cache specced as beta-3.1 (ADR-111 to ADR-113, drop-in 08). |
 | `ARCHITECTURE-HANDOFF-2026-11-23` | `cde088b` | 834 | 11-23: beta-3.1 on the PC; the PC moves only for staff tests; staff-friendly pages; Forequarter; the purchaser's run (ADR-114 to ADR-117); A9 round 1; A17's token diet (ADR-118, drop-in 02). |
+| `ARCHITECTURE-HANDOFF-2026-11-23b` | `9d0d9b6` | 846 | 11-23 evening: A0 #96; A9 round 2 - suppliers, purchaser-run, po-lines and receive specced (ADR-119 to ADR-123); beta-3.2 on the PC; PR #97's review fixes recovered after a power cut. |
 
 Not here: the 2026-09-15 handoff and the dispatcher handoff (never committed),
 and `architect-notes-PRIVATE.md` (stays private). Decisions 1-94 from the 10-22 to

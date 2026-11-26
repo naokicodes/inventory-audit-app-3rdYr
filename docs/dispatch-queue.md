@@ -157,6 +157,9 @@ is. Read the step's own section in `session-status.md` before starting.
 > receive (ADR-119 to ADR-123; one PR each, all PUBLIC). The purchasers get no new work (ADR-122).
 > **2026-11-25:** issue #98 answered (backup-restore's keep window and same-minute names: as built);
 > `/naoki-qs 97` merges. beta-3.2 is on the restaurant PC (2026-11-23).
+> **2026-11-26:** PR #97 (backup-restore) merged (`bf69c71`). restaurant-pc-ii is next in Naoki's lane
+> (its spec gained the Edge states line it lacked), then roles-guard -> save-safety -> cost-guard ->
+> preview-pid; tag beta-4 on the laptop.
 
 #### Fable fixes (2026-11-17)
 
@@ -671,6 +674,8 @@ Fable fixes): do not start.
 marker, no `npm ci` for an unchanged lockfile, first-step messages, only Git and Node on the PC,
 the `.env` questions (admin password, copy folder, cookie secret), auto-start, an Update shortcut.
 After backup-restore. See the spec's 2026-11-22 block.
+**2026-11-26:** runnable - backup-restore merged (PR #97); the spec gained its Edge states line and the
+laptop test install's firewall-and-sleep question (the spec's 2026-11-26 block).
 
 #### Sides (A8)
 
