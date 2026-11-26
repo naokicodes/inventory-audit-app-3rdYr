@@ -1,6 +1,7 @@
 # ADR-122 The purchaser's run: fares and tips as lines, the short, optional photos, no extra work
 
-- Status: Accepted 2026-11-23
+- Status: Accepted 2026-11-23; "the short is shown only" superseded in part by ADR-125 (a payroll
+  charge when the run is checked); cash-out lines and shared receipts added by ADR-126
 - Decided by: Naoki
 - Supersedes: ADR-117 and ADR-068 in part (a receipt's photo is optional; photos are mirrored once
   by the backup)

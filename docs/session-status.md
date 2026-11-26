@@ -132,9 +132,48 @@ the runner reads the last count line in each file.
 **Decision records - from 2026-10-20 (ADR-001).** New and harvested decisions live in
 `docs/decisions/` (one file each, with the why); retired handoffs live in
 `docs/archive/handoffs/` (history, not current). Recorded so far: ADR-001
-to ADR-123; the index, and a map from handoff item numbers to records, is in
+to ADR-127; the index, and a map from handoff item numbers to records, is in
 `docs/decisions/README.md`. If an entry here and an ADR
 disagree, that is a bug: ask Naoki and fix both the same day.
+
+### 2026-11-26 architect (A0: restaurant-pc-ii unblocked; site-picker; A13's money round) - decided (recorded: ADR-124 to ADR-127)
+
+- **Where things stand:** PR #97 (backup-restore) merged 11-25 (`bf69c71`, closed `23b6ae4`; 865
+  tests). No open PRs or issues. beta-3.2 is on the restaurant PC; its tablet check and backup-restore's
+  Windows checks on the laptop are still to do (Naoki, at the restaurant).
+- **restaurant-pc-ii:** `/naoki-qs` stopped it before claiming: its spec had no Edge states line.
+  Drop-in 2026-11-26-01 (`b44ac41`) added it, and a question before the laptop's test install changes
+  the laptop's firewall and sleep settings. Building next.
+- **site-picker specced (ADR-124):** the Landing, Typed sales, Stock Receipts, Allocations and
+  Dashboard list only your restaurants; one opens directly; several remember the last pick on the
+  phone; none shows one plain line; a refusal shows its message; FC's landing lines are null, not 0,
+  when FC's account fails. Last in beta-4, after preview-pid.
+- **Logins and restaurants (Naoki asked; from the code):** a person taps their name (admins also type
+  the admin password) and stays logged in until 8 AM (ADR-113). A person's restaurants come from the
+  people workbook or a role at a restaurant (Roles page); admins and management see every restaurant
+  (siteAccess.js' bypass).
+- **Money (A13; ADR-125, ADR-126):** a purchaser's short is a payroll deduction, charged when the main
+  supervisor marks the run checked (she may lower or clear it with a reason; an over is shown only),
+  built with the charges list; the main supervisor checks money every day near the end of service.
+  The run gains "Cash out" lines (who, how much, what for: a head chef, a supervisor or the COO taking
+  some of the purchaser's cash for a needed buy; Naoki looks further). A receipt for two restaurants is
+  two receipts, as the purchasers already split them.
+- **The cashier's tally (Naoki's reading, to confirm with the cashier):** "comp" under in-house is
+  complimentary; "AMD" may be a one-off item, not a supplier; "P.O" under other expenses is a buy with
+  no store name. The tally stays outside the app (D3).
+- **Suppliers:** the main supervisor's supplier list is collected (names in the private notes; each
+  mall and supermarket is its own store). One veggie source is a group at the public market that
+  gathers the order for the purchaser to pick up (ADR-119's "we pick up").
+- **The restaurant PC (ADR-127):** Windows Update is off and stays off; a monthly update by hand at
+  closing, after a backup.
+- **Forequarter:** 0.2 kg per dish stays, as specced, until the real grams; the switch date and the
+  commissary's October line are still open.
+- **Drop-ins:** with the chat linked to the laptop, the architect applies a drop-in in Naoki's repo
+  folder (after `git status`; the files must match the dry runs' md5s) and Naoki commits and pushes;
+  `/naoki-dropins` is the fallback.
+- **Still open:** the tablet check of beta-3.2 and backup-restore's laptop checks; whether PR #96 had
+  the click-checker's practice reply (A17); rice per tray and the sack; the tally's three lines with
+  the cashier; Forequarter's switch date.
 
 ### 2026-11-25 architect (issue #98: backup-restore's two questions) - answered
 
@@ -6327,6 +6366,74 @@ message on Stock Receipts. You check: the messages read well on a phone.
 Not in scope: Settings' saves (cost-guard's saveRow, settings-safety); a limit per meat; the other
 page-errors items; Loyverse.
 
+## Step site-picker - the pages list only your restaurants; a refusal shows its message (A0, ADR-124)
+
+Decided 2026-11-26 (ADR-091, ADR-124; Naoki). Fable U-02 and the smoke list's line 6 (2026-11-23).
+Naoki's lane, last in beta-4 (after preview-pid; save-safety and this step share three pages).
+
+What a person sees:
+- The Landing, Typed sales, Stock Receipts and Allocations list only the restaurants they can use
+  (GET /api/restaurants' `can_use`): the restaurant picker, the "Restaurant" filter ("All" = all of
+  yours) and Stock Receipts' assign box in an unassigned row. Dashboard's restaurant checkboxes list
+  only yours (its server already drops the others for staff, site-filter-ii).
+- One restaurant: the picker is hidden and the page opens on it, its name shown where the picker was
+  (big, the page's heading size). Several: the picker, opening on the last one picked on this phone
+  (one remembered choice for all four pages); a remembered one that is no longer yours is skipped for
+  the first of yours.
+- None: one line in place of the picker and the table: "You're not set up for a restaurant yet. Ask a
+  supervisor to add you." Nothing else on the page loads or shows.
+- A refusal (403) while loading the page's data: "This restaurant isn't one of yours. Pick another."
+  in place of "Loading..."; any other failed load: "Could not load: <the server's message>. Try
+  again." The Landing hung because it read `{ error }` as rows: every load checks `res.ok` first.
+- Admins, management (read-only) and logged out see every restaurant, as today (`can_use` is true on
+  every row for them, ADR-040, ADR-091). Shipments, the Terminal and Settings are unchanged (the full
+  list). Allocations' From and To are locations, not restaurants: unchanged.
+
+Code:
+1. public/shell.js (every page loads it): one helper on window.AppShell that fetches GET
+   /api/restaurants, keeps the usable rows, fills a select (or reports one or none), remembers the
+   pick in localStorage (`inventory.lastRestaurantId`, every read and write in try/catch, as
+   daily-audit's view key) and gives the pages the no-restaurant line. The four pages and Dashboard
+   use it; none of them fetches /api/restaurants itself any more.
+2. public/daily-audit.html, public/sales.html, public/stock-receipts.html, public/allocations.html:
+   the helper for the picker, the filter and the assign box; each data load checks `res.ok` and shows
+   the two messages above. public/dashboard.html: the checkboxes from the usable rows.
+3. server/engines/loyversePreview.js, computeFcLanding: when no FC account answered (every account's
+   `ok` false), each landing row's `sold` and `taken` are null (the dish table already gives null for
+   a failed account). The page hides that table then, as today.
+
+Edge states: Empty - no usable restaurant: the one line, nothing else. Loading - "Loading..." until
+the list answers, then the page's own. Failure - the list itself fails: "Could not load the
+restaurants. Try again."; a data load fails: "Could not load: <message>. Try again." Blocked - a 403:
+"This restaurant isn't one of yours. Pick another." Stale - a remembered restaurant that is no longer
+yours is skipped; a role taken away while the page is open shows the 403 line at the next load.
+Partial - none (reads only). Inactive - an inactive restaurant is not in the list, as today. Two
+devices - the remembered choice is per phone; on a shared tablet the next person's list skips a
+restaurant that is not theirs.
+
+Tests: server/engines/loyversePreview.test.js - with FC's account failing, every landing row has
+`sold` and `taken` null, and with it working the numbers are as today (the 0s stay 0).
+server/sitePicker.test.js (new, a static check like uiShell.test.js): the four pages and
+dashboard.html use the shell helper and do not fetch /api/restaurants themselves;
+commissary-shipments.html, terminal.html and settings.html still do; shell.js reads `can_use` and
+wraps localStorage in try/catch; no page shows "Loading..." in a load's failure branch.
+
+Touches: public/shell.js, public/daily-audit.html, public/sales.html, public/stock-receipts.html,
+public/allocations.html, public/dashboard.html, server/engines/loyversePreview.js,
+server/engines/loyversePreview.test.js, server/sitePicker.test.js (new).
+
+Click-through (390px and desktop). Claude checks (click-checker): as Test Counter RA - the Landing
+shows Silingan's name, no picker, and its grid (no hang); Typed sales, Stock Receipts and Allocations
+the same, their filters list only Silingan; as Test No Sites - the one line on all four and Dashboard
+shows no restaurant; as Test Admin - every restaurant on all four, pick FC on the Landing, then Typed
+sales opens on FC; a refresh keeps it; Shipments still lists every restaurant. With the FC token set
+to "none" (the smoke list's method), GET /api/loyverse/preview?pos=fc gives null on every landing line.
+You check: on your phone, the one-restaurant name reads clearly and the no-restaurant line is plain;
+ADR-115's pass on the four pages' top part.
+
+Not in scope: blind-history (ADR-091, planned); trimming GET /restaurants itself (it stays a catalog,
+ADR-043, ADR-091); the Terminal's and Settings' lists.
+
 ## Step suppliers - the supplier list and the sort screen (A9, 2026-11-23)
 
 Decided 2026-11-23 (ADR-119, ADR-123; Naoki). After the roster chain (ADR-114: the roster is the
@@ -6548,6 +6655,26 @@ camera.
 Not in scope: a charge from a short and the "cash out" lines (A13); one receipt split across two
 restaurants; the cashier's till and sales money (D3, ADR-117); unit prices and receipt lines (bills);
 deleting old photos (kept for now, ADR-068); a free-space warning (the health line, later).
+
+**Decisions 2026-11-26 (ADR-125, ADR-126; Naoki).** These override the text above where they differ.
+- "+ Cash out" beside "+ Fare", "+ Tip" and "+ Other": who (a typed name, 1 to 40 characters; the box
+  suggests active people's names, a `<datalist>`), the amount, what for (an optional note). No
+  restaurant buttons. The summary card lists cash outs in their own "Cash out" group (who, amount,
+  note) after the restaurants; they count in Spent and in no restaurant's subtotal.
+- Server: addLine / updateLine take kind CASH_OUT with `person` (400 "Type who took the cash." when
+  empty or longer than 40 characters); a CASH_OUT line's `for_site` is stored NULL whatever is sent;
+  FARE, TIP and OTHER still need a restaurant (400 as before).
+- Schema: `purchase_run_lines`' `for_site TEXT` (NULL only for CASH_OUT) and a new `person TEXT`
+  (CASH_OUT only).
+- A receipt shared by two restaurants is two receipts, each with its restaurant and its share; a photo
+  on one is enough. No new control.
+- The short stays shown only in this step: ADR-125 makes it a payroll charge when the run is checked,
+  built with the charges list (bar-shorts), not here.
+- Tests add: a cash out counts in Spent and in no subtotal; a cash out with no person refused; its
+  `for_site` stored NULL; a fare with no restaurant still refused. Click-through adds, as Test Admin
+  "For" Test Counter RA: one cash out ("Test Supervisor RA", 50, "tape") shows in its group and in
+  Spent.
+- Edge states add nothing new: a cash out is a line like the others (the spec's Edge states line).
 
 ## Step po-lines - a day's PO per restaurant, typed (A9, 2026-11-23)
 

@@ -1,6 +1,7 @@
 # ADR-091 Site lists stay open; each row says whether you can use it
 
-- Status: Accepted 2026-11-15
+- Status: Accepted 2026-11-15; the pages that list only your sites widened by ADR-124 (the entry
+  pages, their filters and Dashboard)
 - Decided by: Naoki
 - Supersedes: site-filter-ii's "the picker returns only the user's sites" (ADR-041's list part)
 

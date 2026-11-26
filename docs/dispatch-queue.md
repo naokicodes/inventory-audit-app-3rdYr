@@ -160,6 +160,9 @@ is. Read the step's own section in `session-status.md` before starting.
 > **2026-11-26:** PR #97 (backup-restore) merged (`bf69c71`). restaurant-pc-ii is next in Naoki's lane
 > (its spec gained the Edge states line it lacked), then roles-guard -> save-safety -> cost-guard ->
 > preview-pid; tag beta-4 on the laptop.
+> **2026-11-26 (later):** site-picker specced (ADR-124; Fable U-02, the smoke list's line 6): last in
+> beta-4, after preview-pid. purchaser-run gains cash-out lines and two receipts for a shared one
+> (ADR-126); a short becomes a payroll charge with the charges list (ADR-125).
 
 #### Fable fixes (2026-11-17)
 
@@ -254,6 +257,14 @@ Fable I-08 = F5, F3, PERM-12, I-07 = U-08, I-09, run 1's `{}` lead: a Save is al
 names a bad row; BEGIN IMMEDIATE; a JSON error handler (no stack traces); bad numbers (allocations
 keep negatives), dates, repeated query fields and non-number ids refused. PUBLIC -> click-through.
 Full spec: session-status.md -> "Step save-safety".
+
+### Step site-picker - the pages list only your restaurants; a refusal shows its message  [blocked: preview-pid (order)]
+Touches: public/shell.js, public/daily-audit.html, public/sales.html, public/stock-receipts.html, public/allocations.html, public/dashboard.html, server/engines/loyversePreview.js, server/engines/loyversePreview.test.js, server/sitePicker.test.js
+ADR-091, ADR-124 (Fable U-02; the smoke list's line 6): the Landing, Typed sales, Stock Receipts,
+Allocations and Dashboard list only your restaurants; one opens directly, several remember the last,
+none shows one line; a 403 shows its message, never "Loading..." for good; FC's landing lines null
+when FC's account fails. Naoki's lane, last in beta-4. PUBLIC -> click-through. Full spec:
+session-status.md -> "Step site-picker".
 
 ### 0. Step archive-pass — CLOSED 2026-09-03, PR #2.
 
@@ -712,6 +723,9 @@ ADR-117, ADR-122, ADR-123: cash given, each receipt's store, restaurant, grand t
 photo, fares and tips, cash counted; the short shown; the supervisor marks it checked; photos beside
 the database, mirrored once by the backup. The run replaces the logbook page, never adds to it. New
 tables. PUBLIC -> click-through. Full spec: session-status.md -> "Step purchaser-run".
+**2026-11-26:** + "Cash out" lines (who, amount, what for; no restaurant) and a shared receipt as two
+receipts (ADR-126); the short's payroll charge comes with the charges list (ADR-125). See the spec's
+2026-11-26 block.
 
 ### Step po-lines - a day's PO per restaurant, typed  [blocked: purchaser-run (order)]
 Touches: server/db/schema.sql, server/engines/poLines.js, server/engines/poLines.test.js, server/routes/poLines.js, server/routes/poLines.test.js, server/index.js, scripts/write-path-allowlist.json, public/po.html, public/shell.js
@@ -920,8 +934,8 @@ lands, so it is written against the code it builds on. Roughly in order:
   ADR-088: the supervisor's list of differences, explanation or charge); fc-dish-map (FC's dishes
   and recipes in the database for the landing's expected values, from ADR-094's map and takes in
   meat-landing.md; Kitchen Sales' FC side is landing-sales). Full specs once side-sheets lands.
-- **Sites (ADR-091):** site-picker (the count pages' pickers show only `can_use` sites; a 403 shows
-  its message instead of "Loading..."); blind-history (a blind viewer's History hides the numbers
+- **Sites (ADR-091):** site-picker (specced 2026-11-26, ADR-124: in the Queue under Fable fixes);
+  blind-history (a blind viewer's History hides the numbers
   the count screen hides; Q15).
 - **Roster (ADR-090, not A8):** roster-board (read-only Mon-Sun across the viewer's sites, for
   supervisors and management; the first card, ADR-089), after roster-day-status.

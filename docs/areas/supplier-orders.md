@@ -37,6 +37,10 @@ Status: IRL Written - FLOW Written (the sort, the typed PO) - APP Specced (suppl
   the main supplier, the meat supplier, dry goods, greens, the water station, a supermarket (whole
   chickens), a wholesaler, a mall grocery and a hardware shop. Supplier names and prices: private
   notes.
+- 2026-11-26 (Naoki): the main supervisor's supplier list is collected (names in the private notes;
+  more may come). Each mall and supermarket is its own store. One veggie source is a group at the
+  public market that gathers the day's order; the purchaser picks it up (ADR-119's "we pick up").
+  The cashier's tally may show a buy as "P.O" when no store was named (money.md).
 
 ## FLOW - how they will use the app (drafted)
 1. Counters add PO lines for their items while counting.

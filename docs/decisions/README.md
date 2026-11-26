@@ -133,7 +133,7 @@ flight. (ADR-001 explains the split.)
 | ADR-088 | Charges are recorded in the app; payroll stays in Excel | Accepted 2026-11-15 |
 | ADR-089 | Views are built as cards; a dashboard builder comes later | Accepted 2026-11-15 |
 | ADR-090 | A roster board across sites | Accepted 2026-11-15 |
-| ADR-091 | Site lists stay open; each row says whether you can use it | Accepted 2026-11-15 |
+| ADR-091 | Site lists stay open; each row says whether you can use it | Accepted 2026-11-15; its pages widened by ADR-124 |
 | ADR-092 | Meat requests: where they come from, and a quick request | Accepted 2026-11-15 |
 | ADR-093 | No browser pop-ups | Accepted 2026-11-15 |
 | ADR-094 | FC's sales follow its landing sheet | Accepted 2026-11-15 |
@@ -164,8 +164,12 @@ flight. (ADR-001 explains the split.)
 | ADR-119 | Suppliers: one list, a main and a backup supplier per item, a sort screen | Accepted 2026-11-23 |
 | ADR-120 | A PO line is the amount to buy, typed; a catalog item or a typed name | Accepted 2026-11-23 |
 | ADR-121 | The receive screen: groups by supplier, ticks for weights, counts for pieces, "All here" | Accepted 2026-11-23 |
-| ADR-122 | The purchaser's run: fares and tips as lines, the short, optional photos, no extra work | Accepted 2026-11-23 |
+| ADR-122 | The purchaser's run: fares and tips as lines, the short, optional photos, no extra work | Accepted 2026-11-23; the short's charge by ADR-125; cash outs and shared receipts by ADR-126 |
 | ADR-123 | Four supply switches: edit_suppliers, purchase, check_runs, receive | Accepted 2026-11-23 |
+| ADR-124 | The pages list only your restaurants; a refusal shows its message | Accepted 2026-11-26 |
+| ADR-125 | A purchaser's short is a payroll deduction, charged when the run is checked | Accepted 2026-11-26 |
+| ADR-126 | The run's cash-out lines; a receipt shared by two restaurants is two receipts | Accepted 2026-11-26 |
+| ADR-127 | Windows Update stays off on the restaurant PC; a monthly update by hand | Accepted 2026-11-26 |
 
 **Reversal pairs (A14a, recorded 2026-11-12).** ADR-048 to ADR-059 record swings decided before
 these records existed, in pairs: each older record is marked superseded by the one after it, and
