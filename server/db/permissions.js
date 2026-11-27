@@ -4,7 +4,9 @@
 //
 // A person's live roles at a site, on a business date, are their base role
 // (users.default_role_id) plus every user_roles row for that site or for
-// every site (site_code NULL) that has not ended. A role grants:
+// every site (site_code NULL) that has not ended. Admin and read-only are base
+// roles only (roles-guard, ADR-099): an extra role with either grants nothing.
+// A role grants:
 //   - the four legacy capabilities, read from the roles columns;
 //   - the switches it has rows for in role_capabilities;
 //   - everything, if it has admin.
@@ -77,7 +79,7 @@ function liveRoles(db, user, siteCode, date) {
   `).all(user.id);
   const assigned = db.prepare(`
     SELECT ${ROLE_COLUMNS} FROM user_roles ur JOIN roles r ON r.id = ur.role_id
-     WHERE ur.user_id = ? AND r.active = 1
+     WHERE ur.user_id = ? AND r.active = 1 AND r.can_admin = 0 AND r.read_only = 0
        AND (ur.until_date IS NULL OR ur.until_date >= ?)
        AND (ur.site_code IS NULL OR ur.site_code = ?)
      ORDER BY ur.id
@@ -114,12 +116,75 @@ function capabilitiesBySite(db, user, date) {
   return result;
 }
 
-// Admin, everywhere (not just at one site).
-const isAdmin = (db, actor) => can(db, actor, 'admin', null);
+// Admin, everywhere: the base role only (roles-guard, PERM-09). The person is
+// active, their base role is active and has admin. An extra role never makes
+// an admin. A read-only check reads the base role the same way (siteAccess's
+// isBypass does), never through roleGrants, which says yes to everything for
+// a role with admin.
+function isAdmin(db, actor) {
+  if (!actor) return false;
+  return db.prepare(`
+    SELECT 1 FROM users u JOIN roles r ON r.id = u.default_role_id
+     WHERE u.id = ? AND u.active = 1 AND r.active = 1 AND r.can_admin = 1
+  `).get(actor.id) !== undefined;
+}
 const FORBIDDEN = { status: 403, error: 'Only an admin can change roles.' };
 
 function roleById(db, roleId) {
-  return db.prepare('SELECT id, name, active FROM roles WHERE id = ?').get(Number(roleId));
+  return db.prepare('SELECT id, name, active, can_admin, read_only FROM roles WHERE id = ?').get(Number(roleId));
+}
+
+// --- Step roles-guard (ADR-099): no admin lockout ---
+
+const ADMIN_ROLE = 'admin';
+const BASE_ONLY = { status: 400, error: "Give this as the person's base role." };
+const ADMIN_ROLE_LOCKED = 'The admin role keeps admin and stays on. Make a copy to change it.';
+const OWN_ROLE_LOCKED = 'You are using this role. Ask another admin or the super-admin.';
+const OWN_BASE_ROLE = { status: 400, error: 'Your own base role is changed by another admin or the super-admin.' };
+
+const baseRoleIdOf = (db, user) => (user
+  ? db.prepare('SELECT default_role_id FROM users WHERE id = ?').get(user.id)?.default_role_id ?? null
+  : null);
+
+/**
+ * Why `viewer` may not switch `role` off or turn its admin off, or null if
+ * they may: the built-in admin role (found by name, ADR-083), or the role the
+ * viewer is using as their base role.
+ */
+function lockReason(db, role, viewer) {
+  if (role.name === ADMIN_ROLE) return ADMIN_ROLE_LOCKED;
+  if (role.id === baseRoleIdOf(db, viewer)) return OWN_ROLE_LOCKED;
+  return null;
+}
+
+// "A, B, C, D, E and 2 more": at most five names.
+function namesList(names) {
+  const shown = names.slice(0, 5).join(', ');
+  return names.length > 5 ? `${shown} and ${names.length - 5} more` : shown;
+}
+
+// The people who hold `roleId` as an extra role (any user_roles row).
+function extraHolders(db, roleId) {
+  return db.prepare(`
+    SELECT DISTINCT u.name FROM user_roles ur JOIN users u ON u.id = ur.user_id
+     WHERE ur.role_id = ? ORDER BY u.name
+  `).all(roleId).map(r => r.name);
+}
+
+/**
+ * Server start (roles-guard rule 7): the line listing extra roles that grant
+ * nothing now because their role has admin or read-only, or null if none.
+ */
+function extraRolesGrantingNothing(db) {
+  const rows = db.prepare(`
+    SELECT u.name AS person, r.name AS role, ur.site_code
+      FROM user_roles ur JOIN users u ON u.id = ur.user_id JOIN roles r ON r.id = ur.role_id
+     WHERE r.can_admin = 1 OR r.read_only = 1
+     ORDER BY u.name, r.name, ur.site_code
+  `).all();
+  if (rows.length === 0) return null;
+  const list = rows.map(r => `${r.person} - ${r.role} (${r.site_code === null ? 'every site' : r.site_code})`).join(', ');
+  return `Extra roles that grant nothing now (admin and read-only are base roles only): ${list}. Remove them on the Roles page.`;
 }
 
 const normSite = siteCode => (siteCode === undefined || siteCode === null ? null : siteCode);
@@ -151,7 +216,10 @@ function assignRole(db, { userId, roleId, siteCode, untilDate }, actor) {
   if (until !== null && until < today()) return { status: 400, error: 'The end date is in the past.' };
   if (findAssignment(db, uid, role.id, site)) return { status: 409, error: 'Already assigned.' };
 
-  const id = withTransaction(db, () => {
+  const result = withTransaction(db, () => {
+    // Read inside the transaction, so another admin's change is seen.
+    const flags = roleById(db, role.id);
+    if (flags.can_admin === 1 || flags.read_only === 1) return BASE_ONLY;
     const newId = Number(db.prepare(`
       INSERT INTO user_roles (user_id, role_id, site_code, until_date, created_by_user_id)
       VALUES (?, ?, ?, ?, ?)
@@ -160,9 +228,9 @@ function assignRole(db, { userId, roleId, siteCode, untilDate }, actor) {
       actor: actor.name, entityType: 'user_roles', entityId: newId, action: 'CREATE',
       before: null, after: { ...findAssignment(db, uid, role.id, site) }, source: 'MANUAL',
     });
-    return newId;
+    return { ok: true, id: newId };
   });
-  return { ok: true, id };
+  return result;
 }
 
 /** Remove the assignment (userId, roleId, siteCode). Admin only. Returns { ok } or { status, error }. */
@@ -229,6 +297,18 @@ const nameKey = name => String(name ?? '').trim().replace(/\s+/g, ' ').toLowerCa
 
 const NAME_TAKEN = { status: 409, error: 'A role with that name already exists' };
 
+// roles-guard rule 6: a name's letters and digits alone. "Super.Admin",
+// "super_admin" and "admin" with an unseen character all come to the same.
+const lettersOf = name => String(name ?? '').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** The built-in role whose letters and digits `name` matches, or null. */
+function builtInLookAlike(name) {
+  const letters = lettersOf(name);
+  if (!letters) return null;
+  return BUILT_IN_ROLES.find(builtIn => lettersOf(builtIn) === letters) || null;
+}
+const tooClose = builtIn => ({ status: 400, error: `That name is too close to the built-in role ${builtIn}.` });
+
 // Another role (not `exceptId`) whose name has this key?
 function nameTaken(db, name, exceptId) {
   const key = nameKey(name);
@@ -257,6 +337,8 @@ function createRole(db, { name, copyFrom }, actor) {
   const clean = typeof name === 'string' ? name.trim() : '';
   if (!clean) return { status: 400, error: 'A role needs a name.' };
   if (nameTaken(db, clean, null)) return NAME_TAKEN;
+  const lookAlike = builtInLookAlike(clean);
+  if (lookAlike) return tooClose(lookAlike);
   let source = null;
   if (copyFrom !== undefined && copyFrom !== null && copyFrom !== '') {
     source = roleSnapshot(db, copyFrom);
@@ -301,6 +383,8 @@ function updateRole(db, { roleId, name, active }, actor) {
     if (clean !== before.name) {
       if (BUILT_IN_ROLES.includes(before.name)) return { status: 400, error: 'A built-in role keeps its name' };
       if (nameTaken(db, clean, before.id)) return NAME_TAKEN;
+      const lookAlike = builtInLookAlike(clean);
+      if (lookAlike) return tooClose(lookAlike);
       newName = clean;
     }
   }
@@ -311,14 +395,20 @@ function updateRole(db, { roleId, name, active }, actor) {
   }
   if (newName === before.name && newActive === before.active) return { ok: true, changed: false, role: before };
 
-  withTransaction(db, () => {
+  return withTransaction(db, () => {
+    // roles-guard: the built-in admin role and your own base role stay on.
+    // Read inside the transaction, so another admin's change is seen.
+    if (newActive === 0 && before.active === 1) {
+      const locked = lockReason(db, before, actor);
+      if (locked) return { status: 400, error: locked };
+    }
     db.prepare('UPDATE roles SET name = ?, active = ? WHERE id = ?').run(newName, newActive, before.id);
     logActivity(db, {
       actor: actor.name, entityType: 'roles', entityId: before.id, action: 'UPDATE',
       before, after: roleSnapshot(db, before.id), source: 'MANUAL',
     });
+    return { ok: true, changed: true, role: roleSnapshot(db, before.id) };
   });
-  return { ok: true, changed: true, role: roleSnapshot(db, before.id) };
 }
 
 /**
@@ -343,14 +433,26 @@ function setRoleToggle(db, { roleId, capability, on }, actor) {
   const value = on ? 1 : 0;
   if (before[column] === value) return { ok: true, changed: false, role: before };
 
-  withTransaction(db, () => {
+  return withTransaction(db, () => {
+    // roles-guard checks, read inside the transaction so another admin's
+    // change is seen. A refusal writes nothing.
+    if (on && (capability === 'admin' || capability === 'read_only')) {
+      const holders = extraHolders(db, before.id);
+      if (holders.length > 0) {
+        return { status: 400, error: `${namesList(holders)} hold this as an extra role. Remove it there first, or make it their base role.` };
+      }
+    }
+    if (!on && capability === 'admin') {
+      const locked = lockReason(db, before, actor);
+      if (locked) return { status: 400, error: locked };
+    }
     db.prepare(`UPDATE roles SET ${column} = ? WHERE id = ?`).run(value, before.id);
     logActivity(db, {
       actor: actor.name, entityType: 'roles', entityId: before.id, action: 'UPDATE',
       before, after: roleSnapshot(db, before.id), source: 'MANUAL',
     });
+    return { ok: true, changed: true, role: roleSnapshot(db, before.id) };
   });
-  return { ok: true, changed: true, role: roleSnapshot(db, before.id) };
 }
 
 /**
@@ -367,6 +469,7 @@ function setBaseRole(db, { userId, roleId }, actor) {
   `).get(Number(userId));
   if (!person) return { status: 404, error: 'Unknown person.' };
   if (person.role === SUPER_ADMIN) return { status: 400, error: "The super-admin's role never changes." };
+  if (actor && person.id === actor.id) return OWN_BASE_ROLE;
   const role = roleById(db, roleId);
   if (!role) return { status: 400, error: 'Unknown role.' };
   if (role.name === SUPER_ADMIN) return { status: 400, error: 'The super-admin role is never assigned.' };
@@ -449,4 +552,7 @@ module.exports = {
   setRoleToggle,
   setBaseRole,
   assignmentsOf,
+  lockReason,
+  builtInLookAlike,
+  extraRolesGrantingNothing,
 };

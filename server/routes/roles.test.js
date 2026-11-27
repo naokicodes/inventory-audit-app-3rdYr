@@ -208,9 +208,10 @@ test('a base role change applies on the next request, with a log row', async () 
 test('a name another role holds by the key is refused on create and on rename (ADR-073)', async () => {
   assert.deepStrictEqual(await call('POST', '/api/roles', 'admin', { name: 'Admin', copy_from: roleId.checker }),
     { status: 409, body: { error: 'A role with that name already exists' } });
-  assert.strictEqual((await call('POST', '/api/roles', 'admin', { name: 'head chef' })).status, 200);
-  assert.strictEqual((await call('POST', '/api/roles', 'admin', { name: 'Head  Chef' })).status, 409);
-  for (const name of ['Admin', 'Head  Chef', ' SUPERVISOR ']) {
+  // roles-guard: "head chef" is now too close to head-chef, so the key is shown with another name.
+  assert.strictEqual((await call('POST', '/api/roles', 'admin', { name: 'line cook' })).status, 200);
+  assert.strictEqual((await call('POST', '/api/roles', 'admin', { name: 'Line  Cook' })).status, 409);
+  for (const name of ['Admin', 'Line  Cook', ' SUPERVISOR ']) {
     const res = await call('PUT', `/api/roles/${copyId}`, 'admin', { name });
     assert.strictEqual(res.status, 409, name);
     assert.deepStrictEqual(res.body, { error: 'A role with that name already exists' });
@@ -271,6 +272,51 @@ test('a site_code that is not a code or null is a 400, not a crash', async () =>
     }
   }
   assert.deepStrictEqual((await call('GET', `/api/users/${users.ben}/roles`, 'admin')).body.assignments, []);
+});
+
+// --- Step roles-guard (ADR-099) ---
+
+test('roles-guard: GET /api/roles gives can_switch_off / can_turn_admin_off for the viewer', async () => {
+  const flags = (body, name) => {
+    const r = body.roles.find(x => x.name === name);
+    return [r.can_switch_off, r.can_turn_admin_off];
+  };
+  const asAdmin = (await call('GET', '/api/roles', 'admin')).body;
+  assert.deepStrictEqual(flags(asAdmin, 'admin'), [false, false], 'the built-in admin role');
+  assert.deepStrictEqual(flags(asAdmin, 'checker'), [true, true]);
+  assert.deepStrictEqual(flags(asAdmin, 'line cook'), [true, true]);
+  const asChef = (await call('GET', '/api/roles', 'chef')).body;
+  assert.deepStrictEqual(flags(asChef, 'head-chef'), [false, false], "the viewer's own base role");
+  assert.deepStrictEqual(flags(asChef, 'checker'), [true, true]);
+  assert.deepStrictEqual(flags(asChef, 'admin'), [false, false]);
+});
+
+test('roles-guard: each refusal is a 400 with its message and writes nothing', async () => {
+  const logs = logCount();
+  const roles = JSON.stringify(db.prepare('SELECT * FROM roles').all());
+  const refusals = [
+    ['PUT', `/api/roles/${roleId.admin}`, { active: false }, 'The admin role keeps admin and stays on. Make a copy to change it.'],
+    ['PUT', `/api/roles/${roleId.admin}/capabilities`, { capability: 'admin', on: false }, 'The admin role keeps admin and stays on. Make a copy to change it.'],
+    ['PUT', `/api/users/${users.admin}/base-role`, { role_id: roleId.checker }, 'Your own base role is changed by another admin or the super-admin.'],
+    ['POST', `/api/users/${users.ben}/roles`, { role_id: roleId.admin, site_code: null }, "Give this as the person's base role."],
+    ['POST', `/api/users/${users.ben}/roles`, { role_id: roleId.management, site_code: 'RA' }, "Give this as the person's base role."],
+    ['POST', '/api/roles', { name: 'super admin', copy_from: roleId.checker }, 'That name is too close to the built-in role super-admin.'],
+    ['PUT', `/api/roles/${copyId}`, { name: 'Head.Chef' }, 'That name is too close to the built-in role head-chef.'],
+  ];
+  for (const [m, url, body, error] of refusals) {
+    assert.deepStrictEqual(await call(m, url, 'admin', body), { status: 400, body: { error } }, `${m} ${url} ${JSON.stringify(body)}`);
+  }
+  // Held as an extra role: admin cannot be turned on; the person is named.
+  assert.strictEqual((await call('POST', `/api/users/${users.ben}/roles`, 'admin', { role_id: roleId.supervisor, site_code: 'RA' })).status, 200);
+  const held = await call('PUT', `/api/roles/${roleId.supervisor}/capabilities`, 'admin', { capability: 'read_only', on: true });
+  assert.deepStrictEqual(held, { status: 400, body: { error: 'U ben hold this as an extra role. Remove it there first, or make it their base role.' } });
+  const afterAssign = logCount();
+  assert.strictEqual(afterAssign, logs + 1, 'only the assignment wrote a log row');
+  assert.strictEqual(JSON.stringify(db.prepare('SELECT * FROM roles').all()), roles);
+  assert.strictEqual((await call('DELETE', `/api/users/${users.ben}/roles`, 'admin', { role_id: roleId.supervisor, site_code: 'RA' })).status, 200);
+  // "Admin 2" and "Admins" are fine.
+  assert.strictEqual((await call('POST', '/api/roles', 'admin', { name: 'Admin 2', copy_from: roleId.admin })).status, 200);
+  assert.strictEqual((await call('POST', '/api/roles', 'admin', { name: 'Admins' })).status, 200);
 });
 
 const server = app.listen(0, async () => {
