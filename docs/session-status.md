@@ -5432,6 +5432,7 @@ something else already listening on 3100 (for example `npx http-server -p 3100`)
 with "port 3100 is already in use".
 
 ## Step restaurant-pc-ii - update refreshes the launcher; the admin part reports failures (A0, cubic on PR #47)
+$L
 
 Decided 2026-11-15 (late cubic findings on PR #47). DEPENDS ON nothing. Naoki's own PR (like 3ze):
 it is checked at the restaurant PC, at the beta-3 update. Low priority.

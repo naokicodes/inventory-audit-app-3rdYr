@@ -675,6 +675,7 @@ Needs Windows; You check only. Full spec: session-status.md -> "Step preview-pid
 **2026-11-15 (later):** + the port check asks Windows who listens; "up" needs the preview's own process; a timeout cleans up. See the spec.
 
 ### Step restaurant-pc-ii - update refreshes the launcher; the admin part reports failures  [Naoki's own PR]
+$L
 Touches: scripts/restaurant-pc.bat
 cubic on PR #47: `update` copies the new bat over the desktop launcher's copy; a failed firewall or
 power command shows `[!]`. Checked at the PC at beta-3. Full spec: session-status.md -> "Step
