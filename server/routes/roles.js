@@ -2,7 +2,8 @@
 // read; every write goes through permissions.js, which answers 403 for a
 // non-admin. Logged out -> 401.
 //
-// GET    /api/roles                    - { can_edit, roles, people }
+// GET    /api/roles                    - { can_edit, roles, people }; each role has
+//                                         can_switch_off / can_turn_admin_off for the viewer
 // POST   /api/roles                    - { name, copy_from }
 // PUT    /api/roles/:id                - { name?, active? }
 // PUT    /api/roles/:id/capabilities   - { capability, on }
@@ -60,7 +61,14 @@ router.use(['/roles', '/users/:id/roles', '/users/:id/base-role'], signedIn);
 router.get('/roles', (req, res) => {
   const roles = db.prepare('SELECT id FROM roles ORDER BY id').all().map(r => {
     const role = permissions.roleSnapshot(db, r.id);
-    return { ...role, built_in: permissions.BUILT_IN_ROLES.includes(role.name) };
+    // roles-guard: false for the built-in admin role and the viewer's own base role.
+    const free = permissions.lockReason(db, role, req.user) === null;
+    return {
+      ...role,
+      built_in: permissions.BUILT_IN_ROLES.includes(role.name),
+      can_switch_off: free,
+      can_turn_admin_off: free,
+    };
   });
   const people = db.prepare(`${PEOPLE_SQL} ORDER BY u.name`).all().map(personView);
   res.json({ can_edit: permissions.isAdmin(db, req.user), roles, people });

@@ -33,6 +33,8 @@
     #add-role { padding: 0.75rem 1rem; margin: 0 0 0.75rem; }
     #add-role h3 { margin: 0; font-size: 1rem; }
     #status { min-height: 1.4em; }
+    .reason { margin: 0.35rem 0 0; font-size: 0.9rem; }
+    .refusal { margin: 0.4rem 0 0; }
   </style>
 </head>
 <body class="page-wide">
@@ -66,10 +68,17 @@
     ];
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+    // Step roles-guard (ADR-099): why a role cannot be switched off or lose admin.
+    const ADMIN_ROLE_REASON = 'The admin role keeps admin and stays on. Make a copy to change it.';
+    const OWN_ROLE_REASON = 'You are using this role. Ask another admin or the super-admin.';
+
     const statusEl = document.getElementById('status');
     const rolesEl = document.getElementById('roles');
     const peopleEl = document.getElementById('people');
     let data = null;
+    // The server's refusal, shown beside the role or person it was about:
+    // { key: 'role:<id>' | 'person:<id>' | 'add-role', text }.
+    let refusal = null;
 
     // A tiny element builder: el('p', { className: 'x' }, 'text', child).
     function el(tag, props, ...children) {
@@ -102,11 +111,12 @@
     // Changes run one at a time, in the order clicked, so two quick toggles
     // can never land out of order.
     let queue = Promise.resolve();
-    function act(method, url, body, done) {
-      queue = queue.then(() => send(method, url, body, done));
+    function act(method, url, body, done, key) {
+      queue = queue.then(() => send(method, url, body, done, key));
       return queue;
     }
-    async function send(method, url, body, done) {
+    async function send(method, url, body, done, key) {
+      refusal = null;
       try {
         const res = await fetch(url, {
           method,
@@ -115,7 +125,13 @@
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
-          say(json.error || `Could not save (${res.status}).`, 'error');
+          const text = json.error || `Could not save (${res.status}).`;
+          if (key) {
+            refusal = { key, text };
+            say('');
+          } else {
+            say(text, 'error');
+          }
         } else {
           say(done, 'success');
         }
@@ -123,6 +139,12 @@
         say('Could not reach the server.', 'error');
       }
       await load();
+    }
+
+    // The refusal line for this card, if the last change was refused here.
+    function refusalLine(key) {
+      if (!refusal || refusal.key !== key) return null;
+      return el('p', { className: 'status-message error refusal', role: 'alert', textContent: refusal.text });
     }
 
     function roleCard(role, canEdit) {
@@ -138,15 +160,25 @@
         return card;
       }
 
+      const cardKey = `role:${role.id}`;
+      // roles-guard: the built-in admin role and the viewer's own base role
+      // keep admin and stay on.
+      const adminLocked = role.can_admin === 1 && role.can_turn_admin_off === false;
+      const offLocked = role.active === 1 && role.can_switch_off === false;
+      if (canEdit && (adminLocked || offLocked)) {
+        card.append(el('p', { className: 'muted reason',
+          textContent: role.name === 'admin' ? ADMIN_ROLE_REASON : OWN_ROLE_REASON }));
+      }
+
       const list = el('ul', { className: 'toggles' });
       for (const [key, column, meaning] of TOGGLES) {
         const on = column ? role[column] === 1 : role.switches.includes(key);
         const item = el('li', {}, el('span', { textContent: meaning }));
         if (canEdit) {
-          const box = el('input', { type: 'checkbox', checked: on });
+          const box = el('input', { type: 'checkbox', checked: on, disabled: key === 'admin' && adminLocked });
           box.setAttribute('aria-label', `${role.name}: ${meaning}`);
           box.addEventListener('change', () => act('PUT', `/api/roles/${role.id}/capabilities`,
-            { capability: key, on: box.checked }, `${role.name}: "${meaning}" turned ${box.checked ? 'on' : 'off'}.`));
+            { capability: key, on: box.checked }, `${role.name}: "${meaning}" turned ${box.checked ? 'on' : 'off'}.`, cardKey));
           item.append(box);
         } else {
           item.append(el('span', { className: 'state', textContent: on ? 'On' : 'Off' }));
@@ -161,15 +193,18 @@
             const input = el('input', { type: 'text', value: role.name });
             input.setAttribute('aria-label', 'New name');
             const form = el('div', { className: 'row-form' }, input,
-              button('Save', () => act('PUT', `/api/roles/${role.id}`, { name: input.value }, 'Role renamed.')),
+              button('Save', () => act('PUT', `/api/roles/${role.id}`, { name: input.value }, 'Role renamed.', cardKey)),
               button('Cancel', () => form.remove()));
             card.append(form);
             input.focus();
           }));
         }
-        actions.append(button(role.active ? 'Deactivate' : 'Activate', () => act('PUT', `/api/roles/${role.id}`,
-          { active: !role.active }, `${role.name} ${role.active ? 'deactivated' : 'activated'}.`)));
+        if (!offLocked) {
+          actions.append(button(role.active ? 'Deactivate' : 'Activate', () => act('PUT', `/api/roles/${role.id}`,
+            { active: !role.active }, `${role.name} ${role.active ? 'deactivated' : 'activated'}.`, cardKey)));
+        }
       }
+      card.append(refusalLine(cardKey) || '');
       return card;
     }
 
@@ -187,13 +222,17 @@
       return el('div', { className: 'box', id: 'add-role' },
         el('h3', { textContent: 'Add role' }),
         el('div', { className: 'row-form' }, name, from,
-          button('Add role', () => act('POST', '/api/roles', { name: name.value, copy_from: Number(from.value) }, 'Role added.'))));
+          button('Add role', () => act('POST', '/api/roles', { name: name.value, copy_from: Number(from.value) }, 'Role added.', 'add-role'))),
+        refusalLine('add-role'));
     }
 
     function personCard(person, roles, canEdit) {
       const card = el('div', { className: 'box person-card' });
+      const cardKey = `person:${person.id}`;
       const isSuper = person.base_role === 'super-admin';
       const usable = roles.filter(r => r.active && r.name !== 'super-admin');
+      // roles-guard: admin and read-only are base roles only.
+      const extraUsable = usable.filter(r => r.can_admin !== 1 && r.read_only !== 1);
 
       let base;
       if (canEdit && !isSuper) {
@@ -205,7 +244,7 @@
         }
         base.value = String(person.base_role_id);
         base.addEventListener('change', () => act('PUT', `/api/users/${person.id}/base-role`,
-          { role_id: Number(base.value) }, `${person.name}'s base role changed.`));
+          { role_id: Number(base.value) }, `${person.name}'s base role changed.`, cardKey));
       } else {
         base = el('span', { textContent: person.base_role });
       }
@@ -226,7 +265,7 @@
           const remove = button('Remove', () => {
             slot.replaceChildren(el('span', { className: 'confirm' }, 'Are you sure?',
               button('Yes', () => act('DELETE', `/api/users/${person.id}/roles`,
-                { role_id: a.role_id, site_code: a.site_code }, `${a.role} removed from ${person.name}.`)),
+                { role_id: a.role_id, site_code: a.site_code }, `${a.role} removed from ${person.name}.`, cardKey)),
               button('No', () => slot.replaceChildren(remove))));
           });
           slot.append(remove);
@@ -239,7 +278,7 @@
       if (canEdit && !isSuper) {
         const role = el('select');
         role.setAttribute('aria-label', `${person.name}: role to add`);
-        for (const r of usable) role.append(el('option', { value: r.id, textContent: r.name }));
+        for (const r of extraUsable) role.append(el('option', { value: r.id, textContent: r.name }));
         const site = el('select');
         site.setAttribute('aria-label', `${person.name}: where`);
         site.append(el('option', { value: '', textContent: 'All their sites' }));
@@ -252,8 +291,9 @@
             role_id: Number(role.value),
             site_code: site.value === '' ? null : site.value,
             until_date: until.value === '' ? null : until.value,
-          }, `Role added for ${person.name}.`))));
+          }, `Role added for ${person.name}.`, cardKey))));
       }
+      card.append(refusalLine(cardKey) || '');
       return card;
     }
 

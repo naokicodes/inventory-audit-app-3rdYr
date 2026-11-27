@@ -22,6 +22,7 @@ const db = require('./connection.js');
 const {
   CAPABILITIES, liveRoles, can, capabilitiesBySite, assignRole, removeAssignment,
   setRoleCapability, ensureRoleDefaults,
+  isAdmin, createRole, updateRole, setRoleToggle, setBaseRole, extraRolesGrantingNothing, builtInLookAlike,
 } = require('./permissions.js');
 const { canUseSite } = require('./siteAccess.js');
 const { isBlind, canOrderRecount } = require('../engines/blindCount.js');
@@ -302,6 +303,134 @@ test('GET /api/auth/me returns capabilities_by_site for the sites the user can u
   } finally {
     server.close();
   }
+});
+
+// --- Step roles-guard (ADR-099; Fable U-17 = PERM-10, PERM-09 = C-14, PERM-14) ---
+
+const allLogs = () => db.prepare('SELECT COUNT(*) AS n FROM activity_log').get().n;
+const roleRow = id => ({ ...db.prepare('SELECT name, can_enter_counts, can_finalize, can_admin, read_only, active FROM roles WHERE id = ?').get(id) });
+const BASE_ONLY = { status: 400, error: "Give this as the person's base role." };
+const ADMIN_LOCKED = { status: 400, error: 'The admin role keeps admin and stays on. Make a copy to change it.' };
+const OWN_LOCKED = { status: 400, error: 'You are using this role. Ask another admin or the super-admin.' };
+
+test('roles-guard: PERM-09 - admin and management are refused as extra roles, at a site or everywhere; nothing written', () => {
+  const logs = allLogs();
+  for (const name of ['admin', 'management']) {
+    for (const siteCode of [null, 'RA']) {
+      assert.deepStrictEqual(assignRole(db, { userId: finn.id, roleId: role[name], siteCode }, admin), BASE_ONLY, `${name} at ${siteCode}`);
+    }
+  }
+  assert.deepStrictEqual(assignments(finn.id), []);
+  assert.strictEqual(allLogs(), logs, 'no activity_log row');
+  assert.strictEqual(isAdmin(db, finn), false);
+});
+
+test('roles-guard: an old extra admin row grants nothing, isAdmin is false, and the start line lists it', () => {
+  const ivy = makeUser('Ivy', 'checker', ['RA']);
+  assert.strictEqual(extraRolesGrantingNothing(db), null, 'none yet');
+  rawAssign(ivy.id, role.admin, null, null);
+  rawAssign(ivy.id, role.management, 'RA', null);
+  assert.strictEqual(isAdmin(db, ivy), false, 'isAdmin reads the base role only');
+  for (const cap of ['admin', 'finalize', 'read_only', 'sees_expected', 'pick_tonight', 'manage_staff']) {
+    assert.strictEqual(can(db, ivy, cap, 'RA'), false, `no ${cap} at RA`);
+  }
+  assert.deepStrictEqual(liveRoles(db, ivy, 'RA').map(r => r.name), ['checker'], 'only the base role');
+  assert.deepStrictEqual(capabilitiesBySite(db, ivy), { RA: ['enter_counts'] });
+  assert.strictEqual(createRole(db, { name: 'by ivy' }, ivy).status, 403, 'an old extra admin row is no admin');
+  assert.strictEqual(extraRolesGrantingNothing(db),
+    'Extra roles that grant nothing now (admin and read-only are base roles only): Ivy - admin (every site), Ivy - management (RA). Remove them on the Roles page.');
+  // They can still be removed.
+  assert.deepStrictEqual(removeAssignment(db, { userId: ivy.id, roleId: role.admin, siteCode: null }, admin), { ok: true });
+  assert.deepStrictEqual(removeAssignment(db, { userId: ivy.id, roleId: role.management, siteCode: 'RA' }, admin), { ok: true });
+  assert.strictEqual(extraRolesGrantingNothing(db), null);
+});
+
+test('roles-guard: admin or read-only cannot be turned on for a role held as an extra role; the names are listed, five at most', () => {
+  const logs = allLogs();
+  // head-chef is held as an extra role by Cara (FC), Eli (RA) and Gus (COM-A), from the tests above.
+  for (const capability of ['admin', 'read_only']) {
+    assert.deepStrictEqual(setRoleToggle(db, { roleId: role['head-chef'], capability, on: true }, admin),
+      { status: 400, error: 'Cara, Eli, Gus hold this as an extra role. Remove it there first, or make it their base role.' }, capability);
+  }
+  const prep = Number(db.prepare(`INSERT INTO roles (name, can_enter_counts) VALUES ('prep-cook', 1)`).run().lastInsertRowid);
+  for (const u of [cara, dee, eli, finn, gus, hugo, sam]) rawAssign(u.id, prep, 'RA', null);
+  rawAssign(cara.id, prep, 'FC', null); // two rows, one name
+  assert.deepStrictEqual(setRoleToggle(db, { roleId: prep, capability: 'admin', on: true }, admin),
+    { status: 400, error: 'Cara, Dee, Eli, Finn, Gus and 2 more hold this as an extra role. Remove it there first, or make it their base role.' });
+  assert.strictEqual(roleRow(role['head-chef']).can_admin, 0);
+  assert.strictEqual(roleRow(role['head-chef']).read_only, 0);
+  assert.strictEqual(roleRow(prep).can_admin, 0);
+  assert.strictEqual(allLogs(), logs, 'no activity_log row');
+  // Other toggles on a held role still change.
+  assert.strictEqual(setRoleToggle(db, { roleId: prep, capability: 'finalize', on: true }, admin).changed, true);
+  db.prepare('DELETE FROM user_roles WHERE role_id = ?').run(prep);
+  // Nobody holds it now: admin turns on.
+  assert.strictEqual(setRoleToggle(db, { roleId: prep, capability: 'admin', on: true }, admin).changed, true);
+});
+
+test('roles-guard: U-17 - the built-in admin role cannot be switched off or lose admin, even by the super-admin', () => {
+  const logs = allLogs();
+  const before = roleRow(role.admin);
+  for (const actor of [admin, superAdmin]) {
+    assert.deepStrictEqual(updateRole(db, { roleId: role.admin, active: false }, actor), ADMIN_LOCKED, `${actor.name} deactivate`);
+    assert.deepStrictEqual(setRoleToggle(db, { roleId: role.admin, capability: 'admin', on: false }, actor), ADMIN_LOCKED, `${actor.name} admin off`);
+  }
+  assert.deepStrictEqual(roleRow(role.admin), before);
+  assert.strictEqual(allLogs(), logs, 'no activity_log row');
+  assert.strictEqual(isAdmin(db, admin), true);
+});
+
+test('roles-guard: a copy of admin as my base role - I cannot switch it off or turn its admin off; another admin can', () => {
+  const copy = createRole(db, { name: 'Owner', copyFrom: role.admin }, admin);
+  assert.strictEqual(copy.ok, true, JSON.stringify(copy));
+  role.Owner = copy.role.id;
+  const olga = makeUser('Olga', 'Owner');
+  assert.strictEqual(isAdmin(db, olga), true);
+  const logs = allLogs();
+  assert.deepStrictEqual(updateRole(db, { roleId: role.Owner, active: false }, olga), OWN_LOCKED);
+  assert.deepStrictEqual(setRoleToggle(db, { roleId: role.Owner, capability: 'admin', on: false }, olga), OWN_LOCKED);
+  assert.strictEqual(allLogs(), logs, 'no activity_log row');
+  assert.strictEqual(isAdmin(db, olga), true);
+  // Ada, another admin, can - and give it back.
+  assert.strictEqual(setRoleToggle(db, { roleId: role.Owner, capability: 'admin', on: false }, admin).changed, true);
+  assert.strictEqual(isAdmin(db, olga), false);
+  assert.strictEqual(setRoleToggle(db, { roleId: role.Owner, capability: 'admin', on: true }, admin).changed, true);
+  assert.strictEqual(updateRole(db, { roleId: role.Owner, active: false }, admin).changed, true);
+  assert.strictEqual(isAdmin(db, olga), false, 'an inactive base role grants nothing');
+  assert.strictEqual(updateRole(db, { roleId: role.Owner, active: true }, admin).changed, true);
+  assert.strictEqual(isAdmin(db, olga), true);
+});
+
+test('roles-guard: setBaseRole on myself is refused; another admin may change it', () => {
+  const logs = allLogs();
+  const own = { status: 400, error: 'Your own base role is changed by another admin or the super-admin.' };
+  assert.deepStrictEqual(setBaseRole(db, { userId: admin.id, roleId: role.checker }, admin), own);
+  assert.deepStrictEqual(setBaseRole(db, { userId: admin.id, roleId: role.admin }, admin), own, 'even to the same role');
+  assert.strictEqual(allLogs(), logs, 'no activity_log row');
+  assert.strictEqual(db.prepare('SELECT default_role_id FROM users WHERE id = ?').get(admin.id).default_role_id, role.admin);
+  const olga = db.prepare(`SELECT id FROM users WHERE name = 'Olga'`).get();
+  assert.strictEqual(setBaseRole(db, { userId: olga.id, roleId: role.admin }, admin).changed, true);
+});
+
+test('roles-guard: names whose letters and digits match a built-in role are refused on create and on rename', () => {
+  const logs = allLogs();
+  const roles = db.prepare('SELECT COUNT(*) AS n FROM roles').get().n;
+  for (const [name, builtIn] of [
+    ['super admin', 'super-admin'], ['super_admin', 'super-admin'], ['Super.Admin', 'super-admin'],
+    ['admin​', 'admin'], ['headchef', 'head-chef'], ['ＡＤＭＩＮ', 'admin'],
+  ]) {
+    const refused = { status: 400, error: `That name is too close to the built-in role ${builtIn}.` };
+    assert.deepStrictEqual(createRole(db, { name }, admin), refused, `create ${JSON.stringify(name)}`);
+    assert.deepStrictEqual(updateRole(db, { roleId: role.Owner, name }, admin), refused, `rename ${JSON.stringify(name)}`);
+  }
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM roles').get().n, roles);
+  assert.strictEqual(roleRow(role.Owner).name, 'Owner');
+  assert.strictEqual(allLogs(), logs, 'no activity_log row');
+  assert.strictEqual(createRole(db, { name: 'Admin 2' }, admin).ok, true);
+  assert.strictEqual(updateRole(db, { roleId: role.Owner, name: 'Admins' }, admin).changed, true);
+  assert.strictEqual(builtInLookAlike('Admins'), null);
+  assert.strictEqual(builtInLookAlike('Head Chef'), 'head-chef');
+  assert.strictEqual(builtInLookAlike('---'), null);
 });
 
 // --- ensureRoleDefaults on a database from before this step (beta.db) ---

@@ -421,6 +421,23 @@ try {
     assert.deepStrictEqual(report.leftAsApp, []);
   });
 
+  test('roles-guard: a new role too close to a built-in one is skipped and reported; an existing role still matches by the key', () => {
+    const db = freshDb();
+    const before = counts(db).roles;
+    const report = importSettings(db, workbook({ Roles: [
+      'name,can_enter_counts,can_finalize,can_admin,read_only',
+      'super admin,1,1,1,0',
+      'Admins,1,0,0,0',
+      'Checker,1,0,0,0',
+    ].join('\n') }));
+    assert.strictEqual(role(db, 'super admin'), undefined, 'not added');
+    assert.ok(role(db, 'Admins'), '"Admins" is not too close');
+    assert.strictEqual(counts(db).roles, before + 1);
+    assert.ok(report.problems.includes('Roles row 2 "super admin": too close to the built-in role super-admin - skipped'), report.problems.join('; '));
+    assert.strictEqual(report.problems.length, 1, report.problems.join('; '));
+    assert.strictEqual(report.rolesInserted, 1);
+  });
+
   test('a second run with differences changes nothing and lists them again', () => {
     const db = freshDb();
     importSettings(db, workbook({ Users: 'name,default_role,active,site_memberships\nAna,checker,1,RA\n' }));

@@ -45,6 +45,7 @@ const { resolveDbPath } = require('../server/db/dbPath.js');
 const { resolveSiteCode } = require('../server/db/siteAccess.js');
 const { createSheetDefinition } = require('../server/engines/sheetDefinitions.js');
 const sideItems = require('../server/engines/sideItems.js');
+const { builtInLookAlike } = require('../server/db/permissions.js');
 
 const SUPER_ADMIN_ROLE = 'super-admin';
 const KNOWN_TABS = ['Roles', 'Users', 'Sheets', 'SideItems'];
@@ -236,6 +237,13 @@ function importRoles(db, rows, report) {
       return;
     }
     const existing = matches[0];
+    // roles-guard rule 6: a new role whose letters and digits match a
+    // built-in role's is not added. Existing roles still match by the key.
+    const lookAlike = existing ? null : builtInLookAlike(name);
+    if (lookAlike) {
+      report.problems.push(`${where} "${name}": too close to the built-in role ${lookAlike} - skipped`);
+      return;
+    }
     if (!existing) {
       insertRole.run(name, ...flags);
       report.rolesInserted++;

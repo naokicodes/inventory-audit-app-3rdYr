@@ -41,6 +41,13 @@ try {
 // the default role switches are applied here, once per database.
 require('./db/permissions.js').ensureRoleDefaults(db);
 
+// Step roles-guard (ADR-099): an old extra role with admin or read-only grants
+// nothing now; say so once, so an admin can remove it.
+{
+  const extraRolesLine = require('./db/permissions.js').extraRolesGrantingNothing(db);
+  if (extraRolesLine) console.log(extraRolesLine);
+}
+
 // Step db-start (I-15): the same for the sheet definitions - only what is
 // missing is added, so a site added in Settings and a never-reseeded beta.db
 // get their Landing / Commi sheet.
