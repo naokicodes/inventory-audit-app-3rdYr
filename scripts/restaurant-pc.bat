@@ -301,6 +301,9 @@ for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-NetIPAddr
 echo.
 echo  Keep this window open. Closing it stops the app.
 echo.
+REM The app's port is the one checked above: a PORT this window inherited would
+REM beat .env's (Node keeps a variable that is already set).
+set "PORT=%APP_PORT%"
 REM One line from npm run dev to the end: an update can replace this file while
 REM the window waits at its pause, and cmd reads a whole line before running it.
 call npm.cmd run dev & echo. & echo  The app stopped. If you did not close it, read the lines above: & echo    'database file is missing' - run the setup again; & echo    'newer version' - run Update Inventory App; & echo    anything else - start it again; if it stops again, restart the PC. & pause & exit /b 0
@@ -391,8 +394,8 @@ REM there, start, backup and restore refuse, and the next update finishes this
 REM one. A rerun checks out with -f: the changed files are the update's own
 REM (.env and beta.db are not tracked).
 >"%MARKER%" echo PREV=%PREV%|| goto :fail_markerwrite
->>"%MARKER%" echo TAG=%NEWTAG%
->>"%MARKER%" echo PREVNAME=%PREVNAME%
+>>"%MARKER%" echo TAG=%NEWTAG%|| goto :fail_markerwrite
+>>"%MARKER%" echo PREVNAME=%PREVNAME%|| goto :fail_markerwrite
 set "CHECKOUTF="
 if defined RESUME set "CHECKOUTF=-f"
 git -c advice.detachedHead=false checkout -q %CHECKOUTF% "%NEWTAG%"
@@ -531,6 +534,9 @@ goto :fail
 call :checkmarker
 goto :fail
 :fail_markerwrite
+REM Nothing is checked out yet, so a half-written marker must not block the app.
+REM A rerun keeps it: that update is already part done.
+if not defined RESUME del /f /q "%MARKER%" >nul 2>&1
 echo  [X] Could not write in InventoryApp, so the update stopped. Nothing was changed. Free some disk space, then run the update again.
 goto :fail
 :fail_checkout
